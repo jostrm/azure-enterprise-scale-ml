@@ -38,18 +38,6 @@ ENV_NAMES = {
     "skipDiagSpeech": "SKIP_DIAG_SPEECH", "skipDiagVision": "SKIP_DIAG_VISION",
 }
 UPLOAD_SCRIPT = GHA / "03a-GH-create-or-update-github-variables.sh"
-# .env keys the GitHub workflows read as vars.* that 03a did not upload before the AI Factory
-# MCP / AI Gateway SKU / Agent keys were added. Not reviewed yet: shrink only, by uploading
-# each key from 03a or by recording here why GitHub must not get it.
-PRE_EXISTING_UPLOAD_GAPS = {
-    "AISEARCH_RETRY_CAPCITY_ARRAY", "BASTION_CUSTOM_NAME", "BASTION_SUBSCRIPTION_RESOURCE_GROUP",
-    "CONTAINER_APPS_RETRY_CAPACITY_ARRAY", "DATABRICKS_OID", "DIAGNOSTIC_SETTING_LEVEL",
-    "POSTGRESQL_RETRY_CAPACITY_ARRAY", "SKU_AISEARCH_DEV", "SKU_AISEARCH_STAGEPROD",
-    "SKU_AI_SEARCH_DEV_ARRAY", "SKU_AI_SEARCH_STAGE_PROD_ARRAY", "SKU_ARRAY_AISEARCH_DEV",
-    "SKU_ARRAY_AISEARCH_STAGEPROD", "SKU_ARRAY_CONTAINER_APPS_DEV", "SKU_ARRAY_CONTAINER_APPS_STAGEPROD",
-    "SKU_ARRAY_POSTGRESQL_DEV", "SKU_ARRAY_POSTGRESQL_STAGEPROD", "SKU_CONTAINER_APPS_DEV",
-    "SKU_CONTAINER_APPS_STAGEPROD", "SKU_ELASTIC_DEV", "SKU_ELASTIC_STAGEPROD",
-}
 
 
 def variables_uploaded_by_03a():
@@ -159,9 +147,7 @@ def test_every_env_key_the_github_workflows_read_is_uploaded_by_03a():
     env = set(re.findall(r"^([A-Z][A-Z0-9_]*)=", (GHA / ".env.template").read_text(encoding="utf-8"), re.M))
     read = {name for workflow in GHA.glob("*.yml")
             for name in re.findall(r"\bvars\.([A-Z][A-Z0-9_]*)", workflow.read_text(encoding="utf-8"))}
-    missing = (read & env) - variables_uploaded_by_03a()
-    assert sorted(missing - PRE_EXISTING_UPLOAD_GAPS) == []
-    assert sorted(PRE_EXISTING_UPLOAD_GAPS - missing) == [], "now uploaded: drop from PRE_EXISTING_UPLOAD_GAPS"
+    assert sorted((read & env) - variables_uploaded_by_03a()) == []
 
 
 def test_github_source_coverage_accounts_for_provider_aliases_and_exclusions():

@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 import pytest
 import yaml
@@ -139,3 +140,29 @@ def test_registration_explicit_empty_region_array_clears_previous_opt_in_offline
     assert result.stdout.count("MOCK_GH:<[]>") == 1
     assert f"Skipping repo variable '{name}'" in result.stdout
     assert "Skipping repo variable 'OTHER_EMPTY'" in result.stdout
+
+
+@pytest.mark.parametrize("name", ["SKU_AI_SEARCH_DEV_ARRAY", "SKU_AI_SEARCH_STAGE_PROD_ARRAY"])
+def test_registration_explicit_empty_legacy_sku_array_defers_to_primary_offline(name):
+    # GitHub rejects empty variables, so clearing the legacy JSON alias uploads the default
+    # order, which the resolver treats as unset instead of keeping a stale custom order.
+    source = GHA_ENV.with_name("03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    function = re.search(r"(?ms)^create_or_update_repo_variable\(\) \{.*?^\}", source).group(0)
+    default = re.search(rf"^{name}='([^']*)'", GHA_ENV.read_text(encoding="utf-8"), re.M).group(1)
+    result = bash(
+        f"{function}\n"
+        "single_param_name=; YELLOW=; NC=; GITHUB_NEW_REPO=offline/repo\n"
+        "gh() { printf 'MOCK_GH:<%s>\\n' \"$@\"; }\n"
+        f'{name}=""; create_or_update_repo_variable "{name}" ""\n'
+        f'unset {name}; create_or_update_repo_variable "{name}" ""\n'
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count(f"MOCK_GH:<{default}>") == 1
+    assert f"Skipping repo variable '{name}'" in result.stdout
+    resolved = subprocess.run(
+        [sys.executable, str(BICEP / "scripts" / "deploy-capacity-resource.py"), "--resolve-search-array",
+         "--primary", "standard2,standard", "--legacy", default],
+        cwd=ROOT, capture_output=True, text=True, check=False, timeout=15,
+    )
+    assert resolved.returncode == 0, resolved.stderr
+    assert resolved.stdout.strip() == "standard2,standard"
