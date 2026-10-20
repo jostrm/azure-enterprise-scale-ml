@@ -52,12 +52,17 @@ def test_preflight_and_capacity_suites_are_tier_five_and_skipped_by_default():
     for path in (
         "unit/test_capacity_preflight.py", "unit/test_capacity_resource_deployment.py",
         "unit/test_ai_search_capacity_retry.py", "unit/test_logic_app_plan_retry.py",
-        "unit/test_kv_principal_preflight.py",
         "unit/test_preflight_peerability.py", "unit/test_region_reports.py",
         "unit/test_subnet_scaling_capacity.py",
     ):
         assert MANIFEST.tier_of(path) == 5, path
     assert MANIFEST.parse(MANIFEST.default) == frozenset({1, 2, 3, 4})
+
+
+def test_key_vault_principal_guard_runs_on_every_push_with_identity_tests():
+    # It drives the preflight, but a placeholder object ID leaves the vaults without an admin policy.
+    assert MANIFEST.tier_of("unit/test_kv_principal_preflight.py") == 3
+    assert MANIFEST.tier_of("unit/test_kv_access_policy_principals.py") == 3
 
 
 def test_this_contract_and_the_ci_runner_contract_are_core():
