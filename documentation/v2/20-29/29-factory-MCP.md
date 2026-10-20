@@ -127,6 +127,10 @@ python usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py plan    
 | `addAIFactoryMCP2AIGatewaySKU` | `ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` | optional | Register on the native AI Gateway ([AI Gateways](./29-factory-AI-Gateways.md)). |
 | `addAIFactoryMCP2APIM` | `ADD_AI_FACTORY_MCP_2_APIM` | optional | Publish on the AI gateway pipeline's classic APIM. |
 
+In a `.env`-driven GitHub setup, `10-GH-create-or-update-github-variables.sh` uploads these keys (and the AI Gateway SKU
+and Agent keys) as repository variables. It skips empty values, so to clear one that was set before, delete the
+GitHub variable.
+
 Requirements are validated, never ignored: creating the app needs `enableContainerApps` and `enableAIFoundry`;
 adopting an app needs only `enableAIFoundry`.
 

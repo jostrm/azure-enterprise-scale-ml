@@ -37,6 +37,26 @@ ENV_NAMES = {
     "skipDiagDocIntelligence": "SKIP_DIAG_DOC_INTELLIGENCE",
     "skipDiagSpeech": "SKIP_DIAG_SPEECH", "skipDiagVision": "SKIP_DIAG_VISION",
 }
+UPLOAD_SCRIPT = GHA / "03a-GH-create-or-update-github-variables.sh"
+# .env keys the GitHub workflows read as vars.* that 03a did not upload before the AI Factory
+# MCP / AI Gateway SKU / Agent keys were added. Not reviewed yet: shrink only, by uploading
+# each key from 03a or by recording here why GitHub must not get it.
+PRE_EXISTING_UPLOAD_GAPS = {
+    "AISEARCH_RETRY_CAPCITY_ARRAY", "BASTION_CUSTOM_NAME", "BASTION_SUBSCRIPTION_RESOURCE_GROUP",
+    "CONTAINER_APPS_RETRY_CAPACITY_ARRAY", "DATABRICKS_OID", "DIAGNOSTIC_SETTING_LEVEL",
+    "POSTGRESQL_RETRY_CAPACITY_ARRAY", "SKU_AISEARCH_DEV", "SKU_AISEARCH_STAGEPROD",
+    "SKU_AI_SEARCH_DEV_ARRAY", "SKU_AI_SEARCH_STAGE_PROD_ARRAY", "SKU_ARRAY_AISEARCH_DEV",
+    "SKU_ARRAY_AISEARCH_STAGEPROD", "SKU_ARRAY_CONTAINER_APPS_DEV", "SKU_ARRAY_CONTAINER_APPS_STAGEPROD",
+    "SKU_ARRAY_POSTGRESQL_DEV", "SKU_ARRAY_POSTGRESQL_STAGEPROD", "SKU_CONTAINER_APPS_DEV",
+    "SKU_CONTAINER_APPS_STAGEPROD", "SKU_ELASTIC_DEV", "SKU_ELASTIC_STAGEPROD",
+}
+
+
+def variables_uploaded_by_03a():
+    script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
+    repo_level = re.search(r"^repo_level_vars=\((.*?)^\)", script, re.M | re.S).group(1)
+    names = set(re.findall(r'^\s*"([A-Z][A-Z0-9_]*)"', repo_level, re.M))
+    return names | set(re.findall(r'create_or_update_variable \S+ "([A-Z][A-Z0-9_]*)"', script))
 
 
 def load_override():
@@ -132,6 +152,16 @@ def test_github_project_type_is_not_cosmetic():
     assert 'ADMIN_PROJECT_TYPE="all"' in (GHA / ".env.template").read_text()
     assert '"ADMIN_PROJECT_TYPE"' in (GHA / "03a-GH-create-or-update-github-variables.sh").read_text()
     assert "admin_projectType: ${{ vars.ADMIN_PROJECT_TYPE || 'all' }}" in (GHA / "infra-project-phase.yml").read_text(encoding="utf-8")
+
+
+def test_every_env_key_the_github_workflows_read_is_uploaded_by_03a():
+    # A .env-driven GitHub setup only reaches vars.* through 03a; JSON mode does not use it.
+    env = set(re.findall(r"^([A-Z][A-Z0-9_]*)=", (GHA / ".env.template").read_text(encoding="utf-8"), re.M))
+    read = {name for workflow in GHA.glob("*.yml")
+            for name in re.findall(r"\bvars\.([A-Z][A-Z0-9_]*)", workflow.read_text(encoding="utf-8"))}
+    missing = (read & env) - variables_uploaded_by_03a()
+    assert sorted(missing - PRE_EXISTING_UPLOAD_GAPS) == []
+    assert sorted(PRE_EXISTING_UPLOAD_GAPS - missing) == [], "now uploaded: drop from PRE_EXISTING_UPLOAD_GAPS"
 
 
 def test_github_source_coverage_accounts_for_provider_aliases_and_exclusions():
