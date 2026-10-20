@@ -107,14 +107,17 @@ def main(argv: list[str] | None = None) -> int:
                         help=f"Unit-test tiers such as 1-4, 1,5, 5 or all (default: ${ENVIRONMENT_VARIABLE}, "
                              f"else {MANIFEST.default} from tiers.py)")
     args = parser.parse_args(argv)
-    try:
-        selection = MANIFEST.resolve(args.tiers, os.environ)
-    except ValueError as error:
-        parser.error(str(error))
+    phases = ("unit", "syntax", "bicep") if args.phase == "all" else (args.phase,)
+    selection = None
+    if "unit" in phases:
+        # Only the unit phase uses tiers, so a bad value cannot fail the syntax or Bicep checks.
+        try:
+            selection = MANIFEST.resolve(args.tiers, os.environ)
+        except ValueError as error:
+            parser.error(str(error))
     results = args.results_dir.resolve()
     results.mkdir(parents=True, exist_ok=True)
     failures = []
-    phases = ("unit", "syntax", "bicep") if args.phase == "all" else (args.phase,)
     for phase in phases:
         started = time.monotonic()
         tiers = f" (tiers {selection.spec}, {selection.source})" if phase == "unit" else ""
@@ -166,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
             failures.append(phase)
         print(f"{phase}: {'FAILED' if code else 'passed'} ({time.monotonic() - started:.1f}s)", flush=True)
     summary = {"phases": list(phases), "failed": failures, "azure_deployment_performed": False}
-    if "unit" in phases:
+    if selection:
         summary["tiers"] = {"selected": selection.spec, "source": selection.source, "skipped": list(selection.skipped)}
     (results / f"{args.phase}-summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return int(bool(failures))

@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from base.config import REPO_ROOT
+from domain.pipeline_contracts import evaluate
 import run_ci
 
 
@@ -148,9 +149,17 @@ def test_github_skips_default_tiers_on_push_but_runs_every_tier_nightly_or_on_re
     assert tiers["type"] == "string"
     assert [set(entry) for entry in workflow["on"]["schedule"]] == [{"cron"}]
     job = workflow["jobs"]["offline"]
-    assert job["env"]["AIF_TEST_TIERS"] == (
-        "${{ github.event_name == 'schedule' && 'all' || inputs.tiers || vars.AIF_TEST_TIERS }}"
-    )
+    for event, dispatched, variable, expected in (
+        ("schedule", None, "", "all"),
+        ("schedule", None, "1", "all"),
+        ("push", None, "", ""),
+        ("pull_request", None, "", ""),
+        ("push", None, "all", "all"),
+        ("workflow_dispatch", "", "5", "5"),
+        ("workflow_dispatch", "1,5", "5", "1,5"),
+    ):
+        context = {"github.event_name": event, "inputs.tiers": dispatched, "vars.AIF_TEST_TIERS": variable}
+        assert (evaluate(job["env"]["AIF_TEST_TIERS"], context) or "") == expected, (event, dispatched, variable)
     assert "github.event_name" in workflow["concurrency"]["group"], "A push must not cancel the nightly run."
     execution = next(step for step in job["steps"] if "run_ci.py" in step.get("run", ""))
     assert "--tiers" not in execution["run"], "The selection comes from AIF_TEST_TIERS or tiers.py."
@@ -205,6 +214,7 @@ def test_legacy_dev_check_uses_the_same_pytest_discovery_not_unittest_only():
     path = REPO_ROOT / ".github" / "workflows" / "verify-aifactory-dev.yml"
     job = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)["jobs"]["run-iac-unit-tests"]
     assert job["env"]["LIVE_AZURE"] == "0"
+    assert job["env"]["AIF_TEST_TIERS"] == "${{ vars.AIF_TEST_TIERS }}"
     commands = [step["run"] for step in job["steps"] if "run" in step]
     assert any("pip install -r environment_setup/unit-tests/test-bicep/requirements.txt" in command for command in commands)
     assert any("run_ci.py --phase unit --require-ci-tools" in command for command in commands)

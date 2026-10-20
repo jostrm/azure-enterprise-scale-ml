@@ -207,6 +207,21 @@ def test_run_ci_option_and_environment_enable_tier_five(tmp_path, monkeypatch):
     assert summary["tiers"]["source"] == "environment"
 
 
+def test_unknown_selection_message_does_not_echo_the_raw_value():
+    with pytest.raises(ValueError) as error:
+        MANIFEST.parse("##vso[task.setvariable]x")
+    assert "##vso" not in str(error.value)
+
+
+def test_a_bad_tier_value_cannot_fail_the_syntax_or_bicep_phases(tmp_path, monkeypatch):
+    monkeypatch.setenv(ENVIRONMENT_VARIABLE, "1-9")
+    monkeypatch.setattr(run_ci, "find_bash", lambda: "bash")
+    monkeypatch.setattr(run_ci, "check_syntax", lambda root, bash: {"checked": {}, "failures": []})
+    assert run_ci.main(["--phase", "syntax", "--results-dir", str(tmp_path)]) == 0
+    summary = json.loads((tmp_path / "syntax-summary.json").read_text(encoding="utf-8"))
+    assert "tiers" not in summary
+
+
 def test_run_ci_rejects_an_unknown_selection_before_running_tests(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(run_ci.subprocess, "run", lambda *a, **k: pytest.fail("pytest must not start"))
     with pytest.raises(SystemExit) as error:

@@ -114,12 +114,15 @@ Enabling tier 5 in CI:
 
 - **Once:** GitHub **Actions > AI Factory infrastructure tests > Run workflow** with
   `tiers` = `all`; Azure Pipelines **Run pipeline** with `testTiers` = `all`.
-- **For every push, without a commit:**
+- **For every GitHub push, without a commit:**
   `gh variable set AIF_TEST_TIERS --body all --repo jostrm/azure-enterprise-scale-ml`
-  (remove it with `gh variable delete AIF_TEST_TIERS` to return to the default).
+  (remove it with `gh variable delete AIF_TEST_TIERS` to return to the default). Both
+  `infrastructure-tests.yml` and `verify-aifactory-dev.yml` read it. Azure Pipelines
+  uses only the `testTiers` parameter; a pipeline variable of the same name is ignored.
 - **Permanently in source:** change `default` in `tiers.py` to `all`.
-- **Nightly:** the scheduled runs (02:17 UTC, GitHub and Azure Pipelines) always run
-  every tier, so tier 5 regressions surface within a day.
+- **Nightly (02:17 UTC):** GitHub runs every tier every night. Azure Pipelines runs every
+  tier on nights when `main` changed (`always: false`), unless a schedule set in its UI
+  overrides the YAML schedule.
 
 ## What the matrix proves (and does not)
 

@@ -90,11 +90,12 @@ Unit tests are split into tiers 1-5 (core, pipelines, infra, lifecycle, capacity
 `unit/test_tiers.py` rejects an unassigned or stale file. The selection comes from
 `--tiers`, then `AIF_TEST_TIERS`, then the `tiers.py` default `1-4`, so push and pull
 request runs skip tier 5 (preflight and capacity). `run_ci.py` validates the
-selection, passes it to pytest and records it in `unit-summary.json`. The GitHub
-workflow takes a `tiers` dispatch input or the `AIF_TEST_TIERS` repository variable;
-Azure Pipelines takes a `testTiers` parameter. Both run every tier on a nightly
-schedule, so tier 5 still runs within a day. Each event type has its own GitHub
-concurrency group, so a push cannot cancel the nightly run.
+selection for the unit phase only, passes it to pytest and records it in
+`unit-summary.json`. The GitHub workflows take a `tiers` dispatch input or the
+`AIF_TEST_TIERS` repository variable; Azure Pipelines takes only a `testTiers`
+parameter. GitHub runs every tier nightly; Azure Pipelines does so on nights when
+`main` changed (`always: false`). Each event type has its own GitHub concurrency
+group, so a push cannot cancel the nightly run.
 
 See [[Bootstrap-and-Layouts]], [[Lifecycle-and-Recovery]], [[Factory-Scope-Model]], [[Engines-and-Pipelines]], [[State-Machines-and-DAGs]] and [[Index]].
 

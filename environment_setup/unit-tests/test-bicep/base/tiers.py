@@ -77,8 +77,9 @@ class TierManifest:
                     raise ValueError
                 selected.update(range(first, last + 1))
         except ValueError:
+            # The raw value is not echoed: CI logs interpret some text as commands.
             raise ValueError(
-                f"Unknown test-tier selection {spec!r}: use tiers 1-{len(self.tiers)}, "
+                f"Unknown test-tier selection: use tiers 1-{len(self.tiers)}, "
                 "a range such as 1-4, a list such as 1,5, or all."
             ) from None
         return frozenset(selected)
