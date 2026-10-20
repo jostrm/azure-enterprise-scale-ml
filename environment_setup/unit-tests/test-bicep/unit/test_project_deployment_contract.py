@@ -96,7 +96,7 @@ def test_update_launchers_keep_consumer_main_and_pin_template_version(route):
     script = (ROOT / "bootstrap" / f"{route}-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
     assert 'AIF_VERSION_ARGUMENT="$AIF_UPDATE_DEFAULT_VERSION"' in script
     assert 'aif_version_prepare "$REPO_ROOT" "$project_only" false ""' in script
-    assert 'checkout --detach "$AIF_SUBMODULE_REF"' in script
+    assert 'aif_version_checkout "$REPO_ROOT"' in script
     assert "git submodule foreach" not in script
     assert 'git checkout main' in script or 'readonly BRANCH="${ADO_BRANCH:-main}"' in script
     assert "cleanup_update_state" in script

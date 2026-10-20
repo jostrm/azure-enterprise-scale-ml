@@ -149,9 +149,10 @@ class TestDiagnosticsTelemetry(unittest.TestCase):
         self.assertIsNotNone(condition, "AI Search diagnostics must have an explicit condition")
         self.assertEqual(re.sub(r"\s+", "", condition.group(1)), "!skipDiagAISearch")
         self.assertNotIn("aiSearchExists", condition.group(1))
+        self.assertIn("param capacityIdentityOnly bool = false", self.search_entrypoint)
         for source, expected in (
             (self.cognitive_services, "needsAISearch&&deployAISearch"),
-            (self.search_entrypoint, "needsAISearch"),
+            (self.search_entrypoint, "needsAISearch&&!capacityIdentityOnly"),
         ):
             with self.subTest(entrypoint=expected):
                 orchestration = re.search(
