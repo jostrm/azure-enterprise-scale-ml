@@ -67,6 +67,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "test_project_lake_wiring.py",
         "test_rbac_common_rg.py",
         "test_storage_discovery.py",
+        "unit/test_admin_object_ids.py",
         "unit/test_all_factories_dashboard.py",
         "unit/test_all_factories_dashboard_hub.py",
         "unit/test_aml_aks_compute.py",

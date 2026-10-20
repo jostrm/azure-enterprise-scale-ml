@@ -30,7 +30,8 @@ resource contributorRole2userOrGroup 'Microsoft.Authorization/roleAssignments@20
     roleDefinitionId: contributorRoleDefinition.id
     principalId: additionalUserIds[i]
     principalType:useAdGroups? 'Group':'User'
-    description: 'Contributor to user ${additionalUserEmails[i]} to get Contributor on resource group: ${resourceGroup().name}'
+    // Fewer emails than object IDs is allowed: name the object ID instead of failing with an index out of bounds.
+    description: 'Contributor to user ${i < length(additionalUserEmails) ? additionalUserEmails[i] : additionalUserIds[i]} to get Contributor on resource group: ${resourceGroup().name}'
   }
 }]
 

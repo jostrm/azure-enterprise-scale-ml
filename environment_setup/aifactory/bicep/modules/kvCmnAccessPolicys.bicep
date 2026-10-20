@@ -22,7 +22,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 var main_principal_2_array = array(principalId)
 // Trimmed and lower-cased so ' b' from "a, b" or a secret value ending in a newline is kept, and case duplicates merge.
-var all_principals = union(map(union(main_principal_2_array,additionalPrincipalIds), oid => toLower(trim(oid))), [])
+// Same body as normalizedObjectIds in common/objectIds.bicep, inlined to keep this module classic ARM.
+var all_principals = union(filter(map(union(main_principal_2_array, additionalPrincipalIds), id => toLower(trim(id))), id => !empty(id) && id != 'null'), [])
 // Key Vault rejects a non-GUID objectId, so variables-file placeholders such as databricksOID '<optional>_ObjectID'
 // or DATABRICKS_OID '<todo>' are skipped instead of failing the deployment. GUID shape: 8-4-4-4-12 characters.
 var guid_principals = filter(all_principals, oid => length(oid) == 36 && length(replace(oid, '-', '')) == 32 && take(skip(oid, 8), 1) == '-' && take(skip(oid, 13), 1) == '-' && take(skip(oid, 18), 1) == '-' && take(skip(oid, 23), 1) == '-')

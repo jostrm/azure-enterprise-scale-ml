@@ -43,10 +43,10 @@ param inputKeyvault string
 param inputKeyvaultSubscription string
 param inputKeyvaultResourcegroup string
 
-var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var personaGroupsEnabled = contains(tags, 'AIF-Persona-Access') ? tags['AIF-Persona-Access'] == 'groups-v1' : false
-var technicalAdminsObjectID_array_safe = personaGroupsEnabled || empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null' ? [] : technicalAdminsObjectID_array
+// Same body as normalizedObjectIds in modules/common/objectIds.bicep, inlined to keep this template classic ARM.
+var technicalAdminsObjectID_array_safe = personaGroupsEnabled ? [] : union(filter(map(split(technicalAdminsObjectID, ','), id => toLower(trim(id))), id => !empty(id) && id != 'null'), [])
 var technicalAdminsEmail_array_safe = personaGroupsEnabled || empty(technicalAdminsEmail) || technicalAdminsEmail == 'null' ? [] : technicalAdminsEmail_array
 var subscriptionIdDevTestProd = subscription().subscriptionId
 

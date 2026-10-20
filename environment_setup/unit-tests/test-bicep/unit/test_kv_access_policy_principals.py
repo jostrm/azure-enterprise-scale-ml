@@ -1,14 +1,11 @@
 """Offline regressions for modules/kvCmnAccessPolicys.bicep: principalId gets the policy, placeholders are skipped."""
 
-import ast
-from functools import lru_cache
-import json
 from pathlib import Path
 import re
-import shutil
-import subprocess
 
 import pytest
+
+from base.arm_expressions import arm_value, compile_bicep, resources
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -22,62 +19,8 @@ PLACEHOLDERS = ["", "<todo>", "<optional>_ObjectID", "<todo>_ObjectID", "null", 
                 "24ad8636-1b2c-4d5e-8f90-a1b2c3d4e5f6-"]
 
 
-@lru_cache
 def compiled_module():
-    compiler = shutil.which("bicep")
-    assert compiler, "Bicep CLI required"
-    result = subprocess.run([compiler, "build", str(MODULE), "--stdout", "--no-restore"],
-                            capture_output=True, text=True, timeout=120)
-    assert result.returncode == 0, result.stderr
-    return json.loads(result.stdout)
-
-
-def arm_value(expression, parameters, template, scope=None):
-    if not isinstance(expression, str) or not expression.startswith("["):
-        return expression
-    source = re.sub(r"\b(and|or|not|if|lambda)\(", lambda match: match[1].upper() + "(", expression[1:-1])
-    return visit(ast.parse(source, mode="eval").body, parameters, template, scope or {})
-
-
-def visit(node, parameters, template, scope):
-    def value(child):
-        return visit(child, parameters, template, scope)
-
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, ast.Subscript):
-        return value(node.value)[value(node.slice)]
-    assert isinstance(node, ast.Call) and not node.keywords, ast.dump(node)
-    if isinstance(node.func, ast.Attribute):
-        member = next(group for group in template["functions"]
-                      if group["namespace"] == node.func.value.id)["members"][node.func.attr]
-        args = {key["name"]: value(arg) for key, arg in zip(member["parameters"], node.args)}
-        return arm_value(member["output"]["value"], args, template)
-    name = node.func.id
-    if name == "LAMBDA":
-        names = [value(arg) for arg in node.args[:-1]]
-        return lambda *items: visit(node.args[-1], parameters, template, {**scope, **dict(zip(names, items))})
-    if name == "IF":
-        return value(node.args[1] if value(node.args[0]) else node.args[2])
-    values = [value(arg) for arg in node.args]
-    functions = {
-        "parameters": parameters.__getitem__,
-        "variables": lambda key: arm_value(template["variables"][key], parameters, template),
-        "lambdaVariables": scope.__getitem__,
-        "AND": lambda *args: all(args), "OR": lambda *args: any(args), "NOT": lambda item: not item,
-        "empty": lambda item: not item, "equals": lambda a, b: a == b,
-        "length": len, "toLower": str.lower, "trim": str.strip, "contains": lambda container, item: item in container,
-        "map": lambda items, mapper: [mapper(item) for item in items],
-        "replace": str.replace, "split": lambda text, separator: text.split(separator),
-        "take": lambda item, count: item[:max(count, 0)], "skip": lambda item, count: item[max(count, 0):],
-        "array": lambda item: item if isinstance(item, list) else [item],
-        "createArray": lambda *items: list(items),
-        "union": lambda *arrays: list(dict.fromkeys(item for array in arrays for item in array)),
-        "filter": lambda items, predicate: [item for item in items if predicate(item)],
-        "range": lambda start, count: list(range(start, start + count)),
-        "substring": lambda text, start, length: text[start:start + length],
-    }
-    return functions[name](*values)
+    return compile_bicep(MODULE)
 
 
 def access_policies(principal_id, additional_ids):
@@ -85,12 +28,10 @@ def access_policies(principal_id, additional_ids):
     template = compiled_module()
     parameters = {"keyVaultResourceName": "kv-cmn", "principalId": principal_id, "policyName": "add",
                   "keyVaultPermissions": {"secrets": ["get", "list"]}, "additionalPrincipalIds": additional_ids}
-    resources = template["resources"].values() if isinstance(template["resources"], dict) else template["resources"]
-    policy = next(item for item in resources if item["type"] == "Microsoft.KeyVault/vaults/accessPolicies")
+    policy = next(item for item in resources(template) if item["type"] == "Microsoft.KeyVault/vaults/accessPolicies")
     loop = next(item for item in policy["properties"]["copy"] if item["name"] == "accessPolicies")
     count = arm_value(loop["count"], parameters, template)
-    object_id = loop["input"]["objectId"]
-    return [arm_value(object_id.replace("copyIndex('accessPolicies')", str(index)), parameters, template)
+    return [arm_value(loop["input"]["objectId"], parameters, template, {"copyIndex": lambda *_, index=index: index})
             for index in range(count)]
 
 
