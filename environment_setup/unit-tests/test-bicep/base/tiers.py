@@ -2,7 +2,8 @@
 
 Domain-agnostic: the suite's manifest (``tiers.py``) names the tiers and their files;
 this module only validates that manifest, resolves which tiers to run and decides
-whether a test file is kept. Standard library only.
+whether a test file is kept. Standard library only. The config wizard repository
+(azure-aifactory-config ``tests/tier_selection.py``) uses the same contract.
 """
 from __future__ import annotations
 
@@ -28,10 +29,7 @@ class Selection:
     spec: str
     source: str
     skipped: tuple[int, ...]
-
-    @property
-    def is_default(self) -> bool:
-        return self.source == DEFAULT
+    explicit: bool = True
 
 
 @dataclass(frozen=True)
@@ -67,6 +65,8 @@ class TierManifest:
         text = spec.strip().lower()
         if text == ALL:
             return frozenset(self.numbers)
+        if text == DEFAULT:
+            return self.parse(self.default)
         selected: set[int] = set()
         try:
             for part in text.split(","):
@@ -96,18 +96,22 @@ class TierManifest:
         return ",".join(str(low) if low == high else f"{low}-{high}" for low, high in ranges)
 
     def resolve(self, option: str | None, environment: Mapping[str, str]) -> Selection:
-        """Pick the selection: command-line option, then environment variable, then manifest default."""
+        """Pick the selection: command-line option, then environment variable, then manifest default.
+
+        Any given value is explicit, including "default"; only an absent or empty one is implicit.
+        """
         for source, value in (("option", option), ("environment", environment.get(ENVIRONMENT_VARIABLE))):
-            if value and value.strip() and value.strip().lower() != DEFAULT:
-                return self._selection(value, source)
-        return self._selection(self.default, DEFAULT)
+            if value and value.strip():
+                label = DEFAULT if value.strip().lower() == DEFAULT else source
+                return self._selection(value, label, explicit=True)
+        return self._selection(self.default, DEFAULT, explicit=False)
 
     def keeps(self, relative_path: str, selection: Selection, explicit: bool = False) -> bool:
-        """Unclassified files always run; a file named explicitly overrides only the default selection."""
+        """Unclassified files always run; a file named explicitly overrides only an implicit selection."""
         tier = self.tier_of(relative_path)
-        return tier is None or tier in selection.tiers or (explicit and selection.is_default)
+        return tier is None or tier in selection.tiers or (explicit and not selection.explicit)
 
-    def _selection(self, spec: str, source: str) -> Selection:
+    def _selection(self, spec: str, source: str, explicit: bool) -> Selection:
         tiers = self.parse(spec)
         skipped = tuple(number for number in self.numbers if number not in tiers)
-        return Selection(tiers, self.describe(tiers), source, skipped)
+        return Selection(tiers, self.describe(tiers), source, skipped, explicit)

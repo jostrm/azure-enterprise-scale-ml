@@ -98,7 +98,7 @@ test file is not assigned to a tier, so add it to `tiers.py` in the same change.
 | 5 | `capacity` | Preflight and capacity: capacity preflight, regional and SKU fallback, capacity retries, region reports, subnet scaling and peerability checks. |
 
 The default selection is **1-4** (`default` in `tiers.py`), so pushes and pull requests
-skip tier 5. A selection is a tier (`5`), a range (`1-4`), a list (`1,5`) or `all`.
+skip tier 5. A selection is a tier (`5`), a range (`1-4`), a list (`1,5`), `default` or `all`.
 The first of these that is set wins:
 
 1. `--tiers` on `run_ci.py` or `pytest`, for example `python run_ci.py --phase unit --tiers all`;
@@ -106,7 +106,7 @@ The first of these that is set wins:
 3. the `default` in `tiers.py`.
 
 `pytest unit/test_capacity_preflight.py` still runs a file you name explicitly unless you
-also give a selection. Each test also carries a `tier1`...`tier5` marker, so
+also give a selection (`--tiers default` counts as one). Each test also carries a `tier1`...`tier5` marker, so
 `pytest --tiers all -m "tier2 or tier5"` works. The run ends with a line naming the
 deselected tiers, and `unit-summary.json` records the selection under `tiers`.
 

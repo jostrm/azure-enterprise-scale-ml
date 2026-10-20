@@ -73,6 +73,7 @@ def test_this_contract_and_the_ci_runner_contract_are_core():
 @pytest.mark.parametrize("spec,expected", [
     ("1-4", {1, 2, 3, 4}), ("5", {5}), ("1,5", {1, 5}), (" 2 - 3 , 5 ", {2, 3, 5}),
     ("all", {1, 2, 3, 4, 5}), ("ALL", {1, 2, 3, 4, 5}), ("1-5", {1, 2, 3, 4, 5}), ("3-3", {3}),
+    ("default", {1, 2, 3, 4}),
 ])
 def test_selection_accepts_numbers_ranges_lists_and_all(spec, expected):
     assert MANIFEST.parse(spec) == frozenset(expected)
@@ -113,6 +114,16 @@ def test_default_selection_still_runs_a_file_that_was_named_explicitly():
     chosen = manifest.resolve("1", {})
     assert not manifest.keeps("unit/test_c.py", chosen, explicit=True)
     assert manifest.keeps("integration/test_live.py", chosen), "Unclassified files are never hidden."
+
+
+def test_a_given_default_selection_also_filters_named_files():
+    # Same contract as the config wizard's tests/tier_selection.py: only an absent value is implicit.
+    manifest = small_manifest()
+    for option, environment in (("default", {}), (None, {ENVIRONMENT_VARIABLE: "Default"})):
+        selection = manifest.resolve(option, environment)
+        assert (selection.source, selection.explicit) == ("default", True)
+        assert not manifest.keeps("unit/test_c.py", selection, explicit=True)
+    assert manifest.resolve(None, {}).explicit is False
 
 
 @pytest.mark.parametrize("tiers,problem", [
