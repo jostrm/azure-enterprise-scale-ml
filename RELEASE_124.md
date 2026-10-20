@@ -2,6 +2,24 @@
 **Release Tag:** [release_124](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_124)  
 **Release Date:** January 2026
 
+## Key Vault access policies now reach principalId
+
+`modules/kvCmnAccessPolicys.bicep` built the union of `principalId` and
+`additionalPrincipalIds` but looped only over `additionalPrincipalIds`. Every caller
+that passes only `principalId` therefore got an empty access policy. On v1.24 that
+affects the Databricks SP, the common SP and the common Data Factory identity on the
+common and admin vaults (`13-rgLevel.bicep`), the project SP on the common vault
+(`02-core-infrastructure.bicep`), and the project SP, project Data Factory and Databricks
+SP policies in `esml-project/22-main.bicep`. They now get their configured permissions
+on the next deployment; no configuration change is needed.
+
+The loop uses the trimmed, lower-cased union and keeps only GUID-shaped object IDs.
+Variables-file placeholders such as `databricksOID: '<optional>_ObjectID'`,
+`DATABRICKS_OID="<todo>"`, `''` or `null` are skipped instead of failing Key Vault
+validation, and `" b"` from a `technical_admins` list such as `"a, b"` is kept.
+`policyName: 'replace'` is no longer allowed: a list emptied by skipped placeholders
+would wipe every policy on the vault, and no caller uses it.
+
 ## Logic Apps Standard dedicated outbound subnet
 
 Private Standard Logic Apps now use `snt-prj<projectNumber>-logicapp`, a dedicated `/26`
