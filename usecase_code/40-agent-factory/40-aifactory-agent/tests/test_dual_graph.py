@@ -950,8 +950,12 @@ def test_source_and_sources_aliases_are_merged_without_dropping_provenance(publi
 def test_storage_limits_allow_measured_enriched_graph_without_expanding_query_bounds():
     from aifactory_agent import dual_graph
 
-    assert dual_graph.MAX_GRAPH_BYTES == 64 * 1024 * 1024
-    assert dual_graph.MAX_SNAPSHOT_BYTES == 96 * 1024 * 1024
+    # Measured 2026-10-20: the repository graph reached 67,203,894 bytes (64.09 MiB),
+    # past the previous 64 MiB bound, while nodes/links stayed far below their limits.
+    measured_graph_bytes = 67_203_894
+    assert dual_graph.MAX_GRAPH_BYTES == 96 * 1024 * 1024
+    assert dual_graph.MAX_SNAPSHOT_BYTES == 128 * 1024 * 1024
+    assert measured_graph_bytes < dual_graph.MAX_GRAPH_BYTES < dual_graph.MAX_SNAPSHOT_BYTES
     assert dual_graph.MAX_NODES == 100_000
     assert dual_graph.MAX_LINKS == 250_000
     assert dual_graph.MAX_RESPONSE_BYTES == 256 * 1024
