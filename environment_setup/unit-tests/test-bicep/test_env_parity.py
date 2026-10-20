@@ -17,6 +17,7 @@ ENV_TEMPLATE_PATH = ROOT / (
 
 # ADO -> GitHub variable renames. Keys not listed default to their upper-cased name.
 ALIASES = {
+    "aifactory_mcp_AppID_seeding_kv_name": "AIFACTORY_MCP_KV_S_NAME_APPID",
     "admin_location": "AIFACTORY_LOCATION",
     "admin_locationSuffix": "AIFACTORY_LOCATION_SHORT",
     "admin_aifactoryPrefixRG": "AIFACTORY_PREFIX",

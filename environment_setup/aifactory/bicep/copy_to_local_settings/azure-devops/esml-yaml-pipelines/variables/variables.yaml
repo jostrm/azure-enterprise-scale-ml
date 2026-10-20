@@ -188,6 +188,7 @@ variables:
   project_service_principal_AppID_seeding_kv_name: "<optional>esml-project001-sp-id" # <optional>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
   project_service_principal_OID_seeding_kv_name: "<optional>esml-project001-sp-oid" # <optional>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
   project_service_principal_Secret_seeding_kv_name: "<optional>esml-project001-sp-secret" # <optional>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  aifactory_mcp_AppID_seeding_kv_name: "<optional>esml-project001-mcp-app-id" # <optional>Seeding KV secret name for the AI Factory MCP API app registration client ID<default>esml-project001-mcp-app-id<ensure> name matches the secret written by esml-util/29b-create-mcp-api-sp-for-projects.sh. Used when aifactoryMcpEntraAppId is empty.
   project_number_000: "001" # <mandatory>Project number<default>001<keep-as-is> For 1st project. <otherwise> increment to '002', '003', etc.
   tag_costcenter: "1234" # <optional>Project cost center tag<default>1234<keep-as-is> Metadata for per-project cost tracking on resource group level.
   org-department-name: "" # <optional>Project organizational department name<default>empty<keep-as-is> Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes.

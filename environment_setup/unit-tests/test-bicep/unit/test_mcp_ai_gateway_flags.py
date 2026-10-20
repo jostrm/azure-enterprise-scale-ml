@@ -40,6 +40,9 @@ JOB = ADO_ROOT / "esml-infra-project" / "jobs" / "job-aifactory-mcp-ai-gateway.y
 LAUNCHER = REPO_ROOT / "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py"
 STEP = "Deploy AI Factory MCP and AI Gateway SKU (project001 Dev)"
 GATEWAY_STEP = "Expose the AI Factory MCP on APIM"
+# The MCP app ID read from the seeding Key Vault when aifactoryMcpEntraAppId is empty.
+SEEDED = "aifactoryMcpEntraAppIdFromSeedingKeyvault"
+SEEDING_NAME = {"aifactory_mcp_AppID_seeding_kv_name": "AIFACTORY_MCP_KV_S_NAME_APPID"}
 POOL_STEP = "Deploy APIM Azure OpenAI pool"
 
 
@@ -85,7 +88,7 @@ def test_github_step_runs_last_in_foundry_with_every_launcher_input_bound():
     assert names.index(STEP) == names.index("Deploy Factory Chat Agent in Foundry") + 1
     step = job["steps"][names.index(STEP)]
     assert "45-aifactory-mcp-gateway/deploy.py\" apply --apply" in step["run"]
-    assert launcher_inputs() - {"projectResourceGroup"} <= set(job["env"])
+    assert launcher_inputs() - {"projectResourceGroup", SEEDED} <= set(job["env"])
     for name, public in INPUTS.items():
         assert evaluate(job["env"][name], {"vars." + public: ""}) == ""
         assert f"vars.{public}" in job["env"][name]
@@ -100,7 +103,9 @@ def test_ado_template_is_included_after_azure_mcp_and_maps_every_input():
     assert "45-aifactory-mcp-gateway/deploy.py\" apply --apply" in step["inputs"]["inlineScript"]
     env = step["env"]
     assert set(env) - {"MCP_GATEWAY_REPOSITORY"} == launcher_inputs() - {"projectResourceGroup"}
-    assert all(value == f"$({name})" for name, value in env.items() if name != "MCP_GATEWAY_REPOSITORY")
+    assert all(value == f"$({name})" for name, value in env.items() if name not in {"MCP_GATEWAY_REPOSITORY", SEEDED})
+    # AzureKeyVault@2 (step 03) exposes each seeding secret as $(<secret name>); the name comes from the template.
+    assert env[SEEDED] == "$(${{ variables.aifactory_mcp_AppID_seeding_kv_name }})"
     for name in (*FLAGS, *INPUTS):
         assert name in yaml_defaults()
 
@@ -187,3 +192,20 @@ def test_launcher_and_engine_are_importable_without_azure_access():
     spec.loader.exec_module(module)
     assert module.INPUTS and callable(module.run)
     assert not [item for item in objects(load_pipeline(JOB)) if "deleteAll" in str(item.get("inlineScript", ""))]
+
+
+def test_the_mcp_app_id_secret_name_is_a_seeding_keyvault_setting():
+    default = "<optional>esml-project001-mcp-app-id"
+    for name, public in SEEDING_NAME.items():
+        assert json.loads(VARIABLES_JSON.read_text(encoding="utf-8"))["dev"][name] == default
+        assert yaml_defaults()[name] == default
+        assert env_defaults()[public] == default
+
+
+def test_github_reads_the_mcp_app_id_from_the_seeding_keyvault_before_the_step():
+    job = load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]
+    assert "vars.AIFACTORY_MCP_KV_S_NAME_APPID" in job["env"]["aifactory_mcp_AppID_seeding_kv_name"]
+    names = [step.get("name") for step in job["steps"]]
+    download = job["steps"][names.index("03_Download_Secrets_From_Seeding_KeyVault")]["run"]
+    assert f'"${{{{ env.aifactory_mcp_AppID_seeding_kv_name }}}}" "{SEEDED}"' in download
+    assert names.index("03_Download_Secrets_From_Seeding_KeyVault") < names.index(STEP)

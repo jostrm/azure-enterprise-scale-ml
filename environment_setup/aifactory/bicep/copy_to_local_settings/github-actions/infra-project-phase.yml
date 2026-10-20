@@ -116,6 +116,7 @@ jobs:
       technical_admins_email: ${{ vars.PROJECT_MEMBERS_EMAILS }}
       project_service_principal_AppID_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID }}
       project_service_principal_OID_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID }}
+      aifactory_mcp_AppID_seeding_kv_name: ${{ vars.AIFACTORY_MCP_KV_S_NAME_APPID }}
       project_service_principal_Secret_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S }}
 
       # Flow control
@@ -965,6 +966,8 @@ jobs:
             retrieve_secret_if_configured "common_sp_appid" "${{ env.common_sp_appid_seeding_kv_name }}" "common_sp_appid_value"
             retrieve_secret_if_configured "common_sp_secret" "${{ env.common_sp_secret_seeding_kv_name }}" "common_sp_secret_value"
             retrieve_secret_if_configured "project_sp_oid" "${{ env.project_service_principal_OID_seeding_kv_name }}" "project_sp_oid_value"
+            # The AI Factory MCP app registration client ID (used when aifactoryMcpEntraAppId is empty).
+            retrieve_secret_if_configured "aifactory_mcp_appid" "${{ env.aifactory_mcp_AppID_seeding_kv_name }}" "aifactoryMcpEntraAppIdFromSeedingKeyvault"
 
       - name: 03b_Validate_Service_Principal_Credentials
         run: |

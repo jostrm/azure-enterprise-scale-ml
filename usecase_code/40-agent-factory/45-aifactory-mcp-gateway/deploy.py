@@ -33,6 +33,7 @@ INPUTS = (
     "aifactoryMcpEntraAppId", "aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId",
     "aiGatewaySkuOutboundSubnetId", "aifactoryMcpClassicApimResourceIds", "aifactoryMcpContainerAppResourceId",
     "addAIFactoryMCP2APIM", "apimGatewaySubscriptionId", "apimGatewayResourceGroup", "apimGatewayServiceName",
+    "aifactoryMcpEntraAppIdFromSeedingKeyvault",
 )
 # What the AI gateway pipeline binds for apim-parameters: the APIM, the MCP app and how to find project001 Dev.
 APIM_INPUTS = (

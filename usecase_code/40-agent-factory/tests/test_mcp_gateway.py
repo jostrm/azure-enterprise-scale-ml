@@ -272,6 +272,16 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual((CLASSIC_APIM,), request(**{**APIM_VARS, "addAIFactoryMCP2APIM": "false"},
                                                   aifactoryMcpClassicApimResourceIds=CLASSIC_APIM).apim_caller_ids)
 
+    def test_the_mcp_app_id_can_come_from_the_seeding_keyvault(self):
+        seeded = {"aifactoryMcpEntraAppId": "", "aifactoryMcpEntraAppIdFromSeedingKeyvault": APP_REG.upper()}
+        self.assertEqual(APP_REG, request(**seeded).entra_app_id)
+        self.assertEqual(APP_REG, request(aifactoryMcpEntraAppIdFromSeedingKeyvault=guid(77)).entra_app_id,
+                         "an explicit aifactoryMcpEntraAppId wins")
+        # ADO leaves an unresolved $(<secret name>) macro when the seeding Key Vault has no such secret.
+        unresolved = {"aifactoryMcpEntraAppId": "", "aifactoryMcpEntraAppIdFromSeedingKeyvault": "$(esml-project001-mcp-app-id)"}
+        with self.assertRaisesRegex(ValueError, "aifactory_mcp_AppID_seeding_kv_name"):
+            gw.decide(request(**unresolved))
+
     def test_invalid_adoption_and_apim_requests_never_touch_azure(self):
         arm = FakeArm()
         integration = gw.McpGatewayIntegration(arm)
@@ -776,6 +786,12 @@ class ApimMcpTests(unittest.TestCase):
         # The pipeline deploys to exactly the APIM the launcher resolved (no second derivation in bash).
         self.assertEqual((SUB, "common-rg"), (result["apim_subscription_id"], result["apim_resource_group"]))
 
+    def test_the_apim_step_takes_the_audience_from_the_mcp_app_when_not_configured(self):
+        arm = with_classic_apim(FakeArm())
+        integration = self.owned_mcp(arm, callers=True)
+        result = integration.apim_parameters(self.values(aifactoryMcpEntraAppId=""))
+        self.assertEqual(APP_REG, result["parameters"]["parameters"]["mcpEntraAppId"]["value"])
+
     def test_a_suspended_client_subscription_stays_suspended(self):
         arm = with_classic_apim(FakeArm())
         integration = self.owned_mcp(arm, callers=True)
@@ -855,7 +871,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(set(VALUES) | {"aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId", "projectResourceGroup",
                                         "aifactoryMcpClassicApimResourceIds", "aifactoryMcpContainerAppResourceId",
                                         "addAIFactoryMCP2APIM", "apimGatewaySubscriptionId", "apimGatewayResourceGroup",
-                                        "apimGatewayServiceName"},
+                                        "apimGatewayServiceName", "aifactoryMcpEntraAppIdFromSeedingKeyvault"},
                          set(self.launcher.INPUTS))
 
 

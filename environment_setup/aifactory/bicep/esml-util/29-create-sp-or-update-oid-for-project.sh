@@ -10,19 +10,43 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # 1) EDIT Variables ONCE ################### 
-SUBSCRIPTION_ID="<your-key-vault-name>" # Seeding keyvault
-KEY_VAULT_NAME="<your-key-vault-name>" # Seeding keyvault
-TENANT_ID="<your-tenant-id>" # Seeding keyvault
+SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-<your-key-vault-subscription-id>}" # Seeding keyvault
+KEY_VAULT_NAME="${KEY_VAULT_NAME:-<your-key-vault-name>}" # Seeding keyvault
+TENANT_ID="${TENANT_ID:-<your-tenant-id>}" # Seeding keyvault
 USER_EMAIL="<your-user-email-with-entraID-access-to-create-ServicePrinciples-And-Store-Secrets>"
-SERVICE_PRINCIPAL_NAME_TEMPLATE="<service-principal-name-template-[XXX]>" # User either [XXX] or [Y] somewhere: "esml-project[XXX]-sp", "esml-deployment-project[Y]"
+SERVICE_PRINCIPAL_NAME_TEMPLATE="${SERVICE_PRINCIPAL_NAME_TEMPLATE:-<service-principal-name-template-[XXX]>}" # User either [XXX] or [Y] somewhere: "esml-project[XXX]-sp", "esml-deployment-project[Y]"
 
 # 2) EDIT Variables FOR EACH new service principle ################### 
-PROJECT_NUMBER_XXX="001" # A string with three characters: 001, 023, 123
+PROJECT_NUMBER_XXX="${PROJECT_NUMBER_XXX:-001}" # A string with three characters: 001, 023, 123
+PROJECT_NUMBER_TO="${PROJECT_NUMBER_TO:-}" # OPTIONAL batch: last project of a range, e.g. "010" creates 001..010. Empty = only PROJECT_NUMBER_XXX
+ALSO_CREATE_MCP_API_SP="${ALSO_CREATE_MCP_API_SP:-false}" # OPTIONAL: "true" also runs 29b-create-mcp-api-sp-for-projects.sh for the same projects (secretless AI Factory MCP API SP)
 
 # 3* OPTIONAL Variable: Only need to set if using [Y] in SERVICE_PRINCIPAL_NAME_TEMPLATE
 PROJECT_NUMBER_Y="" # A string number between 1-999. Example: "2" 
 
 # EDIT END
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Batch: sign in once, then run this script once per project of the range (same steps as a single run).
+if [ -n "$PROJECT_NUMBER_TO" ] && [ -z "$AIF_RANGE_CHILD" ]; then
+    from=$((10#$PROJECT_NUMBER_XXX)); to=$((10#$PROJECT_NUMBER_TO))
+    if (( from < 1 || to < from || to > 999 )); then echo -e "${RED}Invalid project range ${PROJECT_NUMBER_XXX}..${PROJECT_NUMBER_TO}${NC}"; exit 1; fi
+    echo -e "${YELLOW}Batch: project service principals ${PROJECT_NUMBER_XXX}..${PROJECT_NUMBER_TO}${NC}"
+    read -p "Continue (Y/n)? " choice
+    if [[ "$choice" == "n" || "$choice" == "N" ]]; then echo "Exiting script."; exit 1; fi
+    if [ "$SKIP_LOGIN" != "true" ]; then az login --tenant "$TENANT_ID" > /dev/null || exit 1; fi
+    for ((n = from; n <= to; n++)); do
+        AIF_RANGE_CHILD=true SKIP_LOGIN=true ASSUME_YES=true ALSO_CREATE_MCP_API_SP=false PROJECT_NUMBER_XXX=$(printf '%03d' "$n") \
+            SUBSCRIPTION_ID="$SUBSCRIPTION_ID" KEY_VAULT_NAME="$KEY_VAULT_NAME" TENANT_ID="$TENANT_ID" \
+            SERVICE_PRINCIPAL_NAME_TEMPLATE="$SERVICE_PRINCIPAL_NAME_TEMPLATE" bash "${BASH_SOURCE[0]}" || exit 1
+    done
+    if [ "$ALSO_CREATE_MCP_API_SP" == "true" ]; then
+        SKIP_LOGIN=true PROJECT_NUMBER_FROM="$PROJECT_NUMBER_XXX" PROJECT_NUMBER_TO="$PROJECT_NUMBER_TO" SUBSCRIPTION_ID="$SUBSCRIPTION_ID" \
+            KEY_VAULT_NAME="$KEY_VAULT_NAME" TENANT_ID="$TENANT_ID" bash "$SCRIPT_DIR/29b-create-mcp-api-sp-for-projects.sh" --yes || exit 1
+    fi
+    exit 0
+fi
 
 ##################### DO NOT CHANGE ANYTHING BELOW #####################
 # Template Names
@@ -51,16 +75,18 @@ echo -e "${YELLOW}OBJECT ID NAME as KV SECRET${NC} in seeding keyvault will have
 echo -e "${YELLOW}SECRET NAME as KV SECRET${NC} in seeding keyvault will have the name: ${GREEN}"$SP_KV_SECRET"${NC}"
 echo -e "${GREEN}Note: If exists: ${NC}If Service principla already exists, then ObjectID will be updated in seeding keyvault.${NC}"
 
-# Prompt the user for confirmation
-read -p "Continue (Y/n)? " choice
-if [[ "$choice" == "n" || "$choice" == "N" ]]; then
-    echo "Exiting script."
-    exit 1
+# Prompt the user for confirmation (once per batch, not per project)
+if [ "$ASSUME_YES" != "true" ]; then
+    read -p "Continue (Y/n)? " choice
+    if [[ "$choice" == "n" || "$choice" == "N" ]]; then
+        echo "Exiting script."
+        exit 1
+    fi
 fi
 
 # Login to Azure with EntraID user
 echo -e "${YELLOW}Logging in to Azure...${NC}"
-az login --tenant $TENANT_ID
+if [ "$SKIP_LOGIN" != "true" ]; then az login --tenant $TENANT_ID; fi
 az account set --subscription $SUBSCRIPTION_ID
 #az account get-access-token
 
@@ -135,7 +161,6 @@ fi
 APP_REG_OID=$(az ad app show --id $APP_ID --query id --output tsv)
 echo "APP_REG_OID: $APP_REG_OID"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGO_URL="$SCRIPT_DIR/images/sp-aifactory-house.png"
 
 if [ ! -f "$LOGO_URL" ]; then
@@ -154,6 +179,12 @@ if [ $? -eq 0 ]; then
 else
     echo -e "${RED}Failed to set logo URL${NC}"
     exit 1
+fi
+
+# Single project: optionally also create its secretless AI Factory MCP API SP
+if [ "$ALSO_CREATE_MCP_API_SP" == "true" ]; then
+    SKIP_LOGIN=true PROJECT_NUMBER_FROM="$PROJECT_NUMBER_XXX" SUBSCRIPTION_ID="$SUBSCRIPTION_ID" KEY_VAULT_NAME="$KEY_VAULT_NAME" \
+        TENANT_ID="$TENANT_ID" bash "$SCRIPT_DIR/29b-create-mcp-api-sp-for-projects.sh" --yes || exit 1
 fi
 
 # APPLICATIONS - To delete: Delete Application, and its service principal is also deleted.

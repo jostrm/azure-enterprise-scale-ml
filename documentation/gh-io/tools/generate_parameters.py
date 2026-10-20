@@ -223,6 +223,8 @@ for names, text in (
      "Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources."),
     (("addAIFactoryMCP2APIM", "ADD_AI_FACTORY_MCP_2_APIM"),
      "Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription."),
+    (("aifactory_mcp_AppID_seeding_kv_name", "AIFACTORY_MCP_KV_S_NAME_APPID"),
+     "Seeding Key Vault secret name holding the AI Factory MCP API app registration client ID, written by esml-util/29b-create-mcp-api-sp-for-projects.sh. The MCP step uses it when aifactoryMcpEntraAppId is empty."),
     (("aifactoryMcpContainerAppResourceId", "AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID"),
      "Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app."),
     (("enableAIFactoryAgentLiveVoice", "ENABLE_AI_FACTORY_AGENT_LIVE_VOICE"),

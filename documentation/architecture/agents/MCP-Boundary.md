@@ -26,6 +26,9 @@ sources:
   - environment_setup/aifactory/bicep/modules/containerappsEnv.bicep
   - environment_setup/aifactory/bicep/modules/azureMcpServer.bicep
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep
+  - environment_setup/aifactory/bicep/esml-util/29b-create-mcp-api-sp-for-projects.sh
+  - environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh
+  - documentation/v2/20-29/29-factory-MCP.md
 tests:
   - mcp/tests/test_server.py
   - mcp/tests/test_auth.py
@@ -39,6 +42,7 @@ tests:
   - usecase_code/40-agent-factory/tests/test_mcp_gateway.py
   - usecase_code/40-agent-factory/tests/test_apim_gateway_policies.py
   - environment_setup/unit-tests/test-bicep/unit/test_mcp_ai_gateway_flags.py
+  - environment_setup/unit-tests/test-bicep/unit/test_mcp_api_sp_script.py
 graph_symbols:
   - mcp/src/aifactory_mcp/server.py::function:create_server
   - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
@@ -99,6 +103,13 @@ project and native AI Gateway callers). The app role stays an Entra admin step: 
 value on the MCP service principal looked up by `appId`). No pipeline references that template, so
 the rule "pipelines never write Microsoft Graph" holds; the admin's delegated Graph permissions
 (`AppRoleAssignment.ReadWrite.All`, `Application.Read.All`) do the write.
+
+The MCP's audience is a dedicated, secretless app registration per project ("MCP SP"), not the project service
+principal and not a managed identity: a managed identity cannot expose app roles or be a token audience, and the
+project SP is a credentialed client with project RBAC. Following the seeding Key Vault split of duties, an Entra admin
+batch-creates the MCP SPs (`esml-util/29b-create-mcp-api-sp-for-projects.sh`, or script `29` with
+`ALSO_CREATE_MCP_API_SP=true`) and stores `esml-projectNNN-mcp-app-id`; the project pipelines read it through
+`aifactory_mcp_AppID_seeding_kv_name` when `aifactoryMcpEntraAppId` is empty. User docs: `documentation/v2/20-29/29-factory-MCP.md`.
 
 `addAIFactoryMCP2APIM` closes the loop for the APIM that the AI gateway pipeline manages
 (`apimGateway*` variables): the project step adds its identity to the callers without listing it,

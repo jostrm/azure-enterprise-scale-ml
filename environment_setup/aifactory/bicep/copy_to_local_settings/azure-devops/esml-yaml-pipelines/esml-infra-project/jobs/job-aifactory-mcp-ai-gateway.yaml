@@ -41,6 +41,8 @@ steps:
       aifactoryMcpImage: '$(aifactoryMcpImage)'
       aifactoryMcpApiImage: '$(aifactoryMcpApiImage)'
       aifactoryMcpEntraAppId: '$(aifactoryMcpEntraAppId)'
+      # Seeding Key Vault fallback: step 03 (AzureKeyVault@2) exposes the secret as $(<secret name>).
+      aifactoryMcpEntraAppIdFromSeedingKeyvault: '$(${{ variables.aifactory_mcp_AppID_seeding_kv_name }})'
       aifactoryMcpContainerAppsEnvironment: '$(aifactoryMcpContainerAppsEnvironment)'
       aiGatewaySkuResourceId: '$(aiGatewaySkuResourceId)'
       aiGatewaySkuOutboundSubnetId: '$(aiGatewaySkuOutboundSubnetId)'

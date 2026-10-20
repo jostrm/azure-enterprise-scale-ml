@@ -28,7 +28,7 @@ import re
 import secrets
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Mapping, Protocol
 
 from .azure import ARM, AzureError
@@ -197,7 +197,9 @@ class IntegrationRequest:
             enable_ai_foundry=flag(get("enableAIFoundry"), "enableAIFoundry"),
             delete_requested=any(flag(get(name), name) for name in ("deleteAllServicesForProject", "deleteAllForProject")),
             mcp_image=_text(get("aifactoryMcpImage")), api_image=_text(get("aifactoryMcpApiImage")),
-            entra_app_id=_text(get("aifactoryMcpEntraAppId")).lower(),
+            # An explicit value wins; otherwise the pipeline passes the secret read from the seeding Key Vault.
+            entra_app_id=(_text(get("aifactoryMcpEntraAppId"))
+                          or _text(get("aifactoryMcpEntraAppIdFromSeedingKeyvault"))).lower(),
             container_apps_environment=_text(get("aifactoryMcpContainerAppsEnvironment")),
             gateway_resource_id=_text(get("aiGatewaySkuResourceId")),
             gateway_subnet_id=_text(get("aiGatewaySkuOutboundSubnetId")),
@@ -243,7 +245,8 @@ def decide(request: IntegrationRequest) -> Decision:
             if not request.mcp_app_resource_id and not IMAGE.fullmatch(value):
                 problems.append(f"{name} must be a digest-pinned Azure Container Registry image (<registry>.azurecr.io/<repo>@sha256:<digest>)")
         if not GUID.fullmatch(request.entra_app_id):
-            problems.append("aifactoryMcpEntraAppId must be the MCP API app registration client ID (GUID)")
+            problems.append("aifactoryMcpEntraAppId must be the MCP API app registration client ID (GUID); set it, or store it in "
+                            "the seeding Key Vault under the secret named by aifactory_mcp_AppID_seeding_kv_name")
     problems.extend(_adoption_problems(request))
     problems.extend(_apim_problems(request))
     if request.gateway_resource_id and not GATEWAY_ID.fullmatch(request.gateway_resource_id):
@@ -296,7 +299,8 @@ def decide_apim(request: IntegrationRequest) -> Decision:
     if request.environment != ENVIRONMENT:
         return Decision(False, f"The AI Factory MCP runs only in Dev; the APIM MCP API is skipped for '{request.environment}'.")
     problems = [*_apim_problems(request), *_adoption_problems(request)]
-    if not GUID.fullmatch(request.entra_app_id):
+    # Empty is fine: the MCP app's own audience is used.
+    if request.entra_app_id and not GUID.fullmatch(request.entra_app_id):
         problems.append("aifactoryMcpEntraAppId must be the MCP API app registration client ID (GUID)")
     for name, value in (("dev_test_prod_sub_id", request.subscription_id), ("tenantId", request.tenant_id)):
         if not GUID.fullmatch(value):
@@ -770,8 +774,11 @@ class McpGatewayIntegration:
             raise ValueError(f"The AI Factory MCP {app_id} does not exist yet: run the project001 Dev pipeline "
                              "with enableAIFactoryMCP=true first.")
         _, _, auth = _mcp_runtime(app, app_id)
-        if str(auth.get("audience", "")).lower() != request.entra_app_id:
+        audience = str(auth.get("audience", "")).lower()
+        if request.entra_app_id and audience != request.entra_app_id:
             raise ValueError(f"{app_id} accepts tokens for another audience than aifactoryMcpEntraAppId.")
+        if not GUID.fullmatch(audience):
+            raise ValueError(f"{app_id} has no MCP app registration audience.")
         if principal not in {str(item.get("object_id", "")).lower() for item in auth.get("identities") or []}:
             raise ValueError(f"The AI Factory MCP does not accept the APIM managed identity {principal} yet: run the "
                              "project001 Dev pipeline with addAIFactoryMCP2APIM=true first.")
@@ -782,14 +789,14 @@ class McpGatewayIntegration:
         subscription = _optional(self.session, f"{request.apim_id}/subscriptions/{APIM_MCP_CLIENT_SUBSCRIPTION}", APIM_API)
         values = {"apimServiceName": request.apim_service_name, "mcpServerName": APIM_MCP_SERVER,
                   "displayName": DISPLAY_NAME, "mcpDescription": READ_ONLY_DESCRIPTION,
-                  "mcpServerBaseUrl": f"https://{fqdn}", "mcpEntraAppId": request.entra_app_id,
+                  "mcpServerBaseUrl": f"https://{fqdn}", "mcpEntraAppId": audience,
                   "clientSubscriptionName": APIM_MCP_CLIENT_SUBSCRIPTION,
                   "clientSubscriptionState": ((subscription or {}).get("properties") or {}).get("state") or "active"}
         segments = request.apim_id.split("/")  # /subscriptions/<sub>/resourceGroups/<rg>/providers/...
         return {
             "mode": "parameters", "apim_id": request.apim_id, "mcp_app_id": app_id, "mutations": False,
             "apim_subscription_id": segments[2], "apim_resource_group": segments[4],
-            "prerequisites": [_app_role_prerequisite(request, principal,
+            "prerequisites": [_app_role_prerequisite(replace(request, entra_app_id=audience), principal,
                                                      f"the APIM managed identity {principal} ({request.apim_id})")],
             "parameters": {
                 "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",

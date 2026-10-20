@@ -406,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 395 |
-| `env` | 393 |
+| `yaml` | 396 |
+| `env` | 394 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 400 |
+| `json.dev` | 401 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 418; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 419; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 420, 444; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 419; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 420; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 421, 445; one reference row.
 
 ## YAML and variables.json reference
 
@@ -562,6 +562,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aifactoryMcpEntraAppId --><!-- parameter json.dev:aifactoryMcpEntraAppId -->`aifactoryMcpEntraAppId` | `AIFACTORY_MCP_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter yaml:aifactoryMcpImage --><!-- parameter json.dev:aifactoryMcpImage -->`aifactoryMcpImage` | `AIFACTORY_MCP_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format |
 | <!-- parameter yaml:aifactory_branch_chosen --><!-- parameter json.dev:aifactory_branch_chosen -->`aifactory_branch_chosen` | `AIFACTORY_BRANCH_CHOSEN` | O | Y: `"release/v1.24"`<br>J.dev: `"release/v1.24"` | Submodule release branch |
+| <!-- parameter yaml:aifactory_mcp_AppID_seeding_kv_name --><!-- parameter json.dev:aifactory_mcp_AppID_seeding_kv_name -->`aifactory_mcp_AppID_seeding_kv_name` | `AIFACTORY_MCP_KV_S_NAME_APPID` | O | Y: `"<optional>esml-project001-mcp-app-id"`<br>J.dev: `"<optional>esml-project001-mcp-app-id"` | Seeding Key Vault secret name holding the AI Factory MCP API app registration client ID, written by esml-util/29b-create-mcp-api-sp-for-projects.sh. The MCP step uses it when aifactoryMcpEntraAppId is empty. |
 | <!-- parameter yaml:aifactory_salt --><!-- parameter json.dev:aifactory_salt -->`aifactory_salt` | `AIFACTORY_SALT` | O | Y: `""`<br>J.dev: `""` | Leave empty, 5 characters.  A deteministic unique value, from COMMON RG |
 | <!-- parameter yaml:aifactory_salt_random --><!-- parameter json.dev:aifactory_salt_random -->`aifactory_salt_random` | `AIFACTORY_SALT_RANDOM` | O | Y: `""`<br>J.dev: `""` | Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. keep-as-is: Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. |
 | <!-- parameter yaml:aifactory_version_major --><!-- parameter json.dev:aifactory_version_major -->`aifactory_version_major` | `AIFACTORY_VERSION_MAJOR` | O | Y: `"1"`<br>J.dev: `"1"` | AI Factory major version keep-as-is: Used to determine which bicep files to use. |
@@ -893,6 +894,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID -->`AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID` | `aifactoryMcpContainerAppResourceId` | O | `""` | Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app. |
 | <!-- parameter env:AIFACTORY_MCP_ENTRA_APP_ID -->`AIFACTORY_MCP_ENTRA_APP_ID` | `aifactoryMcpEntraAppId` | C | `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter env:AIFACTORY_MCP_IMAGE -->`AIFACTORY_MCP_IMAGE` | `aifactoryMcpImage` | C | `""` | Digest-pinned AI Factory MCP image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Format |
+| <!-- parameter env:AIFACTORY_MCP_KV_S_NAME_APPID -->`AIFACTORY_MCP_KV_S_NAME_APPID` | `aifactory_mcp_AppID_seeding_kv_name` | O | `"<optional>esml-project001-mcp-app-id"` | Seeding Key Vault secret name holding the AI Factory MCP API app registration client ID, written by esml-util/29b-create-mcp-api-sp-for-projects.sh. The MCP step uses it when aifactoryMcpEntraAppId is empty. |
 | <!-- parameter env:AIFACTORY_PREFIX -->`AIFACTORY_PREFIX` | `admin_aifactoryPrefixRG` | O | `"acme-ai"` | AI Factory resource group prefix keep-as-is: Max 6 chars. otherwise: set your company prefix, e.g. 'acme-ai-', 'contoso-'. |
 | <!-- parameter env:AIFACTORY_SALT -->`AIFACTORY_SALT` | `aifactory_salt` | O | `"<5>"` | AI Factory deterministic salt (5 chars) ensure: read from COMMON RG resource names, e.g. the 'a4c2b' in 'adf-cmn-weu-dev-a4c2b-001'. Used in project resource naming. |
 | <!-- parameter env:AIFACTORY_SALT_RANDOM -->`AIFACTORY_SALT_RANDOM` | `aifactory_salt_random` | O | `"<10>"` | Random salt placeholder (10 chars) keep-as-is: Do not change. Placeholder only. |

@@ -110,6 +110,7 @@
     "project_service_principal_AppID_seeding_kv_name": "<optional>esml-project001-sp-id",
     "project_service_principal_OID_seeding_kv_name": "<optional>esml-project001-sp-oid",
     "project_service_principal_Secret_seeding_kv_name": "<optional>esml-project001-sp-secret",
+    "aifactory_mcp_AppID_seeding_kv_name": "<optional>esml-project001-mcp-app-id",
     "project_number_000": "001",
     "tag_costcenter": "1234",
     "org-department-name": "",

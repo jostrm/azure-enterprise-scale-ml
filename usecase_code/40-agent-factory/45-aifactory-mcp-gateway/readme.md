@@ -106,8 +106,12 @@ To move to the pipeline-managed app instead, clear the variable and set the imag
 
 1. Build and push the MCP and Factory API images to a registry in the project subscription and
    set their digest-pinned references.
-2. An Entra admin creates the MCP API app registration with app role `AiFactory.Mcp.Read` and
-   sets `aifactoryMcpEntraAppId`. Pipelines never write Microsoft Graph: the step prints, for every
+2. An Entra admin creates the MCP API app registration (the secretless "MCP SP") with app role `AiFactory.Mcp.Read`,
+   usually per project in one batch with `esml-util/29b-create-mcp-api-sp-for-projects.sh`, which stores its client ID
+   in the seeding Key Vault as `esml-projectNNN-mcp-app-id`. Either set `aifactoryMcpEntraAppId`, or leave it empty and
+   set `aifactory_mcp_AppID_seeding_kv_name` to that secret name: the pipelines read it from the seeding Key Vault
+   (ADO step 03 exposes it as `$(<secret name>)`, GHA step 03 exports it). The AI gateway pipeline takes the audience
+   from the MCP app itself. Pipelines never write Microsoft Graph: the step prints, for every
    caller (the Foundry project identity, the AI Gateway identity once it exists, and each classic
    APIM identity), the exact admin command that assigns the role with the Microsoft Graph Bicep
    template `environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep`:
