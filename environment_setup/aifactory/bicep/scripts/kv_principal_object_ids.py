@@ -72,7 +72,7 @@ class Finding:
 @dataclass(frozen=True)
 class Assessment:
     findings: list[Finding]         # FAIL: block the deployment, even in WARN_ONLY mode
-    warnings: list[Finding]         # WARN: never block (except under preflight --strict, like every warning)
+    warnings: list[Finding]         # WARN: never block, not even under preflight --strict (advisory)
     notes: list[str]                # INFO
 
 
@@ -157,7 +157,8 @@ def deviations(value: str) -> list[str]:
 def not_normalized(name: str, label: str, found: list[str]) -> Finding:
     message = f"{name} in {label} is valid but not normalized: it has {', '.join(found)}."
     if found == ["duplicate entries"]:
-        # Names are seeded per object ID, so dropping a repeated entry renames nothing.
+        # Templates that seed names with a list index removed exact duplicates before 474ecff3 too
+        # (union), so neither the list nor its indexes change: nothing is renamed.
         return Finding(NOT_NORMALIZED, message + " Bicep grants each principal once.",
                        "Remove the repeated object IDs.")
     return Finding(
@@ -167,11 +168,12 @@ def not_normalized(name: str, label: str, found: list[str]) -> Finding:
                   "role-assignment names once, and its first redeploy with 474ecff3 or later can fail with "
                   "RoleAssignmentExists (409). New factories are not affected.",
         "Write the object IDs lower-case and comma-separated, without spaces or duplicates: that silences this "
-        "warning but does not change what Bicep deploys. After a RoleAssignmentExists (409), delete each old role "
-        "assignment with the same principal, role and scope (az role assignment delete --assignee <object-id> "
-        "--role <role> --scope <scope>) and run again; this is needed only once per factory. In Azure DevOps, step "
-        "101-rbac-common-rg (job-2-genai-services.yaml) has continueOnError: true, so a 409 there only turns the "
-        "run yellow.")
+        "warning but does not change what Bicep deploys. The 409 fails deployment steps such as "
+        "01_az_bicep_common_rg (common) and 100-rbac-security (project); only 101-rbac-common-rg (Azure DevOps "
+        "job-2-genai-services.yaml and the GitHub project workflow) is set to continue on error, so there it only "
+        "turns the run yellow. Delete each old role assignment with the same principal, role and scope (az role "
+        "assignment delete --assignee <object-id> --role <role> --scope <scope>) and run again. Each old "
+        "assignment fails once, in every environment and project.")
 
 
 def pipeline_value(environ: Mapping[str, str], setting: Setting, keep_empty: bool) -> tuple[str, str] | None:

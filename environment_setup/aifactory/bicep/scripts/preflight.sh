@@ -31,8 +31,9 @@
 #   0  no FAIL findings (deploy may proceed)            -> pipeline continues
 #   1  FAIL findings or a mandatory gate (capacity,
 #      Key Vault principal object IDs)                 -> pipeline ABORTS
-#   2  non-CIDR warnings AND --strict was supplied      -> pipeline ABORTS
-# Address-planning CIDR_* findings are always advisory, including under --strict.
+#   2  non-advisory warnings AND --strict was supplied  -> pipeline ABORTS
+# Address-planning CIDR_* findings and KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED are always
+# advisory, including under --strict.
 #
 # Portability: pure bash, runs on Linux agents AND Git Bash on Windows agents.
 # All `az` calls are addressed by name / use https:// URLs only, so Git Bash
@@ -82,7 +83,7 @@ Usage: preflight.sh [options]
   --scope <scope>          common | project: Key Vault principals that pipeline reads (default: both)
   --subscription <id>      Check only this subscription id (single env)
   --location <region>      Override Azure region (e.g. eastus2)
-  --strict                 Treat non-CIDR WARN-only result as failure (exit 2)
+  --strict                 Treat a WARN-only result as failure (exit 2); advisory warnings excepted
   --warn-only              Advisory FAILs (mandatory capacity gates still block) [default]
   --no-warn-only           Enforce hard failures: any FAIL aborts (exit 1)
   --skip-azure-lookups     Skip every check that needs an 'az' call (config-only)
@@ -151,7 +152,7 @@ ci_warning() {
 # -----------------------------------------------------------------------------
 FAIL_COUNT=0
 WARN_COUNT=0
-CIDR_WARN_COUNT=0
+ADVISORY_WARN_COUNT=0
 FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
 REPORT_FINDINGS=() # NUL-delimited at EXIT; preserve each finding's subscription.
 REPORT_COMPLETED="false"
@@ -171,10 +172,11 @@ record_report_finding() {
 }
 
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
-  # Address planning stays advisory even under --strict; other checks keep their policy.
-  case "$2" in CIDR_*)
+  # Address planning and the technical admin ID format notice (reformatting changes nothing
+  # Bicep deploys) stay advisory even under --strict; other checks keep their policy.
+  case "$2" in CIDR_*|KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED)
     set -- WARN "$2" "$3" "${4:-}"
-    CIDR_WARN_COUNT=$((CIDR_WARN_COUNT + 1))
+    ADVISORY_WARN_COUNT=$((ADVISORY_WARN_COUNT + 1))
     ;;
   esac
   FINDINGS+=("$1|$2|$3|${4:-}")
@@ -1545,7 +1547,7 @@ if [ "$FAIL_COUNT" -gt 0 ]; then
   echo "preflight FAILED with $FAIL_COUNT blocking finding(s). Aborting deployment."
   exit 1
 fi
-if [ "$((WARN_COUNT - CIDR_WARN_COUNT))" -gt 0 ] && [ "$STRICT" = "true" ]; then
+if [ "$((WARN_COUNT - ADVISORY_WARN_COUNT))" -gt 0 ] && [ "$STRICT" = "true" ]; then
   echo ""
   echo "preflight: warnings present and --strict set. Aborting deployment."
   exit 2

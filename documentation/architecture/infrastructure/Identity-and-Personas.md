@@ -100,12 +100,18 @@ upper case, whitespace around entries (spaces or a trailing line break) or
 duplicates. `assess()` in `kv_principal_object_ids.py` returns findings, warnings
 and notes, and `validate()` still returns findings and notes. `preflight.sh` turns
 each `WARN` line into a `KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED` warning that never
-sets `KV_PRINCIPAL_INVALID`. Like any non-CIDR warning it exits 2 only under
-`--strict`, which no pipeline passes. For case or spacing the warning names the
-one-time 409 and its fix: delete the old assignment with the same principal, role
-and scope, then run again. ADO step `101-rbac-common-rg` (`job-2-genai-services.yaml`)
-has `continueOnError: true`, so a 409 there only turns the run yellow. Duplicates
-alone rename nothing, because names are seeded per object ID. The warning never
+sets `KV_PRINCIPAL_INVALID`. `add_finding` keeps it advisory under `--strict`, like
+`CIDR_*`, because reformatting the value changes nothing Bicep deploys (GitHub passes
+`--strict` when the repository variable `PREFLIGHT_STRICT` is true; no ADO step
+passes it). For case or spacing the warning names the one-time 409 and its fix:
+delete the old assignment with the same principal, role and scope, then run again,
+once for each old assignment in every environment and project. The 409 fails steps
+such as `01_az_bicep_common_rg` (common) and `100-rbac-security` (project). Only
+`101-rbac-common-rg` continues on error (ADO `continueOnError: true` in
+`job-2-genai-services.yaml`, GitHub `continue-on-error: true`), so there it only
+turns the run yellow. Duplicates alone rename nothing: the templates that seed
+names with a list index (`kvRbacAssignments.bicep`) got lists that `union` had
+already de-duplicated before 474ecff3, so neither IDs nor indexes change. The warning never
 shows the IDs, because GitHub masks the whole `PROJECT_MEMBERS` secret, not its
 entries. Empty and `'null'` entries stay blocking, because the `esml-util`
 templates do not drop them. `databricksOID` is a single Key Vault access-policy

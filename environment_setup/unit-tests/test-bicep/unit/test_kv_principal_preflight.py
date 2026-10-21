@@ -340,11 +340,14 @@ def test_case_or_spacing_warning_names_the_one_time_409_and_its_fix(checker):
     warning = checker.assess({"technical_admins_ad_object_id": ADMIN.upper()}, ["dev"]).warnings[0]
     assert "role-assignment names" in warning.message and "RoleAssignmentExists (409)" in warning.message
     assert "same principal, role and scope" in warning.hint and "az role assignment delete" in warning.hint
-    assert "101-rbac-common-rg" in warning.hint and "continueOnError: true" in warning.hint
+    # The 409 fails hard steps; only 101-rbac-common-rg continues on error, in ADO and GitHub Actions.
+    assert "01_az_bicep_common_rg" in warning.hint and "100-rbac-security" in warning.hint
+    assert "101-rbac-common-rg" in warning.hint and "continue on error" in warning.hint
+    assert "every environment and project" in warning.hint
 
 
 def test_duplicate_only_warning_does_not_predict_a_409(checker):
-    # Names are seeded per object ID, so dropping a repeated entry renames nothing.
+    # Exact duplicates were removed before 474ecff3 too (union), so no name or list index changes.
     warning = checker.assess({"technical_admins_ad_object_id": f"{ADMIN},{ADMIN}"}, ["dev"]).warnings[0]
     assert "409" not in warning.message + warning.hint
 
@@ -466,8 +469,9 @@ def test_preflight_trusts_valid_pipeline_values_over_a_stale_variables_json(offl
 
 
 def test_preflight_warns_about_unnormalized_technical_admins_without_blocking(offline_preflight):
+    # Advisory even under --strict (GitHub: PREFLIGHT_STRICT=true): reformatting changes nothing Bicep deploys.
     result, _ = offline_preflight({"TF_BUILD": "True", "technical_admins_ad_object_id": f"{ADMIN.upper()}, {ADMIN2}"},
-                                  arguments=("--skip-azure-lookups", "--scope", "project"))
+                                  arguments=("--skip-azure-lookups", "--scope", "project", "--strict"))
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert BLOCKED not in output and f"[WARN] {NOT_NORMALIZED}" in output

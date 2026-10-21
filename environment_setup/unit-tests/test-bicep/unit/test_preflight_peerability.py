@@ -81,8 +81,10 @@ def test_every_environment_subnet_checked_strictly(monkeypatch):
     ([("FAIL", "SEARCH_SKU_UNAVAILABLE")], 1),
     ([("WARN", "SEARCH_QUOTA_UNVALIDATED")], 2),
     ([("FAIL", "CIDR_RANGE_INVALID"), ("FAIL", "RP_NOT_REGISTERED")], 1),
+    ([("WARN", "KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED")], 0),
+    ([("WARN", "KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED"), ("WARN", "SEARCH_QUOTA_UNVALIDATED")], 2),
 ])
-def test_cidr_only_warnings_never_trigger_strict_but_nonnetwork_policy_is_unchanged(findings, expected):
+def test_advisory_only_warnings_never_trigger_strict_but_other_policy_is_unchanged(findings, expected):
     bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
             if os.name == "nt" else Path(shutil.which("bash") or "/unavailable"))
     if not bash.is_file():
@@ -96,7 +98,7 @@ STRICT=true
 WARN_ONLY=false
 FAIL_COUNT=0
 WARN_COUNT=0
-CIDR_WARN_COUNT=0
+ADVISORY_WARN_COUNT=0
 FINDINGS=()
 record_report_finding() { printf 'REPORT:%s:%s\\n' "$1" "$2"; }
 ci_error() { printf 'ERROR:%s\\n' "$1"; }
