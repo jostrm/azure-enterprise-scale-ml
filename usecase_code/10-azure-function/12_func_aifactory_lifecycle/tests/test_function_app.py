@@ -35,14 +35,18 @@ def test_routes_and_triggers_are_registered(function_app):
     assert found["confirm"][1] == "v1/operations/{operation_id}/confirm"
     assert found["list_operations"][1] == "v1/operations"
     assert found["github_events"][1] == "v1/github/events"
+    assert found["runner_results"][1] == "v1/runner/results"
+    assert found["refresh_catalog"][1] == "v1/catalog/refresh"
     assert found["reconcile"][0] == "timerTrigger"
     assert "process_event" not in found
 
 
 def test_lifecycle_routes_need_a_function_key_and_events_are_anonymous_but_signed(function_app):
     found = bindings(function_app)
-    assert "FUNCTION" in found["prepare"][2].upper() and "FUNCTION" in found["confirm"][2].upper()
-    assert "ANONYMOUS" in found["github_events"][2].upper() and "ANONYMOUS" in found["health"][2].upper()
+    for route in ("prepare", "confirm", "refresh_catalog"):
+        assert "FUNCTION" in found[route][2].upper()
+    for route in ("github_events", "runner_results", "health"):
+        assert "ANONYMOUS" in found[route][2].upper()
 
 
 def test_a_request_flows_through_to_the_api(function_app):

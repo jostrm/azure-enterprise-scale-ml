@@ -14,10 +14,17 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/rest_backend.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/sdk_backend.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/trackers.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/runner_protocol.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/runner.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/ports.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/composition.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/settings.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/function-app.bicep
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-event-relay.yml
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-dummy-step.yml
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-ops.yml
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-lifecycle-runner.ps1
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -26,11 +33,15 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_events.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_adapter_parity.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_http_api.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_runner_executor.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_runner_cli.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_workflow_templates.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
-reviewed_source: '01f06fa1 + working tree; observed 2026-10-21'
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
+reviewed_source: 'd37376d1 + working tree; observed 2026-10-22'
 ---
 # Lifecycle Function
 
@@ -53,6 +64,15 @@ GitHub runs through `workflow_run` events.
 - **Executors**: `inprocess` (the API on this host's loopback), `github-dummy` (dummy workflow runs) and
   `github-runner` (the management runner calls the API on 127.0.0.1). The Function never calls the Factory API over
   the network because catalog and deployment routes require a loopback client.
+- **Runner executor** (`adapters/runner_backend.py`, `application/runner_protocol.py`, `runner.py`): every Factory API
+  call is a hand-off (Asynchronous Request-Reply). The Function dispatches `aif-ops.yml` with a request it signs with
+  the event secret and an expiry; the runner verifies it, checks that the workflow inputs describe it, makes the one
+  call through the REST or SDK adapter and posts one signed result to `/api/v1/runner/results`. The step waits in
+  `preparing` or `confirming`; a review that never reports fails, a confirmation that never reports (or whose run ends
+  without a result) is `uncertain`, and a re-run never submits a confirmation again. Planning uses a catalog snapshot
+  that every result refreshes. Because the Factory API refuses to dispatch `factory-lifecycle.yml` while any other
+  workflow of the factory repo runs, the Function's workflows live in a separate ops repository, and API-dispatched
+  runs are followed through the API's job status.
 - **Events**: the relay workflow signs `workflow_run` payloads like a GitHub webhook; the Function checks
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.

@@ -1,7 +1,7 @@
 """Azure Functions entry point (Python v2 model). Thin on purpose: every route forwards to aif_lifecycle.
 
 Lifecycle routes need a function key (AuthLevel.FUNCTION); add App Service authentication with an Entra app role
-before real deployments. The events route is anonymous but HMAC-checked (X-Hub-Signature-256).
+before real deployments. The events and runner-results routes are anonymous but HMAC-checked (X-Hub-Signature-256).
 """
 
 import functools
@@ -70,6 +70,16 @@ def confirm(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="v1/github/events", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def github_events(req: func.HttpRequest) -> func.HttpResponse:
     return _forward("github_events", req)
+
+
+@app.route(route="v1/runner/results", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def runner_results(req: func.HttpRequest) -> func.HttpResponse:
+    return _forward("runner_results", req)
+
+
+@app.route(route="v1/catalog/refresh", methods=["POST"])
+def refresh_catalog(req: func.HttpRequest) -> func.HttpResponse:
+    return _forward("refresh_catalog", req)
 
 
 @app.timer_trigger(schedule="0 */2 * * * *", arg_name="timer", run_on_startup=False, use_monitor=True)

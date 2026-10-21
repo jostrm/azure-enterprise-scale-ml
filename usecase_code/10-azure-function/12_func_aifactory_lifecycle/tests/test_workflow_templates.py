@@ -5,7 +5,9 @@ import re
 import pytest
 import yaml
 
-from aif_lifecycle.application.events import correlate
+from aif_lifecycle.application.events import WorkflowRunObservation, correlate, is_runner_call
+from aif_lifecycle.adapters.runner_backend import RunnerBackend
+from aif_lifecycle.adapters.stores import MemoryStore
 from aif_lifecycle.adapters.trackers import DummyWorkflowTracker
 
 from conftest import TEMPLATE_ROOT
@@ -51,9 +53,47 @@ def test_the_rendered_run_name_correlates_with_and_without_relay(dispatched):
     assert correlate(render(template, {**dispatched, "relay": "true"})) is not None
 
 
+@pytest.fixture
+def ops_dispatch(clock):
+    from support import FakeGitHub as Recorder
+    github = Recorder()
+    backend = RunnerBackend(github, MemoryStore(), clock, workflow="aif-ops.yml", ref="main", backend="rest",
+                            secret=b"event-secret", request_ttl_seconds=900)
+    backend.refresh_catalog()
+    return github.dispatches[0]
+
+
+def test_aif_ops_declares_exactly_the_inputs_the_runner_backend_dispatches(ops_dispatch):
+    on = load("aif-ops.yml")["on"]["workflow_dispatch"]["inputs"]
+    assert set(on) == set(ops_dispatch["inputs"])
+    assert on["action"]["options"] == ["catalog", "prepare", "confirm", "status"]
+
+
+def test_the_aif_ops_run_name_carries_the_nonce_and_correlates_as_a_runner_call(ops_dispatch):
+    inputs = ops_dispatch["inputs"]
+    title = render(load("aif-ops.yml")["run-name"], {**inputs, "relay": "true"})
+    assert correlate(title) == (inputs["operation_id"], int(inputs["step"]), f"{inputs['action']}-{inputs['nonce']}")
+    observed = WorkflowRunObservation(action="completed", run_id=1, workflow="aif-ops", title=title, status="completed",
+                                      conclusion="success", html_url="", attempt=1)
+    assert is_runner_call(observed)
+
+
+def test_aif_ops_runs_the_installed_entry_point_safely_on_the_api_host():
+    workflow = load("aif-ops.yml")
+    job = workflow["jobs"]["call"]
+    assert "aif-lifecycle-mgmt" in job["runs-on"] and job["timeout-minutes"] <= 10
+    step = job["steps"][0]
+    for name, source in (("AIF_RUNNER_REQUEST", "request"), ("AIF_OPERATION_ID", "operation_id"),
+                         ("AIF_STEP", "step"), ("AIF_ACTION", "action"), ("AIF_NONCE", "nonce")):
+        assert step["env"][name] == "${{ inputs.%s }}" % source
+    assert "-P -m aif_lifecycle.runner" in step["run"], "-P keeps the job's working folder off sys.path"
+    assert "-cnotmatch" in step["run"] and "concurrency" not in workflow
+
+
 def test_the_relay_watches_the_dummy_and_only_forwards_dispatch_runs_of_this_repo():
     relay, dummy = load("aif-event-relay.yml"), load("aif-dummy-step.yml")
     assert dummy["name"] in relay["on"]["workflow_run"]["workflows"]
+    assert "aif-ops" in relay["on"]["workflow_run"]["workflows"]
     # Observed on GitHub (byor-121, 2026-10-21): 'requested' events carry the workflow name instead of the run name,
     # so the no-relay filter can't see them and they never correlate.
     assert relay["on"]["workflow_run"]["types"] == ["in_progress", "completed"]
@@ -62,10 +102,13 @@ def test_the_relay_watches_the_dummy_and_only_forwards_dispatch_runs_of_this_rep
     assert "github.event.workflow_run.event == 'workflow_dispatch'" in condition
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in condition
     assert "!endsWith(github.event.workflow_run.display_title, ' no-relay')" in condition
+    # aif-ops results come on the results route; only a run that ended badly (no result) is worth relaying.
+    assert ("(github.event.workflow_run.name != 'aif-ops' || (github.event.action == 'completed' && "
+            "github.event.workflow_run.conclusion != 'success'))") in condition
     assert "aif-lifecycle-mgmt" in job["runs-on"]
 
 
-@pytest.mark.parametrize("name", ["aif-dummy-step.yml", "aif-event-relay.yml"])
+@pytest.mark.parametrize("name", ["aif-dummy-step.yml", "aif-event-relay.yml", "aif-ops.yml"])
 def test_workflows_need_no_token_permissions_and_never_expand_expressions_in_scripts(name):
     data = load(name)
     assert data["permissions"] == {}

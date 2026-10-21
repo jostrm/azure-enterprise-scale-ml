@@ -31,7 +31,7 @@ class SecretReader(Protocol):
     def get(self, name: str) -> str: ...
 
 
-def _secret(env: Mapping[str, str], kind: str, vault: SecretReader | None) -> str | None:
+def secret_value(env: Mapping[str, str], kind: str, vault: SecretReader | None) -> str | None:
     value_name, secret_name = _SECRETS[kind]
     value = env.get(value_name) or (env.get("AIFACTORY_API_KEY") if kind == "factory" else None)
     if value and value.strip().startswith(_REFERENCE):
@@ -84,6 +84,8 @@ class Settings:
     github_ref: str = "main"
     dummy_workflow: str = "aif-dummy-step.yml"
     dummy_duration_seconds: int = 75
+    ops_workflow: str = "aif-ops.yml"
+    runner_timeout_seconds: int = 900
     event_secrets: list[bytes] = field(default_factory=list, repr=False)
     event_processing: str = "inline"
     event_queue: str = "aif-github-events"
@@ -99,9 +101,9 @@ class Settings:
         protected = _list(env.get("AIF_SELF_PROJECT_ID")) + _list(env.get("AIF_PROTECTED_IDS"))
         for item in protected:
             parse_any(item)
-        event_secret = _secret(env, "event", vault)
-        github_token = _secret(env, "github", vault)
-        factory_key = _secret(env, "factory", vault)
+        event_secret = secret_value(env, "event", vault)
+        github_token = secret_value(env, "github", vault)
+        factory_key = secret_value(env, "factory", vault)
         settings = cls(
             backend=_choice(env, "AIF_BACKEND", BACKENDS, "mock"),
             executor=_choice(env, "AIF_EXECUTOR", EXECUTORS, "inprocess"),
@@ -118,6 +120,8 @@ class Settings:
             github_ref=env.get("AIF_GITHUB_REF") or cls.github_ref,
             dummy_workflow=env.get("AIF_DUMMY_WORKFLOW") or cls.dummy_workflow,
             dummy_duration_seconds=_int(env, "AIF_DUMMY_DURATION_SECONDS", 75, 5, 600),
+            ops_workflow=env.get("AIF_OPS_WORKFLOW") or cls.ops_workflow,
+            runner_timeout_seconds=_int(env, "AIF_RUNNER_TIMEOUT_SECONDS", 900, 120, 7200),
             event_secrets=[item.encode("utf-8") for item in _list(event_secret)],
             event_processing=_choice(env, "AIF_EVENT_PROCESSING", EVENT_PROCESSING, "inline"),
             event_queue=env.get("AIF_EVENT_QUEUE") or cls.event_queue,
@@ -133,7 +137,7 @@ class Settings:
     def _check(self) -> None:
         if self.store == "table" and not self.table_account:
             raise ValidationFailed("AIF_STORE=table needs AIF_TABLE_ACCOUNT (the storage account name).")
-        if self.backend in ("rest", "sdk") and not self.factory_folder:
+        if self.backend in ("rest", "sdk") and self.executor != "github-runner" and not self.factory_folder:
             raise ValidationFailed("AIF_BACKEND=rest|sdk needs AIF_FACTORY_FOLDER (the azurefactory folder on the API host).")
         if self.executor in ("github-dummy", "github-runner") and not (self.github_repository and self.github_token):
             raise ValidationFailed(f"AIF_EXECUTOR={self.executor} needs AIF_GITHUB_REPOSITORY and AIF_GITHUB_TOKEN.")
@@ -141,5 +145,8 @@ class Settings:
             raise ValidationFailed("AIF_EXECUTOR=github-dummy runs dummy workflows and only pairs with AIF_BACKEND=mock.")
         if self.executor == "github-runner" and self.backend == "mock":
             raise ValidationFailed("AIF_EXECUTOR=github-runner calls the real Factory API; use AIF_BACKEND=rest or sdk.")
+        if self.executor == "github-runner" and not self.event_secrets:
+            raise ValidationFailed("AIF_EXECUTOR=github-runner signs runner requests and checks results with the event "
+                                   "secret; set AIF_EVENT_SECRET_NAME.")
         if self.event_processing == "queue" and not self.queue_account:
             raise ValidationFailed("AIF_EVENT_PROCESSING=queue needs AzureWebJobsStorage__accountName or AIF_EVENT_QUEUE_ACCOUNT.")

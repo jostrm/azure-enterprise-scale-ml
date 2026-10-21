@@ -36,28 +36,43 @@ def _store(settings: Settings):
     return stores.MemoryStore()
 
 
-def _backend(settings: Settings, store, clock):
-    if settings.backend == "mock":
-        from .adapters.mock_backend import MockFactoryBackend
-        return MockFactoryBackend(store, clock=clock, review_ttl_seconds=settings.review_ttl_seconds)
-    if settings.backend == "rest":
+def factory_api_backend(name: str, url: str, key: str | None, folder: str | None):
+    """Option 1 (REST) or option 2 (SDK) against a Factory API on this host's loopback (the Function or the runner)."""
+    if name == "rest":
         from .adapters.rest_backend import RestFactoryBackend, RestTransport
-        return RestFactoryBackend(RestTransport(settings.factory_api_url, settings.factory_api_key), settings.factory_folder)
-    from .adapters.sdk_backend import SdkFactoryBackend
-    return SdkFactoryBackend(settings.factory_api_url, settings.factory_api_key, settings.factory_folder)
+        return RestFactoryBackend(RestTransport(url, key), folder or "")
+    if name == "sdk":
+        from .adapters.sdk_backend import SdkFactoryBackend
+        return SdkFactoryBackend(url, key, folder or "")
+    raise ValidationFailed(f"'{name}' is not a Factory API backend; use rest or sdk.")
 
 
-def _tracker(settings: Settings, backend):
+def _github(settings: Settings):
+    from .adapters.github import GitHubClient
+    return GitHubClient(settings.github_repository, settings.github_token, api_url=settings.github_api_url)
+
+
+def _backend_and_tracker(settings: Settings, store, clock):
     from .adapters import trackers
 
-    if settings.executor == "inprocess":
-        return trackers.InstantTracker() if settings.backend == "mock" else trackers.ApiJobTracker(backend)
+    if settings.executor == "github-runner":
+        from .adapters.runner_backend import RunnerBackend
+        github = _github(settings)
+        backend = RunnerBackend(github, store, clock, workflow=settings.ops_workflow, ref=settings.github_ref,
+                                backend=settings.backend, secret=settings.event_secrets[0],
+                                request_ttl_seconds=settings.runner_timeout_seconds)
+        return backend, trackers.RunnerJobTracker(backend, github)
+    if settings.backend == "mock":
+        from .adapters.mock_backend import MockFactoryBackend
+        backend = MockFactoryBackend(store, clock=clock, review_ttl_seconds=settings.review_ttl_seconds)
+    else:
+        backend = factory_api_backend(settings.backend, settings.factory_api_url, settings.factory_api_key,
+                                      settings.factory_folder)
     if settings.executor == "github-dummy":
-        from .adapters.github import GitHubClient
-        github = GitHubClient(settings.github_repository, settings.github_token, api_url=settings.github_api_url)
-        return trackers.DummyWorkflowTracker(github, workflow=settings.dummy_workflow, ref=settings.github_ref,
-                                             duration_seconds=settings.dummy_duration_seconds)
-    raise ValidationFailed("AIF_EXECUTOR=github-runner arrives with the real-API pass.")
+        return backend, trackers.DummyWorkflowTracker(_github(settings), workflow=settings.dummy_workflow,
+                                                      ref=settings.github_ref,
+                                                      duration_seconds=settings.dummy_duration_seconds)
+    return backend, (trackers.InstantTracker() if settings.backend == "mock" else trackers.ApiJobTracker(backend))
 
 
 def build_runtime(env: Mapping[str, str] | None = None, *, vault=None) -> Runtime:
@@ -68,11 +83,12 @@ def build_runtime(env: Mapping[str, str] | None = None, *, vault=None) -> Runtim
     settings = Settings.from_env(env, vault=vault)
     clock = SystemClock()
     store = _store(settings)
-    backend = _backend(settings, store, clock)
-    service = LifecycleService(backend=backend, tracker=_tracker(settings, backend), store=store,
+    backend, tracker = _backend_and_tracker(settings, store, clock)
+    service = LifecycleService(backend=backend, tracker=tracker, store=store,
                                guard=SelfProtection(settings.protected_ids), clock=clock,
                                poll_after_seconds=settings.poll_after_seconds,
-                               github_repository=settings.github_repository)
+                               github_repository=settings.github_repository,
+                               runner_timeout_seconds=settings.runner_timeout_seconds)
     enqueue = None
     if settings.event_processing == "queue":
         from .adapters.queue import EventQueue

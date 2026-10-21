@@ -119,6 +119,7 @@ class Step:
     failure: dict[str, Any] | None = None
     started_at: str | None = None
     finished_at: str | None = None
+    handoff: dict[str, Any] | None = None  # the runner call this step waits for: action, nonce, since
 
     @classmethod
     def new(cls, name: str, kind: StepKind) -> "Step":
@@ -300,6 +301,26 @@ class Operation:
             return "step-succeeded"
         return "progressed"
 
+    # ----- runner hand-off (AIF_EXECUTOR=github-runner) -----
+
+    @property
+    def handoff(self) -> dict[str, Any] | None:
+        return self.step.handoff
+
+    def hand_off(self, action: str, nonce: str, now: datetime) -> None:
+        self.step.handoff = {"action": action, "nonce": nonce, "since": iso(now)}
+        self.updated_at = iso(now)
+        self._log(now, "handed-off", f"{self.step.name}: {action} on the runner")
+
+    def take_handoff(self, action: str, nonce: str, step: int | None) -> bool:
+        """Accept a runner result only for the hand-off this step is waiting for; clears it."""
+        pending = self.step.handoff
+        if not pending or step != self.current or pending["action"] != action or \
+                not hmac.compare_digest(str(pending["nonce"]).encode(), str(nonce).encode()):
+            return False
+        self.step.handoff = None
+        return True
+
     def attach_failure_excerpt(self, excerpt: str) -> None:
         if self.step.failure is not None and excerpt:
             self.step.failure["logExcerpt"] = excerpt[-EXCERPT_LIMIT:]
@@ -317,10 +338,11 @@ class Operation:
             if step.preview is not None:
                 preview = step.preview.public()
                 preview["confirmationToken"] = step.plan_hash if step.status is Status.AWAITING_CONFIRMATION else None
+            waiting = {"action": step.handoff["action"], "since": step.handoff["since"]} if step.handoff else None
             steps.append({"index": index, "name": step.name, "kind": step.kind.value, "status": step.status.value,
                           "preview": preview, "runs": [run.public() for run in step.runs],
                           "failure": copy.deepcopy(step.failure), "startedAt": step.started_at,
-                          "finishedAt": step.finished_at})
+                          "finishedAt": step.finished_at, "waitingFor": waiting})
         return {"operationId": self.id, "scenario": self.scenario.value, "scenarioNumber": self.scenario.number,
                 "target": self.target, "status": self.status.value, "backend": self.backend,
                 "executor": self.executor, "currentStep": self.current, "createdAt": self.created_at,

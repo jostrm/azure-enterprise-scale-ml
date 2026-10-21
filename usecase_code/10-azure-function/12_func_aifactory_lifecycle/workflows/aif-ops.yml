@@ -1,0 +1,75 @@
+# One Factory API call for the lifecycle Function (AIF_EXECUTOR=github-runner), run on the Factory API host.
+# The Function dispatches this workflow; the job runs the template's runner entry point, which checks the Function's
+# signature on the request, calls the API on 127.0.0.1 through the REST or SDK adapter and POSTs one signed result to
+# the Function's private endpoint. A confirmation is submitted once: re-running its job does nothing.
+# Copy to .github/workflows/ in the Function's ops repository, next to aif-event-relay.yml - not in the factory
+# repository: the Factory API refuses to dispatch factory-lifecycle runs while any other workflow runs there. Needs:
+#   vars.AIF_LIFECYCLE_RESULTS_URL      https://<function app>.azurewebsites.net/api/v1/runner/results
+#   secrets.AIF_LIFECYCLE_EVENT_SECRET  one value: the first (current) value of the Function's event secret
+#   vars.AIF_LIFECYCLE_HOME             optional; the runner install folder (default C:\aif-lifecycle) holding
+#                                       venv\, app\ (this template) and runner.json (API URL, folder, Key Vault names)
+# The runner label is privileged: jobs on it reach the Factory API and the Function's private endpoint. Keep
+# fork-pull-request workflows off and collaborators to trusted admins; in an organization, limit the runner group to
+# these workflows on refs/heads/main and keep the secret in an environment only main can use.
+# The request input carries reviews and catalog IDs, never secrets; inputs reach the script only through env.
+# No concurrency group: the single management runner already runs one job at a time, and a group would cancel
+# pending runs, which could drop a confirmation.
+name: aif-ops
+run-name: aif-ops [${{ inputs.operation_id }}/${{ inputs.step }}/${{ inputs.action }}-${{ inputs.nonce }}]
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation_id:
+        description: Lifecycle operation ID (UUID)
+        required: true
+        type: string
+      step:
+        description: Step index in the operation
+        required: true
+        type: string
+      action:
+        description: Factory API call
+        required: true
+        type: choice
+        options: [catalog, prepare, confirm, status]
+      nonce:
+        description: Identifies this call (also in the signed request)
+        required: true
+        type: string
+      request:
+        description: The Function's signed request
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  call:
+    runs-on: [self-hosted, aif-lifecycle-mgmt]
+    timeout-minutes: 10  # under the Function's AIF_RUNNER_TIMEOUT_SECONDS (900 s by default)
+    steps:
+      - name: Call the Factory API and report the result
+        shell: powershell
+        env:
+          AIF_OPERATION_ID: ${{ inputs.operation_id }}
+          AIF_STEP: ${{ inputs.step }}
+          AIF_ACTION: ${{ inputs.action }}
+          AIF_NONCE: ${{ inputs.nonce }}
+          AIF_RUNNER_REQUEST: ${{ inputs.request }}
+          AIF_RESULTS_URL: ${{ vars.AIF_LIFECYCLE_RESULTS_URL }}
+          AIF_EVENT_SECRET: ${{ secrets.AIF_LIFECYCLE_EVENT_SECRET }}
+          AIF_LIFECYCLE_HOME: ${{ vars.AIF_LIFECYCLE_HOME }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:AIF_OPERATION_ID -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z') { throw 'operation_id must be a lowercase UUID.' }
+          if ($env:AIF_STEP -cnotmatch '^[0-9]{1,3}\z') { throw 'step must be 0-999.' }
+          if ($env:AIF_NONCE -cnotmatch '^[0-9a-f]{32}\z') { throw 'nonce must be 32 lowercase hex characters.' }
+          if ($env:AIF_RUNNER_REQUEST -cnotmatch '^[A-Za-z0-9_=-]+\.[A-Za-z0-9_-]+\z' -or $env:AIF_RUNNER_REQUEST.Length -gt 60000) { throw 'request must be the Function''s signed request.' }
+          if ($env:AIF_RESULTS_URL -cnotmatch '^https://' -or -not $env:AIF_EVENT_SECRET) { throw 'Set vars.AIF_LIFECYCLE_RESULTS_URL (https://...) and secrets.AIF_LIFECYCLE_EVENT_SECRET.' }
+          $lifecycle = if ($env:AIF_LIFECYCLE_HOME) { $env:AIF_LIFECYCLE_HOME } else { 'C:\aif-lifecycle' }
+          $env:AIF_LIFECYCLE_HOME = $lifecycle
+          $env:PYTHONPATH = Join-Path $lifecycle 'app'
+          # -P keeps the job's working folder off sys.path, so nothing in _work can stand in for the installed code.
+          & (Join-Path $lifecycle 'venv\Scripts\python.exe') -P -m aif_lifecycle.runner
+          if ($LASTEXITCODE -ne 0) { throw "The runner exited with $LASTEXITCODE; the Function times the call out." }

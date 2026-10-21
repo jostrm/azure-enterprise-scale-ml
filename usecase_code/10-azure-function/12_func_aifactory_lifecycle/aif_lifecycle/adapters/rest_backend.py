@@ -26,7 +26,7 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def _loopback(host: str) -> bool:
+def is_loopback(host: str) -> bool:
     if host.lower() == "localhost":
         return True
     try:
@@ -44,7 +44,7 @@ class RestTransport:
         parsed = urlparse(base_url or "")
         if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.query:
             raise ValidationFailed("AIF_FACTORY_API_URL must be an http(s) URL without credentials or query.")
-        if parsed.scheme == "http" and not _loopback(parsed.hostname):
+        if parsed.scheme == "http" and not is_loopback(parsed.hostname):
             raise ValidationFailed("Plain http to the Factory API is allowed only for loopback hosts.")
         self._base = base_url.rstrip("/")
         self._key = api_key

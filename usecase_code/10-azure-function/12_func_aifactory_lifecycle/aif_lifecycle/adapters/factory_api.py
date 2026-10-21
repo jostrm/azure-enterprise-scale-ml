@@ -17,6 +17,24 @@ from ..domain.scenarios import Scenario
 from ..ports import Catalog, ConfirmResult, StepRequest
 
 RUNTIME_STEPS = {"deploy-common", "deploy-project001", "deploy-project", "delete-project", "delete-scaleset"}
+_JOB_STATES = {"queued": ("queued", None), "running": ("in_progress", None), "succeeded": ("completed", "success"),
+               "failed": ("completed", "failure"), "interrupted": ("completed", "failure")}
+
+
+def job_observation(status: dict[str, Any]) -> dict[str, Any] | None:
+    """A Factory API job (or creation workflow) status as a run observation; its latest pipeline run gives the link."""
+    state = _JOB_STATES.get(str(status.get("status")))
+    if state is None:
+        return None
+    run_id, url = None, None
+    for run in reversed(status.get("pipeline_runs") or []):
+        if isinstance(run, dict) and (run.get("html_url") or run.get("url")):
+            url = str(run.get("html_url") or run.get("url"))
+            raw = str(run.get("run_id") or run.get("id") or "")
+            run_id = int(raw) if raw.isdigit() else None
+            break
+    return {"status": state[0], "conclusion": state[1], "run_id": run_id, "html_url": url,
+            "message": str(status.get("message") or "")}
 
 
 def deploy_request(folder: str, factory_id: str, scale_set_id: str, project_id: str | None,
@@ -72,7 +90,11 @@ class FactoryApiBackend(ABC):
     # ----- FactoryBackend port -----
 
     def catalog(self) -> Catalog:
-        return Catalog.from_api(self._catalog_list())
+        return Catalog.from_api(self.catalog_payload())
+
+    def catalog_payload(self) -> dict[str, Any]:
+        """The API's catalog answer as is (the runner sends it to the Function as the planning snapshot)."""
+        return self._catalog_list()
 
     def prepare(self, request: StepRequest) -> Preview:
         revision = self._catalog_list().get("revision")

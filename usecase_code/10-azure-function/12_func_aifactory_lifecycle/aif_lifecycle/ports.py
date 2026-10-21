@@ -18,6 +18,15 @@ class StoreMissing(Exception):
     """The key does not exist."""
 
 
+class Deferred(Exception):
+    """The backend handed the call to the runner; its signed result finishes the step later (apply_runner_result)."""
+
+    def __init__(self, action: str, nonce: str):
+        super().__init__(f"{action} handed to the runner")
+        self.action = action
+        self.nonce = nonce
+
+
 class StateStore(Protocol):
     """Small key-value store with optimistic concurrency (ETags). `value["status"]` is queryable."""
 
@@ -123,6 +132,7 @@ class ExecutionTracker(Protocol):
 
     def advance(self, operation: Operation, now: datetime) -> None: ...
     def poll(self, operation: Operation, run: Run, now: datetime) -> dict[str, Any] | None: ...
+    def observe(self, status: dict[str, Any]) -> dict[str, Any] | None: ...
     def failure_excerpt(self, run_id: int | None) -> str: ...
 
 

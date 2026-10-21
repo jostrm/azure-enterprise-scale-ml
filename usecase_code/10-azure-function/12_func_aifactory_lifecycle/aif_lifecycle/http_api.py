@@ -95,6 +95,18 @@ class LifecycleHttpApi:
             return (202 if result.get("result") in ("applied", "queued") else 200), result, {}
         return self._handle(request, run)
 
+    def runner_results(self, request: ApiRequest) -> ApiResponse:
+        """A runner's result (aif-ops.yml), signed with the event secret like the relay's events."""
+        def run():
+            if not verify(self._secrets, request.body, request.header("x-hub-signature-256")):
+                raise InvalidSignature("X-Hub-Signature-256 does not match the configured event secret.")
+            result = self._service.apply_runner_result(_json(request))
+            return (202 if result.get("result") == "applied" else 200), result, {}
+        return self._handle(request, run)
+
+    def refresh_catalog(self, request: ApiRequest) -> ApiResponse:
+        return self._handle(request, lambda: (202, self._service.refresh_catalog(), {}))
+
     def process_queued(self, message: dict[str, Any]) -> dict[str, Any]:
         """Apply a queued event. Queue access is not trust: only messages this Function signed are applied."""
         unsigned = {key: value for key, value in message.items() if key != "signature"}

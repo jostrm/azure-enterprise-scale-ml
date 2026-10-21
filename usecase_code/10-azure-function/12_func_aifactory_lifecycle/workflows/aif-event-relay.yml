@@ -1,5 +1,6 @@
 # Relays workflow_run events to the lifecycle Function's private endpoint, HMAC-signed like a GitHub webhook.
-# Copy to .github/workflows/ on the factory repo's DEFAULT branch (workflow_run only triggers from there).
+# Copy to .github/workflows/ on the DEFAULT branch (workflow_run only triggers from there) of the repository that
+# runs the Function's workflows: aif-dummy-step.yml (github-dummy) and aif-ops.yml (github-runner).
 # Runs on the management runner, which reaches the Function's private endpoint. Needs:
 #   vars.AIF_LIFECYCLE_EVENTS_URL      https://<function app>.azurewebsites.net/api/v1/github/events
 #   secrets.AIF_LIFECYCLE_EVENT_SECRET one value: the first (current) value of the Function's event secret, no commas
@@ -9,17 +10,20 @@ name: aif-event-relay
 
 on:
   workflow_run:
-    workflows: [aif-dummy-step]
+    workflows: [aif-dummy-step, aif-ops]
     types: [in_progress, completed]  # 'requested' events carry the workflow name, not the run name
 
 permissions: {}
 
 jobs:
   relay:
+    # aif-ops results come on the Function's results route; an aif-ops run is relayed only when it ended badly, so
+    # the Function can stop waiting for a result that will never come. Skipped jobs take no runner time.
     if: >-
       github.event.workflow_run.event == 'workflow_dispatch' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
-      !endsWith(github.event.workflow_run.display_title, ' no-relay')
+      !endsWith(github.event.workflow_run.display_title, ' no-relay') &&
+      (github.event.workflow_run.name != 'aif-ops' || (github.event.action == 'completed' && github.event.workflow_run.conclusion != 'success'))
     runs-on: [self-hosted, aif-lifecycle-mgmt]
     timeout-minutes: 5
     steps:

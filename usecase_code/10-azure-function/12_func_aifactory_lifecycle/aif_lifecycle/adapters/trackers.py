@@ -4,6 +4,8 @@
 - ApiJobTracker (AIF_EXECUTOR=inprocess with rest/sdk): the Factory API started the job; the poller reads its status.
 - DummyWorkflowTracker (AIF_EXECUTOR=github-dummy): one `aif-dummy-step.yml` run per resource group, dispatched in
   order; workflow_run events (relay or webhook) advance them, and the poller recovers lost events.
+- RunnerJobTracker (AIF_EXECUTOR=github-runner): the Factory API started the job at confirm; status checks are handed
+  to aif-ops.yml on the API host, one at a time, and their results update the run.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from typing import Any
 from ..application.events import run_marker
 from ..domain.operation import Operation, Run
 from ..ports import GitHubPort
+from .factory_api import job_observation
 
 
 def planned_outcome(operation: Operation, run: Run) -> str:
@@ -42,12 +45,11 @@ class InstantTracker:
     def poll(self, operation: Operation, run: Run, now: datetime) -> dict[str, Any] | None:
         return None
 
+    def observe(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        return None
+
     def failure_excerpt(self, run_id: int | None) -> str:
         return ""
-
-
-_JOB_STATES = {"queued": ("queued", None), "running": ("in_progress", None), "succeeded": ("completed", "success"),
-               "failed": ("completed", "failure"), "interrupted": ("completed", "failure")}
 
 
 class ApiJobTracker:
@@ -64,11 +66,10 @@ class ApiJobTracker:
             operation.run_dispatched(run.target, now)
 
     def poll(self, operation: Operation, run: Run, now: datetime) -> dict[str, Any] | None:
-        status = self._backend.job_status(operation.step.job)
-        state = _JOB_STATES.get(str(status.get("status")))
-        if state is None:
-            return None
-        return {"status": state[0], "conclusion": state[1], "run_id": None, "html_url": None}
+        return self.observe(self._backend.job_status(operation.step.job))
+
+    def observe(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        return job_observation(status)
 
     def failure_excerpt(self, run_id: int | None) -> str:
         return ""
@@ -103,6 +104,34 @@ class DummyWorkflowTracker:
             return None
         return {"status": data.get("status"), "conclusion": data.get("conclusion"), "run_id": data.get("id"),
                 "html_url": data.get("html_url")}
+
+    def observe(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        return None
+
+    def failure_excerpt(self, run_id: int | None) -> str:
+        return self._github.failure_excerpt(run_id) if run_id else ""
+
+
+class RunnerJobTracker:
+    name = "github-runner"
+
+    def __init__(self, backend, github: GitHubPort):
+        self._backend = backend
+        self._github = github
+
+    def advance(self, operation: Operation, now: datetime) -> None:
+        run = operation.next_dispatchable_run()
+        if run is not None:
+            operation.run_dispatched(run.target, now)
+
+    def poll(self, operation: Operation, run: Run, now: datetime) -> dict[str, Any] | None:
+        """Ask the runner for the job status (one check at a time); the result arrives on the results route."""
+        if operation.handoff is None:
+            operation.hand_off("status", self._backend.status(operation), now)
+        return None
+
+    def observe(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        return job_observation(status)
 
     def failure_excerpt(self, run_id: int | None) -> str:
         return self._github.failure_excerpt(run_id) if run_id else ""

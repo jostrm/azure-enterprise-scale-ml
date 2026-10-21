@@ -63,6 +63,19 @@ expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application
 Start with `AIF_BACKEND=mock` and `AIF_EXECUTOR=inprocess`, then `github-dummy`, before switching to the real API.
 Add App Service authentication with an Entra app role before real deployments; function keys are for the mock passes.
 
+For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `sdk`):
+
+1. Keep the Function's workflows (`aif-ops.yml`, `aif-event-relay.yml`) in an ops repository of their own: the
+   Factory API won't dispatch the factory's runs while another workflow of the factory repo is running. Point
+   `AIF_GITHUB_REPOSITORY` at the ops repository and add its variable `AIF_LIFECYCLE_RESULTS_URL`
+   (`https://<app>.azurewebsites.net/api/v1/runner/results`).
+2. On the management VM, run the Factory API (loopback only) as a service of one fixed Windows user with that user's
+   own `az` and `gh` logins, keep a clone of the factory repo outside the runner's work folder, and install the runner
+   entry point with `scripts\install-lifecycle-runner.ps1` (the API URL, the factory repo's `azurefactory` folder and
+   the Key Vault names go into `runner.json`).
+3. The first prepare answers 503 `catalog-pending` while the runner reads the catalog; `POST /api/v1/catalog/refresh`
+   reads it again after changes made outside the Function.
+
 ## Limits
 
 - Scenario 6 uses `delete-aifactory`, which deletes every environment of a factory. Multi-environment factories get

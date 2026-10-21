@@ -38,18 +38,26 @@ Caller (VPN)
     -> executor  inprocess     : adapters call the API on this host's loopback (local `func start` next to the API)
                  github-dummy  : one aif-dummy-step.yml run per resource group (mocked API, real GitHub events)
                  github-runner : aif-ops.yml on the management runner -> REST/SDK adapter -> API on 127.0.0.1:8765
-                                 -> the API dispatches factory-lifecycle.yml
+                                 -> the API dispatches factory-lifecycle.yml in the factory repo
+ <- results: the runner POSTs one signed result per call to /api/v1/runner/results (github-runner)
  <- events: aif-event-relay.yml (workflow_run, on the management runner) POSTs the payload, HMAC-signed
- <- fallback: the timer polls GitHub for runs whose events are late
+ <- fallback: the timer polls runs whose events are late and times out runner calls that never report
 ```
+
+With `github-runner`, every Factory API call is a hand-off: the step waits in `preparing` or `confirming`
+(`waitingFor` on the operation) until the runner's signed result arrives. A review that never reports fails with
+`runner-timeout`; a confirmation that never reports, or whose aif-ops run ends without a result, becomes `uncertain`
+(never retried). Planning reads a catalog snapshot that every runner result refreshes; the first prepare answers 503
+`catalog-pending` while the snapshot is read, and `POST /api/v1/catalog/refresh` reads it again. Job status checks also
+run on the runner, one at a time.
 
 | Layer | Code | Patterns |
 |---|---|---|
-| Entry | `function_app.py` (thin), `aif_lifecycle/http_api.py` | Gatekeeper (HMAC), Asynchronous Request-Reply |
-| Application | `application/service.py` (`LifecycleService`), `planner.py`, `resolver.py`, `guard.py`, `events.py` | Facade |
+| Entry | `function_app.py` (thin), `aif_lifecycle/http_api.py`, `aif_lifecycle/runner.py` (runner host) | Gatekeeper (HMAC), Asynchronous Request-Reply |
+| Application | `application/service.py` (`LifecycleService`), `planner.py`, `resolver.py`, `guard.py`, `events.py`, `runner_protocol.py` (Function-runner contract) | Facade |
 | Domain | `domain/ids.py`, `operation.py`, `scenarios.py`, `errors.py` | State (transition table) |
 | Ports | `ports.py` | |
-| Adapters | `adapters/mock_backend.py`, `factory_api.py` + `rest_backend.py` / `sdk_backend.py`, `trackers.py`, `github.py`, `stores.py`, `queue.py` | Strategy, Template Method, Adapter, Queue-Based Load Leveling |
+| Adapters | `adapters/mock_backend.py`, `factory_api.py` + `rest_backend.py` / `sdk_backend.py`, `runner_backend.py`, `trackers.py`, `github.py`, `stores.py`, `queue.py` | Strategy, Template Method, Adapter, Queue-Based Load Leveling |
 | Composition root | `composition.py`, `settings.py` | |
 
 - **Two steps everywhere.** `POST .../prepare` returns 202; the preview (plan, affected resource groups, blockers,
@@ -75,6 +83,8 @@ Caller (VPN)
 | `GET /api/v1/operations/{id}` | function key | 200 operation with steps, previews, runs, history |
 | `POST /api/v1/operations/{id}/confirm` | function key | 202, `Location`, `Retry-After` |
 | `POST /api/v1/github/events` | anonymous + `X-Hub-Signature-256` | 202 applied/queued, 200 duplicate/ignored, 401 bad signature |
+| `POST /api/v1/runner/results` | anonymous + `X-Hub-Signature-256` | 202 applied, 200 ignored (not the pending hand-off), 401 bad signature |
+| `POST /api/v1/catalog/refresh` | function key | 202; `github-runner` only (400 `not-supported` otherwise) |
 
 Prepare bodies: `{"factoryId": "aif-121-sdc-dev"}`, `{"scalesetId": "aif-121-sdc-dev-002"}`,
 `{"projectId": "aif-121-esml-project002-sdc-dev-001-rg", "settings": {...}}`. Optional: `wholeWorkflow` (scenario 1,
@@ -102,7 +112,8 @@ Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, 
 | `AIF_KEY_VAULT_NAME` | vault name | The Function reads the secrets below by name with its managed identity |
 | `AIF_EVENT_SECRET_NAME` | secret name | HMAC secret for the events route and queued messages; a secret value may hold two comma-separated values while rotating |
 | `AIF_GITHUB_REPOSITORY`, `AIF_GITHUB_TOKEN_NAME` | `owner/repo`, secret name | Fine-grained token or GitHub App limited to that repo's Actions |
-| `AIF_FACTORY_API_URL`, `AIF_FACTORY_API_KEY_NAME`, `AIF_FACTORY_FOLDER` | `http://127.0.0.1:8765`, secret name, path | REST/SDK; plain http only to loopback |
+| `AIF_FACTORY_API_URL`, `AIF_FACTORY_API_KEY_NAME`, `AIF_FACTORY_FOLDER` | `http://127.0.0.1:8765`, secret name, path | REST/SDK with `inprocess`; plain http only to loopback. With `github-runner` they belong to the runner (`runner.json`), not the Function |
+| `AIF_OPS_WORKFLOW`, `AIF_RUNNER_TIMEOUT_SECONDS` | `aif-ops.yml`, 900 | `github-runner`: the workflow it dispatches in `AIF_GITHUB_REPOSITORY`, and how long a hand-off may stay silent |
 | `AIF_REVIEW_TTL_SECONDS`, `AIF_POLL_AFTER_SECONDS` | 600, 120 | |
 
 For local development, `AIF_EVENT_SECRET`, `AIF_GITHUB_TOKEN` and `AIF_FACTORY_API_KEY` can hold plain values.
@@ -152,21 +163,48 @@ Use function keys for the mock passes. Before real deployments, add App Service 
 
 - `workflows/aif-dummy-step.yml` (GitHub-hosted runner) simulates one resource-group deployment; its run name starts
   with `aif-step [<operationId>/<step>/<target>]`, which the Function matches as a whole.
-- `workflows/aif-event-relay.yml` must be on the factory repo's default branch. It forwards only `workflow_dispatch`
-  runs of the same repository, signs the payload with the first value of the event secret (the Function's rule) and
-  retries transient failures three times. The Function also checks the event, workflow file and repository, keeps the
+- `workflows/aif-event-relay.yml` must be on the default branch of the repository that runs the Function's workflows
+  (the ops repository with the runner executor). It forwards only `workflow_dispatch` runs of the same repository (for
+  `aif-ops`, only runs that ended without success), signs the payload with the first value of the event secret (the
+  Function's rule) and retries transient failures three times. The Function also checks the event, workflow file and repository, keeps the
   first run id bound to a run, and records a delivery only after it was applied or queued. The poller recovers events
   that never arrive (`dropEventAt` simulates that).
-- Register the management runner per factory repo (user-owned repos can't share runners):
+- Register the management runner for that repository (user-owned repos can't share runners):
   `scripts/register-management-runner.ps1` gets a one-hour registration token with `gh` and runs
   `scripts/install-github-runner.ps1` on the VM through a VM run command, passing the token as a protected parameter.
   The runner package hash is verified. Use a label of its own (default `aif-lifecycle-mgmt`), never the factory's
   runner label.
 - **The label is privileged.** Any workflow that targets it runs on the management VM, which reaches the Function's
-  private endpoint and (for the runner executor) the Factory API. Keep fork-pull-request workflows off, limit
-  collaborators to trusted admins, and give the relay its own runner instance when the runner executor is added.
+  private endpoint and (for the runner executor) the Factory API. Keep fork-pull-request workflows off and limit
+  collaborators to trusted admins.
 - Repository settings: variable `AIF_LIFECYCLE_EVENTS_URL` (`https://<app>.azurewebsites.net/api/v1/github/events`)
   and secret `AIF_LIFECYCLE_EVENT_SECRET` (one value, no commas).
+
+## Runner executor: the Factory API host
+
+`AIF_EXECUTOR=github-runner` (with `AIF_BACKEND=rest` or `sdk`, the adapter the runner uses) needs:
+
+- **Two repositories.** The Factory API refuses to dispatch `factory-lifecycle.yml` while any other workflow of the
+  factory repo is queued or running, so `aif-ops.yml`, `aif-event-relay.yml` (and `aif-dummy-step.yml`) live in a
+  separate ops repository with the management runner; `AIF_GITHUB_REPOSITORY` names that ops repository. The factory
+  repository holds only what the Factory API writes there. Runs the API dispatches are followed through the API's job
+  status, because the factory repository can't run a relay either.
+- **The Factory API on the management VM**, loopback only, as a service of one fixed Windows user (its confirmations
+  are sealed for that user) with a fixed `AIFACTORY_CATALOG_OWNER`, and with that user's own `az` and `gh` logins: the
+  API passes no token variables to the CLIs it runs. Keep a persistent clone of the factory repository outside the
+  runner's `_work` folder; the API's `folder` is its `azurefactory` subfolder.
+- **The runner entry point** on the same VM: `C:\aif-lifecycle\app` (this folder), `venv\` with `requirements.txt`, and
+  `runner.json` with `AIF_FACTORY_API_URL`, `AIF_FACTORY_FOLDER`, `AIF_KEY_VAULT_NAME` and
+  `AIF_FACTORY_API_KEY_NAME` (the VM's managed identity reads the key). The ops repository gets variable
+  `AIF_LIFECYCLE_RESULTS_URL` (`https://<app>.azurewebsites.net/api/v1/runner/results`); the result is signed with
+  `AIF_LIFECYCLE_EVENT_SECRET`.
+- Requests travel as workflow inputs, which anyone with read access to the ops repository can see: reviews and catalog
+  IDs, never secrets. The Function signs each request with the event secret and an expiry (`AIF_RUNNER_TIMEOUT_SECONDS`);
+  the runner refuses a request it can't verify, one that expired, or one whose workflow inputs differ from it. The run
+  name ends in `<action>-<nonce>`, so only the run of the pending call can end it. A confirmation is submitted once (a
+  re-run of its job does nothing); only the result post is retried. `install-lifecycle-runner.ps1` removes inherited
+  rights so the runner account can read and run the install but never change it, and aif-ops runs Python with `-P`
+  so the job's working folder can't stand in for the installed code.
 
 ## Consumer copy
 

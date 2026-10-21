@@ -58,6 +58,11 @@ def from_this_function(observed: WorkflowRunObservation, repository: str | None)
     return not (repository and observed.repository and observed.repository.lower() != repository.lower())
 
 
+def is_runner_call(observed: WorkflowRunObservation) -> bool:
+    """An aif-ops run carries one Factory API call (its marker's last part is the action), not a resource group."""
+    return observed.title.startswith("aif-ops [")
+
+
 def run_marker(operation_id: str, step: int, target: str) -> str:
     return f"[{operation_id}/{step}/{target}]"
 
