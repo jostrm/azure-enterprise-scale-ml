@@ -128,6 +128,13 @@ def test_an_unreachable_api_on_confirm_is_uncertain_not_retried(function):
     assert result["outcome"] == "uncertain" and result["error"]["code"] == "upstream-unavailable"
 
 
+def test_a_new_consumer_folder_reports_an_empty_catalog_so_init_factory_can_be_planned(function):
+    with FakeFactoryApi(missing_catalog=True) as api:
+        assert runner.main(env_for(api.url, function, {"action": "catalog"})) == 0
+    result = function.result()
+    assert result["outcome"] == "ok" and result["catalog"] == {"revision": "", "factories": []}
+
+
 def test_status_reports_the_api_job(function):
     with FakeFactoryApi() as api:
         runner.main(env_for(api.url, function, {"action": "status", "job": {"kind": "job", "job_id": "j-1"}}))

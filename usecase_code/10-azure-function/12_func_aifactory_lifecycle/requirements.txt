@@ -4,4 +4,4 @@ azure-data-tables>=12.5
 azure-storage-queue>=12.9
 azure-keyvault-secrets>=4.8
 # Option 2 (AIF_BACKEND=sdk): the stdlib-only azurefactory SDK, pinned to a purple commit (not copied).
-azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@1f76c0a02a51e9b8f63f31787216880f5c939af6#subdirectory=environment_setup/azurefactory-cli
+azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@619d2b05dfead8ad13bb308c303fc6bbc679973e#subdirectory=environment_setup/azurefactory-cli

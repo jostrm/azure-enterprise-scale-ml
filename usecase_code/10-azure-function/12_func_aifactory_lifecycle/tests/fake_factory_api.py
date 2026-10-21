@@ -14,6 +14,7 @@ PROJECT_ID = "33333333-3333-4333-8333-333333333333"
 JOB_ID = "44444444-4444-4444-8444-444444444444"
 WORKFLOW_ID = "55555555-5555-4555-8555-555555555555"
 CONFIRMATION_ID = "66666666-6666-4666-8666-666666666666"
+AUTHORIZATION_HASH = "c" * 64
 
 CATALOG = {"contract_version": 1, "mode": "catalog", "revision": REVISION, "factories": [{
     "id": FACTORY_ID, "key": "aif-121-swedencentral", "kind": "ai", "prefix": "aif-121-", "region": "swedencentral",
@@ -37,7 +38,7 @@ OPENAPI = {"openapi": "3.1.0", "components": {"schemas": {"CatalogPrepare": {"pr
     "initial_project": {}, "target_region_short_name": {}}}}}}
 
 
-def _response(method: str, path: str):
+def _response(method: str, path: str, body):
     if path == "/openapi.json":
         return OPENAPI
     if method == "GET" and path == "/api/v1/factory-catalog":
@@ -46,8 +47,13 @@ def _response(method: str, path: str):
         return JOB
     if method == "GET" and path.startswith("/api/v1/creation/workflows/"):
         return {"workflow_id": WORKFLOW_ID, "status": "running"}
-    if path in ("/api/v1/factory-catalog/prepare", "/api/v1/operations/delete-aifactory/prepare",
-                "/api/v1/creation/workflows/prepare"):
+    if path == "/api/v1/creation/prepare":  # ConfigurationPreview: the catalog review plus the folder it resolved
+        return {**PREVIEW, "folder": body["folder"]}
+    if path == "/api/v1/creation/confirm":
+        return {"contract_version": 1, "catalog": CATALOG, "job": None}
+    if path == "/api/v1/creation/workflows/prepare":
+        return {**PREVIEW, "review": {"workflow_authorization": {"authorization_hash": AUTHORIZATION_HASH}}}
+    if path in ("/api/v1/factory-catalog/prepare", "/api/v1/operations/delete-aifactory/prepare"):
         return PREVIEW
     if path in ("/api/v1/factory-catalog/confirm", "/api/v1/operations/delete-aifactory/confirm"):
         return {"contract_version": 1, "catalog": CATALOG, "job": JOB}
@@ -57,8 +63,9 @@ def _response(method: str, path: str):
 
 
 class FakeFactoryApi:
-    def __init__(self, api_key: str = "test-key"):
+    def __init__(self, api_key: str = "test-key", *, missing_catalog: bool = False):
         self.api_key = api_key
+        self.missing_catalog = missing_catalog  # a new consumer folder: the API answers its catalog with 404
         self.calls: list[dict] = []
         outer = self
 
@@ -74,7 +81,9 @@ class FakeFactoryApi:
                                     "query": sorted(parse_qsl(parts.query, keep_blank_values=True)),
                                     "body": json.loads(raw) if raw else None,
                                     "key": self.headers.get("X-API-Key") == outer.api_key})
-                payload = _response(self.command, parts.path)
+                payload = _response(self.command, parts.path, json.loads(raw) if raw else None)
+                if outer.missing_catalog and parts.path == "/api/v1/factory-catalog":
+                    payload = None
                 status = 200 if payload is not None else 404
                 data = json.dumps(payload if payload is not None else {"detail": "not found"}).encode()
                 self.send_response(status)

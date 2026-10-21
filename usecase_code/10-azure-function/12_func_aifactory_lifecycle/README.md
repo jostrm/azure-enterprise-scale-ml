@@ -88,10 +88,18 @@ run on the runner, one at a time.
 
 Prepare bodies: `{"factoryId": "aif-121-sdc-dev"}`, `{"scalesetId": "aif-121-sdc-dev-002"}`,
 `{"projectId": "aif-121-esml-project002-sdc-dev-001-rg", "settings": {...}}`. Optional: `wholeWorkflow` (scenario 1,
-one bounded approval), `includeProjectSubnets` / `includeKeyvaultAndResourceGroup` (scenario 4, default true),
-`scaleSet` `{subscriptionId, tenantId, orchestrator, vnetCidr, maxProjects}` (scenarios 1-2 against the real API),
-`bootstrapConfig` (scenario 1 against the real API). Mock only: `simulate` `{failAt, uncertainAt, rejectAt,
+one bounded approval; required with the real API), `includeProjectSubnets` / `includeKeyvaultAndResourceGroup`
+(scenario 4, default true), `scaleSet` `{subscriptionId, tenantId, orchestrator, vnetCidr, maxProjects}` (scenario 2
+against the real API), `bootstrapConfig` (scenario 1 against the real API: the API's full bootstrap configuration, for
+example `subscription_id`, `tenant_id`, `team_member_email`, `team_group_name`, `github_repository`,
+`coordination_mode`, `access_hub_mode`, `setup_hub_access`). Mock only: `simulate` `{failAt, uncertainAt, rejectAt,
 dropEventAt}` and `ttlSeconds`.
+
+Against the real API, scenario 1 saves the factory with `POST /api/v1/creation/prepare` and `/confirm` (full
+bootstrap, dev scale set 001; the Function pins `factory_prefix`, `location` and `scale_set_number` to the FactoryId),
+then runs the creation workflow under one whole-workflow approval, which the API continues by itself between stages.
+If the API asks for a new human review mid-workflow (`requires_review`), the step stops with `action_required` and the
+API's message.
 
 Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, never stack traces or secrets:
 400 `validation-failed` / `invalid-id` / `invalid-json` / `unsupported-scenario` / `confirmation-mismatch` /

@@ -106,17 +106,12 @@ class RestFactoryBackend(FactoryApiBackend):
     def _catalog_list(self):
         return self._http.call("GET", "/api/v1/factory-catalog", query={"folder": self.folder})
 
-    def _create_factory(self, *, prefix, region, region_short_name, scale_sets, settings, expected_revision):
-        schema = self._http.call("GET", "/openapi.json")
-        properties = schema.get("components", {}).get("schemas", {}).get("CatalogPrepare", {}).get("properties", {})
-        if "initial_project" not in properties or "target_region_short_name" not in properties:
-            raise ValidationFailed("The Factory API is too old for create-factory with an initial project and region code.")
-        body = {key: value for key, value in {
-            "folder": self.folder, "contract_version": 1, "action": "create-factory", "factory_kind": "ai",
-            "target_prefix": prefix, "target_region": region, "target_region_short_name": region_short_name,
-            "scale_sets": scale_sets, "settings": settings, "expected_revision": expected_revision,
-        }.items() if value is not None}
-        return self._prepare(body)
+    def _creation_prepare(self, body):
+        return self._http.call("POST", "/api/v1/creation/prepare", body=body)
+
+    def _creation_confirm(self, folder, confirmation_id):
+        return self._http.call("POST", "/api/v1/creation/confirm", body={
+            "contract_version": 1, "folder": folder, "confirmation_id": confirmation_id})
 
     def _add_scaleset(self, factory_id, scale_sets, expected_revision):
         return self._prepare(self._request(self.folder, factory_id, "create-scale-set", expected_revision,

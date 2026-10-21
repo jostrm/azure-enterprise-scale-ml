@@ -48,10 +48,11 @@ class SdkFactoryBackend(FactoryApiBackend):
     def _catalog_list(self):
         return self._call(lambda: self._client.catalog_list(self.folder))
 
-    def _create_factory(self, *, prefix, region, region_short_name, scale_sets, settings, expected_revision):
-        return self._call(lambda: self._client.factory_create_prepare(
-            self.folder, prefix=prefix, region=region, scale_sets=scale_sets, settings=settings,
-            expected_revision=expected_revision, region_short_name=region_short_name))
+    def _creation_prepare(self, body):
+        return self._call(lambda: self._client.creation_prepare(body))
+
+    def _creation_confirm(self, folder, confirmation_id):
+        return self._call(lambda: self._client.creation_confirm(folder, confirmation_id))
 
     def _add_scaleset(self, factory_id, scale_sets, expected_revision):
         return self._call(lambda: self._client.scaleset_add_prepare(

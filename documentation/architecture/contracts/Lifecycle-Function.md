@@ -60,7 +60,10 @@ GitHub runs through `workflow_run` events.
   non-idempotent call, and `uncertain` as a terminal outcome that is never retried.
 - **Backends** share one step-to-call mapping (`adapters/factory_api.py`, Template Method); REST and SDK only differ in
   transport, and a parity test proves they make identical calls. A mock backend keeps a persistent catalog for
-  end-to-end tests without Azure.
+  end-to-end tests without Azure. Scenario 1 saves the factory through `/api/v1/creation/prepare|confirm` (full
+  bootstrap, dev scale set 001, prefix/region/suffix pinned to the FactoryId) and runs the creation workflow under one
+  whole-workflow approval that the API continues by itself; a mid-workflow review request stops the step
+  (`action_required`) rather than being auto-confirmed.
 - **Executors**: `inprocess` (the API on this host's loopback), `github-dummy` (dummy workflow runs) and
   `github-runner` (the management runner calls the API on 127.0.0.1). The Function never calls the Factory API over
   the network because catalog and deployment routes require a loopback client.
