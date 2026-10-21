@@ -1,0 +1,40 @@
+# Relays workflow_run events to the lifecycle Function's private endpoint, HMAC-signed like a GitHub webhook.
+# Copy to .github/workflows/ on the factory repo's DEFAULT branch (workflow_run only triggers from there).
+# Runs on the management runner, which reaches the Function's private endpoint. Needs:
+#   vars.AIF_LIFECYCLE_EVENTS_URL      https://<function app>.azurewebsites.net/api/v1/github/events
+#   secrets.AIF_LIFECYCLE_EVENT_SECRET the same value as the Function's AIF_EVENT_SECRET (Key Vault)
+# The payload is read from GITHUB_EVENT_PATH; github.event is never interpolated into a script.
+name: aif-event-relay
+
+on:
+  workflow_run:
+    workflows: [aif-dummy-step, aif-ops, factory-lifecycle]
+    types: [requested, in_progress, completed]
+
+permissions: {}
+
+jobs:
+  relay:
+    if: ${{ !contains(github.event.workflow_run.display_title, 'no-relay') }}
+    runs-on: [self-hosted, aif-lifecycle-mgmt]
+    timeout-minutes: 5
+    steps:
+      - name: Forward the signed event
+        shell: powershell
+        env:
+          AIF_EVENTS_URL: ${{ vars.AIF_LIFECYCLE_EVENTS_URL }}
+          AIF_EVENT_SECRET: ${{ secrets.AIF_LIFECYCLE_EVENT_SECRET }}
+          AIF_DELIVERY: relay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ github.event.action }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          if (-not $env:AIF_EVENTS_URL -or -not $env:AIF_EVENT_SECRET) { throw 'Set vars.AIF_LIFECYCLE_EVENTS_URL and secrets.AIF_LIFECYCLE_EVENT_SECRET.' }
+          if ($env:AIF_DELIVERY -notmatch '^relay-\d+-\d+-[a-z_]+$') { throw 'Unexpected delivery id.' }
+          $body = [IO.File]::ReadAllBytes($env:GITHUB_EVENT_PATH)
+          $hmac = New-Object System.Security.Cryptography.HMACSHA256 (,[Text.Encoding]::UTF8.GetBytes($env:AIF_EVENT_SECRET))
+          $signature = 'sha256=' + (($hmac.ComputeHash($body) | ForEach-Object { $_.ToString('x2') }) -join '')
+          $headers = @{ 'X-Hub-Signature-256' = $signature; 'X-GitHub-Event' = 'workflow_run'
+                        'X-GitHub-Delivery' = $env:AIF_DELIVERY; 'X-AIF-Relay' = '1' }
+          $response = Invoke-WebRequest -Method Post -Uri $env:AIF_EVENTS_URL -Body $body -ContentType 'application/json' `
+            -Headers $headers -UseBasicParsing -TimeoutSec 20
+          Write-Host "Function answered $($response.StatusCode): $($response.Content)"

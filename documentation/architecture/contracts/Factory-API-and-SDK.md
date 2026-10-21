@@ -83,6 +83,6 @@ Agent and MCP adapters consume this client. They do not start or silently upgrad
 
 External Tkinter/MAUI implementation details are documentation-backed boundaries only in this review. No external checkout or running desktop application was verified.
 
-See [[System-Context]], [[Reviewed-Operations]], [[Packaging-and-Release]], [[MCP-Boundary]], [[Bootstrap-and-Layouts]] and [[Index]].
+See [[System-Context]], [[Reviewed-Operations]], [[Packaging-and-Release]], [[MCP-Boundary]], [[Bootstrap-and-Layouts]], [[Lifecycle-Function]] and [[Index]].
 
 Authority: [SDK and commands](../../../environment_setup/azurefactory-cli/readme.md), [runnable API scenarios](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md), [desktop distribution](../../../environment_setup/install_config_wizard/readme.md).

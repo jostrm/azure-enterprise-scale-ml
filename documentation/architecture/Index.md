@@ -28,7 +28,7 @@ Open this directory as an Obsidian vault, or read the Markdown directly. No plug
 
 - [[Bootstrap-and-Layouts]], [[IaC-and-Private-Networking]], [[Identity-and-Personas]], [[Health-Models]].
 - [[Orchestration-and-Updates]], [[Lifecycle-and-Recovery]].
-- [[Factory-API-and-SDK]], [[Reviewed-Operations]], [[Packaging-and-Release]].
+- [[Factory-API-and-SDK]], [[Reviewed-Operations]], [[Packaging-and-Release]], [[Lifecycle-Function]].
 - [[dual-graph-lifecycle]] — locally implemented offline generation, immutable snapshots and query commands; unreleased.
 - [[Trust-and-Authorization]], [[State-Machines-and-DAGs]], [[Dependency-Injection]].
 

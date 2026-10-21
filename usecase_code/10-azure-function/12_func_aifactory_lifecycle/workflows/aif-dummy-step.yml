@@ -1,0 +1,78 @@
+# Dummy deployment of one resource group, dispatched by the lifecycle Function's github-dummy executor.
+# The run name carries the correlation marker [<operation id>/<step>/<target>] that the Function matches.
+# Copy to .github/workflows/ in the factory repo. Runs on GitHub-hosted runners; no Azure access.
+name: aif-dummy-step
+run-name: aif-step [${{ inputs.operation_id }}/${{ inputs.step }}/${{ inputs.target }}] ${{ inputs.outcome }}${{ inputs.relay == 'false' && ' no-relay' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation_id:
+        description: Lifecycle operation ID (UUID)
+        required: true
+        type: string
+      step:
+        description: Step index in the operation
+        required: true
+        type: string
+      target:
+        description: Resource group this run stands for
+        required: true
+        type: string
+      outcome:
+        description: Simulated result
+        required: true
+        type: choice
+        options: [success, failure]
+        default: success
+      duration_seconds:
+        description: Simulated deployment time (5-600 s)
+        required: false
+        type: string
+        default: '75'
+      relay:
+        description: "false: the relay skips this run, so the Function's poller must recover it"
+        required: false
+        type: string
+        default: 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPERATION_ID: ${{ inputs.operation_id }}
+      STEP: ${{ inputs.step }}
+      TARGET: ${{ inputs.target }}
+      OUTCOME: ${{ inputs.outcome }}
+      DURATION: ${{ inputs.duration_seconds }}
+    steps:
+      - name: Validate the inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$OPERATION_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+          [[ "$STEP" =~ ^[0-9]{1,3}$ ]]
+          [[ "$TARGET" =~ ^[a-z0-9-]{1,90}$ ]]
+          [[ "$DURATION" =~ ^[0-9]{1,3}$ ]] && (( DURATION >= 5 && DURATION <= 600 ))
+
+      - name: Simulate the deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Simulating the deployment of $TARGET for operation $OPERATION_ID, step $STEP ($DURATION s)"
+          sleep "$DURATION"
+
+      - name: Report the outcome
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$OUTCOME" == "failure" ]]; then
+            echo "::error title=Simulated failure::$TARGET failed (simulated)"
+            echo "Simulated failure for $TARGET"
+            exit 1
+          fi
+          echo "Simulated deployment of $TARGET succeeded"

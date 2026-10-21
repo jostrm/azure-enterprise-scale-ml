@@ -1,0 +1,28 @@
+{
+  "subscriptionId": "<project subscription id>",
+  "resourceGroup": "<prefix>esml-project001-<loc>-<env>-001-rg",
+  "functionAppName": "aiflc-prj001-<loc>-<env>-<uniq5>-001",
+  "planSku": "B1",
+  "pythonVersion": "3.11",
+  "integrationSubnetId": "/subscriptions/<sub>/resourceGroups/<prefix>esml-common-<loc>-<env>-001/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/snt-prj001-webapp",
+  "privateEndpointSubnetId": "/subscriptions/<sub>/resourceGroups/<prefix>esml-common-<loc>-<env>-001/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/snt-prj001-genai",
+  "privateDnsZoneId": "",
+  "storageAccountName": "<project storage account 1>",
+  "appInsightsName": "ain-prj001-<loc>-<env>-<uniq5>-001",
+  "logAnalyticsWorkspaceId": "/subscriptions/<sub>/resourceGroups/<prefix>esml-common-<loc>-<env>-001/providers/Microsoft.OperationalInsights/workspaces/<workspace>",
+  "keyVaultName": "<project key vault (RBAC)>",
+  "appSettings": {
+    "AIF_BACKEND": "mock",
+    "AIF_EXECUTOR": "inprocess",
+    "AIF_EVENT_PROCESSING": "queue",
+    "AIF_SELF_PROJECT_ID": "<prefix>esml-project001-<loc>-<env>-001-rg",
+    "AIF_PROTECTED_IDS": "<the management runner's scale set, for example prefix-loc-env-001>",
+    "AIF_KEY_VAULT_NAME": "<project key vault>",
+    "AIF_EVENT_SECRET_NAME": "aif-lifecycle-event-secret",
+    "AIF_GITHUB_REPOSITORY": "<owner>/<factory repo>",
+    "AIF_GITHUB_TOKEN_NAME": "aif-lifecycle-github-token"
+  },
+  "tags": {
+    "aifactory-usecase": "12_func_aifactory_lifecycle"
+  }
+}
