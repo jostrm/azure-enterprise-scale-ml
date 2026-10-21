@@ -2,6 +2,17 @@
 **Release Tag:** [release_124](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_124)  
 **Release Date:** January 2026
 
+## ESML project entrypoint compiles again (AKS outbound type)
+
+`esml-project/22-main.bicep`, the ESML/AML project entrypoint, did not compile on Bicep
+0.37.4 or later: error BCP036 at `modules/machineLearning.bicep`. Both files still
+allowed `aksOutboundType: 'none'`, which `modules/aksCluster.bicep` no longer accepts.
+Both now allow only `loadBalancer` (the default) and `userDefinedRouting`, the values
+`variables.yaml`, `.env.template` and the config wizard offer. `none` is not mapped to
+null, because AKS would then use `loadBalancer` and a public egress IP.
+Factories that use the documented values need no change. A variables file that sets
+`aksOutboundType: none` now fails parameter validation instead of the template build.
+
 ## Key Vault access policies now reach principalId
 
 `modules/kvCmnAccessPolicys.bicep` built the union of `principalId` and
