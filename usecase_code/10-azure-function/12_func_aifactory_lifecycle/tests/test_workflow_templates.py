@@ -54,6 +54,9 @@ def test_the_rendered_run_name_correlates_with_and_without_relay(dispatched):
 def test_the_relay_watches_the_dummy_and_only_forwards_dispatch_runs_of_this_repo():
     relay, dummy = load("aif-event-relay.yml"), load("aif-dummy-step.yml")
     assert dummy["name"] in relay["on"]["workflow_run"]["workflows"]
+    # Observed on GitHub (byor-121, 2026-10-21): 'requested' events carry the workflow name instead of the run name,
+    # so the no-relay filter can't see them and they never correlate.
+    assert relay["on"]["workflow_run"]["types"] == ["in_progress", "completed"]
     job = relay["jobs"]["relay"]
     condition = " ".join(job["if"].split())
     assert "github.event.workflow_run.event == 'workflow_dispatch'" in condition

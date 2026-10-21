@@ -10,7 +10,7 @@ name: aif-event-relay
 on:
   workflow_run:
     workflows: [aif-dummy-step]
-    types: [requested, in_progress, completed]
+    types: [in_progress, completed]  # 'requested' events carry the workflow name, not the run name
 
 permissions: {}
 
