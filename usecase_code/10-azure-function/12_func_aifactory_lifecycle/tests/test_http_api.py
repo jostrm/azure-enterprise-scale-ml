@@ -183,6 +183,25 @@ def test_queued_events_are_signed_and_forged_queue_messages_are_rejected(clock):
         api.process_queued({key: value for key, value in message.items() if key != "signature"})
 
 
+def test_a_failed_enqueue_does_not_consume_the_delivery(clock):
+    service = make_service(clock)
+    attempts = []
+
+    def flaky(message):
+        attempts.append(message)
+        if len(attempts) == 1:
+            raise ConnectionError("queue unavailable")
+
+    api = LifecycleHttpApi(service, event_secrets=[SECRET], enqueue=flaky)
+    request = signed(RUN, delivery="d-flaky")
+    response, problem = call(api, "github_events", raw=request["raw"], headers=request["headers"])
+    assert response.status == 500
+    response, body = call(api, "github_events", raw=request["raw"], headers=request["headers"])
+    assert response.status == 202 and body == {"result": "queued"}
+    response, body = call(api, "github_events", raw=request["raw"], headers=request["headers"])
+    assert body == {"result": "duplicate"}
+
+
 def test_list_operations(api):
     prepare(api)
     response, body = call(api, "list_operations", method="GET")

@@ -38,7 +38,7 @@ class FakeGitHub:
         title = f"aif-step [{inputs['operation_id']}/{inputs['step']}/{inputs['target']}] {inputs['outcome']}"
         run = {"id": run_id, "name": "aif-dummy-step", "display_title": title, "status": "completed",
                "conclusion": conclusion, "html_url": f"https://github.com/jostrm/byor/actions/runs/{run_id}",
-               "run_attempt": 1, "event": "workflow_dispatch"}
+               "run_attempt": 1, "event": "workflow_dispatch", "path": ".github/workflows/aif-dummy-step.yml"}
         self.runs[run_id] = run
         if conclusion != "success":
             self.excerpts[run_id] = "Simulated failure for " + inputs["target"]
@@ -66,7 +66,8 @@ def make_service(clock, *, protected=(), github: FakeGitHub | None = None, revie
     else:
         tracker = DummyWorkflowTracker(github, workflow="aif-dummy-step.yml", ref="main", duration_seconds=60)
     service = LifecycleService(backend=backend, tracker=tracker, store=store, guard=SelfProtection(protected),
-                               clock=clock, ids=sequential_ids(), poll_after_seconds=poll_after_seconds)
+                               clock=clock, ids=sequential_ids(), poll_after_seconds=poll_after_seconds,
+                               github_repository="jostrm/byor")
     return service
 
 

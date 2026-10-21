@@ -2,20 +2,24 @@
 # Copy to .github/workflows/ on the factory repo's DEFAULT branch (workflow_run only triggers from there).
 # Runs on the management runner, which reaches the Function's private endpoint. Needs:
 #   vars.AIF_LIFECYCLE_EVENTS_URL      https://<function app>.azurewebsites.net/api/v1/github/events
-#   secrets.AIF_LIFECYCLE_EVENT_SECRET the same value as the Function's AIF_EVENT_SECRET (Key Vault)
-# The payload is read from GITHUB_EVENT_PATH; github.event is never interpolated into a script.
+#   secrets.AIF_LIFECYCLE_EVENT_SECRET one value: the first (current) value of the Function's event secret, no commas
+# Only workflow_dispatch runs of this repository are forwarded, and the payload is read from GITHUB_EVENT_PATH;
+# github.event is never interpolated into a script. Treat the runner label as privileged: keep fork-PR workflows off.
 name: aif-event-relay
 
 on:
   workflow_run:
-    workflows: [aif-dummy-step, aif-ops, factory-lifecycle]
+    workflows: [aif-dummy-step]
     types: [requested, in_progress, completed]
 
 permissions: {}
 
 jobs:
   relay:
-    if: ${{ !contains(github.event.workflow_run.display_title, 'no-relay') }}
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      !endsWith(github.event.workflow_run.display_title, ' no-relay')
     runs-on: [self-hosted, aif-lifecycle-mgmt]
     timeout-minutes: 5
     steps:
@@ -27,14 +31,25 @@ jobs:
           AIF_DELIVERY: relay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ github.event.action }}
         run: |
           $ErrorActionPreference = 'Stop'
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          if (-not $env:AIF_EVENTS_URL -or -not $env:AIF_EVENT_SECRET) { throw 'Set vars.AIF_LIFECYCLE_EVENTS_URL and secrets.AIF_LIFECYCLE_EVENT_SECRET.' }
+          [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+          if ($env:AIF_EVENTS_URL -notmatch '^https://' -or -not $env:AIF_EVENT_SECRET) { throw 'Set vars.AIF_LIFECYCLE_EVENTS_URL (https://...) and secrets.AIF_LIFECYCLE_EVENT_SECRET.' }
           if ($env:AIF_DELIVERY -notmatch '^relay-\d+-\d+-[a-z_]+$') { throw 'Unexpected delivery id.' }
+          # Same rule as the Function: the first trimmed comma-separated value signs.
+          $key = @($env:AIF_EVENT_SECRET -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })[0]
           $body = [IO.File]::ReadAllBytes($env:GITHUB_EVENT_PATH)
-          $hmac = New-Object System.Security.Cryptography.HMACSHA256 (,[Text.Encoding]::UTF8.GetBytes($env:AIF_EVENT_SECRET))
+          $hmac = [Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($key))
           $signature = 'sha256=' + (($hmac.ComputeHash($body) | ForEach-Object { $_.ToString('x2') }) -join '')
-          $headers = @{ 'X-Hub-Signature-256' = $signature; 'X-GitHub-Event' = 'workflow_run'
-                        'X-GitHub-Delivery' = $env:AIF_DELIVERY; 'X-AIF-Relay' = '1' }
-          $response = Invoke-WebRequest -Method Post -Uri $env:AIF_EVENTS_URL -Body $body -ContentType 'application/json' `
-            -Headers $headers -UseBasicParsing -TimeoutSec 20
+          $request = @{ Method = 'Post'; Uri = $env:AIF_EVENTS_URL; Body = $body; ContentType = 'application/json'
+                        UseBasicParsing = $true; TimeoutSec = 30
+                        Headers = @{ 'X-Hub-Signature-256' = $signature; 'X-GitHub-Event' = 'workflow_run'
+                                     'X-GitHub-Delivery' = $env:AIF_DELIVERY; 'X-AIF-Relay' = '1' } }
+          foreach ($attempt in 1..3) {
+            try { $response = Invoke-WebRequest @request; break }
+            catch {
+              $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+              if ($attempt -eq 3 -or ($status -ne 0 -and $status -ne 408 -and $status -ne 429 -and $status -lt 500)) { throw }
+              Write-Host "Attempt $attempt failed (HTTP $status); retrying"
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
           Write-Host "Function answered $($response.StatusCode): $($response.Content)"

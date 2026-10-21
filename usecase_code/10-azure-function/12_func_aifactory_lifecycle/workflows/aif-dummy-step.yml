@@ -1,5 +1,5 @@
 # Dummy deployment of one resource group, dispatched by the lifecycle Function's github-dummy executor.
-# The run name carries the correlation marker [<operation id>/<step>/<target>] that the Function matches.
+# The run name starts with the correlation marker aif-step [<operation id>/<step>/<target>] that the Function matches.
 # Copy to .github/workflows/ in the factory repo. Runs on GitHub-hosted runners; no Azure access.
 name: aif-dummy-step
 run-name: aif-step [${{ inputs.operation_id }}/${{ inputs.step }}/${{ inputs.target }}] ${{ inputs.outcome }}${{ inputs.relay == 'false' && ' no-relay' || '' }}
@@ -36,8 +36,7 @@ on:
         type: string
         default: 'true'
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   simulate:
@@ -54,10 +53,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$OPERATION_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
-          [[ "$STEP" =~ ^[0-9]{1,3}$ ]]
-          [[ "$TARGET" =~ ^[a-z0-9-]{1,90}$ ]]
-          [[ "$DURATION" =~ ^[0-9]{1,3}$ ]] && (( DURATION >= 5 && DURATION <= 600 ))
+          fail() { echo "::error title=Invalid input::$1"; exit 1; }
+          [[ "$OPERATION_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || fail "operation_id must be a lowercase UUID"
+          [[ "$STEP" =~ ^[0-9]{1,3}$ ]] || fail "step must be 0-999"
+          [[ "$TARGET" =~ ^[a-z0-9-]{1,90}$ ]] || fail "target must match [a-z0-9-]{1,90}"
+          { [[ "$DURATION" =~ ^[1-9][0-9]{0,2}$ ]] && (( DURATION >= 5 && DURATION <= 600 )); } || fail "duration_seconds must be 5-600"
 
       - name: Simulate the deployment
         shell: bash

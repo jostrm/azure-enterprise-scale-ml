@@ -90,6 +90,7 @@ class LifecycleHttpApi:
                 result = self._service.receive_event(event, delivery, payload)
                 if result.get("result") == "accepted":
                     self._enqueue(self._signed({**result["message"], "source": source}))
+                    self._service.record_delivery(result["message"]["delivery"])
                     result = {"result": "queued"}
             return (202 if result.get("result") in ("applied", "queued") else 200), result, {}
         return self._handle(request, run)

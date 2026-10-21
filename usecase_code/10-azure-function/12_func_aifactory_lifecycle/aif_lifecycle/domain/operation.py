@@ -369,6 +369,7 @@ class Operation:
             self._log(now, "operation-succeeded", self.target)
 
     def _find_run(self, *, target: str | None = None, run_id: int | None = None) -> Run | None:
+        """A run is matched by its bound run id; by target only while no other run id is bound to it."""
         runs = self.step.runs
         if run_id is not None:
             for run in runs:
@@ -377,6 +378,8 @@ class Operation:
         if target is not None:
             for run in runs:
                 if run.target == target:
+                    if run_id is not None and run.run_id is not None and run.run_id != run_id:
+                        return None
                     return run
         return None
 

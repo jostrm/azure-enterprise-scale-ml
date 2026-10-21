@@ -71,7 +71,8 @@ def build_runtime(env: Mapping[str, str] | None = None, *, vault=None) -> Runtim
     backend = _backend(settings, store, clock)
     service = LifecycleService(backend=backend, tracker=_tracker(settings, backend), store=store,
                                guard=SelfProtection(settings.protected_ids), clock=clock,
-                               poll_after_seconds=settings.poll_after_seconds)
+                               poll_after_seconds=settings.poll_after_seconds,
+                               github_repository=settings.github_repository)
     enqueue = None
     if settings.event_processing == "queue":
         from .adapters.queue import EventQueue

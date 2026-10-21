@@ -115,7 +115,7 @@ The SDK is pinned to a purple commit in `requirements.txt` (`git+https://...@<sh
 ## Local development
 
 ```powershell
-python -m venv .venv; .\.venv\Scripts\pip install -r requirements.txt pytest
+python -m venv .venv; .\.venv\Scripts\pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest tests -q
 Copy-Item local.settings.example.json local.settings.json   # git-ignored; mock backend, file store
 func start   # timers and queues need Azurite or a real storage account
@@ -147,6 +147,26 @@ With the wizard's Factory API on the same machine, set `AIF_BACKEND=rest` (or `s
 3. Get the function key with `az functionapp keys list` and call `GET /api/v1/health`.
 
 Use function keys for the mock passes. Before real deployments, add App Service authentication with an Entra app role.
+
+## GitHub events: relay and management runner
+
+- `workflows/aif-dummy-step.yml` (GitHub-hosted runner) simulates one resource-group deployment; its run name starts
+  with `aif-step [<operationId>/<step>/<target>]`, which the Function matches as a whole.
+- `workflows/aif-event-relay.yml` must be on the factory repo's default branch. It forwards only `workflow_dispatch`
+  runs of the same repository, signs the payload with the first value of the event secret (the Function's rule) and
+  retries transient failures three times. The Function also checks the event, workflow file and repository, keeps the
+  first run id bound to a run, and records a delivery only after it was applied or queued. The poller recovers events
+  that never arrive (`dropEventAt` simulates that).
+- Register the management runner per factory repo (user-owned repos can't share runners):
+  `scripts/register-management-runner.ps1` gets a one-hour registration token with `gh` and runs
+  `scripts/install-github-runner.ps1` on the VM through a VM run command, passing the token as a protected parameter.
+  The runner package hash is verified. Use a label of its own (default `aif-lifecycle-mgmt`), never the factory's
+  runner label.
+- **The label is privileged.** Any workflow that targets it runs on the management VM, which reaches the Function's
+  private endpoint and (for the runner executor) the Factory API. Keep fork-pull-request workflows off, limit
+  collaborators to trusted admins, and give the relay its own runner instance when the runner executor is added.
+- Repository settings: variable `AIF_LIFECYCLE_EVENTS_URL` (`https://<app>.azurewebsites.net/api/v1/github/events`)
+  and secret `AIF_LIFECYCLE_EVENT_SECRET` (one value, no commas).
 
 ## Consumer copy
 

@@ -104,7 +104,65 @@ def test_malformed_workflow_run_payloads_are_400(service):
 def test_correlation_reads_the_run_name_marker():
     marker = correlate("aif-step [00000000-0000-0000-0000-000000000001/2/aif-121-esml-common-sdc-dev-002] success")
     assert marker == ("00000000-0000-0000-0000-000000000001", 2, "aif-121-esml-common-sdc-dev-002")
+    assert correlate("aif-step [00000000-0000-0000-0000-000000000001/2/rg-x] failure no-relay")[2] == "rg-x"
     assert correlate("factory-lifecycle [3f0c9b2e-1111-4222-8333-944455556666]") is None
+
+
+@pytest.mark.parametrize("title", [
+    "Fix docs [00000000-0000-0000-0000-000000000001/1/rg-x] success",
+    "aif-step [x] [00000000-0000-0000-0000-000000000001/1/rg-x] success",
+    "aif-step [00000000-0000-0000-0000-000000000001/1/rg-x] success [00000000-0000-0000-0000-000000000002/1/rg-y]",
+])
+def test_a_marker_outside_the_anchored_run_name_is_not_correlated(title):
+    assert correlate(title) is None
+
+
+def forged(payload, **run):
+    return {**payload, "workflow_run": {**payload["workflow_run"], **run}}
+
+
+@pytest.mark.parametrize("change", [
+    {"event": "pull_request"},
+    {"path": ".github/workflows/pr-check.yml"},
+])
+def test_runs_from_other_triggers_or_workflows_are_ignored(service, github, change):
+    operation = running_scaleset(service)
+    result = service.handle_event("workflow_run", "d-f", forged(github.complete(0), **change))
+    assert result["result"] == "ignored"
+    assert service.get(operation.id).status is Status.RUNNING
+
+
+def test_runs_from_another_repository_are_ignored(service, github):
+    running_scaleset(service)
+    payload = github.complete(0)
+    payload["repository"] = {"full_name": "someone/else"}
+    assert service.handle_event("workflow_run", "d-r", payload)["result"] == "ignored"
+
+
+def test_a_bound_run_id_is_never_replaced_by_another_run(service, github):
+    operation = running_scaleset(service)
+    started = github.complete(0)
+    started["workflow_run"]["status"], started["workflow_run"]["conclusion"] = "in_progress", None
+    service.handle_event("workflow_run", "d-s", started)
+    impostor = forged(github.complete(0), id=999999)
+    assert service.handle_event("workflow_run", "d-i", impostor)["result"] == "ignored"
+    assert service.get(operation.id).steps[1].runs[0].run_id == started["workflow_run"]["id"]
+
+
+def test_a_delivery_is_recorded_only_after_it_was_applied(service, github, monkeypatch):
+    running_scaleset(service)
+    payload = github.complete(0)
+    original = service.apply_event
+
+    def failing(message, source="relay"):
+        raise RuntimeError("store unavailable")
+
+    monkeypatch.setattr(service, "apply_event", failing)
+    with pytest.raises(RuntimeError):
+        service.handle_event("workflow_run", "d-retry", payload)
+    monkeypatch.setattr(service, "apply_event", original)
+    assert service.handle_event("workflow_run", "d-retry", payload)["result"] == "applied"
+    assert service.handle_event("workflow_run", "d-retry", payload) == {"result": "duplicate"}
 
 
 def test_parse_workflow_run_keeps_only_what_the_function_needs():

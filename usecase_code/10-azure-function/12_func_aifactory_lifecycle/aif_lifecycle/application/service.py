@@ -22,7 +22,7 @@ from ..domain.ids import FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Operation, Status, iso
 from ..domain.scenarios import Scenario
 from ..ports import ExecutionTracker, FactoryBackend, StateStore, StepRequest, StoreConflict
-from .events import WorkflowRunObservation, correlate, parse_workflow_run
+from .events import WorkflowRunObservation, correlate, from_this_function, parse_workflow_run
 from .guard import SelfProtection
 from .planner import plan
 
@@ -37,7 +37,8 @@ log = logging.getLogger("aif_lifecycle")
 
 class LifecycleService:
     def __init__(self, *, backend: FactoryBackend, tracker: ExecutionTracker, store: StateStore,
-                 guard: SelfProtection, clock, ids: Callable[[], str] | None = None, poll_after_seconds: int = 120):
+                 guard: SelfProtection, clock, ids: Callable[[], str] | None = None, poll_after_seconds: int = 120,
+                 github_repository: str | None = None):
         self._backend = backend
         self._tracker = tracker
         self._store = store
@@ -45,6 +46,7 @@ class LifecycleService:
         self._clock = clock
         self._ids = ids or (lambda: str(uuid.uuid4()))
         self._poll_after = poll_after_seconds
+        self._repository = github_repository
 
     # ----- queries -----
 
@@ -121,10 +123,16 @@ class LifecycleService:
         received = self.receive_event(event, delivery_id, payload)
         if received["result"] != "accepted":
             return received
-        return self.apply_event(received["message"], source=source)
+        result = self.apply_event(received["message"], source=source)
+        self.record_delivery(received["message"]["delivery"])
+        return result
 
     def receive_event(self, event: str, delivery_id: str | None, payload: Any) -> dict[str, Any]:
-        """The fast part: validate and deduplicate on the delivery ID. Returns the message to apply."""
+        """The fast part: validate and check the delivery ID. Returns the message to apply.
+
+        The delivery is recorded only after it was applied or queued (record_delivery), so a delivery whose
+        processing failed can be redelivered instead of being answered as a duplicate.
+        """
         if event == "ping":
             return {"result": "pong"}
         if event != "workflow_run":
@@ -132,16 +140,23 @@ class LifecycleService:
         observed = parse_workflow_run(payload)
         if not delivery_id:
             raise ValidationFailed("The X-GitHub-Delivery header is required.")
-        try:
-            self._store.insert(DELIVERIES, _delivery_key(delivery_id),
-                               {"event": event, "runId": observed.run_id, "receivedAt": iso(self._clock.now())})
-        except StoreConflict:
+        key = _delivery_key(delivery_id)
+        if self._store.get(DELIVERIES, key) is not None:
             return {"result": "duplicate"}
-        return {"result": "accepted", "message": {"event": event, "run": asdict(observed)}}
+        return {"result": "accepted", "message": {"event": event, "delivery": key, "run": asdict(observed)}}
+
+    def record_delivery(self, key: str) -> bool:
+        try:
+            self._store.insert(DELIVERIES, key, {"receivedAt": iso(self._clock.now())})
+            return True
+        except StoreConflict:
+            return False
 
     def apply_event(self, message: dict[str, Any], *, source: str = "relay") -> dict[str, Any]:
         """Correlate through the run name and advance the operation (inline or from the queue)."""
         observed = WorkflowRunObservation(**message["run"])
+        if not from_this_function(observed, self._repository):
+            return {"result": "ignored"}
         marker = correlate(observed.title)
         if marker is None:
             return {"result": "uncorrelated"}
