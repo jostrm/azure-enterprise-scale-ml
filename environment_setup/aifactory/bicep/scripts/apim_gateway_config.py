@@ -268,8 +268,8 @@ def legacy_config(environment, env):
         "location": env.get("AZURE_LOCATION", ""),
         "serviceName": env.get("APIM_GATEWAY_SERVICE_NAME", ""),
         "serviceMode": "existing", "sku": env.get("APIM_GATEWAY_SKU", "StandardV2"),
-        "skuCapacity": number("APIM_GATEWAY_SKU_CAPACITY", 1),
-        "tags": json_document(env.get("APIM_GATEWAY_TAGS_JSON", "{}")), "api": api,
+        # Existing mode never writes service tags, so factory TAGS (often comma-separated values) stay out.
+        "skuCapacity": number("APIM_GATEWAY_SKU_CAPACITY", 1), "tags": {}, "api": api,
     }
 
 

@@ -100,7 +100,6 @@ jobs:
         GATEWAY_ACTION: ${{ inputs.action }}
         GATEWAY_CONFIG_FILE: ${{ env.APIM_GATEWAY_CONFIG_FILE }}
         AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
-        APIM_GATEWAY_TAGS_JSON: ${{ env.TAGS }}
       shell: bash
       run: |
         set -euo pipefail
@@ -166,7 +165,6 @@ jobs:
         GATEWAY_APPROVED_PREVIEW: ${{ inputs.approved_preview }}
         GATEWAY_APPROVE_INITIAL_PUBLIC_BOOTSTRAP: ${{ inputs.approve_initial_public_bootstrap }}
         AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
-        APIM_GATEWAY_TAGS_JSON: ${{ env.TAGS }}
       shell: bash
       run: |
         set -euo pipefail

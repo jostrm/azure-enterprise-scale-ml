@@ -36,6 +36,11 @@ def value_hash(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 
+def text_hash(data):
+    """Hash source text independently of checkout line endings (Windows CRLF vs Linux agents)."""
+    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+
+
 def azure_error_code(stdout, stderr):
     """Read only the CLI error envelope, never codes embedded in a service message."""
     codes = []
@@ -107,7 +112,7 @@ def source_manifest(module_root=MODULE_ROOT):
             content = data.decode("utf-8")
         except (OSError, UnicodeError):
             raise GatewayError("source-invalid", "Cannot read a transitive Bicep/policy dependency.") from None
-        result[name] = hashlib.sha256(data).hexdigest()
+        result[name] = text_hash(data)
         if path.suffix == ".bicep":
             refs = re.findall(r"\bmodule\s+\w+\s+'([^']+)'", content)
             refs += re.findall(r"\bload(?:TextContent|JsonContent|YamlContent|FileAsBase64)\s*\(\s*'([^']+)'", content)
@@ -117,7 +122,7 @@ def source_manifest(module_root=MODULE_ROOT):
                         "source-invalid", "Only reviewable local static Bicep dependencies are supported.")
                 paths.append(path.parent / ref)
     for script in (Path(__file__), SCRIPT_ROOT / "apim_gateway_config.py"):
-        result["runner/" + script.name] = hashlib.sha256(script.read_bytes()).hexdigest()
+        result["runner/" + script.name] = text_hash(script.read_bytes())
     return dict(sorted(result.items()))
 
 

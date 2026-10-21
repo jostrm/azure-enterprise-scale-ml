@@ -54,6 +54,9 @@ coverage.xml
 /environment_setup/unit-tests/test-bicep/.pytest-deletion-providers/
 /usecase_code/40-agent-factory/40-aifactory-agent/.workload-test-*/
 /.validation-work/
+# APIM runner/workflow unit tests create these at the repository root and remove them afterwards
+/.apim-runner-unit/
+/.apim-workflow-unit/
 /%SystemDrive%/
 
 # Graphify generation scratch (source copies, graphify-out/ and its AST cache); graphs ship as snapshots

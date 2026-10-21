@@ -21,7 +21,9 @@ import uuid
 import pytest
 
 from base.config import REPO_ROOT, env_defaults, yaml_defaults
-from domain.pipeline_contracts import ADO_GATEWAY, GHA_GATEWAY, deployments, evaluate, load_pipeline, objects
+from domain.pipeline_contracts import (
+    ADO_GATEWAY, EXTRA_FEATURES, GHA_GATEWAY, deployments, evaluate, load_pipeline, objects,
+)
 
 
 ADO_PIPELINE = ADO_GATEWAY.parent.parent / "infra-ai-gateway.yaml"
@@ -172,6 +174,7 @@ def test_managed_provisioning_switch_and_config_file_default_off_in_every_templa
         assert values[CONFIG_FILE[platform]] == ""
     assert json_values[SWITCH["ado"]] == "false"
     assert json_values[CONFIG_FILE["ado"]] == ""
+    assert EXTRA_FEATURES[SWITCH["gha"]] == SWITCH["ado"]
     env = load_pipeline(GHA_GATEWAY)["jobs"]["deploy"]["env"]
     assert evaluate(env["APIM_GATEWAY_MANAGED_PROVISIONING"], {"vars.APIM_GATEWAY_MANAGED_PROVISIONING": ""}) == "false"
     assert evaluate(env["APIM_GATEWAY_MANAGED_PROVISIONING"], {"vars.APIM_GATEWAY_MANAGED_PROVISIONING": "true"}) == "true"
@@ -192,6 +195,17 @@ def test_switch_off_keeps_main_behaviour_for_every_action(platform, action, apim
         assert not runs(platform, name, **values)
     if platform == "gha":
         assert runs(platform, "Azure Login", **values) == success
+
+
+@pytest.mark.parametrize("apim,kong,mcp", list(itertools.product(["false", "true"], repeat=3)))
+def test_ado_consumer_without_the_switch_keeps_main_behaviour(apim, kong, mcp):
+    # An older consumer variables.yaml lacks apimGatewayManagedProvisioning: ADO resolves it to null.
+    values = dict(apim=apim, managed=None, kong=kong, mcp=mcp)
+    assert runs("ado", CLASSIC, **values) == (apim == "true")
+    assert runs("ado", MCP, **values) == (mcp == "true")
+    assert runs("ado", KONG, **values) == (kong == "true")
+    for name in (PLAN, ONLINE, LOCATE, PUBLISH):
+        assert not runs("ado", name, **values)
 
 
 @pytest.mark.parametrize("platform", PATHS)
@@ -341,7 +355,7 @@ def test_github_serializes_only_managed_runs_and_scopes_runner_context_to_steps(
         assert env["GATEWAY_REPOSITORY_ROOT"] == "${{ github.workspace }}"
         assert env["GATEWAY_ACTION"] == "${{ inputs.action }}"
         assert env["GATEWAY_CONFIG_FILE"] == "${{ env.APIM_GATEWAY_CONFIG_FILE }}"
-        assert env["APIM_GATEWAY_TAGS_JSON"] == "${{ env.TAGS }}"
+        assert "APIM_GATEWAY_TAGS_JSON" not in env, "Existing mode never deploys tags; managed tags live in the JSON"
     online = step("gha", ONLINE)["env"]
     for name, value in {"APPROVED_PLAN": "approved_plan", "APPROVED_PREVIEW": "approved_preview",
                         "APPROVE_INITIAL_PUBLIC_BOOTSTRAP": "approve_initial_public_bootstrap"}.items():
@@ -359,7 +373,7 @@ def test_ado_legacy_variables_are_explicitly_exported_to_both_runner_tasks():
         env = step("ado", name)["env"]
         for suffix, camel in LEGACY_BINDINGS.items():
             assert env["APIM_GATEWAY_" + suffix] == "$(apimGateway" + camel + ")"
-        assert env["APIM_GATEWAY_TAGS_JSON"] == "$(tags)"
+        assert "APIM_GATEWAY_TAGS_JSON" not in env, "Existing mode never deploys tags; managed tags live in the JSON"
         assert env["AZURE_TENANT_ID"] == "$(tenantId)"
         assert env["AZURE_SUBSCRIPTION_ID"] == "$(dev_test_prod_sub_id)"
         assert env["AZURE_LOCATION"] == "$(admin_location)"
@@ -548,8 +562,10 @@ def test_offline_workflow_reaches_real_runner_and_writes_plan_receipt(platform, 
             "SKU": "StandardV2", "SKU_CAPACITY": "1", "API_ID": "chat-api", "API_PATH": "openai",
             "BACKEND_POOL_NAME": "chat-pool", "AGGREGATE_TPM": "100000", "CALLER_TPM": "10000",
             "RETRY_COUNT": "2", "ASSIGN_OPENAI_USER_ROLE": "false", "MANAGED_IDENTITY_PRINCIPAL_ID": "",
-            "BACKENDS_JSON": json.dumps(config["api"]["azureOpenAIBackends"]), "TAGS_JSON": "{}",
+            "BACKENDS_JSON": json.dumps(config["api"]["azureOpenAIBackends"]),
         }
+        # Factory TAGS often hold comma-separated values; existing mode must not trip over them.
+        monkeypatch.setenv("TAGS", '{"AIF-Networking":"true,true,true"}')
         for key, value in values.items():
             monkeypatch.setenv("APIM_GATEWAY_" + key, value)
     no_azure = Mock()

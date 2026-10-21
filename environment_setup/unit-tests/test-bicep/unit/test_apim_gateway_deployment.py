@@ -311,6 +311,32 @@ def test_legacy_defaults_remain_existing_only():
     assert "network" not in c
 
 
+def test_legacy_configuration_ignores_factory_tags_it_never_deploys():
+    # Existing mode never writes tags, and factory TAGS often hold commas ("true,true,true").
+    env = {"ENABLE_APIM": "true", "AZURE_TENANT_ID": TENANT, "AZURE_SUBSCRIPTION_ID": SUB,
+           "AZURE_LOCATION": "swedencentral", "APIM_GATEWAY_RESOURCE_GROUP": "gateway-rg",
+           "APIM_GATEWAY_SERVICE_NAME": "apim-gateway", "APIM_GATEWAY_AGGREGATE_TPM": "100000",
+           "APIM_GATEWAY_BACKENDS_JSON": json.dumps(config()["api"]["azureOpenAIBackends"]),
+           "APIM_GATEWAY_TAGS_JSON": '{"AIF-Networking":"true,true,true"}',
+           "TAGS": '{"AIF-Networking":"true,true,true"}'}
+    assert load_config(None, "dev", env)["tags"] == {}
+
+
+def test_source_digest_does_not_depend_on_checkout_line_endings(local_area):
+    # A Windows checkout (CRLF) and the Linux agent (LF) must produce the same planDigest.
+    roots = {}
+    for name, newline in (("lf", "\n"), ("crlf", "\r\n")):
+        root = roots[name] = local_area / name
+        root.mkdir()
+        for filename, lines in {
+            "main.bicep": ["targetScope = 'subscription'", "module config './config.bicep' = {}"],
+            "config.bicep": ["var policy = loadTextContent('./policy.xml')"],
+            "policy.xml": ["<policies>", "</policies>"],
+        }.items():
+            (root / filename).write_bytes((newline.join(lines) + newline).encode("utf-8"))
+    assert gw.source_manifest(roots["lf"]) == gw.source_manifest(roots["crlf"])
+
+
 def test_wrong_auth_fails_before_preview_or_write(local_area, modules):
     runner, fake = deployment(local_area, modules)
     fake.read = Mock(return_value={"id": SUB, "tenantId": PRINCIPAL, "state": "Enabled"})

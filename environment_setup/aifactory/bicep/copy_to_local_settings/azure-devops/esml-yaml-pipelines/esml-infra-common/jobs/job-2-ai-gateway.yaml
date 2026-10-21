@@ -100,7 +100,6 @@ steps:
     APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: $(apimGatewayAssignOpenAIUserRole)
     APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: $(apimGatewayManagedIdentityPrincipalId)
     APIM_GATEWAY_BACKENDS_JSON: $(apimGatewayBackendsJson)
-    APIM_GATEWAY_TAGS_JSON: $(tags)
 
 - task: AzureCLI@2
   displayName: Preview or apply reviewed APIM plan
@@ -159,7 +158,6 @@ steps:
     APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: $(apimGatewayAssignOpenAIUserRole)
     APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: $(apimGatewayManagedIdentityPrincipalId)
     APIM_GATEWAY_BACKENDS_JSON: $(apimGatewayBackendsJson)
-    APIM_GATEWAY_TAGS_JSON: $(tags)
 
 - task: Bash@3
   displayName: Locate APIM review artifacts even on failure
