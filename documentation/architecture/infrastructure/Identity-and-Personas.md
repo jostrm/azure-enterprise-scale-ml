@@ -19,6 +19,7 @@ sources:
   - environment_setup/aifactory/bicep/esml-common/main/11-rgCommon.bicep
   - environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep
   - environment_setup/aifactory/bicep/esml-project/22-main.bicep
+  - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_persona_policy.py
   - environment_setup/unit-tests/test-bicep/unit/test_persona_lake.py
@@ -30,7 +31,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_admin_object_ids.py
 graph_symbols:
   - bootstrap/lib/registered_personas.py
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20; normalization warning 474ecff3 + working tree, 2026-10-21'
 ---
 # Identity and personas
 
@@ -92,6 +93,23 @@ older assignment for the same principal, role and scope is deleted.
 `technical_admins_email` has fewer entries than the IDs; before, that case failed
 11-rgCommon and 22-main with an index out of bounds. The manual `esml-util`
 templates still parse the list themselves.
+
+The gate also warns, without blocking, when a valid `technical_admins_ad_object_id`
+differs from its normalized form (source 474ecff3 plus this change, 2026-10-21):
+upper case, whitespace around entries (spaces or a trailing line break) or
+duplicates. `assess()` in `kv_principal_object_ids.py` returns findings, warnings
+and notes, and `validate()` still returns findings and notes. `preflight.sh` turns
+each `WARN` line into a `KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED` warning that never
+sets `KV_PRINCIPAL_INVALID`. Like any non-CIDR warning it exits 2 only under
+`--strict`, which no pipeline passes. For case or spacing the warning names the
+one-time 409 and its fix: delete the old assignment with the same principal, role
+and scope, then run again. ADO step `101-rbac-common-rg` (`job-2-genai-services.yaml`)
+has `continueOnError: true`, so a 409 there only turns the run yellow. Duplicates
+alone rename nothing, because names are seeded per object ID. The warning never
+shows the IDs, because GitHub masks the whole `PROJECT_MEMBERS` secret, not its
+entries. Empty and `'null'` entries stay blocking, because the `esml-util`
+templates do not drop them. `databricksOID` is a single Key Vault access-policy
+principal that seeds no role-assignment name, so it never warns.
 
 Deployment identities, runtime managed identities, human principals and provider service connections serve different purposes. Application runtime inference/search grants do not imply permission to deploy agents, mutate infrastructure or retrieve arbitrary secrets.
 

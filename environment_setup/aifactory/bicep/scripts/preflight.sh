@@ -16,7 +16,8 @@
 #   7. Lists ALL policy assignments on the subscription (informational)
 #   8. Key Vault principal object IDs (technical_admins_ad_object_id, databricksOID)
 #      are GUIDs, not placeholders: blocks even in WARN_ONLY mode
-#      (kv_principal_object_ids.py; also reads variables.json)
+#      (kv_principal_object_ids.py; also reads variables.json). Valid technical
+#      admin IDs with upper case, spacing or duplicates only warn.
 #
 # Settings are read (in priority order) from:
 #   1. CLI flags / PREFLIGHT_* env vars (explicit override)
@@ -1015,6 +1016,8 @@ native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; els
 # --- Config: Key Vault principal object IDs. modules/kvCmnAccessPolicys.bicep silently skips
 # every principal that is not a GUID, so a placeholder such as <todo>_EntraID_ObjectID would
 # leave the common/admin vaults without an admin policy. Hard gate, even in WARN_ONLY mode.
+# WARN lines (valid technical admin IDs that Bicep normalizes: case, spacing, duplicates) never
+# set KV_PRINCIPAL_INVALID; they flag a one-time RoleAssignmentExists (409) on older factories.
 check_kv_principals() {
   local checker="$SCRIPT_DIR/kv_principal_object_ids.py" out kind code msg hint config_env args=()
   if [ -z "$PYBIN" ] || [ ! -f "$checker" ]; then
@@ -1039,6 +1042,7 @@ check_kv_principals() {
   while IFS=$'\t' read -r kind code msg hint; do
     case "$kind" in
       INFO) echo "  [INFO] $code";;
+      WARN) add_finding WARN "$code" "$msg" "$hint";;
       FAIL) add_finding FAIL "$code" "$msg" "$hint"; KV_PRINCIPAL_INVALID="true";;
     esac
   done <<< "$out"

@@ -4,7 +4,11 @@
 modules/kvCmnAccessPolicys.bicep skips every principal that is not a GUID, so a shipped
 placeholder such as <todo>_EntraID_ObjectID silently leaves the common and admin Key Vaults
 without an admin policy. preflight.sh turns every FAIL line printed here into a finding that
-blocks the deployment even in WARN_ONLY mode.
+blocks the deployment even in WARN_ONLY mode, and every WARN line into a warning that does not.
+
+Valid technical admin IDs that Bicep would change (case, surrounding whitespace, duplicates) only
+warn: since purple 474ecff3 Bicep normalizes them before it seeds role-assignment names with them,
+so a factory deployed earlier with upper-case IDs gets new names once (RoleAssignmentExists, 409).
 
 Sources, checked per principal:
   * The pipeline environment (ADO maps variables to UPPERCASE names; GitHub workflows export
@@ -32,6 +36,7 @@ from typing import Mapping, Sequence
 GUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
 INVALID = "KV_PRINCIPAL_OBJECT_ID_INVALID"
 UNREADABLE = "KV_PRINCIPAL_CONFIG_UNREADABLE"
+NOT_NORMALIZED = "KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED"
 SCOPES = ("common", "project")
 OVERRIDES = Path(__file__).resolve().with_name("apply-json-config-overrides.py")
 # The AzureDatabricks first-party application (client) ID is the same in every tenant; Key Vault
@@ -54,6 +59,7 @@ class Principal:
     scopes: tuple[str, ...]         # preflight scopes whose templates read the principal
     hint: str
     wrong_ids: tuple[tuple[str, str], ...] = ()  # well-known GUIDs that are not object IDs
+    names_role_assignments: bool = False  # Bicep normalizes the IDs and seeds role-assignment names with them
 
 
 @dataclass(frozen=True)
@@ -61,6 +67,13 @@ class Finding:
     code: str
     message: str
     hint: str
+
+
+@dataclass(frozen=True)
+class Assessment:
+    findings: list[Finding]         # FAIL: block the deployment, even in WARN_ONLY mode
+    warnings: list[Finding]         # WARN: never block (except under preflight --strict, like every warning)
+    notes: list[str]                # INFO
 
 
 ENABLE_DATABRICKS = Setting("enableDatabricks", "ENABLE_DATABRICKS",
@@ -74,7 +87,7 @@ PRINCIPALS = (
     Principal(
         Setting("technical_admins_ad_object_id", "PROJECT_MEMBERS",
                 ("technical_admins_ad_object_id", "TECHNICAL_ADMINS_AD_OBJECT_ID", "PROJECT_MEMBERS")),
-        multiple=True, switch=None, scopes=SCOPES,
+        multiple=True, switch=None, scopes=SCOPES, names_role_assignments=True,
         hint="Use comma-separated Entra object IDs (GUIDs) of the technical admins, or leave it empty "
              "for none (.env and the GitHub secret: PROJECT_MEMBERS)."),
     # Only esml-common/main/13-rgLevel.bicep reads databricksOID; no project template does.
@@ -116,6 +129,49 @@ def problem(principal: Principal, value: str) -> str | None:
     shown = ", ".join(ascii(entry[:60]) if "<" in entry or not any(ch.isdigit() for ch in entry)
                       else f"entry {position} of {len(entries)}" for position, entry in invalid)
     return f"has entries that are not Entra object IDs (GUIDs): {shown}"
+
+
+def normalized(value: str) -> list[str]:
+    """normalizedObjectIds(split(value, ',')) of modules/common/objectIds.bicep: the IDs Bicep deploys."""
+    result: list[str] = []
+    for entry in value.split(","):
+        entry = entry.strip().lower()
+        if entry and entry != "null" and entry not in result:
+            result.append(entry)
+    return result
+
+
+def deviations(value: str) -> list[str]:
+    """How a valid object ID list differs from its normalized form, without naming any ID."""
+    entries = value.split(",")
+    found = []
+    if value != value.lower():
+        found.append("upper-case letters")
+    if any(entry != entry.strip() for entry in entries):
+        found.append("whitespace around entries (spaces or line breaks)")
+    if len(normalized(value)) < len(entries):
+        found.append("duplicate entries")
+    return found
+
+
+def not_normalized(name: str, label: str, found: list[str]) -> Finding:
+    message = f"{name} in {label} is valid but not normalized: it has {', '.join(found)}."
+    if found == ["duplicate entries"]:
+        # Names are seeded per object ID, so dropping a repeated entry renames nothing.
+        return Finding(NOT_NORMALIZED, message + " Bicep grants each principal once.",
+                       "Remove the repeated object IDs.")
+    return Finding(
+        NOT_NORMALIZED,
+        message + " Since accelerator 474ecff3, Bicep trims and lower-cases each ID and seeds role-assignment "
+                  "names with the result. A factory deployed with this value before 474ecff3 therefore gets new "
+                  "role-assignment names once, and its first redeploy with 474ecff3 or later can fail with "
+                  "RoleAssignmentExists (409). New factories are not affected.",
+        "Write the object IDs lower-case and comma-separated, without spaces or duplicates: that silences this "
+        "warning but does not change what Bicep deploys. After a RoleAssignmentExists (409), delete each old role "
+        "assignment with the same principal, role and scope (az role assignment delete --assignee <object-id> "
+        "--role <role> --scope <scope>) and run again; this is needed only once per factory. In Azure DevOps, step "
+        "101-rbac-common-rg (job-2-genai-services.yaml) has continueOnError: true, so a 409 there only turns the "
+        "run yellow.")
 
 
 def pipeline_value(environ: Mapping[str, str], setting: Setting, keep_empty: bool) -> tuple[str, str] | None:
@@ -176,11 +232,12 @@ def json_settings(path: Path, environment: str) -> dict[str, str]:
     return values
 
 
-def validate(environ: Mapping[str, str], environments: Sequence[str], variables_json: Path | None = None,
-             variables_yaml: Path | None = None, env_file: Path | None = None,
-             scope: str | None = None) -> tuple[list[Finding], list[str]]:
-    """Return the blocking findings and informational notes; scope None checks every principal."""
+def assess(environ: Mapping[str, str], environments: Sequence[str], variables_json: Path | None = None,
+           variables_yaml: Path | None = None, env_file: Path | None = None,
+           scope: str | None = None) -> Assessment:
+    """Return the blocking findings, warnings and informational notes; scope None checks every principal."""
     findings: list[Finding] = []
+    warnings: list[Finding] = []
     notes: list[str] = []
     checked: list[str] = []
     principals = [principal for principal in PRINCIPALS if scope is None or scope in principal.scopes]
@@ -190,7 +247,7 @@ def validate(environ: Mapping[str, str], environments: Sequence[str], variables_
         # The persona bridge already resolved this run; settings-file copies cannot change that.
         notes.append("the pipeline environment: groups-v1 persona access clears the technical admins and the "
                      "Databricks Key Vault grant, so they are not validated.")
-        return findings, notes
+        return Assessment(findings, warnings, notes)
 
     files: list[tuple[str, dict[str, str], bool]] = []  # label, canonical values, dotenv naming
     if variables_yaml:
@@ -219,7 +276,8 @@ def validate(environ: Mapping[str, str], environments: Sequence[str], variables_
             if principal.switch and not is_true(values.get(principal.switch, "")):
                 continue
             name = name_of(principal)
-            text = str(values.get(principal.setting.name, "")).strip()
+            raw = str(values.get(principal.setting.name, ""))
+            text = raw.strip()
             if not text:
                 if principal.switch:
                     notes.append(f"{name} is empty in {label} while {principal.switch} is true: "
@@ -229,6 +287,8 @@ def validate(environ: Mapping[str, str], environments: Sequence[str], variables_
             if reason:
                 findings.append(Finding(INVALID, f"{name} in {label} {reason}, so the principal would get "
                                         "no access to the common/admin Key Vaults.", principal.hint))
+            elif principal.names_role_assignments and (found := deviations(raw)):
+                warnings.append(not_normalized(name, label, found))
         checked.append(label)
 
     pipeline = [principal for principal in principals if in_pipeline[principal.setting.name]]
@@ -248,7 +308,15 @@ def validate(environ: Mapping[str, str], environments: Sequence[str], variables_
               lambda principal: principal.setting.dotenv if dotenv else principal.setting.name)
     if checked and not findings:
         notes.append("Key Vault principal object IDs are valid in: " + ", ".join(checked) + ".")
-    return findings, notes
+    return Assessment(findings, warnings, notes)
+
+
+def validate(environ: Mapping[str, str], environments: Sequence[str], variables_json: Path | None = None,
+             variables_yaml: Path | None = None, env_file: Path | None = None,
+             scope: str | None = None) -> tuple[list[Finding], list[str]]:
+    """The blocking findings and notes of assess(), for callers that do not read its warnings."""
+    result = assess(environ, environments, variables_json, variables_yaml, env_file, scope)
+    return result.findings, result.notes
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -260,13 +328,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--scope", choices=SCOPES, help="principals the common or project templates read; "
                                                          "default: both")
     args = parser.parse_args(argv)
-    findings, notes = validate(os.environ, args.environment or ["dev"], args.variables_json,
-                               args.variables_yaml, args.env_file, args.scope)
-    for note in notes:
+    result = assess(os.environ, args.environment or ["dev"], args.variables_json,
+                    args.variables_yaml, args.env_file, args.scope)
+    for note in result.notes:
         print(f"INFO\t{note}")
-    for finding in findings:
-        fields = (finding.code, finding.message, finding.hint)
-        print("FAIL\t" + "\t".join(field.replace("\t", " ").replace("\n", " ") for field in fields))
+    for kind, findings in (("WARN", result.warnings), ("FAIL", result.findings)):
+        for finding in findings:
+            fields = (finding.code, finding.message, finding.hint)
+            print(f"{kind}\t" + "\t".join(field.replace("\t", " ").replace("\n", " ") for field in fields))
     return 0
 
 

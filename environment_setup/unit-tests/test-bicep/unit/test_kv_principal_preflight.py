@@ -3,6 +3,8 @@
 modules/kvCmnAccessPolicys.bicep skips every principal that is not a GUID (purple 6383fdd3),
 so the shipped technical_admins_ad_object_id default "<todo>_EntraID_ObjectID" would leave the
 common/admin vaults without an admin policy. The preflight must stop it before any deployment.
+Valid technical admin IDs that Bicep normalizes (purple 474ecff3) only warn: case or spacing renames
+role assignments once.
 """
 
 import importlib.util
@@ -32,6 +34,7 @@ DATABRICKS = "99999999-8888-4777-8666-555555555555"
 AZURE_DATABRICKS_APP_ID = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"  # first-party app ID, same in every tenant
 INVALID = "KV_PRINCIPAL_OBJECT_ID_INVALID"
 UNREADABLE = "KV_PRINCIPAL_CONFIG_UNREADABLE"
+NOT_NORMALIZED = "KV_PRINCIPAL_OBJECT_ID_NOT_NORMALIZED"
 BLOCKED = "preflight FAILED: Key Vault principal object IDs"
 
 
@@ -302,6 +305,84 @@ def test_pipeline_databricks_flag_falls_back_to_settings_files(checker, tmp_path
     assert codes(findings) == [INVALID] and "pipeline environment" in findings[0].message
 
 
+# --- Normalization warnings (Bicep trims, lower-cases and de-duplicates since purple 474ecff3) ------
+
+@pytest.mark.parametrize("value,reason", [
+    (ADMIN.upper(), "upper-case"),
+    (f"{ADMIN2},{ADMIN.upper()}", "upper-case"),
+    (f" {ADMIN}", "whitespace"),
+    (f"{ADMIN} , {ADMIN2}", "whitespace"),
+    (f"{ADMIN}\n", "whitespace"),             # a GitHub secret pasted with its line break
+    (f"{ADMIN},{ADMIN2},{ADMIN}", "duplicate"),
+    (f"{ADMIN},{ADMIN.upper()}", "duplicate"),  # the same principal once lower-cased
+])
+def test_valid_but_unnormalized_technical_admins_warn_without_blocking(checker, value, reason):
+    result = checker.assess({"technical_admins_ad_object_id": value}, ["dev"])
+    assert result.findings == []
+    assert codes(result.warnings) == [NOT_NORMALIZED]
+    assert reason in result.warnings[0].message
+    assert "technical_admins_ad_object_id in the pipeline environment" in result.warnings[0].message
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\n", ADMIN, f"{ADMIN},{ADMIN2}"])
+def test_normalized_or_empty_technical_admins_do_not_warn(checker, value):
+    assert checker.assess({"technical_admins_ad_object_id": value}, ["dev"]).warnings == []
+
+
+@pytest.mark.parametrize("value", [f"{ADMIN.upper()},,{ADMIN2}", f"{ADMIN.upper()},", " null "])
+def test_blocked_values_fail_without_an_extra_warning(checker, value):
+    # Empty and 'null' entries stay blocking: esml-util templates still split the list themselves.
+    result = checker.assess({"technical_admins_ad_object_id": value}, ["dev"])
+    assert codes(result.findings) == [INVALID] and result.warnings == []
+
+
+def test_case_or_spacing_warning_names_the_one_time_409_and_its_fix(checker):
+    warning = checker.assess({"technical_admins_ad_object_id": ADMIN.upper()}, ["dev"]).warnings[0]
+    assert "role-assignment names" in warning.message and "RoleAssignmentExists (409)" in warning.message
+    assert "same principal, role and scope" in warning.hint and "az role assignment delete" in warning.hint
+    assert "101-rbac-common-rg" in warning.hint and "continueOnError: true" in warning.hint
+
+
+def test_duplicate_only_warning_does_not_predict_a_409(checker):
+    # Names are seeded per object ID, so dropping a repeated entry renames nothing.
+    warning = checker.assess({"technical_admins_ad_object_id": f"{ADMIN},{ADMIN}"}, ["dev"]).warnings[0]
+    assert "409" not in warning.message + warning.hint
+
+
+def test_warnings_list_every_deviation_but_never_the_object_ids(checker):
+    # GitHub masks the whole PROJECT_MEMBERS secret, not its entries.
+    warning = checker.assess({"PROJECT_MEMBERS": f" {ADMIN.upper()} ,{ADMIN2},{ADMIN2}\n"}, ["dev"]).warnings[0]
+    assert all(reason in warning.message for reason in ("upper-case", "whitespace", "duplicate"))
+    text = (warning.message + " " + warning.hint).lower()
+    assert ADMIN[:8] not in text and ADMIN2[:8] not in text and ADMIN[-12:] not in text
+
+
+@pytest.mark.parametrize("source,label", [
+    ("json", "technical_admins_ad_object_id in variables.json [dev]"),
+    ("yaml", "technical_admins_ad_object_id in variables.yaml"),
+    ("dotenv", "PROJECT_MEMBERS in .env"),
+])
+def test_unnormalized_technical_admins_warn_in_every_settings_file(checker, tmp_path, source, label):
+    files = source_files(tmp_path, source, {"technical_admins_ad_object_id": f"{ADMIN2}, {ADMIN.upper()}"})
+    result = checker.assess({}, ["dev"], **files)
+    assert result.findings == [] and codes(result.warnings) == [NOT_NORMALIZED]
+    assert label in result.warnings[0].message
+
+
+def test_databricks_object_id_case_does_not_warn(checker):
+    # One Key Vault access-policy principal: no role-assignment name is seeded with it.
+    result = checker.assess({"enableDatabricks": "true", "databricksOID": f" {DATABRICKS.upper()} "}, ["dev"])
+    assert result.findings == [] and result.warnings == []
+
+
+def test_groups_v1_persona_access_does_not_warn(checker):
+    result = checker.assess({"technical_admins_ad_object_id": ADMIN.upper(), "enablePersonas": "true"}, ["dev"])
+    assert result.warnings == []
+
+
+def test_validate_still_returns_only_findings_and_notes(checker):
+    findings, notes = checker.validate({"technical_admins_ad_object_id": ADMIN.upper()}, ["dev"])
+    assert findings == [] and any("are valid in: the pipeline environment" in note for note in notes)
 
 
 # --- Command line --------------------------------------------------------------------------------
@@ -319,6 +400,16 @@ def test_command_line_prints_tab_separated_findings(tmp_path):
     assert result.returncode == 0, result.stderr
     fail = [line.split("\t") for line in result.stdout.splitlines() if line.startswith("FAIL\t")]
     assert len(fail) == 1 and fail[0][1] == INVALID and len(fail[0]) == 4
+
+
+def test_command_line_prints_tab_separated_warnings(tmp_path):
+    path = write(tmp_path / "variables.json", json.dumps({"dev": {"technical_admins_ad_object_id": ADMIN.upper()}}))
+    result = run_checker("--variables-json", str(path), "--environment", "dev", "--scope", "project")
+    assert result.returncode == 0, result.stderr
+    lines = [line.split("\t") for line in result.stdout.splitlines()]
+    warn = [fields for fields in lines if fields[0] == "WARN"]
+    assert len(warn) == 1 and warn[0][1] == NOT_NORMALIZED and len(warn[0]) == 4
+    assert not [fields for fields in lines if fields[0] == "FAIL"]
 
 
 def test_command_line_rejects_an_unknown_scope():
@@ -372,6 +463,17 @@ def test_preflight_trusts_valid_pipeline_values_over_a_stale_variables_json(offl
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "KV_PRINCIPAL" not in output
+
+
+def test_preflight_warns_about_unnormalized_technical_admins_without_blocking(offline_preflight):
+    result, _ = offline_preflight({"TF_BUILD": "True", "technical_admins_ad_object_id": f"{ADMIN.upper()}, {ADMIN2}"},
+                                  arguments=("--skip-azure-lookups", "--scope", "project"))
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    assert BLOCKED not in output and f"[WARN] {NOT_NORMALIZED}" in output
+    assert kv_lines(result, "##vso[task.logissue type=warning]"), output
+    assert not kv_lines(result, "##vso[task.logissue type=error]"), output
+    assert ADMIN.upper() not in output and ADMIN2 not in output
 
 
 def test_preflight_without_python_warns_that_principals_were_not_validated(offline_preflight):
