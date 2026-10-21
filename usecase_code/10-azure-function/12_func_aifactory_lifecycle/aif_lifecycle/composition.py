@@ -94,4 +94,5 @@ def build_runtime(env: Mapping[str, str] | None = None, *, vault=None) -> Runtim
         from .adapters.queue import EventQueue
         enqueue = EventQueue(settings.queue_account, settings.event_queue).send
     return Runtime(settings=settings, service=service, api=LifecycleHttpApi(service, event_secrets=settings.event_secrets,
-                                                                             enqueue=enqueue))
+                                                                             enqueue=enqueue,
+                                                                             required_role=settings.required_role))

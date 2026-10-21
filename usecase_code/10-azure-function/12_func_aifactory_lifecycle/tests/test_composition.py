@@ -40,10 +40,18 @@ def test_protected_ids_start_with_the_functions_own_project():
      "AIF_FACTORY_FOLDER": "C:/f"},
     {"AIF_EVENT_PROCESSING": "queue"},
     {"AIF_POLL_AFTER_SECONDS": "soon"},
+    {"AIF_EXECUTOR": "github-runner", "AIF_BACKEND": "rest", "AIF_GITHUB_REPOSITORY": "o/r", "AIF_GITHUB_TOKEN": "t"},
+    {"AIF_REQUIRED_ROLE": "Lifecycle.Operator"},  # without App Service authentication the principal header is forgeable
 ])
 def test_invalid_settings_fail_fast(env):
     with pytest.raises(ValidationFailed):
         Settings.from_env(env)
+
+
+def test_a_required_role_needs_app_service_authentication_on_the_app():
+    settings = Settings.from_env({"AIF_REQUIRED_ROLE": "Lifecycle.Operator", "WEBSITE_AUTH_ENABLED": "True"})
+    assert settings.required_role == "Lifecycle.Operator"
+    assert Settings.from_env({}).required_role is None
 
 
 @pytest.mark.parametrize("name", ["AIF_EVENT_SECRET", "AIF_GITHUB_TOKEN", "AIF_FACTORY_API_KEY"])

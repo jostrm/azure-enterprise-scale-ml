@@ -2,10 +2,14 @@
 
 Changes answer 202 with Location and Retry-After (Asynchronous Request-Reply); reads answer 200. Errors are RFC 9457
 problems with a stable code and a correlationId. The events route checks X-Hub-Signature-256 before anything else.
+With a required app role, the lifecycle routes also need the role in the principal that App Service authentication
+(Easy Auth) puts in X-MS-CLIENT-PRINCIPAL; health, events and runner results stay anonymous (HMAC-checked).
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import uuid
@@ -13,7 +17,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from .domain.errors import InvalidSignature, LifecycleError, ValidationFailed
+from .domain.errors import InvalidSignature, LifecycleError, MissingRole, Unauthenticated, ValidationFailed
 from .problem import PROBLEM_MEDIA_TYPE, problem_document
 from .signatures import sign, verify
 
@@ -42,12 +46,13 @@ class ApiResponse:
 
 class LifecycleHttpApi:
     def __init__(self, service, *, event_secrets: list[bytes], base_path: str = "/api", retry_after_seconds: int = 5,
-                 enqueue: Callable[[dict[str, Any]], None] | None = None):
+                 enqueue: Callable[[dict[str, Any]], None] | None = None, required_role: str | None = None):
         self._service = service
         self._secrets = [secret for secret in event_secrets if secret]
         self._base = base_path.rstrip("/")
         self._retry_after = str(retry_after_seconds)
         self._enqueue = enqueue
+        self._role = required_role
 
     # ----- routes -----
 
@@ -58,10 +63,11 @@ class LifecycleHttpApi:
         def run():
             operation = self._service.prepare(request.route_params.get("scenario", ""), _json(request))
             return 202, operation.to_public(), self._accepted(operation.id)
-        return self._handle(request, run)
+        return self._handle(request, run, protected=True)
 
     def get_operation(self, request: ApiRequest) -> ApiResponse:
-        return self._handle(request, lambda: (200, self._service.get(request.route_params.get("operation_id", "")).to_public(), {}))
+        return self._handle(request, lambda: (200, self._service.get(request.route_params.get("operation_id", "")).to_public(), {}),
+                            protected=True)
 
     def list_operations(self, request: ApiRequest) -> ApiResponse:
         def run():
@@ -69,13 +75,13 @@ class LifecycleHttpApi:
                                                                  "currentStep", "createdAt", "updatedAt")}
                          for item in self._service.list()]
             return 200, {"operations": summaries}, {}
-        return self._handle(request, run)
+        return self._handle(request, run, protected=True)
 
     def confirm(self, request: ApiRequest) -> ApiResponse:
         def run():
             operation = self._service.confirm(request.route_params.get("operation_id", ""), _json(request))
             return 202, operation.to_public(), self._accepted(operation.id)
-        return self._handle(request, run)
+        return self._handle(request, run, protected=True)
 
     def github_events(self, request: ApiRequest) -> ApiResponse:
         def run():
@@ -105,7 +111,7 @@ class LifecycleHttpApi:
         return self._handle(request, run)
 
     def refresh_catalog(self, request: ApiRequest) -> ApiResponse:
-        return self._handle(request, lambda: (202, self._service.refresh_catalog(), {}))
+        return self._handle(request, lambda: (202, self._service.refresh_catalog(), {}), protected=True)
 
     def process_queued(self, message: dict[str, Any]) -> dict[str, Any]:
         """Apply a queued event. Queue access is not trust: only messages this Function signed are applied."""
@@ -123,9 +129,28 @@ class LifecycleHttpApi:
     def _accepted(self, operation_id: str) -> dict[str, str]:
         return {"Location": f"{self._base}/v1/operations/{operation_id}", "Retry-After": self._retry_after}
 
-    def _handle(self, request: ApiRequest, run: Callable[[], tuple[int, Any, dict[str, str]]]) -> ApiResponse:
+    def _authorize(self, request: ApiRequest) -> None:
+        """The app role from the principal App Service authentication validated (never from the caller's own claims)."""
+        if not self._role:
+            return
+        try:
+            document = json.loads(base64.b64decode(request.header("x-ms-client-principal") or "", validate=True))
+            role_type = document.get("role_typ") or "roles"
+            roles = {claim.get("val") for claim in document.get("claims") or []
+                     if claim.get("typ") in (role_type, "roles")}
+        except (ValueError, binascii.Error, AttributeError, TypeError):
+            raise Unauthenticated("Call with a Microsoft Entra ID access token for this Function's app.") from None
+        if self._role not in roles:
+            raise MissingRole(f"The caller needs the app role {self._role}.")
+        log.info("caller %s on %s %s", request.header("x-ms-client-principal-name") or "unknown", request.method,
+                 request.path)
+
+    def _handle(self, request: ApiRequest, run: Callable[[], tuple[int, Any, dict[str, str]]], *,
+                protected: bool = False) -> ApiResponse:
         correlation = request.header("x-correlation-id") or str(uuid.uuid4())
         try:
+            if protected:
+                self._authorize(request)
             status, body, headers = run()
             return _response(status, JSON_MEDIA_TYPE, body, {**headers, "x-correlation-id": correlation})
         except LifecycleError as error:

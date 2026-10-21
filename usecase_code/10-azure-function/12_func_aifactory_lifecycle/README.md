@@ -78,10 +78,10 @@ run on the runner, one at a time.
 | Method and route | Auth | Answer |
 |---|---|---|
 | `GET /api/v1/health` | anonymous | 200 `{status, version, backend, executor}` |
-| `POST /api/v1/lifecycle/{scenario}/prepare` | function key | 202, `Location`, `Retry-After` |
-| `GET /api/v1/operations` | function key | 200 list |
-| `GET /api/v1/operations/{id}` | function key | 200 operation with steps, previews, runs, history |
-| `POST /api/v1/operations/{id}/confirm` | function key | 202, `Location`, `Retry-After` |
+| `POST /api/v1/lifecycle/{scenario}/prepare` | function key (+ Entra app role) | 202, `Location`, `Retry-After` |
+| `GET /api/v1/operations` | function key (+ Entra app role) | 200 list |
+| `GET /api/v1/operations/{id}` | function key (+ Entra app role) | 200 operation with steps, previews, runs, history |
+| `POST /api/v1/operations/{id}/confirm` | function key (+ Entra app role) | 202, `Location`, `Retry-After` |
 | `POST /api/v1/github/events` | anonymous + `X-Hub-Signature-256` | 202 applied/queued, 200 duplicate/ignored, 401 bad signature |
 | `POST /api/v1/runner/results` | anonymous + `X-Hub-Signature-256` | 202 applied, 200 ignored (not the pending hand-off), 401 bad signature |
 | `POST /api/v1/catalog/refresh` | function key | 202; `github-runner` only (400 `not-supported` otherwise) |
@@ -122,6 +122,7 @@ Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, 
 | `AIF_GITHUB_REPOSITORY`, `AIF_GITHUB_TOKEN_NAME` | `owner/repo`, secret name | Fine-grained token or GitHub App limited to that repo's Actions |
 | `AIF_FACTORY_API_URL`, `AIF_FACTORY_API_KEY_NAME`, `AIF_FACTORY_FOLDER` | `http://127.0.0.1:8765`, secret name, path | REST/SDK with `inprocess`; plain http only to loopback. With `github-runner` they belong to the runner (`runner.json`), not the Function |
 | `AIF_OPS_WORKFLOW`, `AIF_RUNNER_TIMEOUT_SECONDS` | `aif-ops.yml`, 900 | `github-runner`: the workflow it dispatches in `AIF_GITHUB_REPOSITORY`, and how long a hand-off may stay silent |
+| `AIF_REQUIRED_ROLE` | app role, for example `Lifecycle.Operator` | Lifecycle routes also need this role in the caller's Entra token; refused at startup unless App Service authentication is on (`authClientId`) |
 | `AIF_REVIEW_TTL_SECONDS`, `AIF_POLL_AFTER_SECONDS` | 600, 120 | |
 
 For local development, `AIF_EVENT_SECRET`, `AIF_GITHUB_TOKEN` and `AIF_FACTORY_API_KEY` can hold plain values.
@@ -165,7 +166,21 @@ With the wizard's Factory API on the same machine, set `AIF_BACKEND=rest` (or `s
    the app**: give this template its own app.
 3. Get the function key with `az functionapp keys list` and call `GET /api/v1/health`.
 
-Use function keys for the mock passes. Before real deployments, add App Service authentication with an Entra app role.
+Use function keys for the mock passes. Before real deployments, add App Service authentication with an Entra app role:
+
+```powershell
+.\scripts\register-entra-app.ps1 -DisplayName aif-lifecycle-func-<consumer> -Operator <upn>   # prints authClientId
+```
+
+Put `authClientId` in `settings.<consumer>.json` and `"AIF_REQUIRED_ROLE": "Lifecycle.Operator"` in its
+`appSettings`, then redeploy with infrastructure. App Service authentication then answers 401 to calls without a valid
+token for `api://<authClientId>`, and the Function answers 403 `missing-role` to callers without the role; health,
+events and runner results stay anonymous (HMAC-checked). Callers send both the function key and a token:
+
+```powershell
+$token = az account get-access-token --resource api://<authClientId> --query accessToken -o tsv
+Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Authorization = "Bearer $token" }
+```
 
 ## GitHub events: relay and management runner
 

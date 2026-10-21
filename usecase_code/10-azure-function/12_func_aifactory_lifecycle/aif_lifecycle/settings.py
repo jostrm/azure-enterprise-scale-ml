@@ -94,6 +94,7 @@ class Settings:
     review_ttl_seconds: int = 600
     poll_after_seconds: int = 120
     key_vault_name: str | None = None
+    required_role: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None, *, vault: SecretReader | None = None) -> "Settings":
@@ -130,8 +131,12 @@ class Settings:
             review_ttl_seconds=_int(env, "AIF_REVIEW_TTL_SECONDS", 600, 30, 3600),
             poll_after_seconds=_int(env, "AIF_POLL_AFTER_SECONDS", 120, 15, 3600),
             key_vault_name=env.get("AIF_KEY_VAULT_NAME") or None,
+            required_role=(env.get("AIF_REQUIRED_ROLE") or "").strip() or None,
         )
         settings._check()
+        if settings.required_role and (env.get("WEBSITE_AUTH_ENABLED") or "").strip().lower() != "true":
+            # Only App Service authentication sets X-MS-CLIENT-PRINCIPAL; without it a caller could forge the header.
+            raise ValidationFailed("AIF_REQUIRED_ROLE needs App Service authentication (Microsoft Entra ID) on the app.")
         return settings
 
     def _check(self) -> None:

@@ -14,7 +14,7 @@
   The publish replaces every function in the app: deploy this template only to an app that is dedicated to it.
 
 .PARAMETER SettingsFile
-  JSON with subscriptionId, resourceGroup, functionAppName, planName (optional), planSku, pythonVersion,
+  JSON with subscriptionId, resourceGroup, functionAppName, planName (optional), authClientId (optional), planSku, pythonVersion,
   integrationSubnetId, privateEndpointSubnetId, privateDnsZoneId, storageAccountName, appInsightsName,
   logAnalyticsWorkspaceId, keyVaultName, appSettings and tags. See settings.example.json. No secret values.
 
@@ -76,6 +76,7 @@ try {
             appInsightsName         = $settings.appInsightsName
             logAnalyticsWorkspaceId = $settings.logAnalyticsWorkspaceId ?? ''
             keyVaultName            = $settings.keyVaultName ?? ''
+            authClientId            = $settings.authClientId ?? ''
             grantQueueRole          = ($settings.appSettings.AIF_EVENT_PROCESSING -eq 'queue')
             appSettings             = $settings.appSettings ?? @{}
             tags                    = $settings.tags ?? @{}

@@ -32,6 +32,14 @@ class InvalidSignature(LifecycleError):
     status, code, title = 401, "invalid-signature", "The event signature is not valid"
 
 
+class Unauthenticated(LifecycleError):
+    status, code, title = 401, "unauthenticated", "Sign in with Microsoft Entra ID"
+
+
+class MissingRole(LifecycleError):
+    status, code, title = 403, "missing-role", "The caller does not have the required app role"
+
+
 class ProtectedTarget(LifecycleError):
     status, code, title = 403, "protected-target", "The target is protected"
 

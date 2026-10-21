@@ -202,6 +202,43 @@ def test_a_failed_enqueue_does_not_consume_the_delivery(clock):
     assert body == {"result": "duplicate"}
 
 
+ROLE = "Lifecycle.Operator"
+
+
+def principal(*roles, name="operator@example.com"):
+    """The X-MS-CLIENT-PRINCIPAL header App Service authentication (Easy Auth) adds for a signed-in caller."""
+    import base64
+    role_type = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+    claims = [{"typ": "name", "val": name}] + [{"typ": role_type, "val": role} for role in roles]
+    document = {"auth_typ": "aad", "claims": claims, "name_typ": "name", "role_typ": role_type}
+    return {"X-MS-CLIENT-PRINCIPAL": base64.b64encode(json.dumps(document).encode()).decode(),
+            "X-MS-CLIENT-PRINCIPAL-NAME": name}
+
+
+@pytest.fixture
+def guarded(clock):
+    return LifecycleHttpApi(make_service(clock), event_secrets=[SECRET], required_role=ROLE)
+
+
+def test_a_required_role_admits_only_callers_easy_auth_gave_that_role(guarded):
+    body = json.dumps({"factoryId": "aif-121-sdc-dev"}).encode()
+    route = {"path": "/api/v1/lifecycle/init-factory/prepare", "params": {"scenario": "init-factory"}, "raw": body}
+    assert call(guarded, "prepare", **route)[1]["code"] == "unauthenticated"
+    assert call(guarded, "prepare", **route, headers={"X-MS-CLIENT-PRINCIPAL": "not base64 json"})[0].status == 401
+    response, document = call(guarded, "prepare", **route, headers=principal("Reader"))
+    assert response.status == 403 and document["code"] == "missing-role"
+    assert call(guarded, "prepare", **route, headers=principal(ROLE))[0].status == 202
+    for handler in ("list_operations", "refresh_catalog"):
+        assert call(guarded, handler, method="GET")[0].status == 401
+
+
+def test_health_events_and_results_stay_anonymous_behind_a_required_role(guarded):
+    assert call(guarded, "health", method="GET")[0].status == 200
+    event = signed(RUN)
+    assert call(guarded, "github_events", raw=event["raw"], headers=event["headers"])[0].status == 200
+    assert call(guarded, "runner_results", body={"v": 1})[0].status == 401  # HMAC, not the app role, guards results
+
+
 def test_list_operations(api):
     prepare(api)
     response, body = call(api, "list_operations", method="GET")

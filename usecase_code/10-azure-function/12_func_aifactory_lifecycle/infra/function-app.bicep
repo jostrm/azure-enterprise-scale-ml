@@ -49,6 +49,9 @@ param grantQueueRole bool = true
 @description('Extra app settings (AIF_*). Secrets are read from Key Vault by name, never passed here.')
 param appSettings object = {}
 
+@description('Microsoft Entra app (client) ID for App Service authentication (scripts/register-entra-app.ps1). Empty: no App Service authentication, function keys only (the mock passes). With it, set AIF_REQUIRED_ROLE in appSettings.')
+param authClientId string = ''
+
 param tags object = {}
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -138,6 +141,48 @@ resource ftpBasicAuth 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@20
   name: 'ftp'
   properties: {
     allow: false
+  }
+}
+
+// App Service authentication validates Entra ID tokens for the lifecycle routes; the Function then requires the app
+// role (AIF_REQUIRED_ROLE) from the principal it adds. Health, events and runner results stay anonymous: they are
+// HMAC-checked, and the relay and runner have no Entra token.
+resource auth 'Microsoft.Web/sites/config@2024-04-01' = if (!empty(authClientId)) {
+  parent: site
+  name: 'authsettingsV2'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      requireAuthentication: true
+      unauthenticatedClientAction: 'Return401'
+      excludedPaths: [
+        '/api/v1/health'
+        '/api/v1/github/events'
+        '/api/v1/runner/results'
+      ]
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: authClientId
+          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+        }
+        validation: {
+          allowedAudiences: [
+            'api://${authClientId}'
+            authClientId
+          ]
+        }
+      }
+    }
+    login: {
+      tokenStore: {
+        enabled: false
+      }
+    }
   }
 }
 
