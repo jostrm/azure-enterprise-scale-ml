@@ -30,6 +30,12 @@ if ($Commit -notmatch '^[0-9a-f]{40}$') { throw 'Commit must be a full 40-charac
 if ($ApiUrl -notmatch '^http://(127\.0\.0\.1|localhost)(:\d+)?$') { throw 'ApiUrl must be a loopback http URL.' }
 if (-not (Test-Path $Python)) { throw "Python not found: $Python" }
 
+# pip clones purple for the SDK pin, and purple's deep paths pass Windows' 260-character limit: enable git's long
+# paths for this script's git calls only (environment config, git 2.31+), not for the whole VM.
+$env:GIT_CONFIG_COUNT = '1'
+$env:GIT_CONFIG_KEY_0 = 'core.longpaths'
+$env:GIT_CONFIG_VALUE_0 = 'true'
+
 $template = 'usecase_code/10-azure-function/12_func_aifactory_lifecycle'
 $source = Join-Path $InstallRoot 'src'
 $app = Join-Path $InstallRoot 'app'
@@ -67,6 +73,8 @@ $json = $settings | ConvertTo-Json
 
 # Only SYSTEM and Administrators may change the install; the runner service account reads and runs it. Inheritance is
 # removed because C:\ lets Authenticated Users modify new folders, which would let one job rewrite the runner code.
+# The rights are set on the root only, then everything below is reset to inherit exactly them.
 Invoke-Native icacls @($InstallRoot, '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F',
-                       "*${RunnerSid}:(OI)(CI)RX", '/T', '/Q')
+                       "*${RunnerSid}:(OI)(CI)RX", '/Q')
+Invoke-Native icacls @((Join-Path $InstallRoot '*'), '/reset', '/T', '/C', '/Q')
 Write-Output "Lifecycle runner installed at $InstallRoot from $Commit."
