@@ -132,7 +132,8 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = if (commonN
   ]
 }
 
-var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array_1 = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null' || length(IPwhiteList) < 5) ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = if(!empty(ipWhitelist_array) && (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_bastion_subnet_name}'))){

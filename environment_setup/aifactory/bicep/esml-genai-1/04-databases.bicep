@@ -295,7 +295,8 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 //var genaiName = namingConvention.outputs.genaiName
 
 // IP Rules processing
-var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 
 // SQL Server SKU object
 var sqlServerSKUObject_DTU = {

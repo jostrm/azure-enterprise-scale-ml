@@ -8,6 +8,7 @@
 // Import types
 import { aifactoryNamingType } from '../types/aifactoryNaming.bicep'
 import { normalizedObjectIds } from 'objectIds.bicep'
+import { trimmedEntries } from 'listEntries.bicep'
 
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
@@ -74,10 +75,10 @@ var resourceSuffixPlusOne = '-${padLeft(string(int(substring(resourceSuffix,1,3)
 
 var p011_genai_team_lead_array = normalizedObjectIds(split(technicalAdminsObjectID, ','))
 
-var postGresAdminEmailsLocal_array = array(split(replace(postGresAdminEmails,'\\s+', ''),','))
+var postGresAdminEmailsLocal_array = trimmedEntries(split(postGresAdminEmails, ','))
 var postGresAdminEmailsLocal = (empty(postGresAdminEmails)) ? [] : union(postGresAdminEmailsLocal_array,[])
 
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
+var technicalAdminsEmail_array = trimmedEntries(split(technicalAdminsEmail, ','))
 var p011_genai_team_lead_email_array = (empty(technicalAdminsEmail)) ? [] : technicalAdminsEmail_array
 
 // ============================================================================

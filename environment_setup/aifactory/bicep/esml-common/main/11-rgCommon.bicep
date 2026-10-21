@@ -43,7 +43,8 @@ param inputKeyvault string
 param inputKeyvaultSubscription string
 param inputKeyvaultResourcegroup string
 
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var technicalAdminsEmail_array = filter(map(split(technicalAdminsEmail, ','), entry => trim(entry)), entry => !empty(entry))
 var personaGroupsEnabled = contains(tags, 'AIF-Persona-Access') ? tags['AIF-Persona-Access'] == 'groups-v1' : false
 // Same body as normalizedObjectIds in modules/common/objectIds.bicep, inlined to keep this template classic ARM.
 var technicalAdminsObjectID_array_safe = personaGroupsEnabled ? [] : union(filter(map(split(technicalAdminsObjectID, ','), id => toLower(trim(id))), id => !empty(id) && id != 'null'), [])

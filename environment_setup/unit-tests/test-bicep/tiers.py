@@ -82,6 +82,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_hub_private_transition.py",
         "unit/test_kv_access_policy_principals.py",
         "unit/test_kv_principal_preflight.py",
+        "unit/test_list_entries.py",
         "unit/test_logic_app_subnet.py",
         "unit/test_mcp_api_sp_script.py",
         "unit/test_monitoring_runbook_adapters.py",

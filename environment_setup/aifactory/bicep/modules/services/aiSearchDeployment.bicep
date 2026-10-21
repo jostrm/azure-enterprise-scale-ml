@@ -29,6 +29,8 @@ param admin_bicep_kv_fw_rg string = ''
 param admin_bicep_input_keyvault_subscription string = ''
 
 var cmkForAISearch = cmk && !cmkDisableForAISearch
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var cmkIdentityId = resourceId(context.subscriptionId, context.targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', context.names.miPrjName)
 var sharedPrivateLinks = enableAISearchSharedPrivateLink ? [
   {
@@ -62,9 +64,9 @@ module aiSearchService '../aiSearch.bicep' = {
     storageAccountNameForSharedLinks: enableAISearchSharedPrivateLink ? context.names.storageAccount2001Name : ''
     approveAiServicesSharedLink: false
     aiServicesNameForSharedLink: (enableAISearchSharedPrivateLink && enableAIServices) ? context.names.aiServicesName : ''
-    ipRules: [for ip in (!empty(IPwhiteList) ? split(IPwhiteList, ',') : []): {
+    ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value: trim(ip)
+      value: ip
     }]
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     managedIdentities: {

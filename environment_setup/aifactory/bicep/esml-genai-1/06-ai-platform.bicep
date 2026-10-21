@@ -276,7 +276,8 @@ var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 
 // IP Rules processing
-var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: replace(ip, '/32', '')]
 
 // Normalize IP addresses: add /32 to single IPs if not present

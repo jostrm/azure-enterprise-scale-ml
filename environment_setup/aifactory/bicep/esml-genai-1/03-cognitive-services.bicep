@@ -373,7 +373,8 @@ var safeNameAISearch = (needsAISearch && !empty(safeNameAISearchOrg))
   : ''
 
 // IP Rules processing
-var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var processedIpRulesAIServices = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: trim(ip)

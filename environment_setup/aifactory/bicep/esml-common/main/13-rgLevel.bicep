@@ -206,7 +206,8 @@ var commonSubnetScoring = (BYO_subnets)?replace(subnetCommonScoring, '<network_e
 var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-${commonResourceAbbreviation}-${commonResourceShortName}-pbi-001' // common_pbi_subnet_name
 
 // RBAC
-var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array_1 = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
 
 // Process IP rules for Container Registry (add /32 if no CIDR notation provided)
@@ -219,7 +220,7 @@ var personaGroupsEnabled = contains(tags, 'AIF-Persona-Access') ? tags['AIF-Pers
 // Same body as normalizedObjectIds in modules/common/objectIds.bicep, inlined to keep this template classic ARM.
 var technicalAdminsObjectID_array_safe = personaGroupsEnabled ? [] : union(filter(map(split(technicalAdminsObjectID, ','), id => toLower(trim(id))), id => !empty(id) && id != 'null'), [])
 
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
+var technicalAdminsEmail_array = filter(map(split(technicalAdminsEmail, ','), entry => trim(entry)), entry => !empty(entry))
 var technicalAdminsEmail_array_safe = (personaGroupsEnabled || empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var sweden_central_adf_missing = false // (location == 'swedencentral')?true:false
 

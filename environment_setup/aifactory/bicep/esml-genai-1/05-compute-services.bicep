@@ -510,7 +510,8 @@ var aksSubnetIdResolved = !empty(aksSubnetId) ? aksSubnetId : aks2SubnetId
 var vnetIntegrationSubnetName = !empty(webappSubnetName) ? webappSubnetName : ((!enableAKS && !empty(aksSubnetName)) ? aksSubnetName : acaSubnetName)
 
 // IP Rules processing
-var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 
 // Safe domain construction to avoid InvalidDomainName errors
 var safeLocation = toLower(location)

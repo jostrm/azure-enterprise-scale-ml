@@ -17,6 +17,8 @@ targetScope = 'subscription'
 // CMK: Is not supported for these services. But storage, and keyvault for App services packages uses CMK, from other bicep.
 // ================================================================
 
+import { trimmedEntries } from '../modules/common/listEntries.bicep'
+
 // ============== SKUs ==============
 @description('App Service Plan SKU for Logic Apps hosting - Dev')
 @allowed(['WS1', 'WS2', 'WS3', 'EP1', 'EP2', 'EP3', 'P1V2', 'P2V2', 'P3V2', 'P1V3', 'P2V3', 'P3V3'])
@@ -217,6 +219,7 @@ param tagsProject object = {}
 
 // IP Whitelist (comma separated) for AML studio / scoring endpoints
 param IPwhiteList string = ''
+var ipWhitelist_array = trimmedEntries(split(IPwhiteList, ','))
 
 // Key Vault seeding / SP linking (needed for spAndMiArray)
 @description('Existing Key Vault name containing SP secret for seeding')
@@ -478,10 +481,10 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.14.0' = if(!eventHubsEx
     // Network rule set (only if public access is enabled with perimeter)
     networkRuleSets: enablePublicAccessWithPerimeter ? {
       defaultAction: 'Deny'
-      ipRules: !empty(IPwhiteList) ? map(split(IPwhiteList, ','), ip => {
-        ipMask: trim(ip)
+      ipRules: map(ipWhitelist_array, ip => {
+        ipMask: ip
         action: 'Allow'
-      }) : []
+      })
       virtualNetworkRules: [
         {
           subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)

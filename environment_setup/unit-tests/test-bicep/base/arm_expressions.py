@@ -66,6 +66,25 @@ def _format(text, *args):
     return re.sub(r"\{(\d+)\}", lambda match: str(args[int(match[1])]), text)
 
 
+def _variable(key, parameters, template, context):
+    """A variable, including one a ``[for ...]`` expression compiled into the variables ``copy`` list."""
+    variables = template["variables"]
+    if key in variables:
+        return arm_value(variables[key], parameters, template, context)
+    loop = next(item for item in variables.get("copy", []) if item["name"] == key)
+    count = arm_value(loop["count"], parameters, template, context)
+    return [_deep_value(loop["input"], parameters, template, {**context, "copyIndex": lambda *_, index=index: index})
+            for index in range(count)]
+
+
+def _deep_value(item, parameters, template, context):
+    if isinstance(item, dict):
+        return {key: _deep_value(child, parameters, template, context) for key, child in item.items()}
+    if isinstance(item, list):
+        return [_deep_value(child, parameters, template, context) for child in item]
+    return arm_value(item, parameters, template, context)
+
+
 def _visit(node, parameters, template, context, scope):
     def value(child):
         return _visit(child, parameters, template, context, scope)
@@ -94,7 +113,7 @@ def _visit(node, parameters, template, context, scope):
         raise ValueError(values[0])
     functions = {
         "parameters": parameters.__getitem__,
-        "variables": lambda key: arm_value(template["variables"][key], parameters, template, context),
+        "variables": lambda key: _variable(key, parameters, template, context),
         "lambdaVariables": scope.__getitem__,
         "AND": lambda *args: all(args), "OR": lambda *args: any(args), "NOT": lambda item: not item,
         "true": lambda: True, "false": lambda: False, "null": lambda: None,

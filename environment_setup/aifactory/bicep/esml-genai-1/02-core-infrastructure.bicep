@@ -284,7 +284,8 @@ resource commonKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 // ============================================================================
 
 // IP Rules processing
-var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var processedIpRulesKv = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: trim(ip)

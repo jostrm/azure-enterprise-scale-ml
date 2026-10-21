@@ -233,13 +233,14 @@ param addBastionHost bool // Dummy: do not correspond to any parameters defined 
 param alsoManagedMLStudio bool = true
 
 // RBAC
-var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined like the esml-common copies.
+var ipWhitelist_array_1 = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null' || length(IPwhiteList) < 5) ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 // Same body as normalizedObjectIds in modules/common/objectIds.bicep, inlined like the esml-common copies so all share one test pin.
 var p011_genai_team_lead_array = union(filter(map(split(technicalAdminsObjectID, ','), id => toLower(trim(id))), id => !empty(id) && id != 'null'), [])
 
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
+var technicalAdminsEmail_array = filter(map(split(technicalAdminsEmail, ','), entry => trim(entry)), entry => !empty(entry))
 var p011_genai_team_lead_email = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
 // create Project RG and use as salt for Project/env specific

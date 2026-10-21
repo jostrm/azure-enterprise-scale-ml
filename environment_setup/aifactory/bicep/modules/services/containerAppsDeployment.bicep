@@ -48,7 +48,9 @@ var appWorkloadProfileName = workloadProfileType == 'Consumption'
   : 'aifactory-dedicated'
 var containerRegistryName = useCommonACR ? context.names.acrCommonName : context.names.acrProjectName
 var aiServicesName = enableAIServices ? context.names.aiServicesName : ''
-var ipSecurityRestrictions = [for ip in (!empty(IPwhiteList) ? split(IPwhiteList, ',') : []): {
+// Same body as trimmedEntries in modules/common/listEntries.bicep, inlined to keep this template classic ARM.
+var ipWhitelist_array = filter(map(split(IPwhiteList, ','), entry => trim(entry)), entry => !empty(entry))
+var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
   name: replace(replace(ip, ',', ''), '/', '_')
   ipAddressRange: ip
   action: 'Allow'
