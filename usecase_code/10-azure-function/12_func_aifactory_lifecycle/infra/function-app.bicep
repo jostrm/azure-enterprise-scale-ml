@@ -55,6 +55,11 @@ param authClientId string = ''
 @description('App role the lifecycle routes require (AIF_REQUIRED_ROLE) whenever authClientId is set, so every signed-in tenant user is not enough.')
 param requiredRole string = 'Lifecycle.Operator'
 
+@description('Client application IDs whose tokens App Service authentication accepts (the token\'s azp). Default: Azure CLI, which operators use (az account get-access-token). Observed on the Spider Function (2026-10-22): with an empty list, Azure CLI tokens got 403 until this was set.')
+param authAllowedClientApplications array = [
+  '04b07795-8ddb-461a-bbee-02f9e1bf7b46'
+]
+
 param tags object = {}
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -189,6 +194,9 @@ resource auth 'Microsoft.Web/sites/config@2024-04-01' = {
             'api://${authClientId}'
             authClientId
           ]
+          defaultAuthorizationPolicy: {
+            allowedApplications: authAllowedClientApplications
+          }
         }
       }
     }

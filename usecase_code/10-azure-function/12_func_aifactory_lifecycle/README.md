@@ -174,7 +174,9 @@ Use function keys for the mock passes. Before real deployments, add App Service 
 
 Put `authClientId` in `settings.<consumer>.json` and redeploy with infrastructure; the template then sets
 `AIF_REQUIRED_ROLE` (`requiredRole`, default `Lifecycle.Operator`) itself, and never passes `WEBSITE_AUTH_*` settings
-through. Clearing `authClientId` turns App Service authentication off again. App Service authentication answers 401 to calls without a valid
+through. Clearing `authClientId` turns App Service authentication off again. Tokens are accepted only from the client
+applications in `authAllowedClientApplications` (default: Azure CLI); with an empty list, Azure CLI tokens got 403 on
+the Spider Function. App Service authentication answers 401 to calls without a valid
 token for `api://<authClientId>`, and the Function answers 403 `missing-role` to callers without the role; health,
 events and runner results stay anonymous (HMAC-checked). Callers send both the function key and a token:
 
