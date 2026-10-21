@@ -41,7 +41,9 @@ function Invoke-Graph([string]$Method, [string]$Uri, $Body) {
     }
 }
 
-$app = (Invoke-Graph GET "/applications?`$filter=displayName eq '$DisplayName'").value | Select-Object -First 1
+$matches_ = @((Invoke-Graph GET "/applications?`$filter=displayName eq '$DisplayName'").value)
+if ($matches_.Count -gt 1) { throw "$($matches_.Count) apps are named $DisplayName; rename the extra ones first." }
+$app = $matches_ | Select-Object -First 1
 if (-not $app) {
     if (-not $PSCmdlet.ShouldProcess($DisplayName, 'Create app registration')) { return }
     $app = Invoke-Graph POST '/applications' @{ displayName = $DisplayName; signInAudience = 'AzureADMyOrg' }
@@ -49,7 +51,11 @@ if (-not $app) {
 $roleId = ($app.appRoles | Where-Object value -eq $Role | Select-Object -First 1).id ?? [guid]::NewGuid().ToString()
 $scope = $app.api.oauth2PermissionScopes | Where-Object value -eq 'user_impersonation' | Select-Object -First 1
 $scopeId = $scope.id ?? [guid]::NewGuid().ToString()
-$appRoles = @($app.appRoles | Where-Object value -ne $Role) + @{
+# Send back only the writable fields of the app's other roles (Graph refuses read-only ones such as origin).
+$otherRoles = @($app.appRoles | Where-Object value -ne $Role | ForEach-Object {
+    @{ id = $_.id; value = $_.value; displayName = $_.displayName; description = $_.description
+       isEnabled = $_.isEnabled; allowedMemberTypes = @($_.allowedMemberTypes) } })
+$appRoles = $otherRoles + @{
     id = $roleId; value = $Role; displayName = 'Lifecycle operator'; isEnabled = $true
     allowedMemberTypes = @('User', 'Application')
     description = 'Prepare, confirm and read AI Factory lifecycle operations.'
@@ -76,11 +82,14 @@ if ($PSCmdlet.ShouldProcess($DisplayName, "Set role $Role, api://$($app.appId) a
 $sp = (Invoke-Graph GET "/servicePrincipals?`$filter=appId eq '$($app.appId)'").value | Select-Object -First 1
 if (-not $sp -and $PSCmdlet.ShouldProcess($app.appId, 'Create service principal')) {
     $sp = Invoke-Graph POST '/servicePrincipals' @{ appId = $app.appId; appRoleAssignmentRequired = $true }
+} elseif ($sp -and -not $sp.appRoleAssignmentRequired -and $PSCmdlet.ShouldProcess($app.appId, 'Require role assignment')) {
+    Invoke-Graph PATCH "/servicePrincipals/$($sp.id)" @{ appRoleAssignmentRequired = $true } | Out-Null
 }
+if (-not $sp) { return }  # -WhatIf before the service principal exists
 foreach ($name in $Operator) {
     $user = Invoke-Graph GET "/users/$([uri]::EscapeDataString($name))?`$select=id"
-    $assigned = (Invoke-Graph GET "/servicePrincipals/$($sp.id)/appRoleAssignedTo").value |
-        Where-Object { $_.principalId -eq $user.id -and $_.appRoleId -eq $roleId }
+    $assigned = (Invoke-Graph GET "/users/$($user.id)/appRoleAssignments?`$filter=resourceId eq $($sp.id)").value |
+        Where-Object { $_.appRoleId -eq $roleId }
     if (-not $assigned -and $PSCmdlet.ShouldProcess($name, "Assign $Role")) {
         Invoke-Graph POST "/servicePrincipals/$($sp.id)/appRoleAssignedTo" @{
             principalId = $user.id; resourceId = $sp.id; appRoleId = $roleId } | Out-Null

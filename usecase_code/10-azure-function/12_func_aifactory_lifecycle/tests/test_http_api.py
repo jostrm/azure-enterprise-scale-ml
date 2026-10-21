@@ -232,6 +232,14 @@ def test_a_required_role_admits_only_callers_easy_auth_gave_that_role(guarded):
         assert call(guarded, handler, method="GET")[0].status == 401
 
 
+def test_the_plain_roles_claim_form_is_accepted_too(guarded):
+    """Without a role_typ (or with the default claims mapping) Easy Auth can send the role as a `roles` claim."""
+    import base64
+    document = {"auth_typ": "aad", "claims": [{"typ": "roles", "val": ROLE}]}
+    headers = {"X-MS-CLIENT-PRINCIPAL": base64.b64encode(json.dumps(document).encode()).decode()}
+    assert call(guarded, "list_operations", method="GET", headers=headers)[0].status == 200
+
+
 def test_health_events_and_results_stay_anonymous_behind_a_required_role(guarded):
     assert call(guarded, "health", method="GET")[0].status == 200
     event = signed(RUN)

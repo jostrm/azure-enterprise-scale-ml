@@ -49,8 +49,11 @@ param grantQueueRole bool = true
 @description('Extra app settings (AIF_*). Secrets are read from Key Vault by name, never passed here.')
 param appSettings object = {}
 
-@description('Microsoft Entra app (client) ID for App Service authentication (scripts/register-entra-app.ps1). Empty: no App Service authentication, function keys only (the mock passes). With it, set AIF_REQUIRED_ROLE in appSettings.')
+@description('Microsoft Entra app (client) ID for App Service authentication (scripts/register-entra-app.ps1). Empty: App Service authentication off, function keys only (the mock passes).')
 param authClientId string = ''
+
+@description('App role the lifecycle routes require (AIF_REQUIRED_ROLE) whenever authClientId is set, so every signed-in tenant user is not enough.')
+param requiredRole string = 'Lifecycle.Operator'
 
 param tags object = {}
 
@@ -84,6 +87,10 @@ var baseSettings = [
   { name: 'AIF_STORE', value: 'table' }
   { name: 'AIF_TABLE_ACCOUNT', value: storage.name }
 ]
+// With App Service authentication the role requirement always comes along; without it the setting is left out.
+var authSettings = empty(authClientId) ? [] : [
+  { name: 'AIF_REQUIRED_ROLE', value: requiredRole }
+]
 var baseNames = [
   'FUNCTIONS_EXTENSION_VERSION'
   'FUNCTIONS_WORKER_RUNTIME'
@@ -92,8 +99,10 @@ var baseNames = [
   'SCM_DO_BUILD_DURING_DEPLOYMENT'
   'AIF_STORE'
   'AIF_TABLE_ACCOUNT'
+  'AIF_REQUIRED_ROLE'
 ]
-var extraSettings = [for setting in filter(items(appSettings), item => !contains(baseNames, item.key)): {
+// WEBSITE_AUTH_* belong to the platform: passing one through could fake the Function's App Service authentication check.
+var extraSettings = [for setting in filter(items(appSettings), item => !contains(baseNames, item.key) && !startsWith(toUpper(item.key), 'WEBSITE_AUTH_')): {
   name: setting.key
   value: string(setting.value)
 }]
@@ -123,7 +132,7 @@ resource site 'Microsoft.Web/sites@2024-04-01' = {
       vnetRouteAllEnabled: false
       ipSecurityRestrictionsDefaultAction: 'Deny'
       scmIpSecurityRestrictionsDefaultAction: 'Deny'
-      appSettings: concat(baseSettings, extraSettings)
+      appSettings: concat(baseSettings, authSettings, extraSettings)
     }
   }
 }
@@ -147,10 +156,15 @@ resource ftpBasicAuth 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@20
 // App Service authentication validates Entra ID tokens for the lifecycle routes; the Function then requires the app
 // role (AIF_REQUIRED_ROLE) from the principal it adds. Health, events and runner results stay anonymous: they are
 // HMAC-checked, and the relay and runner have no Entra token.
-resource auth 'Microsoft.Web/sites/config@2024-04-01' = if (!empty(authClientId)) {
+// Always deployed, so clearing authClientId turns App Service authentication off instead of leaving the old app on.
+resource auth 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: site
   name: 'authsettingsV2'
-  properties: {
+  properties: empty(authClientId) ? {
+    platform: {
+      enabled: false
+    }
+  } : {
     platform: {
       enabled: true
     }
