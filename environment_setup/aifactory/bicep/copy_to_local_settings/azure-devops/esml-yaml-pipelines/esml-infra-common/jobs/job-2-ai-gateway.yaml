@@ -1,11 +1,189 @@
 parameters:
 - name: serviceConnection
   type: string
+# Passed by infra-ai-gateway.yaml; only the managed APIM runner (apimGatewayManagedProvisioning) reads them.
+- name: gatewayEnvironment
+  type: string
+  default: ''
+- name: deploymentTarget
+  type: string
+  default: all
+  values: [all, dev, stage, prod]
+- name: action
+  type: string
+  default: plan
+  values: [plan, what-if, apply]
+- name: approvedPlan
+  type: string
+  default: ''
+- name: approvedPreview
+  type: string
+  default: ''
+- name: approveInitialPublicBootstrap
+  type: boolean
+  default: false
 
 steps:
+# apimGatewayManagedProvisioning: 'true' routes APIM through the reviewed runner (offline plan, then what-if and
+# apply of one phase per run; it can also provision a private StandardV2 APIM). 'false', the default, keeps the
+# classic "Deploy APIM Azure OpenAI pool" step below unchanged.
+- task: Bash@3
+  displayName: Validate target and plan APIM offline
+  condition: and(succeeded(), eq(variables['ENABLE_APIM'], 'true'), eq(variables['apimGatewayManagedProvisioning'], 'true'))
+  inputs:
+    targetType: inline
+    script: |
+      set -euo pipefail
+      python3 - <<'PY'
+      import os
+      import re
+      import subprocess
+      import sys
+      from pathlib import Path
+
+      def require(valid, message):
+          if not valid:
+              raise SystemExit(message)
+
+      guid = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
+      for key in ("AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID"):
+          require(re.fullmatch(guid, os.environ.get(key, "")), "Exact pipeline tenant and subscription are required.")
+      require(os.environ.get("GATEWAY_ENVIRONMENT") in ("dev", "stage", "prod"), "Invalid target environment.")
+      require(os.environ["GATEWAY_ACTION"] in ("plan", "what-if", "apply"), "Invalid action.")
+      require(os.environ["GATEWAY_ACTION"] != "apply" or os.environ.get("GATEWAY_DEPLOYMENT_TARGET") != "all",
+              "Managed APIM apply needs one deploymentTarget (dev, stage or prod), not all.")
+      root = Path(os.environ["GATEWAY_REPOSITORY_ROOT"]).resolve(strict=True)
+      relative_runner = Path("environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py")
+      runner = root / "azure-enterprise-scale-ml" / relative_runner
+      if not runner.is_file():
+          runner = root / relative_runner
+      require(runner.is_file(), "APIM runner missing from root checkout or expected submodule.")
+      args = [sys.executable, str(runner), "--environment", os.environ["GATEWAY_ENVIRONMENT"],
+              "--action", "plan", "--output-dir", os.environ["GATEWAY_OUTPUT_DIR"]]
+      value = os.environ.get("GATEWAY_CONFIG_FILE", "")
+      if value:
+          relative = Path(value)
+          require(not relative.is_absolute() and ".." not in relative.parts
+                  and "\\" not in value and not any(ord(c) < 32 for c in value),
+                  "Config file must be a consumer-relative path without traversal.")
+          try:
+              config = (root / relative).resolve(strict=True)
+          except (OSError, ValueError):
+              raise SystemExit("Cannot resolve the consumer configuration.") from None
+          require(config.is_relative_to(root) and config.is_file(),
+                  "Config file must remain inside the consumer repository.")
+          args.extend(["--config", str(config)])
+      raise SystemExit(subprocess.run(args, check=False).returncode)
+      PY
+  env:
+    GATEWAY_REPOSITORY_ROOT: $(Build.SourcesDirectory)
+    GATEWAY_OUTPUT_DIR: $(Build.ArtifactStagingDirectory)/apim-gateway-$(System.JobAttempt)
+    GATEWAY_ENVIRONMENT: ${{ parameters.gatewayEnvironment }}
+    GATEWAY_DEPLOYMENT_TARGET: ${{ parameters.deploymentTarget }}
+    GATEWAY_ACTION: ${{ parameters.action }}
+    GATEWAY_CONFIG_FILE: $(apimGatewayConfigFile)
+    AZURE_TENANT_ID: $(tenantId)
+    AZURE_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    AZURE_LOCATION: $(admin_location)
+    ENABLE_APIM: $(ENABLE_APIM)
+    APIM_GATEWAY_SUBSCRIPTION_ID: $(apimGatewaySubscriptionId)
+    APIM_GATEWAY_RESOURCE_GROUP: $(apimGatewayResourceGroup)
+    APIM_GATEWAY_SERVICE_NAME: $(apimGatewayServiceName)
+    APIM_GATEWAY_SKU: $(apimGatewaySku)
+    APIM_GATEWAY_SKU_CAPACITY: $(apimGatewaySkuCapacity)
+    APIM_GATEWAY_API_ID: $(apimGatewayApiId)
+    APIM_GATEWAY_API_PATH: $(apimGatewayApiPath)
+    APIM_GATEWAY_BACKEND_POOL_NAME: $(apimGatewayBackendPoolName)
+    APIM_GATEWAY_AGGREGATE_TPM: $(apimGatewayAggregateTpm)
+    APIM_GATEWAY_CALLER_TPM: $(apimGatewayCallerTpm)
+    APIM_GATEWAY_RETRY_COUNT: $(apimGatewayRetryCount)
+    APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: $(apimGatewayAssignOpenAIUserRole)
+    APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: $(apimGatewayManagedIdentityPrincipalId)
+    APIM_GATEWAY_BACKENDS_JSON: $(apimGatewayBackendsJson)
+    APIM_GATEWAY_TAGS_JSON: $(tags)
+
+- task: AzureCLI@2
+  displayName: Preview or apply reviewed APIM plan
+  condition: and(succeeded(), eq(variables['ENABLE_APIM'], 'true'), eq(variables['apimGatewayManagedProvisioning'], 'true'), ne('${{ parameters.action }}', 'plan'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    visibleAzLogin: false
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -euo pipefail
+      runner="$GATEWAY_REPOSITORY_ROOT/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py"
+      if [[ ! -f "$runner" ]]; then
+        runner="$GATEWAY_REPOSITORY_ROOT/environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py"
+      fi
+      args=(--environment "$GATEWAY_ENVIRONMENT" --action "$GATEWAY_ACTION" --output-dir "$GATEWAY_OUTPUT_DIR")
+      if [[ -n "$GATEWAY_CONFIG_FILE" ]]; then
+        args+=(--config "$GATEWAY_REPOSITORY_ROOT/$GATEWAY_CONFIG_FILE")
+      fi
+      if [[ "$GATEWAY_ACTION" == "apply" ]]; then
+        args+=(--approved-plan "$GATEWAY_APPROVED_PLAN" --approved-preview "$GATEWAY_APPROVED_PREVIEW")
+        if [[ "${GATEWAY_APPROVE_INITIAL_PUBLIC_BOOTSTRAP,,}" == "true" ]]; then
+          args+=(--approve-initial-public-bootstrap)
+        fi
+      fi
+      summary="$(python3 "$runner" "${args[@]}")"
+      echo "$summary"
+      # The MCP and Kong steps publish on a managed APIM only after an apply reached its configuration phase.
+      configured="$(python3 -c 'import json, sys; print(str(json.loads(sys.argv[1]).get("gatewayConfigured") is True).lower())' "$summary")"
+      echo "##vso[task.setvariable variable=apimGatewayManagedConfigured]$configured"
+  env:
+    GATEWAY_REPOSITORY_ROOT: $(Build.SourcesDirectory)
+    GATEWAY_OUTPUT_DIR: $(Build.ArtifactStagingDirectory)/apim-gateway-$(System.JobAttempt)
+    GATEWAY_ENVIRONMENT: ${{ parameters.gatewayEnvironment }}
+    GATEWAY_DEPLOYMENT_TARGET: ${{ parameters.deploymentTarget }}
+    GATEWAY_ACTION: ${{ parameters.action }}
+    GATEWAY_CONFIG_FILE: $(apimGatewayConfigFile)
+    GATEWAY_APPROVED_PLAN: ${{ parameters.approvedPlan }}
+    GATEWAY_APPROVED_PREVIEW: ${{ parameters.approvedPreview }}
+    GATEWAY_APPROVE_INITIAL_PUBLIC_BOOTSTRAP: ${{ parameters.approveInitialPublicBootstrap }}
+    AZURE_TENANT_ID: $(tenantId)
+    AZURE_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    AZURE_LOCATION: $(admin_location)
+    ENABLE_APIM: $(ENABLE_APIM)
+    APIM_GATEWAY_SUBSCRIPTION_ID: $(apimGatewaySubscriptionId)
+    APIM_GATEWAY_RESOURCE_GROUP: $(apimGatewayResourceGroup)
+    APIM_GATEWAY_SERVICE_NAME: $(apimGatewayServiceName)
+    APIM_GATEWAY_SKU: $(apimGatewaySku)
+    APIM_GATEWAY_SKU_CAPACITY: $(apimGatewaySkuCapacity)
+    APIM_GATEWAY_API_ID: $(apimGatewayApiId)
+    APIM_GATEWAY_API_PATH: $(apimGatewayApiPath)
+    APIM_GATEWAY_BACKEND_POOL_NAME: $(apimGatewayBackendPoolName)
+    APIM_GATEWAY_AGGREGATE_TPM: $(apimGatewayAggregateTpm)
+    APIM_GATEWAY_CALLER_TPM: $(apimGatewayCallerTpm)
+    APIM_GATEWAY_RETRY_COUNT: $(apimGatewayRetryCount)
+    APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: $(apimGatewayAssignOpenAIUserRole)
+    APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: $(apimGatewayManagedIdentityPrincipalId)
+    APIM_GATEWAY_BACKENDS_JSON: $(apimGatewayBackendsJson)
+    APIM_GATEWAY_TAGS_JSON: $(tags)
+
+- task: Bash@3
+  displayName: Locate APIM review artifacts even on failure
+  condition: and(always(), eq(variables['ENABLE_APIM'], 'true'), eq(variables['apimGatewayManagedProvisioning'], 'true'))
+  inputs:
+    targetType: inline
+    script: |
+      set -euo pipefail
+      if [[ -f "$GATEWAY_OUTPUT_DIR/plan.json" || -f "$GATEWAY_OUTPUT_DIR/receipt.json" ]]; then
+        echo "##vso[task.setvariable variable=apimGatewayArtifactsReady]true"
+      fi
+  env:
+    GATEWAY_OUTPUT_DIR: $(Build.ArtifactStagingDirectory)/apim-gateway-$(System.JobAttempt)
+
+- task: PublishPipelineArtifact@1
+  displayName: Publish APIM plan and sanitized phase receipts
+  condition: and(always(), eq(variables['ENABLE_APIM'], 'true'), eq(variables['apimGatewayManagedProvisioning'], 'true'), eq(variables['apimGatewayArtifactsReady'], 'true'))
+  inputs:
+    targetPath: $(Build.ArtifactStagingDirectory)/apim-gateway-$(System.JobAttempt)
+    artifact: apim-gateway-${{ parameters.gatewayEnvironment }}-$(System.JobAttempt)
+
 - task: AzureCLI@2
   displayName: Deploy APIM Azure OpenAI pool
-  condition: eq(variables['ENABLE_APIM'], 'true')
+  condition: and(eq(variables['ENABLE_APIM'], 'true'), ne(variables['apimGatewayManagedProvisioning'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -83,9 +261,10 @@ steps:
 # addAIFactoryMCP2APIM: publish the project001 Dev AI Factory MCP on this APIM as a plain HTTP proxy API.
 # The launcher reads the MCP app and the APIM (GET only) and refuses until the project pipeline has added
 # the APIM identity to the MCP callers; Stage/Prod are skipped because the MCP runs only in Dev.
+# With a managed APIM it also waits until the runner has configured that APIM in this run.
 - task: AzureCLI@2
   displayName: Expose the AI Factory MCP on APIM
-  condition: and(succeeded(), eq(variables['addAIFactoryMCP2APIM'], 'true'))
+  condition: and(succeeded(), eq(variables['addAIFactoryMCP2APIM'], 'true'), or(ne(variables['ENABLE_APIM'], 'true'), ne(variables['apimGatewayManagedProvisioning'], 'true'), eq(variables['apimGatewayManagedConfigured'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -128,9 +307,10 @@ steps:
     apimGatewayResourceGroup: $(apimGatewayResourceGroup)
     apimGatewayServiceName: $(apimGatewayServiceName)
 
+# With a managed APIM, Kong waits until the runner has configured that APIM in this run.
 - task: AzureCLI@2
   displayName: Deploy Kong edge gateway
-  condition: eq(variables['ENABLE_KONG'], 'true')
+  condition: and(eq(variables['ENABLE_KONG'], 'true'), or(ne(variables['ENABLE_APIM'], 'true'), ne(variables['apimGatewayManagedProvisioning'], 'true'), eq(variables['apimGatewayManagedConfigured'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

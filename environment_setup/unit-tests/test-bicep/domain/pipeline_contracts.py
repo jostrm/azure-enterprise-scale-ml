@@ -301,6 +301,7 @@ def evaluate(expression: str, context: dict[str, Any]) -> Any:
                 "not": lambda item: not item, "eq": equal,
                 "ne": lambda left, right: not equal(left, right),
                 "in": lambda item, *items: any(equal(item, other) for other in items),
+                "always": lambda: True,
                 "success": lambda: context.get("success", True),
                 "succeeded": lambda: context.get("success", True),
                 "failed": lambda: context.get("failed", False),

@@ -4,9 +4,9 @@ This guide covers `infra-ai-gateway.yaml`.
 
 ## Short answer
 
-Setting `ENABLE_APIM: "true"` is **not sufficient** and does **not** create an API Management service.
+Setting `ENABLE_APIM: "true"` is **not sufficient** and does **not** create an API Management service. Creating a private StandardV2 APIM is a separate opt-in: [Managed APIM provisioning](#managed-apim-provisioning-apimgatewaymanagedprovisioning).
 
-The pipeline configures an **existing APIM service**. It can update that service's SKU and capacity, then creates or updates:
+By default the pipeline configures an **existing APIM service**. It can update that service's SKU and capacity, then creates or updates:
 
 - Azure OpenAI backend entities with `429` circuit breakers
 - A weighted APIM backend pool
@@ -110,7 +110,7 @@ The pipeline reads the current APIM SKU and patches it to `apimGatewaySku` and `
 5. Configure approvals/checks on the Azure DevOps `Dev`, `Stage`, and `Prod` environments if required. Referencing an environment does not create an approval automatically.
 6. Run the pipeline manually. It has `trigger: none`.
 
-A normal manual run evaluates Dev, Stage, and Prod in sequence. The gateway variables in the shared variable template are reused across stages. If environments have different APIM names, resource groups, backend lists, SKUs, or TPM values, define stage-specific overrides or use separate variable templates before running all stages.
+A normal manual run (`deploymentTarget: all`, the default) evaluates Dev, Stage, and Prod in sequence; `dev`, `stage` or `prod` runs only that stage. The gateway variables in the shared variable template are reused across stages. If environments have different APIM names, resource groups, backend lists, SKUs, or TPM values, define stage-specific overrides or use separate variable templates before running all stages.
 
 `ENABLE_KONG` is independent and defaults to `false`; Kong configuration is not required for the APIM gateway.
 
@@ -121,6 +121,31 @@ A normal manual run evaluates Dev, Stage, and Prod in sequence. The gateway vari
 Run the project pipeline first: with the same flag, its MCP step adds the APIM identity to the MCP callers. The task's launcher (`deploy.py apim-parameters`, GET only) fails with that instruction while the MCP app is missing or does not list the APIM identity, and Stage/Prod skip the task. An Entra admin still assigns app role `AiFactory.Mcp.Read` to the APIM identity once; the project run prints the exact assignment. Details: `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md`.
 
 The task deploys to the APIM subscription and resource group that the launcher resolved and checked, and only after the previous tasks succeeded. A redeploy keeps the current state of `aifactory-mcp-client`, so a key an operator suspended stays suspended. Setting the flag back to `false` skips the task and deletes nothing: the API and the subscription stay until you remove them.
+
+## Managed APIM provisioning (`apimGatewayManagedProvisioning`)
+
+Off by default (`apimGatewayManagedProvisioning: "false"`): the pipeline runs as described above and the runtime parameters below have no effect. Set it to `"true"`, together with `ENABLE_APIM: "true"`, to replace **Deploy APIM Azure OpenAI pool** with the reviewed runner. The runner configures an existing APIM without SKU changes (`serviceMode: existing`) or provisions a private StandardV2 APIM in phases (`serviceMode: managed`). Modes, phases and limits: [APIM README](../../../../esml-common/ai-gateway/apim/README.md#managed-provisioning-and-reviewed-deployments-opt-in).
+
+| Variable | Meaning |
+| --- | --- |
+| `apimGatewayManagedProvisioning` | `"true"` routes APIM through the runner. Default `"false"`. |
+| `apimGatewayConfigFile` | Consumer-relative JSON (start from `copy_to_local_settings/ai-gateway/apim.*.example.json`). Empty builds an `existing` configuration from the `apimGateway*` variables. |
+
+| Runtime parameter | Default | Meaning |
+| --- | --- | --- |
+| `deploymentTarget` | `all` | `all` keeps Dev, then Stage and Prod on manual runs; `dev`, `stage` or `prod` runs one stage. `apply` requires one stage. |
+| `action` | `plan` | `plan` (offline, no Azure login), `what-if` (reads and previews the next phase) or `apply` (writes one phase). |
+| `approvedPlan`, `approvedPreview` | empty | The `planDigest` and `previewDigest` you reviewed (apply only). |
+| `approveInitialPublicBootstrap` | `false` | Consent to the temporary public access of a new managed APIM (first apply only). |
+
+Each run publishes the pipeline artifact `apim-gateway-<environment>-<attempt>` with `plan.json`, `receipt.json` and the phase preview. A managed APIM takes one review loop per phase:
+
+1. Run with `action: plan` and review `plan.json` (target, `config`, `resourceChanges`, `phases`, `roles`).
+2. Run with `action: what-if` and `deploymentTarget: dev`. Review `<phase>.what-if.json`.
+3. Run with `action: apply`, the same `deploymentTarget`, `approvedPlan` = `planDigest` and `approvedPreview` = `previewDigest` (plus `approveInitialPublicBootstrap: true` for the first create).
+4. Read `receipt.json` `nextAction` and repeat steps 2-3 until the `configuration` phase is applied.
+
+**Expose the AI Factory MCP on APIM** and **Deploy Kong edge gateway** run in a managed-mode run only after its apply reached the `configuration` phase (the runner sets `apimGatewayManagedConfigured`). The Azure DevOps service connection needs subscription deployment rights and, for a managed APIM, subnet join and private endpoint rights. Configure an exclusive lock or approvals on the `Dev`, `Stage` and `Prod` environments so that only one run writes to an APIM at a time.
 
 ## Preflight checklist
 
@@ -145,4 +170,4 @@ The API requires an APIM subscription key. Its default routes are:
 
 Send the configured Azure OpenAI API version as required by the selected operation. Verify that requests succeed, that a backend receives traffic, and that APIM returns `429` when the configured token limit is exceeded.
 
-The pipeline does not run an Azure deployment `what-if`. Use a non-production APIM instance for the first run or add a reviewed what-if step before production rollout.
+The classic step does not run an Azure deployment `what-if`. Use a non-production APIM instance for the first run, or opt in to the reviewed runner (`apimGatewayManagedProvisioning`), which previews every phase before it writes.

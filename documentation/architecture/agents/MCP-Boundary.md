@@ -48,7 +48,7 @@ graph_symbols:
   - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
   - mcp/src/aifactory_mcp/backend.py::function:AgentBackend.call_tool
   - mcp/src/aifactory_mcp/graph.py::function:call
-reviewed_source: '0a0595c9 + working tree; observed 2026-10-19'
+reviewed_source: '1f76c0a0 + managed APIM provisioning working tree; observed 2026-10-21'
 ---
 # MCP boundary
 
@@ -118,6 +118,10 @@ and the AI gateway pipeline step "Expose the AI Factory MCP on APIM" deploys
 and refuses until the MCP app exists and lists the APIM identity, so the order is fixed by evidence
 rather than by convention: project pipeline first, then the AI gateway pipeline. The module's
 optional `clientSubscriptionName` issues one client subscription scoped to the MCP API.
+When the AI gateway pipeline runs APIM through the opt-in reviewed runner
+(`apimGatewayManagedProvisioning`, see [[AI-Gateway-APIM-Provisioning]]), the same step runs only in
+a run whose apply reached the runner's `configuration` phase (`gatewayConfigured`). With the switch
+off (default) its gate is unchanged.
 
 An MCP app deployed outside the step (the `mcp/deploy/rollout.py` pilot in Spider) is adopted by
 `aifactoryMcpContainerAppResourceId`. Adoption is ownership-safe by construction: the app must be in

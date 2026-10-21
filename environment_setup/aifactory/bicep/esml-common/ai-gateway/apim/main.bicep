@@ -155,3 +155,4 @@ output backendPoolResourceId string = apimConfiguration.outputs.backendPoolResou
 output policyFeatures object = apimConfiguration.outputs.policyFeatures
 output mcpGatewayUrls array = [for (server, index) in mcpServers: apimMcpServers[index].outputs.gatewayMcpUrl]
 output requiredRoleDefinitionId string = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+output apimResourceId string = resourceId(apimSubscriptionId, apimResourceGroupName, 'Microsoft.ApiManagement/service', apimServiceName)

@@ -217,8 +217,13 @@ def test_gateway_steps_compare_boolean_strings_not_truthiness(public, value):
                if public in item.step.get("if", ""))
     ado = next(item for item in deployments(document(ADO_GATEWAY))
                if public in item.step.get("condition", ""))
-    assert bool(evaluate(gha.step["if"], {"env." + public: value})) == (value == "true")
-    assert bool(evaluate(ado.step["condition"], {"variables." + public: value})) == (value == "true")
+    # Classic mode: the reviewed managed APIM runner (test_apim_gateway_workflows) is off by default.
+    gha_context = {"env.ENABLE_APIM": "false", "env.APIM_GATEWAY_MANAGED_PROVISIONING": "false",
+                   "steps.managed_apim.outputs.configured": "", "env." + public: value}
+    ado_context = {"variables.ENABLE_APIM": "false", "variables.apimGatewayManagedProvisioning": "false",
+                   "variables.apimGatewayManagedConfigured": "", "variables." + public: value}
+    assert bool(evaluate(gha.step["if"], gha_context)) == (value == "true")
+    assert bool(evaluate(ado.step["condition"], ado_context)) == (value == "true")
 
 
 @pytest.mark.parametrize("foundry,caphost,debug,expected", [

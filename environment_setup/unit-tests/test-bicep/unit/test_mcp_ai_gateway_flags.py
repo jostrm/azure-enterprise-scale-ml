@@ -168,10 +168,15 @@ def gateway_step(path, key):
 def test_ai_gateway_pipelines_publish_the_mcp_on_apim_behind_the_flag(value):
     ado = gateway_step(ADO_GATEWAY, "displayName")
     gha = gateway_step(GHA_GATEWAY, "name")
-    assert bool(evaluate(ado["condition"], {"variables.addAIFactoryMCP2APIM": value})) == (value == "true")
+    # Classic APIM (managed provisioning off, its default); the managed gate is in test_apim_gateway_workflows.
+    ado_classic = {"variables.ENABLE_APIM": "true", "variables.apimGatewayManagedProvisioning": "false",
+                   "variables.apimGatewayManagedConfigured": ""}
+    gha_classic = {"env.ENABLE_APIM": "true", "env.APIM_GATEWAY_MANAGED_PROVISIONING": "false",
+                   "steps.managed_apim.outputs.configured": ""}
+    assert bool(evaluate(ado["condition"], {**ado_classic, "variables.addAIFactoryMCP2APIM": value})) == (value == "true")
     # Like GHA's implicit success(): a failed OpenAI pool/SKU step stops the MCP step.
-    assert not evaluate(ado["condition"], {"variables.addAIFactoryMCP2APIM": "true", "success": False})
-    assert bool(evaluate(gha["if"], {"env.ADD_AI_FACTORY_MCP_2_APIM": value})) == (value == "true")
+    assert not evaluate(ado["condition"], {**ado_classic, "variables.addAIFactoryMCP2APIM": "true", "success": False})
+    assert bool(evaluate(gha["if"], {**gha_classic, "env.ADD_AI_FACTORY_MCP_2_APIM": value})) == (value == "true")
     job_env = load_pipeline(GHA_GATEWAY)["jobs"]["deploy"]["env"]
     assert evaluate(job_env["ADD_AI_FACTORY_MCP_2_APIM"], {"vars.ADD_AI_FACTORY_MCP_2_APIM": ""}) == "false"
     for script in (ado["inputs"]["inlineScript"], gha["run"]):

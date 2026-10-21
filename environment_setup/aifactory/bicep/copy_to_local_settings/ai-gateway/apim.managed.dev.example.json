@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "environment": "dev",
+  "tenantId": "11111111-1111-1111-1111-111111111111",
+  "subscriptionId": "22222222-2222-2222-2222-222222222222",
+  "resourceGroup": "rg-example-gateway-dev",
+  "location": "westeurope",
+  "serviceName": "apim-example-managed-dev",
+  "serviceMode": "managed",
+  "sku": "StandardV2",
+  "skuCapacity": 1,
+  "publisherName": "Example Gateway Team",
+  "publisherEmail": "gateway-owner@example.invalid",
+  "ownershipId": "example-gateway-dev",
+  "tags": {
+    "environment": "dev",
+    "purpose": "example"
+  },
+  "network": {
+    "integrationSubnetId": "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-example-network-dev/providers/Microsoft.Network/virtualNetworks/vnet-example-dev/subnets/snet-example-apim-integration",
+    "createIntegrationSubnet": false,
+    "integrationSubnetPrefix": "10.80.20.0/27",
+    "networkSecurityGroupId": "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-example-network-dev/providers/Microsoft.Network/networkSecurityGroups/nsg-example-apim",
+    "routeTableId": "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-example-network-dev/providers/Microsoft.Network/routeTables/rt-example-apim",
+    "privateEndpointSubnetId": "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-example-network-dev/providers/Microsoft.Network/virtualNetworks/vnet-example-dev/subnets/snet-example-private-endpoints",
+    "privateEndpointName": "pe-example-apim-dev",
+    "privateDnsMode": "policy"
+  },
+  "api": {
+    "apiId": "example-openai",
+    "apiPath": "openai",
+    "backendPoolName": "example-openai-pool",
+    "aggregateTokensPerMinute": 40000,
+    "callerTokensPerMinute": 10000,
+    "retryCount": 2,
+    "assignOpenAIUserRole": false,
+    "azureOpenAIBackends": [
+      {
+        "name": "example-openai-dev",
+        "endpoint": "https://example-openai-dev.openai.azure.com",
+        "resourceId": "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-example-ai-dev/providers/Microsoft.CognitiveServices/accounts/example-openai-dev",
+        "weight": 1,
+        "priority": 1
+      }
+    ]
+  }
+}

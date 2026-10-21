@@ -7,7 +7,7 @@ They can be combined; each is opt-in.
 |---|---|---|---|
 | What | Azure API Management SKU `AIGateway` (the new AI Gateway, `ai.gateway.azure.com`) | An existing API Management service (Developer, Basic, Standard, Premium or a v2 tier) | Kong Gateway OSS in Azure Container Instances |
 | Where | Project resource group (project001 Dev) | Any resource group you name (`apimGatewayResourceGroup`) | Its own `*-kong-*` resource group in the common VNet |
-| Created by | Project pipeline step 71 (creates or adopts) | You (the pipeline configures an existing APIM) | AI gateway pipeline |
+| Created by | Project pipeline step 71 (creates or adopts) | You (the pipeline configures an existing APIM), or the AI gateway pipeline with opt-in [managed provisioning](#managed-apim-opt-in) | AI gateway pipeline |
 | Pipeline | Project pipeline, foundry phase | AI gateway pipeline (`infra-ai-gateway`) | AI gateway pipeline (`infra-ai-gateway`) |
 | Models | Foundry account as a model provider (managed identity) | Azure OpenAI backend pool with 429 circuit breakers | Routes to Azure OpenAI or Foundry (private endpoint), or to APIM |
 | MCP | Tool server `aifactory-mcp-p001-dev` (`addAIFactoryMCP2AIGatewaySKU`) | API `enterprise-scale-ai-factory` (`addAIFactoryMCP2APIM`) | Not built in |
@@ -54,6 +54,40 @@ limits, Entra token validation, token metrics and a semantic cache.
 
 Pipeline guide: [`infra-ai-gateway.md`](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-common/infra-ai-gateway.md).
 
+### Managed APIM (opt-in)
+
+By default the AI gateway pipeline only configures an APIM you already have. To have it **create** a private
+StandardV2 APIM, or to configure an existing one only after a reviewed what-if, turn on the reviewed runner.
+Nothing changes until you do.
+
+| Variable | GHA | Meaning |
+|---|---|---|
+| `apimGatewayManagedProvisioning` | `APIM_GATEWAY_MANAGED_PROVISIONING` | `"true"` (with `ENABLE_APIM`) runs APIM through the reviewed runner instead of the classic step. Default `"false"`. |
+| `apimGatewayConfigFile` | `APIM_GATEWAY_CONFIG_FILE` | Your APIM JSON, relative to the repository root, e.g. `aifactory/gateways/apim.dev.json`. Empty: an existing APIM described by the `APIM_GATEWAY_*` variables. |
+
+How to use it:
+
+1. Copy [`apim.managed.dev.example.json`](../../../environment_setup/aifactory/bicep/copy_to_local_settings/ai-gateway/apim.managed.dev.example.json)
+   (new private APIM) or [`apim.existing.dev.example.json`](../../../environment_setup/aifactory/bicep/copy_to_local_settings/ai-gateway/apim.existing.dev.example.json)
+   (existing APIM) into your repository, one file per environment, and fill in your tenant, subscription, resource
+   group, region, APIM name, network IDs (managed) and backends.
+2. Set `apimGatewayManagedProvisioning: "true"` and `apimGatewayConfigFile` (GitHub: the `APIM_GATEWAY_*`
+   repository or environment variables). Leave the `apimGatewayResourceGroup`/`apimGatewayServiceName`
+   variables empty or naming the same APIM, because the MCP and Kong steps use them.
+3. Run the AI gateway pipeline with `action: plan` (the default; offline, no Azure login). Review `plan.json` in
+   the run artifact `apim-gateway-<environment>-<attempt>` and copy its `planDigest`.
+4. Run it with `action: what-if` for one environment (Azure DevOps `deploymentTarget: dev`, GitHub
+   `environment: dev`). Review the `<phase>.what-if.json` and copy its `previewDigest`.
+5. Run it with `action: apply`, `approvedPlan`/`approved_plan` and `approvedPreview`/`approved_preview` set to the
+   two digests. The first create of a managed APIM also needs `approveInitialPublicBootstrap` (it starts with
+   public access, which the later lockdown phase disables).
+6. Each apply writes one phase: integration subnet (if you asked for one), service, private endpoint, lockdown,
+   configuration. Repeat steps 4-5, following `nextAction` in `receipt.json`, until `configuration` is applied.
+   The MCP step and Kong run in the same run as that last apply.
+
+A private endpoint must be approved by its network owner; the pipeline never approves it. Details, limits and
+recovery: [APIM README](../../../environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/README.md#managed-provisioning-and-reviewed-deployments-opt-in).
+
 ## Kong AI gateway
 
 Kong Gateway OSS runs in Azure Container Instances in the common VNet, with its declarative `kong.yaml` on a file
@@ -76,6 +110,8 @@ Details: [Kong readme](../../../environment_setup/aigateway/kong/readme.md), [AI
   registered as a tool server.
 - **An enterprise APIM you already run, with your own policies and subscriptions:** classic APIM, with
   `addAIFactoryMCP2APIM` for the MCP.
+- **A new private APIM owned by the AI Factory, with a reviewed preview before every change:** classic APIM with
+  managed provisioning (`apimGatewayManagedProvisioning`).
 - **An open-source gateway or an edge in front of APIM:** Kong.
 
 All three reach private backends only through private endpoints and private DNS, and none of them changes who may

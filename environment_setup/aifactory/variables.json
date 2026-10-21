@@ -306,6 +306,8 @@
     "apimGatewayAssignOpenAIUserRole": "false",
     "apimGatewayManagedIdentityPrincipalId": "",
     "apimGatewayBackendsJson": "[]",
+    "apimGatewayManagedProvisioning": "false",
+    "apimGatewayConfigFile": "",
     "ENABLE_KONG": "false",
     "kongGatewayVnetResourceGroup": "",
     "kongGatewayVnetName": "",

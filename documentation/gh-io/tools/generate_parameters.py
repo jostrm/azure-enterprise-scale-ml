@@ -75,6 +75,8 @@ REVIEWED_ALIASES = {
     "apimGatewayAssignOpenAIUserRole": "APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE",
     "apimGatewayManagedIdentityPrincipalId": "APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID",
     "apimGatewayBackendsJson": "APIM_GATEWAY_BACKENDS_JSON",
+    "apimGatewayManagedProvisioning": "APIM_GATEWAY_MANAGED_PROVISIONING",
+    "apimGatewayConfigFile": "APIM_GATEWAY_CONFIG_FILE",
     "kongGatewayVnetResourceGroup": "KONG_GATEWAY_VNET_RESOURCE_GROUP",
     "kongGatewayVnetName": "KONG_GATEWAY_VNET_NAME",
     "kongGatewaySubnetCidr": "KONG_GATEWAY_SUBNET_CIDR",

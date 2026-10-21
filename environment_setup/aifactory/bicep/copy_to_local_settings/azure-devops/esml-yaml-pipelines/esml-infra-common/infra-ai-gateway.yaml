@@ -1,10 +1,37 @@
 trigger: none
 
+# deploymentTarget 'all' keeps the Dev -> Stage -> Prod promotion. The other parameters only apply when
+# apimGatewayManagedProvisioning is 'true' (reviewed plan -> what-if -> apply runner); see infra-ai-gateway.md.
+parameters:
+- name: deploymentTarget
+  displayName: Gateway environment (all = Dev, then Stage/Prod on manual runs)
+  type: string
+  default: all
+  values: [all, dev, stage, prod]
+- name: action
+  displayName: Managed APIM action (apimGatewayManagedProvisioning only; plan is offline, apply needs reviewed digests)
+  type: string
+  default: plan
+  values: [plan, what-if, apply]
+- name: approvedPlan
+  displayName: Reviewed managed APIM plan digest (apply only)
+  type: string
+  default: ''
+- name: approvedPreview
+  displayName: Reviewed managed APIM phase preview digest (apply only)
+  type: string
+  default: ''
+- name: approveInitialPublicBootstrap
+  displayName: Approve the temporary public bootstrap of a new managed APIM (apply only)
+  type: boolean
+  default: false
+
 variables:
 - template: ../variables/variables.yaml
 
 stages:
 - stage: Dev
+  condition: in('${{ parameters.deploymentTarget }}', 'all', 'dev')
   displayName: AI_Gateway_Dev
   variables:
     dev_test_prod: dev
@@ -24,10 +51,16 @@ stages:
           - template: ./jobs/job-2-ai-gateway.yaml
             parameters:
               serviceConnection: ${{ variables.dev_service_connection }}
+              gatewayEnvironment: dev
+              deploymentTarget: ${{ parameters.deploymentTarget }}
+              action: ${{ parameters.action }}
+              approvedPlan: ${{ parameters.approvedPlan }}
+              approvedPreview: ${{ parameters.approvedPreview }}
+              approveInitialPublicBootstrap: ${{ parameters.approveInitialPublicBootstrap }}
 
 - stage: Stage
   dependsOn: Dev
-  condition: eq(variables['Build.Reason'], 'Manual')
+  condition: or(and(eq('${{ parameters.deploymentTarget }}', 'all'), eq(variables['Build.Reason'], 'Manual')), eq('${{ parameters.deploymentTarget }}', 'stage'))
   displayName: AI_Gateway_Stage
   variables:
     dev_test_prod: test
@@ -47,12 +80,18 @@ stages:
           - template: ./jobs/job-2-ai-gateway.yaml
             parameters:
               serviceConnection: ${{ variables.test_service_connection }}
+              gatewayEnvironment: stage
+              deploymentTarget: ${{ parameters.deploymentTarget }}
+              action: ${{ parameters.action }}
+              approvedPlan: ${{ parameters.approvedPlan }}
+              approvedPreview: ${{ parameters.approvedPreview }}
+              approveInitialPublicBootstrap: ${{ parameters.approveInitialPublicBootstrap }}
 
 - stage: Prod
   dependsOn:
   - Dev
   - Stage
-  condition: and(eq(variables['Build.Reason'], 'Manual'), in(dependencies.Stage.result, 'Succeeded', 'Skipped'))
+  condition: or(and(eq('${{ parameters.deploymentTarget }}', 'all'), eq(variables['Build.Reason'], 'Manual'), in(dependencies.Stage.result, 'Succeeded', 'Skipped')), eq('${{ parameters.deploymentTarget }}', 'prod'))
   displayName: AI_Gateway_Prod
   variables:
     dev_test_prod: prod
@@ -72,3 +111,9 @@ stages:
           - template: ./jobs/job-2-ai-gateway.yaml
             parameters:
               serviceConnection: ${{ variables.prod_service_connection }}
+              gatewayEnvironment: prod
+              deploymentTarget: ${{ parameters.deploymentTarget }}
+              action: ${{ parameters.action }}
+              approvedPlan: ${{ parameters.approvedPlan }}
+              approvedPreview: ${{ parameters.approvedPreview }}
+              approveInitialPublicBootstrap: ${{ parameters.approveInitialPublicBootstrap }}

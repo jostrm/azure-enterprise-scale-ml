@@ -406,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 396 |
-| `env` | 394 |
+| `yaml` | 398 |
+| `env` | 396 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 401 |
+| `json.dev` | 403 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 419; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 420; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 421, 445; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 154, 421; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 155, 422; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 423, 447; one reference row.
 
 ## YAML and variables.json reference
 
@@ -447,6 +447,8 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:apimGatewayBackendPoolName --><!-- parameter json.dev:apimGatewayBackendPoolName -->`apimGatewayBackendPoolName` | `APIM_GATEWAY_BACKEND_POOL_NAME` | O | Y: `"aoai-gpt55-pool"`<br>J.dev: `"aoai-gpt55-pool"` | Apim gateway backend pool name. |
 | <!-- parameter yaml:apimGatewayBackendsJson --><!-- parameter json.dev:apimGatewayBackendsJson -->`apimGatewayBackendsJson` | `APIM_GATEWAY_BACKENDS_JSON` | C | Y: `"[]"`<br>J.dev: `"[]"` | JSON array; see esml-common/ai-gateway/apim/README.md. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter yaml:apimGatewayCallerTpm --><!-- parameter json.dev:apimGatewayCallerTpm -->`apimGatewayCallerTpm` | `APIM_GATEWAY_CALLER_TPM` | O | Y: `"10000"`<br>J.dev: `"10000"` | Fair-use TPM allocation per APIM subscription. |
+| <!-- parameter yaml:apimGatewayConfigFile --><!-- parameter json.dev:apimGatewayConfigFile -->`apimGatewayConfigFile` | `APIM_GATEWAY_CONFIG_FILE` | O | Y: `""`<br>J.dev: `""` | Consumer-relative APIM JSON for the reviewed runner (apimGatewayManagedProvisioning:'true') keep-as-is: Empty builds an existing-APIM configuration from the apimGateway* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json. |
+| <!-- parameter yaml:apimGatewayManagedProvisioning --><!-- parameter json.dev:apimGatewayManagedProvisioning -->`apimGatewayManagedProvisioning` | `APIM_GATEWAY_MANAGED_PROVISIONING` | O | Y: `"false"`<br>J.dev: `"false"` | Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md. |
 | <!-- parameter yaml:apimGatewayResourceGroup --><!-- parameter json.dev:apimGatewayResourceGroup -->`apimGatewayResourceGroup` | `APIM_GATEWAY_RESOURCE_GROUP` | C | Y: `""`<br>J.dev: `""` | Resource group containing the existing APIM service. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter yaml:apimGatewayRetryCount --><!-- parameter json.dev:apimGatewayRetryCount -->`apimGatewayRetryCount` | `APIM_GATEWAY_RETRY_COUNT` | O | Y: `"2"`<br>J.dev: `"2"` | Apim gateway retry count. |
 | <!-- parameter yaml:apimGatewayServiceName --><!-- parameter json.dev:apimGatewayServiceName -->`apimGatewayServiceName` | `APIM_GATEWAY_SERVICE_NAME` | C | Y: `""`<br>J.dev: `""` | Existing APIM service with system-assigned managed identity enabled. Required by the separate AI gateway workflow when APIM is enabled. |
@@ -988,6 +990,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:APIM_GATEWAY_BACKENDS_JSON -->`APIM_GATEWAY_BACKENDS_JSON` | `apimGatewayBackendsJson` | C | `"[]"` | Apim gateway backends json. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter env:APIM_GATEWAY_BACKEND_POOL_NAME -->`APIM_GATEWAY_BACKEND_POOL_NAME` | `apimGatewayBackendPoolName` | O | `"aoai-gpt55-pool"` | Apim gateway backend pool name. |
 | <!-- parameter env:APIM_GATEWAY_CALLER_TPM -->`APIM_GATEWAY_CALLER_TPM` | `apimGatewayCallerTpm` | O | `"10000"` | Apim gateway caller tpm. |
+| <!-- parameter env:APIM_GATEWAY_CONFIG_FILE -->`APIM_GATEWAY_CONFIG_FILE` | `apimGatewayConfigFile` | O | `""` | Consumer-relative APIM JSON for the reviewed runner (APIM_GATEWAY_MANAGED_PROVISIONING:'true') keep-as-is: Empty builds an existing-APIM configuration from the APIM_GATEWAY_* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json. |
+| <!-- parameter env:APIM_GATEWAY_MANAGED_PROVISIONING -->`APIM_GATEWAY_MANAGED_PROVISIONING` | `apimGatewayManagedProvisioning` | O | `"false"` | Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md. |
 | <!-- parameter env:APIM_GATEWAY_RESOURCE_GROUP -->`APIM_GATEWAY_RESOURCE_GROUP` | `apimGatewayResourceGroup` | C | `""` | Apim gateway resource group. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter env:APIM_GATEWAY_RETRY_COUNT -->`APIM_GATEWAY_RETRY_COUNT` | `apimGatewayRetryCount` | O | `"2"` | Apim gateway retry count. |
 | <!-- parameter env:APIM_GATEWAY_SERVICE_NAME -->`APIM_GATEWAY_SERVICE_NAME` | `apimGatewayServiceName` | C | `""` | Apim gateway service name. Required by the separate AI gateway workflow when APIM is enabled. |

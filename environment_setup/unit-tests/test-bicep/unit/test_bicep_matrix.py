@@ -197,6 +197,8 @@ def test_dynamic_production_entrypoints_include_common_genai_and_both_gateways()
     assert "environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep" in relative
     assert "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep" in relative
     assert "environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep" in relative
+    for phase in ("network-main", "service-main", "private-endpoint-main"):
+        assert f"environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/{phase}.bicep" in relative
     assert "environment_setup/aigateway/kong/main.bicep" in relative
     for capacity_template in ("03b-ai-search", "04b-postgresql", "05b-container-apps"):
         assert f"environment_setup/aifactory/bicep/esml-genai-1/{capacity_template}.bicep" in relative
@@ -204,6 +206,33 @@ def test_dynamic_production_entrypoints_include_common_genai_and_both_gateways()
     reachable = reachable_templates(paths, config.REPO_ROOT, registry_modules)
     assert set(paths) < set(reachable)
     assert "br/public:avm/utl/types/avm-common-types:0.5.1" in registry_modules
+
+
+@pytest.mark.parametrize("phase_map", [
+    "PHASE_TEMPLATES = {'configuration': 'main.bicep'}",
+    "PHASE_TEMPLATES = dict(configuration='main.bicep')",
+    "PHASE_TEMPLATES = {'configuration': '../main.bicep'}",
+])
+def test_gateway_runner_discovery_reads_literal_map_without_executing_python(phase_map):
+    with work_directory(config.REPO_ROOT) as repo:
+        base = repo / "environment_setup" / "aifactory" / "bicep"
+        pipelines = base / "copy_to_local_settings"
+        (pipelines / "github-actions").mkdir(parents=True)
+        (pipelines / "azure-devops").mkdir()
+        (pipelines / "github-actions" / "gateway.yml").write_text(
+            "run: python3 scripts/apim-gateway-deployment.py --action plan\n", encoding="utf-8")
+        scripts = base / "scripts"
+        scripts.mkdir()
+        (scripts / "apim-gateway-deployment.py").write_text(
+            "raise RuntimeError('Discovery must not execute the runner')\n" + phase_map, encoding="utf-8")
+        template = base / "esml-common" / "ai-gateway" / "apim" / "main.bicep"
+        template.parent.mkdir(parents=True)
+        template.write_text("targetScope = 'subscription'\n", encoding="utf-8")
+        if phase_map == "PHASE_TEMPLATES = {'configuration': 'main.bicep'}":
+            assert discover_entrypoints(repo) == [template]
+        else:
+            with pytest.raises(MatrixError, match="APIM runner"):
+                discover_entrypoints(repo)
 
 
 def test_reachable_module_inventory_ignores_comments_and_requires_explicit_registry_inventory():

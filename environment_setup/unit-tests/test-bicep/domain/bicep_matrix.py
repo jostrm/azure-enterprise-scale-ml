@@ -8,6 +8,7 @@ conditions, runtime dependencies, or all 2**N deployments.
 from __future__ import annotations
 
 import argparse
+import ast
 import itertools
 import json
 import math
@@ -63,6 +64,7 @@ LIMITS = [
     "Scope: literal --template-file entrypoints and direct ADO parameter references "
     "bound by local template callers (or declared defaults) in committed GHA/ADO "
     "pipeline templates, plus every reachable local Bicep/ARM module; not orphaned/retired templates. "
+    "The APIM runner's literal PHASE_TEMPLATES map is included when that runner is referenced. "
     "Unresolved or forwarded dynamic template paths fail; this is not full ADO expression evaluation. "
     "Registry module references are reported and require a pre-populated Bicep cache; "
     "--no-restore fails when a dependency is absent.",
@@ -153,6 +155,7 @@ def discover_entrypoints(repo: Path) -> list[Path]:
     source = base / "copy_to_local_settings"
     roots: set[Path] = set()
     ado_documents: dict[Path, Any] | None = None
+    gateway_runner_used = False
     for directory in (source / "github-actions", source / "azure-devops"):
         if not directory.is_dir():
             raise MatrixError(f"Missing pipeline template directory: {directory}")
@@ -160,6 +163,8 @@ def discover_entrypoints(repo: Path) -> list[Path]:
             if path.suffix not in {".yaml", ".yml"}:
                 continue
             for line in path.read_text(encoding="utf-8-sig").splitlines():
+                if not line.lstrip().startswith("#") and "apim-gateway-deployment.py" in line:
+                    gateway_runner_used = True
                 if line.lstrip().startswith("#") or "--template-file" not in line:
                     continue
                 match = re.search(r"""--template-file(?:\s+|=)(["'])(.+?)\1""", line)
@@ -180,6 +185,24 @@ def discover_entrypoints(repo: Path) -> list[Path]:
                     references = _ado_parameter_values(path, parameter[1], ado_documents, repo)
                 for reference in references:
                     roots.add(_entrypoint_path(reference, path, repo, base))
+    if gateway_runner_used:
+        runner = base / "scripts" / "apim-gateway-deployment.py"
+        try:
+            syntax = ast.parse(runner.read_text(encoding="utf-8-sig"))
+            maps = [statement.value for statement in syntax.body if isinstance(statement, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == "PHASE_TEMPLATES"
+                            for target in statement.targets)]
+            if len(maps) != 1:
+                raise ValueError("Expected one phase map")
+            phases = ast.literal_eval(maps[0])
+        except (OSError, SyntaxError, ValueError, TypeError) as error:
+            raise MatrixError("APIM runner must declare one static PHASE_TEMPLATES map") from error
+        if (not isinstance(phases, dict) or not phases or
+                any(not isinstance(key, str) or not isinstance(value, str) or
+                    not re.fullmatch(r"[A-Za-z0-9_-]+\.bicep", value) for key, value in phases.items())):
+            raise MatrixError("APIM runner phase templates must be local literal Bicep filenames")
+        for filename in phases.values():
+            roots.add(_entrypoint_path("esml-common/ai-gateway/apim/" + filename, runner, repo, base))
     if not roots:
         raise MatrixError("No production Bicep entrypoints discovered")
     return sorted(roots)

@@ -458,6 +458,8 @@ variables:
   apimGatewayAssignOpenAIUserRole: "false" # Requires roleAssignments/write in every backend subscription.
   apimGatewayManagedIdentityPrincipalId: "" # APIM system-assigned managed identity object ID.
   apimGatewayBackendsJson: "[]" # JSON array; see esml-common/ai-gateway/apim/README.md.
+  apimGatewayManagedProvisioning: "false" # <optional>Run APIM through the reviewed plan -> what-if -> apply runner, which can also provision a private StandardV2 APIM<default>false<keep-as-is> false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md.
+  apimGatewayConfigFile: "" # <optional>Consumer-relative APIM JSON for the reviewed runner (apimGatewayManagedProvisioning:'true')<default>""<keep-as-is> Empty builds an existing-APIM configuration from the apimGateway* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json.
   ENABLE_KONG: "false" # Deploys Kong as an optional private edge proxy to APIM.
   kongGatewayVnetResourceGroup: ""
   kongGatewayVnetName: ""

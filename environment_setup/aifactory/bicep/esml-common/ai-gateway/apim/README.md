@@ -82,3 +82,55 @@ With `addAIFactoryMCP2APIM: "true"` and `enableAIFactoryMCP: "true"` no manual s
 2. The AI gateway pipeline step "Expose the AI Factory MCP on APIM" (after the OpenAI pool) runs `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py apim-parameters`, which reads the MCP app and the APIM (GET only), and deploys this module with API `enterprise-scale-ai-factory` and client subscription `aifactory-mcp-client`. It refuses, naming the next step, while the MCP does not exist or does not list the APIM identity, and it skips Stage/Prod because the MCP runs only in Dev.
 
 See `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md` for adopting an MCP app that was deployed outside the pipeline (`aifactoryMcpContainerAppResourceId`).
+
+## Managed provisioning and reviewed deployments (opt-in)
+
+Off by default. With `apimGatewayManagedProvisioning: "true"` (GitHub: `APIM_GATEWAY_MANAGED_PROVISIONING`) and `ENABLE_APIM: "true"`, the AI gateway pipeline runs APIM through the reviewed runner `../../../scripts/apim-gateway-deployment.py` instead of the classic "Deploy APIM Azure OpenAI pool" step. With the switch off, the classic step, the MCP step and Kong behave exactly as described above.
+
+The runner reads a consumer JSON file named by `apimGatewayConfigFile` (GitHub: `APIM_GATEWAY_CONFIG_FILE`), relative to the consumer repository root, for example `aifactory/gateways/apim.dev.json`. Start from [apim.managed.dev.example.json](../../../copy_to_local_settings/ai-gateway/apim.managed.dev.example.json) or [apim.existing.dev.example.json](../../../copy_to_local_settings/ai-gateway/apim.existing.dev.example.json) and replace every illustrative ID, name, CIDR, limit and publisher value. With an empty `apimGatewayConfigFile` the runner builds an `existing` configuration from the `apimGateway*` variables. `../../../scripts/apim_gateway_config.py` rejects unknown fields, duplicate JSON keys and a target that differs from the pipeline tenant, subscription or environment.
+
+| `serviceMode` | What the runner does |
+| --- | --- |
+| `existing` (default) | Configures the API, backends and policy on an existing APIM with a system-assigned identity. It never creates the service, changes its SKU or capacity, or changes networking: a mismatch fails, where the classic step would patch the SKU. |
+| `managed` | Provisions a private **StandardV2** APIM in reviewed phases, then configures it. It reuses a service only when the `aifactory-gateway-owner` tag equals `ownershipId` and the publisher, region, SKU, capacity, subnet and identity match. |
+
+### Actions
+
+| Action | Azure access | Result |
+| --- | --- | --- |
+| `plan` (default) | None, no login | `plan.json` and `receipt.json`, with `planDigest` over the normalized configuration and the SHA-256 of every APIM template, the policy and both runner scripts |
+| `what-if` | Reads only | Inventory, then an ARM what-if of **only the next phase**: `<phase>.what-if.json` with `previewDigest` (values hashed, raw CLI output suppressed) |
+| `apply` | Writes one phase | Needs `approvedPlan` and `approvedPreview` equal to the reviewed digests, re-runs that phase's what-if and deploys at most one phase. The first managed create also needs `approveInitialPublicBootstrap`. |
+
+Use the same commit for plan, what-if and apply; any change to the configuration or the templates changes `planDigest` and blocks the apply. Digests prove content equality only: keep environment approvals and one writer per APIM.
+
+| Next phase (managed) | Change and next review |
+| --- | --- |
+| `network` | Only with `createIntegrationSubnet: true` and the subnet absent: the dedicated integration subnet. Then set `createIntegrationSubnet: false` and plan again. |
+| `service-bootstrap` | StandardV2 with public access `Enabled`, system identity, no APIs. Public access stays until the lockdown run, so run the next phases promptly. |
+| `private-endpoint` | The gateway private endpoint (and, in `existingZone` mode, the zone group). The connection must be `Approved`; the runner never approves it. |
+| `service-lockdown` | Public access `Disabled`. An existing managed service is never re-enabled. |
+| `configuration` | API, backends, policy and optional backend role assignments, only after the private endpoint, `Disabled` access and the identity are verified. |
+
+An apply that reaches `configuration` reports `gatewayConfigured: true`. Only then do the pipelines run "Expose the AI Factory MCP on APIM" (`addAIFactoryMCP2APIM`) and Kong in that run. Both read the `apimGateway*` variables, so the runner refuses a configuration file that names a different APIM than non-empty `apimGatewaySubscriptionId`, `apimGatewayResourceGroup` or `apimGatewayServiceName`.
+
+### Boundaries
+
+- Public Azure; the APIM, its network resources and the pipeline environment share one subscription and region (no cross-subscription fallback). Backends are `*.openai.azure.com` origins checked against the live account.
+- The integration subnet is dedicated IPv4 /27 or larger, delegated only to `Microsoft.Web/serverFarms`, with the declared NSG and optional route table. The private endpoint subnet is an existing, undelegated subnet in the same VNet. No VNet, NSG, route table, DNS zone or resource group is created.
+- `privateDnsMode: policy` (default) leaves DNS to Azure Policy; `existingZone` associates the declared `privatelink.azure-api.net` zone only.
+- The runner passes the same `main.bicep` parameters as the classic step, so the policy package and `mcpServers` keep their defaults.
+- No automatic cleanup, deletion or write retry. Turning the switch off only skips future runs; it is not a rollback. Inspect `receipt.json` (`failedPhase`, `publicBootstrapMayBeActive`) before the next plan.
+- Plans and receipts hold resource metadata, not secrets; keep pipeline artifacts access-restricted.
+
+### Run the runner yourself
+
+```powershell
+$runner = ".\azure-enterprise-scale-ml\environment_setup\aifactory\bicep\scripts\apim-gateway-deployment.py"
+python $runner --environment dev --config .\aifactory\gateways\apim.dev.json --output-dir ..\apim-review\dev
+# After az login to the target tenant/subscription and a review of plan.json:
+python $runner --environment dev --config .\aifactory\gateways\apim.dev.json --output-dir ..\apim-review\dev --action what-if
+python $runner --environment dev --config .\aifactory\gateways\apim.dev.json --output-dir ..\apim-review\dev-apply --action apply --approved-plan <planDigest> --approved-preview <previewDigest>
+```
+
+When `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` are set, the runner requires the configuration to match them, and `what-if`/`apply` always check that the Azure CLI login is that tenant and subscription. Keep the output directory outside this module and outside the configuration folder.

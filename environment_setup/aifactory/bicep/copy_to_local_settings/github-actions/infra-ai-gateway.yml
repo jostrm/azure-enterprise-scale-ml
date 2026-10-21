@@ -12,6 +12,33 @@ on:
         - stage
         - prod
         default: dev
+      action:
+        description: Managed APIM action (APIM_GATEWAY_MANAGED_PROVISIONING only; plan is offline, apply needs reviewed digests)
+        required: true
+        type: choice
+        options: [plan, what-if, apply]
+        default: plan
+      approved_plan:
+        description: Reviewed managed APIM plan digest (APIM_GATEWAY_MANAGED_PROVISIONING apply only)
+        required: false
+        type: string
+        default: ''
+      approved_preview:
+        description: Reviewed managed APIM phase preview digest (APIM_GATEWAY_MANAGED_PROVISIONING apply only)
+        required: false
+        type: string
+        default: ''
+      approve_initial_public_bootstrap:
+        description: Approve the temporary public bootstrap of a new managed APIM (APIM_GATEWAY_MANAGED_PROVISIONING apply only)
+        required: false
+        type: boolean
+        default: false
+
+# Managed APIM runs are serialized per environment within this repository (not a global lock; shared APIM
+# writers across repositories need an external exclusive-writer lock). Classic runs keep a unique group.
+concurrency:
+  group: ${{ vars.APIM_GATEWAY_MANAGED_PROVISIONING == 'true' && format('apim-{0}', inputs.environment) || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -41,6 +68,8 @@ jobs:
       APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: ${{ vars.APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE || 'false' }}
       APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: ${{ vars.APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID || '' }}
       APIM_GATEWAY_BACKENDS_JSON: ${{ vars.APIM_GATEWAY_BACKENDS_JSON || '[]' }}
+      APIM_GATEWAY_MANAGED_PROVISIONING: ${{ vars.APIM_GATEWAY_MANAGED_PROVISIONING || 'false' }}
+      APIM_GATEWAY_CONFIG_FILE: ${{ vars.APIM_GATEWAY_CONFIG_FILE || '' }}
       ADD_AI_FACTORY_MCP_2_APIM: ${{ vars.ADD_AI_FACTORY_MCP_2_APIM || 'false' }}
       ENABLE_KONG: ${{ vars.ENABLE_KONG || 'false' }}
       KONG_GATEWAY_VNET_RESOURCE_GROUP: ${{ vars.KONG_GATEWAY_VNET_RESOURCE_GROUP || '' }}
@@ -58,13 +87,119 @@ jobs:
       with:
         submodules: true
 
+    # APIM_GATEWAY_MANAGED_PROVISIONING: 'true' routes APIM through the reviewed runner (offline plan, then what-if
+    # and apply of one phase per run; it can also provision a private StandardV2 APIM). 'false', the default,
+    # keeps the classic "Deploy APIM Azure OpenAI pool" step below unchanged.
+    - name: Validate target and plan APIM offline
+      if: env.ENABLE_APIM == 'true' && env.APIM_GATEWAY_MANAGED_PROVISIONING == 'true'
+      env:
+        GATEWAY_REPOSITORY_ROOT: ${{ github.workspace }}
+        GATEWAY_OUTPUT_DIR: ${{ runner.temp }}/apim-gateway-${{ github.run_id }}-${{ github.run_attempt }}
+        GATEWAY_ENVIRONMENT: ${{ inputs.environment }}
+        GATEWAY_DEPLOYMENT_TARGET: ${{ inputs.environment }}
+        GATEWAY_ACTION: ${{ inputs.action }}
+        GATEWAY_CONFIG_FILE: ${{ env.APIM_GATEWAY_CONFIG_FILE }}
+        AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
+        APIM_GATEWAY_TAGS_JSON: ${{ env.TAGS }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import os
+        import re
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        def require(valid, message):
+            if not valid:
+                raise SystemExit(message)
+
+        guid = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
+        for key in ("AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID"):
+            require(re.fullmatch(guid, os.environ.get(key, "")), "Exact pipeline tenant and subscription are required.")
+        require(os.environ.get("GATEWAY_ENVIRONMENT") in ("dev", "stage", "prod"), "Invalid target environment.")
+        require(os.environ["GATEWAY_ACTION"] in ("plan", "what-if", "apply"), "Invalid action.")
+        require(os.environ["GATEWAY_ACTION"] != "apply" or os.environ.get("GATEWAY_DEPLOYMENT_TARGET") != "all",
+                "Managed APIM apply needs one deploymentTarget (dev, stage or prod), not all.")
+        root = Path(os.environ["GATEWAY_REPOSITORY_ROOT"]).resolve(strict=True)
+        relative_runner = Path("environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py")
+        runner = root / "azure-enterprise-scale-ml" / relative_runner
+        if not runner.is_file():
+            runner = root / relative_runner
+        require(runner.is_file(), "APIM runner missing from root checkout or expected submodule.")
+        args = [sys.executable, str(runner), "--environment", os.environ["GATEWAY_ENVIRONMENT"],
+                "--action", "plan", "--output-dir", os.environ["GATEWAY_OUTPUT_DIR"]]
+        value = os.environ.get("GATEWAY_CONFIG_FILE", "")
+        if value:
+            relative = Path(value)
+            require(not relative.is_absolute() and ".." not in relative.parts
+                    and "\\" not in value and not any(ord(c) < 32 for c in value),
+                    "Config file must be a consumer-relative path without traversal.")
+            try:
+                config = (root / relative).resolve(strict=True)
+            except (OSError, ValueError):
+                raise SystemExit("Cannot resolve the consumer configuration.") from None
+            require(config.is_relative_to(root) and config.is_file(),
+                    "Config file must remain inside the consumer repository.")
+            args.extend(["--config", str(config)])
+        raise SystemExit(subprocess.run(args, check=False).returncode)
+        PY
+
     - name: Azure Login
+      if: env.ENABLE_APIM != 'true' || env.APIM_GATEWAY_MANAGED_PROVISIONING != 'true' || inputs.action != 'plan'
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    - name: Preview or apply reviewed APIM plan
+      id: managed_apim
+      if: env.ENABLE_APIM == 'true' && env.APIM_GATEWAY_MANAGED_PROVISIONING == 'true' && inputs.action != 'plan'
+      env:
+        GATEWAY_REPOSITORY_ROOT: ${{ github.workspace }}
+        GATEWAY_OUTPUT_DIR: ${{ runner.temp }}/apim-gateway-${{ github.run_id }}-${{ github.run_attempt }}
+        GATEWAY_ENVIRONMENT: ${{ inputs.environment }}
+        GATEWAY_DEPLOYMENT_TARGET: ${{ inputs.environment }}
+        GATEWAY_ACTION: ${{ inputs.action }}
+        GATEWAY_CONFIG_FILE: ${{ env.APIM_GATEWAY_CONFIG_FILE }}
+        GATEWAY_APPROVED_PLAN: ${{ inputs.approved_plan }}
+        GATEWAY_APPROVED_PREVIEW: ${{ inputs.approved_preview }}
+        GATEWAY_APPROVE_INITIAL_PUBLIC_BOOTSTRAP: ${{ inputs.approve_initial_public_bootstrap }}
+        AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
+        APIM_GATEWAY_TAGS_JSON: ${{ env.TAGS }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        runner="$GATEWAY_REPOSITORY_ROOT/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py"
+        if [[ ! -f "$runner" ]]; then
+          runner="$GATEWAY_REPOSITORY_ROOT/environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py"
+        fi
+        args=(--environment "$GATEWAY_ENVIRONMENT" --action "$GATEWAY_ACTION" --output-dir "$GATEWAY_OUTPUT_DIR")
+        if [[ -n "$GATEWAY_CONFIG_FILE" ]]; then
+          args+=(--config "$GATEWAY_REPOSITORY_ROOT/$GATEWAY_CONFIG_FILE")
+        fi
+        if [[ "$GATEWAY_ACTION" == "apply" ]]; then
+          args+=(--approved-plan "$GATEWAY_APPROVED_PLAN" --approved-preview "$GATEWAY_APPROVED_PREVIEW")
+          if [[ "${GATEWAY_APPROVE_INITIAL_PUBLIC_BOOTSTRAP,,}" == "true" ]]; then
+            args+=(--approve-initial-public-bootstrap)
+          fi
+        fi
+        summary="$(python3 "$runner" "${args[@]}")"
+        echo "$summary"
+        # The MCP and Kong steps publish on a managed APIM only after an apply reached its configuration phase.
+        configured="$(python3 -c 'import json, sys; print(str(json.loads(sys.argv[1]).get("gatewayConfigured") is True).lower())' "$summary")"
+        echo "configured=$configured" >> "$GITHUB_OUTPUT"
+
+    - name: Publish APIM plan and sanitized phase receipts
+      if: always() && env.ENABLE_APIM == 'true' && env.APIM_GATEWAY_MANAGED_PROVISIONING == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: apim-gateway-${{ inputs.environment }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/apim-gateway-${{ github.run_id }}-${{ github.run_attempt }}
+        if-no-files-found: ignore
+
     - name: Deploy APIM Azure OpenAI pool
-      if: env.ENABLE_APIM == 'true'
+      if: env.ENABLE_APIM == 'true' && env.APIM_GATEWAY_MANAGED_PROVISIONING != 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -131,8 +266,9 @@ jobs:
     # ADD_AI_FACTORY_MCP_2_APIM: publish the project001 Dev AI Factory MCP on this APIM as a plain HTTP proxy API.
     # The launcher reads the MCP app and the APIM (GET only) and refuses until the project workflow has added
     # the APIM identity to the MCP callers; stage/prod are skipped because the MCP runs only in dev.
+    # With a managed APIM it also waits until the runner has configured that APIM in this run.
     - name: Expose the AI Factory MCP on APIM
-      if: env.ADD_AI_FACTORY_MCP_2_APIM == 'true'
+      if: env.ADD_AI_FACTORY_MCP_2_APIM == 'true' && (env.ENABLE_APIM != 'true' || env.APIM_GATEWAY_MANAGED_PROVISIONING != 'true' || steps.managed_apim.outputs.configured == 'true')
       shell: bash
       env:
         enableAIFactoryMCP: ${{ vars.ENABLE_AI_FACTORY_MCP || 'false' }}
@@ -172,8 +308,9 @@ jobs:
           --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep" \
           --parameters "@$parameters"
 
+    # With a managed APIM, Kong waits until the runner has configured that APIM in this run.
     - name: Deploy Kong edge gateway
-      if: env.ENABLE_KONG == 'true'
+      if: env.ENABLE_KONG == 'true' && (env.ENABLE_APIM != 'true' || env.APIM_GATEWAY_MANAGED_PROVISIONING != 'true' || steps.managed_apim.outputs.configured == 'true')
       shell: bash
       run: |
         set -euo pipefail
