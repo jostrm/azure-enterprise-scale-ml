@@ -160,3 +160,14 @@ to the public Anthropic endpoint.
 See the [Agent Factory starter](../../../usecase_code/40-agent-factory/readme.md)
 for configuration, private networking, data ingestion, deployment commands, and
 current Agent Map limitations.
+
+Two separately configured examples run outside the default inventory. Each has
+its own environment, configuration and explicit deployment or paid-call approval:
+
+| Example | What it shows | Start here |
+| --- | --- | --- |
+| `48-rag-with-splitted-tables-acl-adlsgen2` | Whole-table Text Split with native ADLS permissions on every chunk, exact sales totals from hash-pinned rows across two indexes, an optional Graph delta/webhook sync, a calculator-free retrieval experiment and an offline answer checker (`check_sum.py`). | [Example readme](../../../usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/readme.md) |
+| `49-agent-training-ml-churn-prediction` | An agent that creates the synthetic M49 churn use case, trains it, retrains M05 air-passengers and runs batch scoring through ESML v2, only within a plan you approve. Run it as a CLI prompt agent (`main.py`) or as a code-based hosted agent in the Foundry Playground (`hosted-package`, `hosted-deploy`). | [Example readme](../../../usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/readme.md) |
+
+Why these examples keep their permission and approval boundaries is described in
+the [Agent Factory architecture note](../../architecture/agents/Agent-Factory.md).

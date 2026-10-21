@@ -250,6 +250,8 @@ It also comes with DEMO data, per project team.
 ## 38) How-to guide: LLMOps & RAG Chat Agent
 
 [ !WIP! - HOWTO - Quickstart: LLMOps & RAG Chat Agent](../v2/30-39/37-mlops.md)
+
+[Agent Factory - agents, tools and examples](../v2/30-39/agent-factory.md)
 ## 39) End-2-End setup: ESML Project, ESGenAI Project
 
 **ESML Project:** Here is an end-2-end setup tutorial, for DataOps and MLOps
