@@ -2619,10 +2619,15 @@ jobs:
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             _aksComputeExists=false
             if [ "${{ env.enableAzureMachineLearning }}" = "true" ] && [ "${{ env.enableAksForAzureML }}" = "true" ]; then
+              # Same common resource group as the phase 01 naming deployment: a BYO commonResourceGroup_param wins.
+              _aifCommonRg="${{ env.commonResourceGroup_param }}"
+              if [ -z "$_aifCommonRg" ]; then
+                _aifCommonRg="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
+              fi
               _aksComputeExists=$(python3 azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/discover-aml-aks-attachment.py \
                 --subscription "${{ env.dev_test_prod_sub_id }}" \
                 --resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.projectPrefix }}project${{ env.project_number_000 }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.projectSuffix }}" \
-                --common-resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+                --common-resource-group "$_aifCommonRg" \
                 --project-number "${{ env.project_number_000 }}" \
                 --location-suffix "${{ env.admin_locationSuffix }}" \
                 --environment "${{ env.dev_test_prod }}" \

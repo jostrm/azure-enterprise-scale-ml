@@ -189,3 +189,25 @@ def test_cli_emits_only_boolean_after_success_and_no_fallback_on_error(discovery
     output = capsys.readouterr()
     assert output.out == ""
     assert "forbidden" in output.err
+
+
+PIPELINES = {
+    "azure-devops": BICEP / "copy_to_local_settings" / "azure-devops" / "esml-yaml-pipelines" / "esml-infra-project"
+    / "jobs" / "job-2-genai-services.yaml",
+    "github-actions": BICEP / "copy_to_local_settings" / "github-actions" / "infra-project-phase.yml",
+}
+
+
+@pytest.mark.parametrize("system", sorted(PIPELINES))
+def test_discovery_uses_the_common_resource_group_the_naming_phase_used(system):
+    # Phase 01 names resources with a BYO commonResourceGroup_param when one is set. Discovery
+    # rebuilds that naming deployment's inputs, so it must use the same group or it fails closed
+    # on every run with AML + AKS for AML enabled.
+    text = PIPELINES[system].read_text(encoding="utf-8")
+    call = text.index("discover-aml-aks-attachment.py")
+    step = text[text.rindex("_aksComputeExists=false", 0, call):text.index("|| exit 1", call)]
+    assert step.count("commonResourceGroup_param") >= 1
+    resolved = step.index("_aifCommonRg=")
+    assert resolved < step.index("discover-aml-aks-attachment.py")
+    assert '--common-resource-group "$_aifCommonRg"' in step
+    assert "vnetResourceGroupBase" in step[resolved:step.index("discover-aml-aks-attachment.py")]

@@ -3565,10 +3565,15 @@ steps:
      az account set --subscription "$(dev_test_prod_sub_id)"
      _aksComputeExists=false
      if [ "$(enableAzureMachineLearning)" = "true" ] && [ "$(enableAksForAzureML)" = "true" ]; then
+       # Same common resource group as the phase 01 naming deployment: a BYO commonResourceGroup_param wins.
+       _aifCommonRg="$(commonResourceGroup_param)"
+       if [ -z "$_aifCommonRg" ] || [ "$_aifCommonRg" = '$''(commonResourceGroup_param)' ]; then
+         _aifCommonRg="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+       fi
        _aksComputeExists=$(python3 scripts/discover-aml-aks-attachment.py \
          --subscription "$(dev_test_prod_sub_id)" \
          --resource-group "$(admin_aifactoryPrefixRG)$(projectPrefix)project$(project_number_000)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)$(projectSuffix)" \
-         --common-resource-group "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)" \
+         --common-resource-group "$_aifCommonRg" \
          --project-number "$(project_number_000)" \
          --location-suffix "$(admin_locationSuffix)" \
          --environment "$(dev_test_prod)" \
