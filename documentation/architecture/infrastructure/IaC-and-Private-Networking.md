@@ -186,9 +186,33 @@ does not configure. `managedNATGateway` needs an AKS-managed VNet, and the ESML 
 always brings its own subnet. The GenAI route declares aksCluster's four values in
 05-compute-services and 07-ml-data-platform. Its 31-network accepts only `loadBalancer`
 and `userDefinedRouting` and runs first, unless BYO_subnets is true or
-runNetworkingVar is false. A compile test keeps 22-main building and follows each
+runNetworkingVar is false. So `scripts/preflight.sh` (`check_aks_networking`) judges
+the value itself: `managedNATGateway` and unknown values fail
+(`AKS_OUTBOUND_UNSUPPORTED`), and `userAssignedNATGateway` fails without BYO subnets
+(`AKS_OUTBOUND_NAT_NEEDS_BYO`). On BYO subnets it warns
+(`AKS_OUTBOUND_NAT_UNVERIFIED`), because AKS then needs a NAT gateway on the subnet
+and preflight does not look. The Bicep lists stay as they are, so a BYO subnet with
+a NAT gateway keeps working. `userDefinedRouting` also needs a route table with a
+`0.0.0.0/0` route on the cluster subnet. 31-network attaches its UDR route table only
+to `snt-<project>-aks-002`, which the AML AKS in 07 uses. The GenAI cluster in 05
+(`enableAKS`) lands on `snt-<project>-aks`, which has no route table. So without BYO
+subnets, `enableAKS` with `userDefinedRouting` fails in preflight
+(`AKS_UDR_GENAI_SUBNET_NO_ROUTE`). Attaching a route table to that subnet in 31-network
+is not done yet. A compile test keeps 22-main building and follows each
 value through the compiled ARM to the cluster. This proves the source contract
 offline, not a live deployment.
+
+ADO/GHA parameter parity on the GenAI route (2026-10-21): GHA's
+`65-compute-services` step did not pass `aksExists`, `aksEnablePrivateCluster`,
+`aksOutboundType`, `aksPrivateDNSZone` or `aksSkuName` to `05-compute-services`. So on
+GHA the GenAI cluster always got the Bicep defaults: `AKS_OUTBOUND_TYPE=userDefinedRouting`
+still produced a public egress load balancer, and the `aksExists` reconciliation never
+reached the cluster module, so every run re-PUT the cluster. The step now passes them as
+ADO does. The AKS modules in 05 only create clusters (`!aksExists`): an existing
+Succeeded cluster keeps its egress, private-cluster and SKU settings, and changing them
+means recreating the cluster. `unit/test_genai_parameter_parity.py` compares the
+parameter names each provider passes to every GenAI phase template. Its `KNOWN_GAPS`
+lists the remaining reviewed differences, and closing one must remove its entry.
 
 Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
 finish before Web App/Function integration. Function also depends on Web App,

@@ -1189,18 +1189,52 @@ EOF
   [ -z "$had" ] && echo "  [OK] Configured environment VNets/subnets are aligned and non-overlapping; address ranges permit peering, actual peering not verified."
 }
 
-# --- Networking: AKS with userDefinedRouting requires a firewall IP and a
-# non-'system' private DNS zone.
+# --- Networking: AKS outbound type. AI Factory always places AKS in its own subnet, so
+# managedNATGateway (AKS-managed VNet only) can never deploy, and userAssignedNATGateway
+# needs a NAT gateway on a BYO subnet: the 31-network gate that rejects both is skipped
+# when BYO_subnets=true or runNetworkingVar=false. userDefinedRouting requires a
+# firewall IP, a non-'system' private DNS zone and a route table on the cluster subnet:
+# 31-network attaches its UDR route table only to snt-<project>-aks-002 (AML AKS, 07),
+# while the GenAI cluster (enableAKS, 05) lands on snt-<project>-aks.
 check_aks_networking() {
   if ! is_true "$ENABLE_AKS" && ! is_true "$ENABLE_AKS_AML"; then
     echo "  AKS not enabled -> no AKS networking check."
     return 0
   fi
-  if [ "$(lc "$AKS_OUTBOUND_TYPE")" != "userdefinedrouting" ]; then
-    echo "  [OK] aksOutboundType='$AKS_OUTBOUND_TYPE' (no UDR-specific requirements)."
-    return 0
-  fi
+  case "$(lc "$AKS_OUTBOUND_TYPE")" in
+    loadbalancer)
+      echo "  [OK] aksOutboundType='$AKS_OUTBOUND_TYPE' (no UDR-specific requirements)."
+      return 0;;
+    userdefinedrouting) ;;
+    userassignednatgateway)
+      if is_true "$BYO_SUBNETS"; then
+        add_finding WARN AKS_OUTBOUND_NAT_UNVERIFIED \
+          "aksOutboundType=userAssignedNATGateway needs a NAT gateway on the BYO AKS subnet; preflight does not verify it." \
+          "Associate a NAT gateway with the AKS subnet before deploying, or use loadBalancer or userDefinedRouting."
+      else
+        add_finding FAIL AKS_OUTBOUND_NAT_NEEDS_BYO \
+          "aksOutboundType=userAssignedNATGateway needs BYO subnets with a NAT gateway; AI Factory subnets accept only loadBalancer or userDefinedRouting." \
+          "Use loadBalancer or userDefinedRouting, or set BYO_subnets=true with a NAT gateway on the AKS subnet."
+      fi
+      return 0;;
+    managednatgateway)
+      add_finding FAIL AKS_OUTBOUND_UNSUPPORTED \
+        "aksOutboundType=managedNATGateway needs an AKS-managed VNet, but AI Factory always places AKS in its own subnet." \
+        "Use loadBalancer or userDefinedRouting (or userAssignedNATGateway on BYO subnets with a NAT gateway)."
+      return 0;;
+    *)
+      add_finding FAIL AKS_OUTBOUND_UNSUPPORTED \
+        "aksOutboundType '$AKS_OUTBOUND_TYPE' is not loadBalancer or userDefinedRouting." \
+        "Set aksOutboundType to loadBalancer or userDefinedRouting."
+      return 0;;
+  esac
   local ok="1"
+  if is_true "$ENABLE_AKS" && ! is_true "$BYO_SUBNETS"; then
+    add_finding FAIL AKS_UDR_GENAI_SUBNET_NO_ROUTE \
+      "enableAKS with aksOutboundType=userDefinedRouting needs a route table on the GenAI AKS subnet, but AI Factory attaches its UDR route table only to snt-<project>-aks-002 (AML AKS)." \
+      "Use loadBalancer for the GenAI AKS, or set BYO_subnets=true with a route table (0.0.0.0/0 to the firewall) on the AKS subnet."
+    ok=""
+  fi
   if is_unset_placeholder "$AKS_FW_IP"; then
     add_finding FAIL AKS_UDR_NO_FW_IP \
       "aksOutboundType=userDefinedRouting but aksAzureFirewallPrivateIp is empty." \
@@ -1218,7 +1252,9 @@ check_aks_networking() {
       "Set aksPrivateDNSZone to 'none' or to a full private DNS zone resource ID."
     ok=""
   fi
-  [ -n "$ok" ] && echo "  [OK] AKS UDR config: firewall IP set and aksPrivateDNSZone='$AKS_PRIVATE_DNS'."
+  if [ -n "$ok" ]; then
+    echo "  [OK] AKS UDR config: firewall IP set and aksPrivateDNSZone='$AKS_PRIVATE_DNS'."
+  fi
 }
 
 # --- Observability: split-brain check for any BYO App Insights / Log Analytics

@@ -23,6 +23,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_domain_impl_mock.py",
         "unit/test_enable_personas.py",
         "unit/test_foundry_model_deployments.py",
+        "unit/test_genai_parameter_parity.py",
         "unit/test_iac_build_mock.py",
         "unit/test_install_config_wizard_downloads.py",
         "unit/test_mcp_ai_gateway_flags.py",

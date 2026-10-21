@@ -4,8 +4,8 @@ The preflight gate (scripts/kv_principal_object_ids.py) accepts "a , B"; the Bic
 value normalizes it with the one rule in modules/common/objectIds.bicep. Role-assignment names are seeded
 with the object ID, so spacing or case must not change them (RoleAssignmentExists 409 on redeploy), and
 already-normalized input must keep the names existing factories were deployed with. Classic-ARM templates
-inline the rule, because importing a function would switch them to languageVersion 2.0; the last tests pin
-every copy to objectIds.bicep.
+inline the rule, because importing a function would switch them to languageVersion 2.0; esml-project/22-main,
+already 2.0, inlines it too. The last tests pin every copy to objectIds.bicep.
 """
 from pathlib import Path
 import re
@@ -169,7 +169,7 @@ def test_naming_team_lead_array_is_normalized(raw, expected):
     assert arm_value(output, {"technicalAdminsObjectID": raw}, template) == expected
 
 
-# --- one rule: imported by languageVersion 2.0 templates, inlined verbatim by classic ones --------------------
+# --- one rule: imported by CmnAIfactoryNaming, inlined verbatim by classic templates and esml-project/22-main ---
 
 CSV = "split(technicalAdminsObjectID, ',')"
 INLINED = {"esml-common/main/11-rgCommon.bicep": CSV, "esml-common/main/13-rgLevel.bicep": CSV,
@@ -190,7 +190,7 @@ def inlined(source_ids):
 
 
 @pytest.mark.parametrize("relative,source_ids", INLINED.items())
-def test_classic_templates_inline_the_exact_rule(relative, source_ids):
+def test_inlined_copies_match_the_exact_rule(relative, source_ids):
     assert inlined(source_ids) in (BICEP / relative).read_text(encoding="utf-8")
 
 

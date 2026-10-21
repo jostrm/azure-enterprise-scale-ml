@@ -80,7 +80,8 @@ to ARM languageVersion 2.0, which changes how its `existing` resources deploy. S
 only `CmnAIfactoryNaming.bicep`, already 2.0, imports it; its
 `p011_genai_team_lead_array` feeds the GenAI RBAC modules. The classic templates
 `11-rgCommon.bicep`, `13-rgLevel.bicep` and `kvCmnAccessPolicys.bicep` (before its
-GUID filter) inline the exact body, as does `esml-project/22-main.bicep`.
+GUID filter) inline the exact body. `esml-project/22-main.bicep` inlines it too,
+although it already compiles to 2.0 and so could import it.
 `test_admin_object_ids.py` pins every copy and keeps the classic templates classic.
 Role-assignment names are seeded with the object ID: `contributorRbac.bicep` uses
 `guid('<id>-contributor-<rg id>')`. So spacing or case in the variable no longer
