@@ -4,7 +4,10 @@ A parameter one provider forwards and the other leaves out silently falls back t
 on that provider. GHA's 65-compute-services step left out aksExists, aksEnablePrivateCluster,
 aksOutboundType, aksPrivateDNSZone and aksSkuName. So on GHA the GenAI cluster ignored those settings:
 AKS_OUTBOUND_TYPE=userDefinedRouting still produced a public egress load balancer, and the aksExists
-reconciliation never reached the cluster module, so every run re-PUT the cluster.
+reconciliation never reached the cluster module, so every run re-PUT the cluster. GHA's 63 step left
+out enablePublicNetworkAccessForCognitive, so Content Safety, Vision, Speech and Document Intelligence
+kept public network access whatever ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET said, and its 63 and 64 steps
+left out the CMK seeding Key Vault, so cmk=true had no vault to use.
 
 KNOWN_GAPS lists the remaining reviewed differences; closing one must also remove its entry.
 """
@@ -29,27 +32,24 @@ KNOWN_GAPS = {
         "vmExists": ("ado", "GHA does not detect the project VM yet; the module default false applies"),
     },
     "03-cognitive-services.bicep": {
-        "admin_bicep_kv_fw": ("ado", "GHA does not pass the CMK seeding Key Vault to 03 yet"),
-        "admin_bicep_kv_fw_rg": ("ado", "GHA does not pass the CMK seeding Key Vault to 03 yet"),
-        "admin_bicep_input_keyvault_subscription": ("ado", "GHA does not pass the CMK seeding Key Vault to 03 yet"),
-        "enablePublicNetworkAccessForCognitive": ("ado", "GHA does not map ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET to 03 yet"),
         "disableLocalAuth": ("gha", "ADO defines disableLocalAuth but does not forward it to 03 yet"),
         "storageAccountSkuName": ("gha", "ADO defines skuStorageAccount* but forwards them only to 02 yet"),
     },
     "04-databases.bicep": {
-        "admin_bicep_kv_fw": ("ado", "GHA does not pass the CMK seeding Key Vault to 04 yet"),
-        "admin_bicep_kv_fw_rg": ("ado", "GHA does not pass the CMK seeding Key Vault to 04 yet"),
-        "admin_bicep_input_keyvault_subscription": ("ado", "GHA does not pass the CMK seeding Key Vault to 04 yet"),
         "postgreSQLVersion": ("ado", "ADO pins '17', the module default GHA relies on"),
     },
     "09-ai-foundry-2025-v4.bicep": {
         "disableLocalAuth": ("gha", "ADO defines disableLocalAuth but does not forward it to 09 yet"),
     },
 }
-AKS_FORWARDING = [
-    *(("05-compute-services.bicep", name) for name in (
+# (module, parameter, the pipeline variable both providers pass to it)
+FORWARDING = [
+    *(("05-compute-services.bicep", name, name) for name in (
         "aksExists", "aksEnablePrivateCluster", "aksOutboundType", "aksPrivateDNSZone", "aksSkuName")),
-    *(("07-ml-data-platform.bicep", name) for name in ("aksExists", "aksOutboundType", "aksPrivateDNSZone")),
+    *(("07-ml-data-platform.bicep", name, name) for name in ("aksExists", "aksOutboundType", "aksPrivateDNSZone")),
+    ("03-cognitive-services.bicep", "enablePublicNetworkAccessForCognitive", "allowPublicAccessWhenBehindVnet"),
+    *((module, name, name) for module in ("03-cognitive-services.bicep", "04-databases.bicep")
+      for name in ("admin_bicep_kv_fw", "admin_bicep_kv_fw_rg", "admin_bicep_input_keyvault_subscription")),
 ]
 
 
@@ -88,7 +88,7 @@ def test_ado_and_gha_pass_the_same_parameters(module):
     )
 
 
-@pytest.mark.parametrize("module,parameter", AKS_FORWARDING)
-def test_aks_settings_reach_the_genai_aks_templates_unchanged(module, parameter):
-    assert forwarded(module, ADO_SERVICES, parameter) == f"$({parameter})"
-    assert forwarded(module, GHA_PHASE, parameter) == "${{ env." + parameter + " }}"
+@pytest.mark.parametrize("module,parameter,source", FORWARDING)
+def test_settings_reach_the_genai_templates_unchanged(module, parameter, source):
+    assert forwarded(module, ADO_SERVICES, parameter) == f"$({source})"
+    assert forwarded(module, GHA_PHASE, parameter) == "${{ env." + source + " }}"

@@ -2240,8 +2240,12 @@ jobs:
               --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+              --parameters admin_bicep_kv_fw="${{ env.admin_bicep_kv_fw }}" \
+              --parameters admin_bicep_kv_fw_rg="${{ env.admin_bicep_kv_fw_rg }}" \
+              --parameters admin_bicep_input_keyvault_subscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
-              --parameters disableLocalAuth="${{ env.disableLocalAuth }}"
+              --parameters disableLocalAuth="${{ env.disableLocalAuth }}" \
+              --parameters enablePublicNetworkAccessForCognitive="${{ env.allowPublicAccessWhenBehindVnet }}"
 
       - name: 63b-ai-search-region-gate
         if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
@@ -2370,7 +2374,10 @@ jobs:
               --parameters enableAFoundryCaphost="${{ env.enableAFoundryCaphost }}" \
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters cmk="${{ env.cmk }}" \
-              --parameters cmkKeyName="${{ env.cmkKeyName }}"
+              --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+              --parameters admin_bicep_kv_fw="${{ env.admin_bicep_kv_fw }}" \
+              --parameters admin_bicep_kv_fw_rg="${{ env.admin_bicep_kv_fw_rg }}" \
+              --parameters admin_bicep_input_keyvault_subscription="${{ env.admin_bicep_input_keyvault_subscription }}"
 
       - name: 64b-postgresql-attempt-1
         if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && env.enablePostgreSQL == 'true' && (env.debug_disable_64_databases != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))

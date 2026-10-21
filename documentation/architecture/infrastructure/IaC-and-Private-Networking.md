@@ -210,7 +210,22 @@ still produced a public egress load balancer, and the `aksExists` reconciliation
 reached the cluster module, so every run re-PUT the cluster. The step now passes them as
 ADO does. The AKS modules in 05 only create clusters (`!aksExists`): an existing
 Succeeded cluster keeps its egress, private-cluster and SKU settings, and changing them
-means recreating the cluster. `unit/test_genai_parameter_parity.py` compares the
+means recreating the cluster. GHA's `63-cognitive-services` step also did not pass
+`enablePublicNetworkAccessForCognitive` (ADO maps `allowPublicAccessWhenBehindVnet` to it),
+so Content Safety, Vision, Speech and Document Intelligence kept public network access on
+GHA. Steps 63 and 64 did not pass the CMK seeding Key Vault (`admin_bicep_kv_fw`,
+`admin_bicep_kv_fw_rg`, `admin_bicep_input_keyvault_subscription`) either, so `cmk=true`
+had no vault there (2026-10-22). Both steps now pass them as ADO does; without CMK the
+vault values are unused. Upgrade note for existing GHA factories that enable any of those
+four accounts with `enablePublicGenAIAccess=false`: the next infra run re-PUTs them with
+public network access disabled (and outbound access restricted) when the effective
+`allowPublicAccessWhenBehindVnet` is false, so IP-allow-list access from outside the VNet
+stops. To keep public access, set the GitHub variable
+`ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET=true` or `allowPublicAccessWhenBehindVnet: "true"`
+in variables.json. With the `.env` route the effective value is `false` whatever `.env`
+says: `.env.template` spells the key `ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET`, while
+`03a-GH-create-or-update-github-variables.sh` uploads only
+`ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET`. `unit/test_genai_parameter_parity.py` compares the
 parameter names each provider passes to every GenAI phase template. Its `KNOWN_GAPS`
 lists the remaining reviewed differences, and closing one must remove its entry.
 
