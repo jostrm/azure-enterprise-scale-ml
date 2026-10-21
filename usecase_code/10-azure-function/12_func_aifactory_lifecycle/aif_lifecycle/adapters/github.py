@@ -19,6 +19,8 @@ from ..domain.errors import UpstreamError, UpstreamTimeout, UpstreamUnavailable,
 
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 _WORKFLOW = re.compile(r"[A-Za-z0-9_.-]+\.ya?ml")
+_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")  # terminal colour codes that Actions keeps in job logs
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 EXCERPT_LINES = 40
 
 
@@ -71,7 +73,7 @@ class GitHubClient:
                 text = response.read().decode("utf-8", "replace")
         except (HTTPError, URLError, TimeoutError, socket.timeout):
             return ""
-        return "\n".join(text.splitlines()[-EXCERPT_LINES:])
+        return "\n".join(_CONTROL.sub("", _ANSI.sub("", line)) for line in text.splitlines()[-EXCERPT_LINES:])
 
     # ----- transport -----
 

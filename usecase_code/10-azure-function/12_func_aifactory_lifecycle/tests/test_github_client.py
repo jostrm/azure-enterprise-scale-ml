@@ -55,6 +55,16 @@ class FakeGitHubApi:
                 if path == "/blob/log.txt":
                     lines = "\n".join(f"2026-10-21T12:00:{i:02d}Z line {i}" for i in range(60))
                     return self._send(200, text=lines)
+                if path.endswith("/actions/runs/4/jobs"):
+                    return self._send(200, {"jobs": [{"id": 41, "conclusion": "failure"}]})
+                if path.endswith("/actions/jobs/41/logs"):
+                    return self._send(302, headers={"Location": outer.url + "/blob/ansi.txt"})
+                if path == "/blob/ansi.txt":  # shape of a real Actions job log (byor-121, 2026-10-21)
+                    return self._send(200, text="\r\n".join([
+                        '2026-10-21T21:28:40.4446752Z \x1b[36;1msleep "$DURATION"\x1b[0m',
+                        "2026-10-21T21:28:40.4504286Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}",
+                        "2026-10-21T21:30:00.3243176Z ##[error]target-rg failed (simulated)",
+                        "2026-10-21T21:30:00.3249985Z \x1b[1;31mSimulated failure for target-rg\x1b[0m"]))
                 if path.endswith("/actions/runs/404"):
                     return self._send(404, {"message": "Not Found"})
                 return self._send(500, {"message": "boom"})
@@ -104,6 +114,13 @@ def test_failure_excerpt_reads_the_failed_job_log_tail_without_sending_the_token
     assert len(excerpt.splitlines()) == 40
     blob = [call for call in api.calls if call["path"] == "/blob/log.txt"][0]
     assert blob["auth"] is None
+
+
+def test_failure_excerpt_strips_terminal_colour_codes(client):
+    excerpt = client.failure_excerpt(4)
+    assert "\x1b" not in excerpt and "\r" not in excerpt
+    assert 'sleep "$DURATION"' in excerpt.splitlines()[0]
+    assert excerpt.splitlines()[-1].endswith("Z Simulated failure for target-rg")
 
 
 def test_errors_become_upstream_errors_without_the_token(client):
