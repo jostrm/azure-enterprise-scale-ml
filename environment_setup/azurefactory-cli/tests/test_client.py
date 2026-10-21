@@ -149,6 +149,30 @@ def test_catalog_settings_sdk_surfaces_errors_without_fallback_or_retry(server, 
     assert len(Handler.records) == 1
 
 
+def test_creation_prepare_and_confirm_save_a_full_bootstrap_factory_once(server):
+    body = {"contract_version": 1, "mode": "full-bootstrap", "folder": r"C:\aif\byor-122", "orchestrator": "gha",
+            "config": {"github_repository": "jostrm/azure-enterprise-scale-byor-122", "coordination_mode": "single-writer"}}
+    sent = json.loads(json.dumps(body))
+    Handler.responses[("POST", "/api/v1/creation/prepare")] = (200, {"confirmation_id": "c-1", "folder": r"C:\aif\byor-122\azurefactory"}, {})
+    Handler.responses[("POST", "/api/v1/creation/confirm")] = (200, {"catalog": {"revision": "r"}, "job": None}, {})
+    client = AzureFactoryClient(server, "k")
+    assert client.creation_prepare(body)["confirmation_id"] == "c-1"
+    assert client.creation_confirm(r"C:\aif\byor-122\azurefactory", "c-1")["catalog"] == {"revision": "r"}
+    assert body == sent, "the request body is sent as given and never changed"
+    assert [(item["method"], item["path"]) for item in Handler.records] == [
+        ("POST", "/api/v1/creation/prepare"), ("POST", "/api/v1/creation/confirm")]
+    assert Handler.records[0]["body"] == body
+    assert Handler.records[1]["body"] == {"contract_version": 1, "folder": r"C:\aif\byor-122\azurefactory",
+                                          "confirmation_id": "c-1"}
+
+
+def test_creation_confirm_is_never_retried(server):
+    Handler.responses[("POST", "/api/v1/creation/confirm")] = (500, {"detail": "boom"}, {})
+    with pytest.raises(APIError):
+        AzureFactoryClient(server, "k").creation_confirm(r"C:\aif\byor-122\azurefactory", "c-1")
+    assert len(Handler.records) == 1
+
+
 def test_factory_create_sdk_defers_defaults_and_prepares_only(server):
     client = AzureFactoryClient(server, "test-key")
     scales = [{"environment": "dev", "suffix": "001"}]

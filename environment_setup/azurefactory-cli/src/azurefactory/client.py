@@ -670,6 +670,15 @@ class AzureFactoryClient(SavedMonitoringClient):
     def bootstrap_job(self, job_id: str) -> dict[str, Any]:
         return self._object(self.request("GET", f"/api/v1/creation/bootstrap/jobs/{job_id}"), "bootstrap job")
 
+    def creation_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Review saving a new factory for a creation flow (for example mode full-bootstrap); nothing is saved yet."""
+        return self._object(self.request("POST", "/api/v1/creation/prepare", body=body), "creation prepare")
+
+    def creation_confirm(self, folder: str, confirmation_id: str) -> dict[str, Any]:
+        """Save the reviewed factory once (no retry); the answer carries the catalog with its new IDs."""
+        return self._object(self.request("POST", "/api/v1/creation/confirm", body={
+            "contract_version": 1, "folder": folder, "confirmation_id": confirmation_id}), "creation confirm")
+
     def creation_workflow_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._object(self.request("POST", "/api/v1/creation/workflows/prepare", body=body), "workflow prepare")
 
