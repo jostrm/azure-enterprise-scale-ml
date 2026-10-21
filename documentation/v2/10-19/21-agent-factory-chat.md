@@ -211,7 +211,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
    | Connecting | Opening the secure voice connection. |
    | Listening | Your microphone is live; the orb reacts to your voice. |
    | Thinking | Your question was understood; the governed backend is answering. |
-   | Speaking | A short spoken summary is playing. |
+   | Speaking | A spoken version of the answer is playing. |
    | Voice unavailable | The session ended or could not start; typing still works. |
 
 3. Ask your question. In native mode the model streams audio directly through Voice Live
@@ -286,6 +286,12 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 - The voice relay, the orb UI and the pipeline step are covered by offline tests with fake backends and by real
   browser runs. A live Azure Voice Live session depends on your tenant: its region, private networking and
   role assignments. Treat the first session in each environment as the live validation.
+- The operator flow was validated live on a private test factory (project001 Dev) over its VPN: the new revision
+  became healthy with all traffic, the served page files matched the repository, and a scripted session with
+  synthesized speech passed end to end. The sign-in token was accepted, Voice Live opened through the private
+  endpoint, the greeting was spoken, the question was transcribed correctly, the governed answer returned
+  with citations in about 18 seconds, and the reply was spoken. The session ended cleanly in the app log. That run
+  did not exercise a real microphone or the orb in a browser.
 - Voice Live is a Microsoft preview-era service surface: model and region availability, pricing and the exact
   role requirements can change. Check the
   [Voice Live documentation](https://learn.microsoft.com/azure/ai-services/speech-service/voice-live) before production use.
