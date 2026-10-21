@@ -27,7 +27,11 @@ sources:
   - environment_setup/aifactory/bicep/scripts/region_report.py
   - environment_setup/aifactory/bicep/esml-genai-1/03b-ai-search.bicep
   - environment_setup/aifactory/bicep/modules/services/aiSearchDeployment.bicep
+  - environment_setup/aifactory/bicep/esml-project/22-main.bicep
+  - environment_setup/aifactory/bicep/modules/machineLearning.bicep
+  - environment_setup/aifactory/bicep/modules/aksCluster.bicep
 tests:
+  - environment_setup/unit-tests/test-bicep/unit/test_aks_outbound_type.py
   - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
   - environment_setup/unit-tests/test-bicep/unit/test_common_network_preservation.py
   - environment_setup/unit-tests/test-bicep/unit/test_subnet_scaling_capacity.py
@@ -168,6 +172,23 @@ WS1 plan is created only for Standard. VNet-integrated apps set
 sends only RFC1918 traffic into the VNet and would bypass private endpoints in
 other private ranges such as `100.64.0.0/10`. Internet-bound connector traffic then
 uses the VNet's egress. These are offline-tested source contracts.
+
+AKS outbound type on the ESML project route (main source, 2026-10-21):
+`esml-project/22-main.bicep` and `modules/machineLearning.bicep` allow only
+`loadBalancer` and `userDefinedRouting` for `aksOutboundType`. These are the values
+that variables.json, variables.yaml, .env.template and the pink wizard document.
+`modules/aksCluster.bicep` owns the AKS values. Since c7a9d8d8 its `@allowed` list
+rejects `none`, so the stale `none` in both callers stopped 22-main from compiling (BCP036).
+The GA AKS API enum also lacks `none`. `none` is not mapped to null: the module default
+`loadBalancer` would then apply, which means a public egress IP. AKS `none`
+belongs to network-isolated clusters (a private ACR bootstrap profile), which this module
+does not configure. `managedNATGateway` needs an AKS-managed VNet, and the ESML route
+always brings its own subnet. The GenAI route declares aksCluster's four values in
+05-compute-services and 07-ml-data-platform. Its 31-network accepts only `loadBalancer`
+and `userDefinedRouting` and runs first, unless BYO_subnets is true or
+runNetworkingVar is false. A compile test keeps 22-main building and follows each
+value through the compiled ARM to the cluster. This proves the source contract
+offline, not a live deployment.
 
 Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
 finish before Web App/Function integration. Function also depends on Web App,

@@ -49,7 +49,6 @@ param aksDockerBridgeCidr string = '172.17.0.1/16'
 @allowed([
   'loadBalancer'
   'userDefinedRouting'
-  'none'
 ])
 param aksOutboundType string = 'loadBalancer' // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
 
