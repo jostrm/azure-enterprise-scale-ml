@@ -2940,11 +2940,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">396</td>
+<td style="text-align: right;">398</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">394</td>
+<td style="text-align: right;">396</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2960,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">401</td>
+<td style="text-align: right;">403</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 419; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 420; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 421, 445; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 154, 421; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 155, 422; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 423, 447; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3123,6 +3123,20 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"10000"</code><br>J.dev: <code>"10000"</code></td>
 <td>Fair-use TPM allocation per APIM subscription.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:apimGatewayConfigFile --><!-- parameter json.dev:apimGatewayConfigFile --><code>apimGatewayConfigFile</code></td>
+<td><code>APIM_GATEWAY_CONFIG_FILE</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Consumer-relative APIM JSON for the reviewed runner (apimGatewayManagedProvisioning:'true') keep-as-is: Empty builds an existing-APIM configuration from the apimGateway* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:apimGatewayManagedProvisioning --><!-- parameter json.dev:apimGatewayManagedProvisioning --><code>apimGatewayManagedProvisioning</code></td>
+<td><code>APIM_GATEWAY_MANAGED_PROVISIONING</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:apimGatewayResourceGroup --><!-- parameter json.dev:apimGatewayResourceGroup --><code>apimGatewayResourceGroup</code></td>
@@ -6716,6 +6730,20 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"10000"</code></td>
 <td>Apim gateway caller tpm.</td>
+</tr>
+<tr>
+<td><!-- parameter env:APIM_GATEWAY_CONFIG_FILE --><code>APIM_GATEWAY_CONFIG_FILE</code></td>
+<td><code>apimGatewayConfigFile</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Consumer-relative APIM JSON for the reviewed runner (APIM_GATEWAY_MANAGED_PROVISIONING:'true') keep-as-is: Empty builds an existing-APIM configuration from the APIM_GATEWAY_* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json.</td>
+</tr>
+<tr>
+<td><!-- parameter env:APIM_GATEWAY_MANAGED_PROVISIONING --><code>APIM_GATEWAY_MANAGED_PROVISIONING</code></td>
+<td><code>apimGatewayManagedProvisioning</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md.</td>
 </tr>
 <tr>
 <td><!-- parameter env:APIM_GATEWAY_RESOURCE_GROUP --><code>APIM_GATEWAY_RESOURCE_GROUP</code></td>
