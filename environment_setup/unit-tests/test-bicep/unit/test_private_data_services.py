@@ -152,7 +152,11 @@ def test_data_factory_rbac_uses_one_valid_factory_contributor_grant_per_principa
         is_service_principal = name.endswith("ServicePrincipal")
         is_factory_contributor = name.startswith("dataFactoryContributor")
         properties = item["properties"]
-        assert item["scope"] == "[format('Microsoft.DataFactory/factories/{0}', parameters('datafactoryName'))]"
+        # Bicep compilers render the same existing-resource scope either way (CI's unit phase is newer).
+        assert item["scope"] in (
+            "[format('Microsoft.DataFactory/factories/{0}', parameters('datafactoryName'))]",
+            "[resourceId('Microsoft.DataFactory/factories', parameters('datafactoryName'))]",
+        )
         assert expected_names[name] in item["name"]
         assert properties["roleDefinitionId"] == (
             "[variables('roleDataFactoryContributor')]" if is_factory_contributor

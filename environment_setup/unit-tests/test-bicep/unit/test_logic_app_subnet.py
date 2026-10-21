@@ -685,6 +685,15 @@ def test_actual_ado_normalizer_preserves_historical_standard_default(hosting):
         assert "variable=subnetProjLogicapp]\n" in run.stdout
 
 
+def _all_steps(steps):
+    """Top-level steps plus the steps inside ADO ${{ if }} / ${{ else }} blocks (e.g. the linuxRunner arms)."""
+    for step in steps:
+        if isinstance(step, dict) and len(step) == 1 and next(iter(step)).startswith("${{"):
+            yield from _all_steps(next(iter(step.values())))
+        elif isinstance(step, dict):
+            yield step
+
+
 def test_provider_allocator_dynamic_and_task68_pass_the_same_flags():
     base = BICEP / "copy_to_local_settings"
     ado = base / "azure-devops/esml-yaml-pipelines"
@@ -698,14 +707,16 @@ def test_provider_allocator_dynamic_and_task68_pass_the_same_flags():
                        "14_Generate_Dynamic_Network_Parameters", "68-integration"]),
     ):
         for name in names:
-            step = next(step for step in steps if step.get(key) == name)
-            code = json.dumps(step)
-            for flag in ("enableLogicApps", "byoASEv3", "enablePublicAccessWithPerimeter"):
-                assert flag in code, (name, flag)
-            assert "logicAppType" in code
-            if name == "68-integration":
-                assert "logiAppType" in code
-                assert "dynamicNetworkParams.json" in code
+            matches = [step for step in _all_steps(steps) if step.get(key) == name]
+            assert matches, name
+            for step in matches:  # every conditional arm must pass the same flags
+                code = json.dumps(step)
+                for flag in ("enableLogicApps", "byoASEv3", "enablePublicAccessWithPerimeter"):
+                    assert flag in code, (name, flag)
+                assert "logicAppType" in code
+                if name == "68-integration":
+                    assert "logiAppType" in code
+                    assert "dynamicNetworkParams.json" in code
     assert any(step.get("template") == "../../variables/logic-app-network-steps.yaml" for step in network)
     assert any(step.get("template") == "../../variables/logic-app-network-steps.yaml" for step in services)
 
