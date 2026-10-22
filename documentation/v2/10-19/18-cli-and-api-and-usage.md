@@ -5,10 +5,22 @@
 
 Choose one tool below. The whole tutorial changes with your choice on the
 [documentation site](https://jostrm.github.io/azure-enterprise-scale-ml/factory-tools/18-cli-and-api-and-usage/).
-GitHub's Markdown viewer provides expandable tool sections instead of interactive tabs.
 
-**This quick connection check does not create Azure resources, deploy or delete.**
-It uses the new registered Azure Factory approach and an empty local folder.
+**6 common scenarios all tools support**
+
+The Configuration Wizard, CLI, REST API and Python SDK cover the same six
+common scenarios. Each SDK call below is a client of the same Config Wizard API.
+
+| Scenario | SDK call | Outcome |
+|---|---|---|
+| 1. Init AI Factory | `factory_create_prepare` / `bootstrap_*` | Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones. |
+| 2. Add scaleset | `scaleset_add_prepare` | Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group. |
+| 3. Add or update project | `project_add_prepare` + `project_deployment_*` | Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists. |
+| 4. Delete project | `project_delete_prepare` | The project resource group is deleted. |
+| 5. Delete scaleset | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. |
+| 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. |
+
+**Note:** It uses the new registered Azure Factory approach (v.1.25 and higher).
 You need the prepared API and accelerator source folders from your platform team.
 
 ## Choose your tool
