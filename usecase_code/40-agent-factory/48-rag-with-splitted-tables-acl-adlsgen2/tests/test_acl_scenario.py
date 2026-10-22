@@ -173,8 +173,11 @@ class AccessChecksTests(unittest.TestCase):
             self.scenario.search("")
 
     def test_retrieve_passes_the_user_token_to_the_knowledge_base(self):
-        self.session.request.return_value = {"references": [{"sourceData": {"title": "a.md"}}], "activity": []}
-        result = self.scenario.retrieve("user-token", "What can I see?")
+        # Shape observed live: the title is top level and sourceData is null unless requested.
+        self.session.request.return_value = {"references": [{"type": "searchIndex", "title": "a.md", "sourceData": None},
+                                                            {"type": "searchIndex", "title": "a.md", "sourceData": None}],
+                                             "activity": []}
+        result = self.scenario.retrieve("user-token", "access marker")
         self.assertIn("/knowledgebases/" + self.scenario.plan["knowledge_base"]["name"] + "/retrieve",
                       self.session.request.call_args.args[1])
         self.assertEqual(self.session.request.call_args.kwargs["headers"],
@@ -195,6 +198,15 @@ class AccessChecksTests(unittest.TestCase):
         self.assertEqual(request.get_method(), "HEAD")
         self.assertEqual(request.full_url,
                          "https://demostorage.dfs.core.windows.net/lake3/?action=getAccessControl")
+
+    def test_storage_scope_covers_every_owned_path_but_not_the_shared_root(self):
+        store = self.scenario.storage()
+        owned = [*self.scenario.plan["traversal"][1:], *[f["path"] for f in self.scenario.plan["folders"]],
+                 *[f["path"] for f in self.scenario.plan["files"]]]
+        for path in owned:
+            self.assertTrue(any(path == root or path.startswith(root + "/") for root in store.roots), path)
+        self.assertNotIn("", store.roots)
+        self.assertEqual(store.roots, ("s09-acl-demo",))
 
     def test_writes_require_apply(self):
         for method in (self.scenario.publish, self.scenario.configure, self.scenario.deploy):

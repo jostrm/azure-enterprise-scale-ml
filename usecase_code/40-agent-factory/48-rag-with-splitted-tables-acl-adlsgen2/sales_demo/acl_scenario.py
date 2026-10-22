@@ -230,7 +230,8 @@ class AclScenario:
         return f"{self.config['search_endpoint']}/{collection}/{name}{suffix}?api-version={API_VERSION}"
 
     def storage(self, session=None):
-        return _ScenarioStorage(self.config, session or self.session, self.plan["root"])
+        # The top-level S09 folder is task-owned; the container root above it is shared and out of scope.
+        return _ScenarioStorage(self.config, session or self.session, self.plan["traversal"][1])
 
     def root_acl_change(self, root_acl: str) -> str | None:
         """The ACL a Storage superuser must set on the shared container root, or None if traversal exists."""
@@ -342,7 +343,8 @@ class AclScenario:
             {"intents": [{"type": "semantic", "search": question}], "includeActivity": True,
              "maxOutputDocuments": 10},
             audience=SEARCH_AUDIENCE, headers=_user_headers(user_token))
-        titles = sorted({ref.get("sourceData", {}).get("title") for ref in response.get("references", [])} - {None})
+        titles = sorted({ref.get("title") or (ref.get("sourceData") or {}).get("title")
+                         for ref in response.get("references", [])} - {None})
         return {"titles": titles, "activity": copy.deepcopy(response.get("activity", []))}
 
     def ask(self, user_token: str, question: str, *, allow_paid=False) -> dict:

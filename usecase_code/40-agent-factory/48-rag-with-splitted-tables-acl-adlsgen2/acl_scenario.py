@@ -22,7 +22,7 @@ def parser():
     result.add_argument("--scenario", type=Path, required=True, help="Consumer S09 approval and identities (JSON).")
     result.add_argument("--profile", type=Path,
                         help="AZURE_CONFIG_DIR of the separately signed-in end user; omit for the operator.")
-    result.add_argument("--input", default="Which documents can you see? List each file name and access marker.")
+    result.add_argument("--input", default="List every document you can find with its access marker.")
     result.add_argument("--apply", action="store_true")
     result.add_argument("--allow-paid", action="store_true")
     result.add_argument("--output", type=Path)
