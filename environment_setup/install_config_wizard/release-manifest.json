@@ -1,42 +1,42 @@
 {
-  "version": "v0.47.30",
-  "source_commit": "bc4ca102944314edeaf6d7baa0a1c2dcfd4d583b",
+  "version": "v0.47.31",
+  "source_commit": "712bb1004350b806dbd49f7115433f8373ede3a5",
   "artifacts": [
     {
-      "version": "v0.47.30",
-      "source_commit": "bc4ca102944314edeaf6d7baa0a1c2dcfd4d583b",
-      "accelerator_commit": "531cb425c1dd8b17d8c7877ad1a45af585083cb8",
+      "version": "v0.47.31",
+      "source_commit": "712bb1004350b806dbd49f7115433f8373ede3a5",
+      "accelerator_commit": "41d8b1ad2ceb301b0e1db251edc2bcabf264dc7c",
       "platform": "windows",
       "architecture": "AMD64",
       "python": "3.13.16",
       "archive": "aifactory-config-windows.zip",
-      "bytes": 44081433,
-      "sha256": "e5c2cdd0cf428aaeed3092b57cd674f093257df06cd38930dc88e1244851f714",
-      "run_id": "39745423949"
+      "bytes": 44121109,
+      "sha256": "b22414c7672c48453f766f027781b0a4c400ededae72966f651d8bfd926820ee",
+      "run_id": "39760111635"
     },
     {
-      "version": "v0.47.30",
-      "source_commit": "bc4ca102944314edeaf6d7baa0a1c2dcfd4d583b",
-      "accelerator_commit": "531cb425c1dd8b17d8c7877ad1a45af585083cb8",
+      "version": "v0.47.31",
+      "source_commit": "712bb1004350b806dbd49f7115433f8373ede3a5",
+      "accelerator_commit": "41d8b1ad2ceb301b0e1db251edc2bcabf264dc7c",
       "platform": "linux",
       "architecture": "x86_64",
       "python": "3.13.16",
       "archive": "aifactory-config-linux.tar.gz",
-      "bytes": 59050697,
-      "sha256": "01effa975c9362098fa6b124c968c1ebe753b88789cdefd740742958fc82bc80",
-      "run_id": "39745423949"
+      "bytes": 59083913,
+      "sha256": "bc4cdc3d63991b1cc2bec09db4b2219202b8f3390e2ac59121c23d0a08c218eb",
+      "run_id": "39760111635"
     },
     {
-      "version": "v0.47.30",
-      "source_commit": "bc4ca102944314edeaf6d7baa0a1c2dcfd4d583b",
-      "accelerator_commit": "531cb425c1dd8b17d8c7877ad1a45af585083cb8",
+      "version": "v0.47.31",
+      "source_commit": "712bb1004350b806dbd49f7115433f8373ede3a5",
+      "accelerator_commit": "41d8b1ad2ceb301b0e1db251edc2bcabf264dc7c",
       "platform": "macos",
       "architecture": "arm64",
       "python": "3.13.16",
       "archive": "aifactory-config-macos.tar.gz",
-      "bytes": 40421538,
-      "sha256": "24855a5e8ceab62caa44ec8b8d8f370c641bf0770ca2a23f32f22656ef2555e5",
-      "run_id": "39745423949"
+      "bytes": 40457784,
+      "sha256": "e295e47bce08dd05d64957e7b0e24b3641bcc8f9583a557dfc3f6290d307f05c",
+      "run_id": "39760111635"
     }
   ]
 }
