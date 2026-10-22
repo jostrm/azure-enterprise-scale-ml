@@ -41,3 +41,21 @@ def test_the_token_is_checked_before_folders_or_gh_change():
     check = text.index("Assert-GitHubTokenScope $token")
     assert check < text.index("foreach ($folder in")
     assert check < text.index("| gh auth login")
+
+
+def test_the_task_runs_the_windowed_api_with_redirected_output_and_waits_for_it():
+    """aifactory-config.exe is a windowed app: started with the call operator it gets no output streams, so its web
+    server fails at startup, and the task ends at once (observed on 2026-10-22: no port, task Ready, exit 0)."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    begin = text.index('$start = @"')
+    start = text[begin:text.index('"@', begin)]
+    assert "& '$exe'" not in start
+    assert "Start-Process @arguments" in start
+    for part in ("RedirectStandardOutput", "RedirectStandardError", "Wait = `$true", "exit `$api.ExitCode"):
+        assert part in start
+
+
+def test_a_reinstall_stops_the_running_api_before_the_task_starts_it_again():
+    text = SCRIPT.read_text(encoding="utf-8")
+    stop = text.index("Get-Process -Name aifactory-config")
+    assert text.index("Stop-ScheduledTask") < stop < text.index("Start-ScheduledTask")

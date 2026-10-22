@@ -12,7 +12,8 @@
     - az for SYSTEM must already be logged in with `az login --identity` (the managed identity needs the factory
       subscription's Owner role, plus Microsoft Graph Group.ReadWrite.All and User.Read.All for the team group);
     - the pinned release asset is downloaded with gh and checked against the release's SHA256SUMS.txt;
-    - start-api.ps1 reads the API key from Key Vault at every start and runs `aifactory-config.exe --api-host`;
+    - start-api.ps1 reads the API key from Key Vault at every start and runs `aifactory-config.exe --api-host`, with
+      its output in <InstallRoot>\logs (the previous run's logs are kept as *.prev);
     - a scheduled task runs it as SYSTEM at startup and restarts it on failure.
     Windows PowerShell 5.1 compatible.
 
@@ -114,14 +115,25 @@ $exe = Get-ChildItem -Path $target -Recurse -Filter 'aifactory-config.exe' | Sel
 if (-not $exe) { throw "aifactory-config.exe not found under $target." }
 
 # The service script reads the API key at every start, so rotating it in Key Vault needs only a restart.
+# aifactory-config.exe is a windowed app: the call operator neither waits for it nor gives it output streams, and its
+# web server fails at startup without them. Start-Process with redirected output and -Wait does both, and keeps a log.
 $start = @"
 `$ErrorActionPreference = 'Stop'
 `$imds = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net'
 `$token = (Invoke-RestMethod -Headers @{ Metadata = 'true' } -Uri `$imds -TimeoutSec 15).access_token
 `$env:AIFACTORY_API_KEY = (Invoke-RestMethod -Headers @{ Authorization = "Bearer `$token" } -Uri 'https://$KeyVaultName.vault.azure.net/secrets/$ApiKeySecretName`?api-version=7.4' -TimeoutSec 15).value
 `$env:AIFACTORY_CATALOG_OWNER = '$CatalogOwner'
-& '$exe' --api-host --port $Port
-exit `$LASTEXITCODE
+`$logs = '$InstallRoot\logs'
+New-Item -ItemType Directory -Force -Path `$logs | Out-Null
+foreach (`$name in 'api.out.log', 'api.err.log') {
+    if (Test-Path "`$logs\`$name") { Move-Item -Force "`$logs\`$name" "`$logs\`$name.prev" }
+}
+`$arguments = @{
+    FilePath = '$exe'; ArgumentList = @('--api-host', '--port', '$Port'); NoNewWindow = `$true; Wait = `$true
+    PassThru = `$true; RedirectStandardOutput = "`$logs\api.out.log"; RedirectStandardError = "`$logs\api.err.log"
+}
+`$api = Start-Process @arguments
+exit `$api.ExitCode
 "@
 $startScript = Join-Path $InstallRoot 'start-api.ps1'
 Set-Content -Path $startScript -Value $start -Encoding UTF8
@@ -133,6 +145,9 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 999 -
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $principal `
     -Settings $settings -Force | Out-Null
 Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+# Stopping the task can leave the API itself running on the port; a reinstall starts it fresh.
+Get-Process -Name aifactory-config -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallRoot\*" } |
+    Stop-Process -Force
 Start-ScheduledTask -TaskName $TaskName
 
 $deadline = (Get-Date).AddSeconds(90)
@@ -143,4 +158,4 @@ while ((Get-Date) -lt $deadline) {
         return
     } catch { Start-Sleep -Seconds 3 }
 }
-throw "The Factory API did not answer on 127.0.0.1:$Port within 90 s; check the $TaskName task."
+throw "The Factory API did not answer on 127.0.0.1:$Port within 90 s; check the $TaskName task and $InstallRoot\logs."
