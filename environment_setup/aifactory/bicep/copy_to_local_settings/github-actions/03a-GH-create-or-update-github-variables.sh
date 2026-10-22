@@ -33,10 +33,18 @@ fi
 declare -A env_spellings=(
   [ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET]=ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET
   [INPUT_COMMON_SPSECRET_KEY]=INPUT_COMMON_SP_SECRET_KEY
+  [DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS]=DISABLE_CONTRIBUTOR_ACCESS_FORUSERS
+  [DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS]=DISABLE_RBAC_ADMIN_ON_RG_FORUSERS
 )
+# Least-privilege switches: the other spelling may only tighten access, so the template's "false"
+# never overwrites a "true" set on the repository by hand. Set the upload name itself to loosen.
+tighten_only=" DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS "
 for upload_name in "${!env_spellings[@]}"; do
   spelling="${env_spellings[$upload_name]}"
   if [[ -z "${!upload_name:-}" && -n "${!spelling:-}" ]]; then
+    if [[ "$tighten_only" == *" $upload_name "* && "${!spelling,,}" != "true" ]]; then
+      continue
+    fi
     printf -v "$upload_name" '%s' "${!spelling}"
   fi
 done
@@ -451,6 +459,8 @@ repo_level_vars=(
   "BYO_CONTRIBUTOR_ROLE_ID"
   "DISABLE_CONTRIBUTOR_ACCESS_FORUSERS"
   "DISABLE_RBAC_ADMIN_ON_RG_FORUSERS"
+  "DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS"
+  "DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS"
   "DISABLE_SUBNET_JOIN_ACTION"
   # === Complete mode vs Incremental mode ===
   "ENABLE_DELETE_FOR_DISABLED_RESOURCES"

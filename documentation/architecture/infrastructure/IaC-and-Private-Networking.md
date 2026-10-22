@@ -236,7 +236,26 @@ private then gets public endpoints limited to its IP allow list on the next infr
 `10-GH-create-or-update-github-variables.sh`, so after bumping the submodule refresh it
 (`bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh`) before running it.
 `unit/test_template_flag_sync.py` checks that every name 03a reads from `.env` comes from
-`.env.template` or that map, except the reviewed `PROJECT_IP_WHITELIST`.
+`.env.template` or that map, except the reviewed `PROJECT_IP_WHITELIST`. The same gap hit
+least privilege: the workflows read `DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS` and
+`DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS`, but `.env.template` and 03a used `..._FORUSERS`. So
+on the `.env` route project users kept Contributor and RBAC Admin on the project resource
+group even when `.env` disabled them. 03a now also uploads the `FOR_USERS` names, filled
+from the `FORUSERS` keys through the map. For these two switches the other spelling may
+only tighten access: a `FORUSERS` value fills the upload name only when it is `"true"`, so
+the template's `"false"` never overwrites a `"true"` an operator set on the repository by
+hand. To loosen access, set the `FOR_USERS` name itself. Setting a switch to `"true"` only
+stops creating the user Contributor and RBAC Admin assignments on new runs. Existing
+assignments stay until removed by hand: Contributor (or `BYO_CONTRIBUTOR_ROLE_ID`) and
+Role Based Access Control Administrator for the `PROJECT_MEMBERS` principals at the project
+resource group. The test also works the other way: every `vars.*` name a workflow reads is
+uploaded by 03a, read only together with a name 03a uploads
+(`DISABLE_WHITELISTING_FOR_BUILT_AGENTS`, `COMMON_SUBNET_NAME`, which the project phase now
+also falls back to `SUBNET_COMMON_BASE` for, as infra-common does), or listed with a reason.
+One listed name is a known gap: nothing sets `COMMON_LAKE_NAME_PREFIX_MAX8CHARS` on the
+`.env` route, so the common lake gets no prefix, while the project phase reads `LAKE_PREFIX`
+on every route. A common-side fallback would deploy a second, empty lake under a new name,
+so it needs its own decision.
 `unit/test_genai_parameter_parity.py` compares the
 parameter names each provider passes to every GenAI phase template. Its `KNOWN_GAPS`
 lists the remaining reviewed differences, and closing one must remove its entry.

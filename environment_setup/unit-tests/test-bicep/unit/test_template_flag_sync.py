@@ -47,6 +47,39 @@ UNTEMPLATED_UPLOADS = {
                             "project_IP_whitelist, which the workflows set from the PROJECT_MEMBERS_IP_ADDRESS "
                             "secret, and that secret must not become a plain variable",
 }
+# Workflow vars.* names 03a does not upload, each reviewed. These are read only together with a name 03a
+# uploads, in the same expression (every read line must include it): name -> that uploaded name.
+WORKFLOW_FALLBACKS = {
+    "DISABLE_WHITELISTING_FOR_BUILT_AGENTS": "DISABLE_WHITELISTING_FOR_BUILD_AGENTS",
+    "COMMON_SUBNET_NAME": "SUBNET_COMMON_BASE",
+}
+OPERATOR_SWITCH = ("operator switch with a safe workflow default; no config template (.env.template, "
+                   "variables.yaml, variables.json) defines it, so an operator sets it by hand")
+# Names the .env route never sets: name -> reason.
+NOT_FROM_ENV = {
+    "AIFACTORY_GITHUB_ENVIRONMENTS": "written by bootstrap/lib/github_environments.py, which 03a runs with --ensure",
+    "COMMON_LAKE_NAME_PREFIX_MAX8CHARS": "known gap: nothing sets it on the .env route, so the common lake gets no "
+                                         "prefix, while the project phase reads LAKE_PREFIX on every route; a "
+                                         "common-side fallback would deploy a second, empty lake under a new name",
+    "DEPLOY_MODEL_GPT_4": "retired GPT-4 switch; no config template defines it and the workflow default is false",
+    **{name: OPERATOR_SWITCH for name in (
+        "DEPLOY_ONLY_AIGATEWAY_NETWORKING", "ENABLE_PROJECT_LAKE_ACCESS", "PROJECT_LAKE_ACCESS_LEGACY_LAYOUT",
+        "PREFLIGHT_SKIP", "PREFLIGHT_STRICT", "PRIVATE_DNS_AND_VNET_LINK_ALL_GLOBAL_LOCATION",
+        *(f"ZONE_{zone}_EXISTS" for zone in ("APIM", "AZURECONTAINERAPPS", "MONGO", "POSTGRES", "REDIS",
+                                              "SERVICES_AI", "SQL")),
+    )},
+}
+
+
+def workflow_var_reads():
+    """Each vars.* name the GitHub workflows read -> the code part (comments dropped) of each line reading it."""
+    reads = {}
+    for workflow in sorted(GHA.glob("*.yml")):
+        for line in workflow.read_text(encoding="utf-8").splitlines():
+            code = "" if line.lstrip().startswith("#") else line.split(" #", 1)[0].strip()
+            for name in re.findall(r"\bvars\.([A-Z][A-Z0-9_]*)\b", code):
+                reads.setdefault(name, []).append(f"{workflow.name}: {code}")
+    return reads
 
 
 def variables_uploaded_by_03a():
@@ -202,10 +235,33 @@ def test_every_name_03a_uploads_comes_from_the_env_template_or_a_spelling_alias(
     assert sorted(env_names_read_by_03a() - env - spellings.keys() - UNTEMPLATED_UPLOADS.keys()) == []
 
 
+def test_every_variable_the_github_workflows_read_is_uploaded_by_03a_or_reviewed():
+    # The workflows read vars.DISABLE_*_FOR_USERS while .env.template and 03a used *_FORUSERS, so on the
+    # .env route project users kept Contributor and RBAC Admin even when .env disabled them.
+    reads, uploaded = workflow_var_reads(), variables_uploaded_by_03a()
+    assert all(reason.strip() for reason in NOT_FROM_ENV.values())
+    exceptions = WORKFLOW_FALLBACKS.keys() | NOT_FROM_ENV.keys()
+    assert sorted(exceptions & uploaded) == [], "remove exceptions 03a now uploads"
+    assert sorted(exceptions - reads.keys()) == [], "remove exceptions no workflow reads"
+    assert sorted(set(WORKFLOW_FALLBACKS.values()) - uploaded) == [], "fallbacks must be uploaded names"
+    assert sorted(reads.keys() - uploaded - exceptions) == []
+    unguarded = [line for name, fallback in WORKFLOW_FALLBACKS.items()
+                 for line in reads.get(name, []) if not re.search(rf"\bvars\.{fallback}\b", line)]
+    assert unguarded == [], "a fallback name must always be read together with the name 03a uploads"
+
+
 PUBLIC_ACCESS = "ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET"
 
 
 @pytest.mark.parametrize("lines,name,expected", [
+    (['DISABLE_CONTRIBUTOR_ACCESS_FORUSERS="true"'], "DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS", "true"),
+    (['DISABLE_RBAC_ADMIN_ON_RG_FORUSERS="true"'], "DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS", "true"),
+    (['DISABLE_RBAC_ADMIN_ON_RG_FORUSERS="true"', 'DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS="false"'],
+     "DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS", "false"),
+    # Least privilege: the template's "false" must not overwrite a "true" set on the repository by hand.
+    (['DISABLE_CONTRIBUTOR_ACCESS_FORUSERS="false"'], "DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS", ""),
+    (['DISABLE_RBAC_ADMIN_ON_RG_FORUSERS="false"'], "DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS", ""),
+    (['DISABLE_RBAC_ADMIN_ON_RG_FORUSERS="TRUE"'], "DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS", "TRUE"),
     (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="true"'], PUBLIC_ACCESS, "true"),
     (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="false"'], PUBLIC_ACCESS, "false"),
     (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="false"', 'ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET="true"'], PUBLIC_ACCESS, "true"),

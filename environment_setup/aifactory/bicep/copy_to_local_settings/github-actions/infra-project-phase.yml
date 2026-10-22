@@ -238,7 +238,7 @@ jobs:
       # Naming / network bases
       vnetNameBase: ${{ vars.VNET_NAME_BASE || 'vnt-esmlcmn' }}
       vnetResourceGroupBase: ${{ vars.VNET_RESOURCE_GROUP_BASE || 'esml-common' }}
-      common_subnet_name: ${{ vars.COMMON_SUBNET_NAME || 'snet-esml-cmn-001' }}
+      common_subnet_name: ${{ vars.COMMON_SUBNET_NAME || vars.SUBNET_COMMON_BASE || 'snet-esml-cmn-001' }}
       centralDnsZoneByPolicyInHub: ${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB || 'false' }}
       privDnsSubscription_param: ${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM || '' }}
       privDnsResourceGroup_param: ${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM || '' }}
