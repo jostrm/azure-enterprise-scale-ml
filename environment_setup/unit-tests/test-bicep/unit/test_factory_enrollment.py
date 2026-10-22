@@ -97,7 +97,7 @@ class Response(io.BytesIO):
 class Fake:
     """Fake command executor plus HTTP service, retaining state across ensures."""
 
-    def __init__(self, req, provisioned=True):
+    def __init__(self, req, provisioned=True, immutable_oidc=False):
         self.request = req
         self.commands, self.calls, self.writes = [], [], []
         self.resources = {}
@@ -114,6 +114,9 @@ class Fake:
         self.variables = {}
         self.ado_endpoint = None
         self.oidc_default = True
+        # GitHub issues immutable subjects (repo:OWNER@OWNER_ID/REPO@REPO_ID) for repositories created after 2026-07-15.
+        self.oidc_immutable = immutable_oidc
+        self.oidc_prefix = None
         self.token_tenant = TENANT
         self.identity_subscription_tenant = TENANT
         self.token_audience = None
@@ -135,6 +138,9 @@ class Fake:
         self.cloud = en.Cloud(req, command_runner=self.run, opener=self)
         if provisioned:
             self.provision_prerequisites()
+
+    def sub_claim_prefix(self):
+        return "repo:org@1001/repo@2002" if self.oidc_immutable else "repo:org/repo"
 
     def _token(self, audience, tenant):
         claims = {"tid": tenant, "aud": audience, "oid": OPERATOR, "exp": time.time() + 3600}
@@ -180,9 +186,12 @@ class Fake:
         if key in self.fail:
             status, result = self.fail[key], {}
         elif endpoint == "repos/org/repo":
-            status, result = 200, {"full_name": "org/repo", "permissions": {"admin": True}}
+            status, result = 200, {"full_name": "org/repo", "name": "repo", "id": 2002,
+                                   "owner": {"login": "org", "id": 1001}, "permissions": {"admin": True}}
         elif endpoint.endswith("/actions/oidc/customization/sub"):
-            status, result = 200, {"use_default": self.oidc_default}
+            status, result = 200, {"use_default": self.oidc_default, "use_immutable_subject": self.oidc_immutable,
+                                   "sub_claim_prefix": self.sub_claim_prefix() if self.oidc_prefix is None
+                                   else self.oidc_prefix}
         elif "/variables/" in endpoint:
             name = endpoint.rsplit("/", 1)[1]
             status = 200 if name in self.variables else 404
@@ -322,7 +331,7 @@ class Fake:
         self.existing_storage()
         route = self.request["route"]
         issuer = "https://token.actions.githubusercontent.com"
-        subject = "repo:org/repo:environment:" + route["auth_namespace"]
+        subject = self.sub_claim_prefix() + ":environment:" + route["auth_namespace"]
         if route["kind"] == "ado":
             issuer = "https://vstoken.dev.azure.com/remote-issued-org-id"
             subject = "sc://real-org/project/" + route["auth_namespace"]
@@ -972,6 +981,42 @@ def test_variable_conflict_and_custom_subject_are_blocked(workspace):
     fake.variables.clear()
     fake.oidc_default = False
     with pytest.raises(en.EnrollmentError, match="custom-oidc-subject"):
+        en.plan(req, cloud=fake.cloud)
+    assert not fake.writes
+
+
+def test_immutable_github_oidc_subject_is_planned_recorded_and_federated_exactly(workspace):
+    # Observed 2026-10-22: a repository created after 2026-07-15 presents repo:OWNER@OWNER_ID/REPO@REPO_ID, so a
+    # federated credential with the classic subject failed azure/login with AADSTS700213.
+    req = request(workspace)
+    fake = Fake(req, immutable_oidc=True)
+    for key in [key for key in fake.resources if "/federatedidentitycredentials/" in key]:
+        del fake.resources[key]
+    subject = "repo:org@1001/repo@2002:environment:factory-stage"
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert review["federation"] == {"issuer": "https://token.actions.githubusercontent.com", "subject": subject}
+    assert "create-federated-identity-credential" in review["actions"]
+    result = enroll(req, fake)
+    assert result["enrollment_complete"], result
+    fic = [x for x in fake.resources.values() if "/federatedidentitycredentials/" in x["id"].lower()]
+    assert len(fic) == 1 and fic[0]["properties"]["subject"] == subject
+
+
+def test_classic_github_oidc_subject_stays_for_older_repositories(workspace):
+    req = request(workspace)
+    review = en.plan(req, cloud=Fake(req).cloud, acknowledge_exclusive_writer_governance=True)
+    assert review["federation"] == {"issuer": "https://token.actions.githubusercontent.com",
+                                    "subject": "repo:org/repo:environment:factory-stage"}
+
+
+@pytest.mark.parametrize("immutable, prefix", [
+    (True, "repo:org@1001/other@2002"), (True, "repo:org@1001/repo@9999"), (True, "repo:org/repo"),
+    (False, "repo:org@1001/repo@2002"), (False, "repo:someone/repo"), (True, None)])
+def test_github_oidc_subject_prefix_must_describe_exactly_this_repository(workspace, immutable, prefix):
+    req = request(workspace)
+    fake = Fake(req, immutable_oidc=immutable)
+    fake.oidc_prefix = prefix if prefix is not None else ""
+    with pytest.raises(en.EnrollmentError, match="github-oidc-subject-prefix-mismatch"):
         en.plan(req, cloud=fake.cloud)
     assert not fake.writes
 

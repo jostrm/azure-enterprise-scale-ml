@@ -3169,10 +3169,32 @@ aif_configure_ado() {
   aif_ensure_ado_service_connection
 }
 
+aif_github_oidc_subject_prefix() {
+  # GitHub signs repo:OWNER@OWNER_ID/REPO@REPO_ID for repositories created after 2026-07-15; factory_enrollment owns
+  # the rule, so this path federates the same subject as the registered bootstrap.
+  local repository customization
+  repository="$(gh api "repos/$GITHUB_REPOSITORY")" || return
+  customization="$(gh api "repos/$GITHUB_REPOSITORY/actions/oidc/customization/sub")" || return
+  AIF_GITHUB_REPOSITORY_JSON="$repository" AIF_GITHUB_OIDC_SUBJECT_JSON="$customization" \
+    "${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$GITHUB_REPOSITORY" <<'PY'
+import json
+import os
+import sys
+sys.path.insert(0, sys.argv[1])
+from factory_enrollment import EnrollmentError, github_subject_prefix
+try:
+    sys.stdout.write(github_subject_prefix(sys.argv[2], json.loads(os.environ["AIF_GITHUB_REPOSITORY_JSON"]),
+                                           json.loads(os.environ["AIF_GITHUB_OIDC_SUBJECT_JSON"])))
+except EnrollmentError as error:
+    raise SystemExit("GitHub OIDC subject of " + sys.argv[2] + " is not supported (" + error.code
+                     + "); no federated credential was changed.")
+PY
+}
+
 aif_configure_github_identity() {
   aif_section "13 / GitHub deployment identity"
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
-  local github_environment logical_environment credential_name subject existing_credential
+  local github_environment logical_environment credential_name subject subject_prefix existing_credential
   AIFACTORY_GITHUB_ENVIRONMENTS="$("${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/github_environments.py" \
     --repository "$GITHUB_REPOSITORY" --ensure dev stage prod)" || return
   export AIFACTORY_GITHUB_ENVIRONMENTS
@@ -3200,10 +3222,11 @@ PY
           --repo "$GITHUB_REPOSITORY" \
           --env "$AIF_GITHUB_DEV_ENVIRONMENT"
   else
+    subject_prefix="$(aif_github_oidc_subject_prefix)" || return
     for logical_environment in dev stage prod; do
       github_environment="$(aif_github_environment_name "$logical_environment")"
       credential_name="github-${AIF_SCALESET_SUFFIX}-${logical_environment}"
-      subject="repo:$GITHUB_REPOSITORY:environment:${github_environment//:/%3A}"
+      subject="$subject_prefix:environment:${github_environment//:/%3A}"
       existing_credential="$(az identity federated-credential list \
         --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
         --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \

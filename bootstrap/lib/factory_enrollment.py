@@ -900,15 +900,35 @@ def _identity(value, request):
     return result
 
 
+def github_subject_prefix(repository, repo, customization):
+    """The repository part of the sub claim GitHub issues for OWNER/REPO, from GET repos/OWNER/REPO (repo) and its
+    actions/oidc/customization/sub (customization): repo:OWNER/REPO, or repo:OWNER@OWNER_ID/REPO@REPO_ID for
+    repositories created after 2026-07-15 (GitHub cannot turn those immutable IDs off). GitHub's own sub_claim_prefix is
+    used only when it names exactly this repository, so the federated credential matches the tokens byte for byte.
+    create-new-aifactory-scaleset.sh federates with the same rule."""
+    require(repo.get("full_name", "").lower() == repository.lower(), "github-repository-mismatch")
+    require(customization.get("use_default") is True, "github-custom-oidc-subject-unsupported")
+    expected = "repo:" + repo["full_name"]
+    if customization.get("use_immutable_subject") is True:
+        owner = repo.get("owner") if isinstance(repo.get("owner"), dict) else {}
+        login, name = owner.get("login"), repo.get("name")
+        require(isinstance(login, str) and isinstance(name, str)
+                and (login + "/" + name).lower() == repo["full_name"].lower()
+                and all(type(value) is int and value > 0 for value in (owner.get("id"), repo.get("id"))),
+                "github-oidc-subject-prefix-mismatch")
+        expected = "repo:" + login + "@" + str(owner["id"]) + "/" + name + "@" + str(repo["id"])
+    require(customization.get("sub_claim_prefix", expected) == expected, "github-oidc-subject-prefix-mismatch")
+    return expected
+
+
 def _provider(cloud, request, identity):
     route, target = request["route"], request["target"]
     if route["kind"] == "gha":
         repository = route["repository"].removeprefix("https://github.com/").removesuffix(".git")
         base = "repos/" + repository
         _, _, repo = cloud.gh("GET", base)
-        require(repo.get("full_name", "").lower() == repository.lower(), "github-repository-mismatch")
-        _, _, subject = cloud.gh("GET", base + "/actions/oidc/customization/sub")
-        require(subject.get("use_default") is True, "github-custom-oidc-subject-unsupported")
+        _, _, customization = cloud.gh("GET", base + "/actions/oidc/customization/sub")
+        prefix = github_subject_prefix(repository, repo, customization)
         path = base + "/environments/" + quote(route["auth_namespace"], safe="")
         environment = _absent(cloud.gh("GET", path, allowed=(200, 404)))
         variables = {}
@@ -922,7 +942,7 @@ def _provider(cloud, request, identity):
                             "github-variable-conflict")
         return {"kind": "gha", "environment": environment, "variables": variables, "path": path,
                 "issuer": "https://token.actions.githubusercontent.com",
-                "subject": "repo:" + repo["full_name"] + ":environment:" + route["auth_namespace"]}
+                "subject": prefix + ":environment:" + route["auth_namespace"]}
     parts = unquote(urlsplit(route["repository"]).path).strip("/").split("/")
     organization, project = parts[:2]
     base = "https://dev.azure.com/" + quote(organization, safe="")
@@ -1619,6 +1639,9 @@ def _review(request, state, acknowledge):
     result = {"schema": 1, "scope_hash": scope_hash, "state_hash": digest(state),
               "target": request["target"], "route": request["route"],
               "identity_id": request["identity_id"], "identity": state["identity"],
+              # The federation the credential carries (for ADO the service connection's, null until it exists), so a
+              # reviewer of this plan can verify the GitHub subject without GitHub.
+              "federation": {"issuer": state["provider"]["issuer"], "subject": state["provider"]["subject"]},
               "coordination": ({**request["coordinates"]} if _single_writer(request) else
                                {"account_id": request["account_id"], **request["coordinates"]}),
               "resource_group_ids": request["scopes"], "common_dependency_ids": request["common_dependencies"],

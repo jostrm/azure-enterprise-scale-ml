@@ -9,6 +9,7 @@ sources:
   - environment_setup/aifactory/bicep/modules/kvRbacAssignments.bicep
   - bootstrap/lib/registered_personas.py
   - bootstrap/lib/factory_enrollment.py
+  - bootstrap/lib/create-new-aifactory-scaleset.sh
   - environment_setup/aifactory/bicep/modules/dataLake.bicep
   - environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep
   - environment_setup/aifactory/bicep/scripts/kv_principal_object_ids.py
@@ -24,13 +25,14 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_persona_lake.py
   - environment_setup/unit-tests/test-bicep/unit/test_registered_personas.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_enrollment.py
+  - environment_setup/unit-tests/test-bicep/unit/test_github_json_bootstrap.py
   - environment_setup/unit-tests/test-bicep/integration/test_persona_authorization.py
   - environment_setup/unit-tests/test-bicep/unit/test_kv_access_policy_principals.py
   - environment_setup/unit-tests/test-bicep/unit/test_kv_principal_preflight.py
   - environment_setup/unit-tests/test-bicep/unit/test_admin_object_ids.py
 graph_symbols:
   - bootstrap/lib/registered_personas.py
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20; GitHub federation subject 98711370 + working tree, 2026-10-22'
 ---
 # Identity and personas
 
@@ -95,6 +97,17 @@ older assignment for the same principal, role and scope is deleted.
 templates still parse the list themselves.
 
 Deployment identities, runtime managed identities, human principals and provider service connections serve different purposes. Application runtime inference/search grants do not imply permission to deploy agents, mutate infrastructure or retrieve arbitrary secrets.
+
+GitHub deployment federation (observed on a real bootstrap, 2026-10-22): a federated credential works only with the
+exact `sub` GitHub signs. For repositories created after 2026-07-15 that is the immutable
+`repo:OWNER@OWNER_ID/REPO@REPO_ID:environment:ENV`, which GitHub can't turn off; older repositories keep
+`repo:OWNER/REPO:environment:ENV`. `factory_enrollment.github_subject_prefix` derives the prefix from
+`GET repos/OWNER/REPO` and its `actions/oidc/customization/sub`, uses GitHub's `sub_claim_prefix` only when it names
+exactly that repository, and refuses a customized subject. The registered bootstrap records the result as the
+review's `federation`, which the Factory API's ownership handoff checks the credential against; Simple mode
+(`create-new-aifactory-scaleset.sh`) uses the same rule. A credential with another subject is never replaced: a
+factory federated with the classic subject on a newer repository fails `azure/login` with `AADSTS700213` until its
+credential is migrated explicitly.
 
 ## Intended constraints
 

@@ -133,10 +133,11 @@ with `AIF_PROTECTED_IDS`.
 
    ```powershell
    az vm run-command invoke -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
-      --scripts '@scripts/install-factory-api-host.ps1' --parameters KeyVaultName=kv-p001-sdc-dev-abcde01 Release=v0.47.31
+      --scripts '@scripts/install-factory-api-host.ps1' --parameters KeyVaultName=kv-p001-sdc-dev-abcde01 Release=v0.47.32
    ```
 
-   Pass `Release` explicitly: v0.47.31 or later reads a new Entra group back until Microsoft Graph has replicated it.
+   Pass `Release` explicitly: v0.47.32 or later federates the OIDC subject GitHub signs for repositories created after
+   July 15, 2026, and reads a new Entra group back until Microsoft Graph has replicated it.
    Logs: `C:\aif-api\logs`. The API's `folder` is the factory repository's `azurefactory` subfolder, for example
    `C:\aif\aif-factory-contoso-ai\azurefactory`.
 3. **The management runner** for the ops repository, with a label of its own (never the factory runner's label):
@@ -352,7 +353,7 @@ if review["can_execute"] and not review["blockers"]:
 | 403 `deletes-disabled` | `AIF_DELETES=refuse` (the default) | Set `simulate` to rehearse; `allow` only for real deletes |
 | 403 `protected-target` | The target contains `AIF_SELF_PROJECT_ID` or an `AIF_PROTECTED_IDS` entry | By design: the Function never deletes its own host |
 | A step fails with `runner-timeout` | No `aif-ops` result arrived in `AIF_RUNNER_TIMEOUT_SECONDS` | Check the ops repository's runs and that the management runner is online |
-| The first COMMON run fails at `azure/login`: `AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:OWNER@OWNER_ID/REPO@REPO_ID:environment:Dev'` | GitHub repositories created after July 15, 2026 use the immutable OIDC subject (owner and repository IDs), and that format can't be turned off for them. The bootstrap creates its federated credential with the classic subject `repo:OWNER/REPO:environment:Dev` (`bootstrap/lib/factory_enrollment.py`), which the API's ownership handoff also expects | Not fixed yet: the bootstrap must build the subject from the repository's `GET /repos/{repo}/actions/oidc/customization/sub` `sub_claim_prefix`. Check `gh api repos/contoso/aif-factory-contoso-ai/actions/oidc/customization/sub` before a bootstrap. Don't add a second federated credential by hand: the ownership handoff treats it as an unregistered resource |
+| The first COMMON run fails at `azure/login`: `AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:OWNER@OWNER_ID/REPO@REPO_ID:environment:Dev'` | GitHub repositories created after July 15, 2026 use the immutable OIDC subject (owner and repository IDs), and that format can't be turned off for them. Factory API v0.47.31 and older bootstrap the federated credential with the classic subject `repo:OWNER/REPO:environment:Dev` | Bootstrap with Factory API v0.47.32 or later: the bootstrap then federates the subject GitHub signs (`sub_claim_prefix` of `gh api repos/contoso/aif-factory-contoso-ai/actions/oidc/customization/sub`). A factory bootstrapped before keeps its classic credential. Don't add a second federated credential by hand: the ownership handoff treats it as an unregistered resource |
 | A deploy review fails with `upstream-timeout` (or its confirm becomes `uncertain`) | The Factory API call took longer than `AIF_FACTORY_API_TIMEOUT_SECONDS` on the runner | Keep it at the default 2700 s or more (a machine environment variable on the VM overrides `runner.json`, which the installer rewrites), `aif-ops.yml`'s job timeout above it and `AIF_RUNNER_TIMEOUT_SECONDS` above that. Never retry an uncertain confirm: check the API's jobs first |
 | A step is `uncertain` | A confirm's outcome is unknown | Never retry it: check the Factory API's job or creation workflow first |
 | Scenario 1 stops as `uncertain` after a verified stage, diagnostic `stage-execution-interrupted`, phase `authorization-continuation` | The API's own continuation failed before the next stage started, for example the network-foundation review got an ARM 403 reading a peered network in another subscription | Grant the missing access (Reader on that network), then recover at the verified boundary below |

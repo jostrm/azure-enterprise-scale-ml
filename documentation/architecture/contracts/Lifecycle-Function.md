@@ -46,7 +46,7 @@ graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: 'd7f3fbad + working tree; observed 2026-10-22'
+reviewed_source: '98711370 + working tree; observed 2026-10-22'
 ---
 # Lifecycle Function
 
@@ -95,11 +95,13 @@ GitHub runs through `workflow_run` events.
   then stops as `uncertain` with only `stage-execution-interrupted` in phase `authorization-continuation` (the API logs
   nothing). Reader on the one peered hub network fixed it; the API's verified-boundary recovery resumed the workflow
   without repeating verified stages. The Function's scenario 1 operation stays terminal and does not follow it.
-  Observed the same day: the first COMMON run's `azure/login` fails (`AADSTS700213`) for factory repositories created
+  Observed the same day: the first COMMON run's `azure/login` failed (`AADSTS700213`) for a factory repository created
   after July 15, 2026, because GitHub then issues the immutable OIDC subject (owner and repository IDs), while the
-  bootstrap's federated credential (`bootstrap/lib/factory_enrollment.py`) and the API's ownership handoff use the
-  classic `repo:OWNER/REPO:environment:ENV` subject. The Factory API v0.47.31 has no HTTP surface to retire such a
-  dispatched COMMON attempt (`terminal-common-before-azure-mutation-v1` exists only internally).
+  bootstrap's federated credential and the API's ownership handoff used the classic `repo:OWNER/REPO:environment:ENV`
+  subject. Fixed in the bootstrap (`factory_enrollment.github_subject_prefix`, see [[Identity-and-Personas]]) and in
+  Factory API v0.47.32; a factory bootstrapped before keeps its classic credential. The Factory API v0.47.31 has no
+  HTTP surface to retire such a dispatched COMMON attempt (`terminal-common-before-azure-mutation-v1` exists only
+  internally).
 - **Events**: the relay workflow signs `workflow_run` payloads like a GitHub webhook; the Function checks
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.

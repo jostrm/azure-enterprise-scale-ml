@@ -681,13 +681,19 @@ printf '%s\\n' "$AIF_TEAM_GROUP_ID/$AIF_TEAM_GROUP_NAME/$AIF_TEAM_MEMBER_EMAIL/$
     assert result.stdout == ("" if failure else "team-id/team/team@example.org/admin-result\n")
 
 
-@pytest.mark.parametrize("mode", ["absent", "matching", "wrong-subject", "wrong-issuer", "wrong-audience", "error"])
-def test_bootstrap_federation_never_overwrites_a_conflicting_binding(bash_executable, mode):
+CLASSIC_OIDC = {"use_default": True, "use_immutable_subject": False, "sub_claim_prefix": "repo:example/factory"}
+IMMUTABLE_OIDC = {"use_default": True, "use_immutable_subject": True,
+                  "sub_claim_prefix": "repo:example@1001/factory@2002"}
+
+
+def run_github_identity(bash_executable, federation, oidc=CLASSIC_OIDC, existing_prefix="repo:example/factory"):
+    """Runs aif_configure_github_identity against fake gh/az; the subject rule itself is the real factory_enrollment."""
     python = shlex.quote(Path(sys.executable).as_posix())
+    library = shlex.quote((ROOT / "bootstrap" / "lib").as_posix())
     script = f"""
 set -euo pipefail
 AIF_PYTHON=(test_python)
-AIF_DRY_RUN=false AIF_IDENTITY_MODE=c AIF_SCALESET_LIB_DIR=unused AIF_SCALESET_SUFFIX=001
+AIF_DRY_RUN=false AIF_IDENTITY_MODE=c AIF_SCALESET_LIB_DIR={library} AIF_SCALESET_SUFFIX=001
 AIF_IDENTITY_SUBSCRIPTION_ID=subscription AIF_IDENTITY_RESOURCE_GROUP=bootstrap-rg
 AIF_IDENTITY_NAME=deployment-mi AIF_IDENTITY_CLIENT_ID=client-id GITHUB_REPOSITORY=example/factory
 aif_section() {{ :; }}
@@ -698,7 +704,13 @@ test_python() {{
     {python} "$@"
   fi
 }}
-gh() {{ printf 'GH:%s\\n' "$*"; }}
+gh() {{
+  case "$*" in
+    "api repos/example/factory") printf '%s' "$AIF_TEST_REPOSITORY" ;;
+    "api repos/example/factory/actions/oidc/customization/sub") printf '%s' "$AIF_TEST_OIDC" ;;
+    *) printf 'GH:%s\\n' "$*" ;;
+  esac
+}}
 az() {{
   case "$1 $2 $3" in
     "identity federated-credential list")
@@ -711,7 +723,7 @@ az() {{
       {python} -c '
 import json, os, sys
 mode = os.environ["AIF_TEST_FEDERATION"]
-value = {{"subject": "repo:example/factory:environment:" + sys.argv[1],
+value = {{"subject": os.environ["AIF_TEST_EXISTING_PREFIX"] + ":environment:" + sys.argv[1],
           "issuer": "https://token.actions.githubusercontent.com",
           "audiences": ["api://AzureADTokenExchange"]}}
 if mode.startswith("wrong-"):
@@ -723,10 +735,20 @@ print(json.dumps([] if mode == "absent" else [value]))
     *) return 99 ;;
   esac
 }}
-""" + bootstrap_function("aif_github_environment_name") + "\n" + bootstrap_function(
-        "aif_configure_github_identity") + "\naif_configure_github_identity\n"
-    result = subprocess.run([bash_executable, "-c", script], capture_output=True, text=True,
-                            env=dict(os.environ, AIF_TEST_FEDERATION=mode), timeout=30)
+""" + "\n".join(bootstrap_function(name) for name in (
+        "aif_github_environment_name", "aif_github_oidc_subject_prefix", "aif_configure_github_identity")
+    ) + "\naif_configure_github_identity\n"
+    repository = {"full_name": "example/factory", "name": "factory", "id": 2002,
+                  "owner": {"login": "example", "id": 1001}}
+    return subprocess.run([bash_executable, "-c", script], capture_output=True, text=True, timeout=30,
+                          env=dict(os.environ, AIF_TEST_FEDERATION=federation, AIF_TEST_OIDC=json.dumps(oidc),
+                                   AIF_TEST_REPOSITORY=json.dumps(repository),
+                                   AIF_TEST_EXISTING_PREFIX=existing_prefix))
+
+
+@pytest.mark.parametrize("mode", ["absent", "matching", "wrong-subject", "wrong-issuer", "wrong-audience", "error"])
+def test_bootstrap_federation_never_overwrites_a_conflicting_binding(bash_executable, mode):
+    result = run_github_identity(bash_executable, mode)
     successful = mode in ("absent", "matching")
     assert (result.returncode == 0) == successful, result.stderr
     assert result.stdout.count("CREATE:") == (3 if mode == "absent" else 0)
@@ -734,6 +756,43 @@ print(json.dumps([] if mode == "absent" else [value]))
     if mode == "absent":
         assert "--subject repo:example/factory:environment:Dev%3A Blue" in result.stdout
     assert "update" not in result.stdout and "delete" not in result.stdout
+
+
+def test_bootstrap_federation_uses_the_immutable_subject_github_signs(bash_executable):
+    # Observed 2026-10-22: GitHub signs repo:OWNER@OWNER_ID/REPO@REPO_ID for repositories created after 2026-07-15,
+    # and azure/login failed with AADSTS700213 against a credential that carried the classic subject.
+    result = run_github_identity(bash_executable, "absent", IMMUTABLE_OIDC)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("CREATE:") == 3
+    assert "--subject repo:example@1001/factory@2002:environment:Dev%3A Blue" in result.stdout
+    assert "--subject repo:example@1001/factory@2002:environment:Prod" in result.stdout
+    assert "--subject repo:example/factory:" not in result.stdout
+
+
+def test_bootstrap_federation_keeps_a_matching_immutable_binding(bash_executable):
+    result = run_github_identity(bash_executable, "matching", IMMUTABLE_OIDC,
+                                 existing_prefix="repo:example@1001/factory@2002")
+    assert result.returncode == 0, result.stderr
+    assert "CREATE:" not in result.stdout
+
+
+def test_bootstrap_federation_never_replaces_a_classic_binding_of_an_immutable_repository(bash_executable):
+    result = run_github_identity(bash_executable, "matching", IMMUTABLE_OIDC)
+    assert result.returncode != 0
+    assert "CREATE:" not in result.stdout and "GH:secret" not in result.stdout
+    assert "update" not in result.stdout and "delete" not in result.stdout
+
+
+@pytest.mark.parametrize("oidc", [
+    {"use_default": False, "include_claim_keys": ["repo", "context"]},
+    {**IMMUTABLE_OIDC, "sub_claim_prefix": "repo:example@1001/other@2002"},
+    {**CLASSIC_OIDC, "sub_claim_prefix": "repo:someone/factory"},
+])
+def test_bootstrap_federation_refuses_a_subject_it_cannot_reproduce(bash_executable, oidc):
+    result = run_github_identity(bash_executable, "absent", oidc)
+    assert result.returncode != 0
+    assert "no federated credential was changed" in result.stderr
+    assert "CREATE:" not in result.stdout and "GH:secret" not in result.stdout
 
 
 def run_sync_blocks(tmp_path, bash_executable, answer, *, use_json="y", update=None, uploader_exit=0):
