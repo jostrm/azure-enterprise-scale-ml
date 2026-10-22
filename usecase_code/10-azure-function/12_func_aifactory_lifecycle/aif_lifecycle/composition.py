@@ -88,7 +88,8 @@ def build_runtime(env: Mapping[str, str] | None = None, *, vault=None) -> Runtim
                                guard=SelfProtection(settings.protected_ids), clock=clock,
                                poll_after_seconds=settings.poll_after_seconds,
                                github_repository=settings.github_repository,
-                               runner_timeout_seconds=settings.runner_timeout_seconds)
+                               runner_timeout_seconds=settings.runner_timeout_seconds,
+                               simulate_deletes=settings.deletes == "simulate")
     enqueue = None
     if settings.event_processing == "queue":
         from .adapters.queue import EventQueue

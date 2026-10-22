@@ -69,6 +69,9 @@ run on the runner, one at a time.
   confirmation. A failed run stops the chain with the run link and a log excerpt.
 - **Self-protection.** Targets that contain `AIF_SELF_PROJECT_ID` or any `AIF_PROTECTED_IDS` entry (for example the
   management runner's scale set) are refused with 403, so scenario 5 or 6 can never delete the host.
+- **Simulated deletes.** With `AIF_DELETES=simulate`, scenarios 4-6 still get the Factory API's real review (what
+  would be deleted, or the API's refusal), but confirming one answers 403 `deletes-simulated`, so the Function never
+  deletes anything and the review expires. Use it for test environments next to a real factory.
 - **Scenario 6** uses `delete-aifactory`, which always deletes every environment of a factory. The Function accepts a
   FactoryId only when all of the factory's scale sets are in that environment; otherwise 409 `scope-not-supported`
   (delete the scale sets one by one with scenario 5).
@@ -117,6 +120,7 @@ Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, 
 | `AIF_STORE` | `memory`, `file`, `table` | `table` uses the Function's managed identity (`AIF_TABLE_ACCOUNT`, `AIF_TABLE_NAME`) |
 | `AIF_EVENT_PROCESSING` | `inline`, `queue` | `queue` answers fast and applies events from `AIF_EVENT_QUEUE` |
 | `AIF_SELF_PROJECT_ID`, `AIF_PROTECTED_IDS` | IDs | Deny list for self-protection |
+| `AIF_DELETES` | `allow` (default), `simulate` | `simulate`: delete scenarios are reviewed but never confirmed (403 `deletes-simulated`); health shows the mode |
 | `AIF_KEY_VAULT_NAME` | vault name | The Function reads the secrets below by name with its managed identity |
 | `AIF_EVENT_SECRET_NAME` | secret name | HMAC secret for the events route and queued messages; a secret value may hold two comma-separated values while rotating |
 | `AIF_GITHUB_REPOSITORY`, `AIF_GITHUB_TOKEN_NAME` | `owner/repo`, secret name | Fine-grained token or GitHub App limited to that repo's Actions |

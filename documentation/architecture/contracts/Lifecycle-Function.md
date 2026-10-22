@@ -38,6 +38,7 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_runner_cli.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_workflow_templates.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_api_host_installer.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_simulated_deletes.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
@@ -87,7 +88,8 @@ GitHub runs through `workflow_run` events.
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.
 - **Self-protection** refuses any target that contains the Function's own project or the configured management-runner
-  scope. Scenario 6 is limited to single-environment factories because `delete-aifactory` always deletes every
+  scope. `AIF_DELETES=simulate` goes further for test environments: delete scenarios are reviewed for real but their
+  confirmation is refused (403 `deletes-simulated`), so the Function never deletes anything. Scenario 6 is limited to single-environment factories because `delete-aifactory` always deletes every
   environment.
 
 ## Constraints

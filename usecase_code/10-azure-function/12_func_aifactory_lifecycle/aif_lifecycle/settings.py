@@ -20,6 +20,7 @@ BACKENDS = ("mock", "rest", "sdk")
 EXECUTORS = ("inprocess", "github-dummy", "github-runner")
 STORES = ("memory", "file", "table")
 EVENT_PROCESSING = ("inline", "queue")
+DELETES = ("allow", "simulate")
 _REFERENCE = "@Microsoft.KeyVault("
 # (plain value setting, Key Vault secret name setting)
 _SECRETS = {"event": ("AIF_EVENT_SECRET", "AIF_EVENT_SECRET_NAME"),
@@ -95,6 +96,7 @@ class Settings:
     poll_after_seconds: int = 120
     key_vault_name: str | None = None
     required_role: str | None = None
+    deletes: str = "allow"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None, *, vault: SecretReader | None = None) -> "Settings":
@@ -132,6 +134,7 @@ class Settings:
             poll_after_seconds=_int(env, "AIF_POLL_AFTER_SECONDS", 120, 15, 3600),
             key_vault_name=env.get("AIF_KEY_VAULT_NAME") or None,
             required_role=(env.get("AIF_REQUIRED_ROLE") or "").strip() or None,
+            deletes=_choice(env, "AIF_DELETES", DELETES, "allow"),
         )
         settings._check()
         if settings.required_role and (env.get("WEBSITE_AUTH_ENABLED") or "").strip().lower() != "true":

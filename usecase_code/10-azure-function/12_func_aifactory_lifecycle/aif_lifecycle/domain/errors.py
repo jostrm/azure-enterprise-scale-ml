@@ -44,6 +44,10 @@ class ProtectedTarget(LifecycleError):
     status, code, title = 403, "protected-target", "The target is protected"
 
 
+class DeletesSimulated(LifecycleError):
+    status, code, title = 403, "deletes-simulated", "Deletes are simulated in this deployment"
+
+
 class UnknownId(LifecycleError):
     status, code, title = 404, "unknown-id", "The ID is not in the factory catalog"
 

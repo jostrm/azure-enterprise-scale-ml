@@ -42,6 +42,7 @@ def test_protected_ids_start_with_the_functions_own_project():
     {"AIF_POLL_AFTER_SECONDS": "soon"},
     {"AIF_EXECUTOR": "github-runner", "AIF_BACKEND": "rest", "AIF_GITHUB_REPOSITORY": "o/r", "AIF_GITHUB_TOKEN": "t"},
     {"AIF_REQUIRED_ROLE": "Lifecycle.Operator"},  # without App Service authentication the principal header is forgeable
+    {"AIF_DELETES": "sometimes"},
 ])
 def test_invalid_settings_fail_fast(env):
     with pytest.raises(ValidationFailed):
@@ -91,6 +92,11 @@ def test_build_runtime_wires_the_mock_loop_with_self_protection():
     assert runtime.service.health()["backend"] == "mock"
     with pytest.raises(ProtectedTarget):
         runtime.service.prepare("delete-project", {"projectId": SELF})
+
+
+def test_deletes_are_allowed_by_default_and_simulate_reaches_the_service():
+    assert Settings.from_env({}).deletes == "allow"
+    assert build_runtime({"AIF_DELETES": "Simulate"}).service.health()["deletes"] == "simulate"
 
 
 def test_build_runtime_wires_the_github_dummy_executor_without_network():

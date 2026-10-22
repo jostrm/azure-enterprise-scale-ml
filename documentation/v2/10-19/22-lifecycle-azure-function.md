@@ -87,3 +87,5 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
 - Whole-factory deletion also removes a factory-owned access hub inside its own common resource group.
 - The management runner must sit outside every factory the Function can create or delete; protect its scale set with
   `AIF_PROTECTED_IDS`.
+- In a test environment next to a real factory, set `AIF_DELETES=simulate`: scenarios 4-6 show the Factory API's real
+  review, but the Function refuses to confirm them (403 `deletes-simulated`), so nothing is deleted.
