@@ -118,6 +118,7 @@ class FactoryBackend(Protocol):
     """Strategy: mock, REST (option 1) or SDK (option 2) access to the Factory API."""
 
     name: str
+    delete_mode: str  # "mock", "refuse" (real API, the default), "simulate" or "allow"
 
     def catalog(self) -> Catalog: ...
     def prepare(self, request: StepRequest) -> Preview: ...

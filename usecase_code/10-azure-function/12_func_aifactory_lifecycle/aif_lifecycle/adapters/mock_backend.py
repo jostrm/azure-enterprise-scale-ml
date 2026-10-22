@@ -24,6 +24,7 @@ PARTITION, KEY = "mockcatalog", "catalog"
 
 class MockFactoryBackend:
     name = "mock"
+    delete_mode = "mock"  # a mock delete only changes the mock catalog
 
     def __init__(self, store: StateStore, *, clock, review_ttl_seconds: int = 600,
                  ids: Callable[[], str] | None = None):

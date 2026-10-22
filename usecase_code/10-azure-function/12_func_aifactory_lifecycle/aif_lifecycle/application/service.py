@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from .. import __version__
-from ..domain.errors import (ConfirmationExpired, DeletesSimulated, InProgress, LifecycleError, OperationNotFound,
+from ..domain.errors import (ConfirmationExpired, DeletesDisabled, InProgress, LifecycleError, OperationNotFound,
                              ValidationFailed)
 from ..domain.ids import FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Operation, Preview, Status, iso
@@ -40,8 +40,7 @@ log = logging.getLogger("aif_lifecycle")
 class LifecycleService:
     def __init__(self, *, backend: FactoryBackend, tracker: ExecutionTracker, store: StateStore,
                  guard: SelfProtection, clock, ids: Callable[[], str] | None = None, poll_after_seconds: int = 120,
-                 github_repository: str | None = None, runner_timeout_seconds: int = 900,
-                 simulate_deletes: bool = False):
+                 github_repository: str | None = None, runner_timeout_seconds: int = 900):
         self._backend = backend
         self._tracker = tracker
         self._store = store
@@ -51,13 +50,12 @@ class LifecycleService:
         self._poll_after = poll_after_seconds
         self._repository = github_repository
         self._runner_timeout = runner_timeout_seconds
-        self._simulate_deletes = simulate_deletes
 
     # ----- queries -----
 
     def health(self) -> dict[str, Any]:
         return {"status": "ok", "version": __version__, "backend": self._backend.name, "executor": self._tracker.name,
-                "deletes": "simulate" if self._simulate_deletes else "allow"}
+                "deletes": self._backend.delete_mode}
 
     def get(self, operation_id: str) -> Operation:
         operation = self._load(operation_id)
@@ -73,6 +71,10 @@ class LifecycleService:
 
     def prepare(self, scenario_slug: str, body: Any) -> Operation:
         scenario = Scenario.parse(scenario_slug)
+        if scenario.destructive and self._backend.delete_mode == "refuse":
+            # Refused before any catalog read or operation, so the caller gets a 403 problem and nothing is recorded.
+            raise DeletesDisabled(f"{scenario.value} is off here: the real Factory API never gets a delete unless "
+                                  "AIF_DELETES=allow. Use AIF_DELETES=simulate to rehearse scenarios 4-6.")
         body = _object(body)
         target = self._target(scenario, body)
         settings = body.get("settings", {})
@@ -94,10 +96,6 @@ class LifecycleService:
     def confirm(self, operation_id: str, body: Any) -> Operation:
         body = _object(body)
         operation = self._load(operation_id)
-        if self._simulate_deletes and operation.scenario.destructive:
-            # The review was real; only its confirmation is withheld, so nothing is ever deleted and the review expires.
-            raise DeletesSimulated(f"Deletes are simulated in this deployment (AIF_DELETES=simulate): the "
-                                   f"{operation.scenario.value} review for {operation.target} stays unconfirmed.")
         now = self._clock.now()
         phrase = body.get("confirmationPhrase")
         try:

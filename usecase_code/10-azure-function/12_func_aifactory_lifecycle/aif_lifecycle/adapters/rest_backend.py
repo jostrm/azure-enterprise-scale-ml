@@ -90,8 +90,8 @@ def _detail(payload: bytes, secret: str | None) -> str:
 class RestFactoryBackend(FactoryApiBackend):
     name = "rest"
 
-    def __init__(self, transport: RestTransport, folder: str):
-        super().__init__(folder)
+    def __init__(self, transport: RestTransport, folder: str, *, allow_deletes: bool = False):
+        super().__init__(folder, allow_deletes=allow_deletes)
         self._http = transport
 
     def _prepare(self, body):

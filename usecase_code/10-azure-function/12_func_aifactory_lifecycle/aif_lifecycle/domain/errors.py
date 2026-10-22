@@ -44,8 +44,8 @@ class ProtectedTarget(LifecycleError):
     status, code, title = 403, "protected-target", "The target is protected"
 
 
-class DeletesSimulated(LifecycleError):
-    status, code, title = 403, "deletes-simulated", "Deletes are simulated in this deployment"
+class DeletesDisabled(LifecycleError):
+    status, code, title = 403, "deletes-disabled", "Deletes through the real Factory API are not allowed here"
 
 
 class UnknownId(LifecycleError):

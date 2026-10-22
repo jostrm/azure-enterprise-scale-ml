@@ -26,6 +26,7 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-ops.yml
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-lifecycle-runner.ps1
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/simulated_deletes.py
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -88,8 +89,11 @@ GitHub runs through `workflow_run` events.
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.
 - **Self-protection** refuses any target that contains the Function's own project or the configured management-runner
-  scope. `AIF_DELETES=simulate` goes further for test environments: delete scenarios are reviewed for real but their
-  confirmation is refused (403 `deletes-simulated`), so the Function never deletes anything. Scenario 6 is limited to single-environment factories because `delete-aifactory` always deletes every
+  scope. Real deletes need an explicit opt-in on both hosts (decided 2026-10-22, next to the real Spider factory):
+  `AIF_DELETES` defaults to `refuse` (403 `deletes-disabled` before anything is recorded), every real adapter refuses
+  a delete on its own, and the runner also needs `AIF_ALLOW_REAL_DELETES=true`. `AIF_DELETES=simulate` routes
+  scenarios 4-6 to the mock backend over a read-only catalog mirror (Decorator `DeleteSimulation`) and runs them as
+  dummy workflows (`DeleteRoutingTracker`), so the Factory API never gets a delete. Scenario 6 is limited to single-environment factories because `delete-aifactory` always deletes every
   environment.
 
 ## Constraints

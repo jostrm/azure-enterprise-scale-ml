@@ -15,6 +15,7 @@ from ..application.runner_protocol import CATALOG_OPERATION, RunnerRequest, enco
 from ..domain.errors import UpstreamUnavailable
 from ..domain.operation import Operation, Preview, iso
 from ..ports import Catalog, ConfirmResult, Deferred, GitHubPort, StateStore, StepRequest
+from .factory_api import refuse_deletes
 
 CATALOG = "catalog"
 
@@ -22,8 +23,9 @@ CATALOG = "catalog"
 class RunnerBackend:
     def __init__(self, github: GitHubPort, store: StateStore, clock, *, workflow: str, ref: str, backend: str,
                  secret: bytes, request_ttl_seconds: int, nonces: Callable[[], str] | None = None,
-                 refresh_after_seconds: int = 300):
+                 refresh_after_seconds: int = 300, allow_deletes: bool = False):
         self.name = backend
+        self.delete_mode = "allow" if allow_deletes else "refuse"
         self._github = github
         self._store = store
         self._clock = clock
@@ -37,17 +39,23 @@ class RunnerBackend:
     # ----- FactoryBackend port -----
 
     def catalog(self) -> Catalog:
+        return Catalog.from_api(self.catalog_payload())
+
+    def catalog_payload(self) -> dict[str, Any]:
+        """The latest snapshot the runner sent, as the Factory API answered it."""
         found = self._store.get(CATALOG, "snapshot")
         if found is None:
             self.refresh_catalog(force=False)
             raise UpstreamUnavailable("The catalog snapshot is being read on the Factory API host; retry in a minute.",
                                       code="catalog-pending")
-        return Catalog.from_api(found[0]["payload"])
+        return found[0]["payload"]
 
     def prepare(self, request: StepRequest) -> Preview:
+        refuse_deletes(self.delete_mode, request)  # before the dispatch: a refused delete never leaves the Function
         raise Deferred("prepare", self._dispatch("prepare", request.operation_id, request.step_index, request=request))
 
     def confirm(self, request: StepRequest, preview: Preview, phrase: str | None) -> ConfirmResult:
+        refuse_deletes(self.delete_mode, request)
         raise Deferred("confirm", self._dispatch("confirm", request.operation_id, request.step_index, request=request,
                                                  preview=preview, phrase=phrase))
 

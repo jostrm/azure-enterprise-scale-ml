@@ -35,8 +35,9 @@ def _translated(call: Callable[[], Any]) -> Any:
 class SdkFactoryBackend(FactoryApiBackend):
     name = "sdk"
 
-    def __init__(self, base_url: str, api_key: str | None, folder: str, timeout: float = 30.0, client=None):
-        super().__init__(folder)
+    def __init__(self, base_url: str, api_key: str | None, folder: str, timeout: float = 30.0, client=None, *,
+                 allow_deletes: bool = False):
+        super().__init__(folder, allow_deletes=allow_deletes)
         if client is None:
             from azurefactory import AzureFactoryClient
             client = _translated(lambda: AzureFactoryClient(base_url=base_url, api_key=api_key, timeout=timeout))

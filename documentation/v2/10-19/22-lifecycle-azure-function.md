@@ -87,5 +87,7 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
 - Whole-factory deletion also removes a factory-owned access hub inside its own common resource group.
 - The management runner must sit outside every factory the Function can create or delete; protect its scale set with
   `AIF_PROTECTED_IDS`.
-- In a test environment next to a real factory, set `AIF_DELETES=simulate`: scenarios 4-6 show the Factory API's real
-  review, but the Function refuses to confirm them (403 `deletes-simulated`), so nothing is deleted.
+- With the real Factory API, deletes are off by default: scenarios 4-6 answer 403 `deletes-disabled`, and the runner
+  refuses a delete request unless its `runner.json` sets `AIF_ALLOW_REAL_DELETES=true`. Set `AIF_DELETES=simulate` to
+  rehearse them end to end on the mock backend and dummy workflows (the Factory API never sees a delete), or
+  `AIF_DELETES=allow` plus the runner setting to delete for real.

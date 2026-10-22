@@ -94,9 +94,10 @@ EXPECTED_ROUTES = {
 
 
 def backend_for(option, api):
+    """Parity covers every scenario's API calls, deletes included, so these backends opt in to real deletes."""
     if option == "rest":
-        return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER)
-    return SdkFactoryBackend(api.url, api.api_key, FOLDER)
+        return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER, allow_deletes=True)
+    return SdkFactoryBackend(api.url, api.api_key, FOLDER, allow_deletes=True)
 
 
 def record(option, steps):

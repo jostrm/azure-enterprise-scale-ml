@@ -73,8 +73,10 @@ def execute(request: RunnerRequest, env: Mapping[str, str], vault, *, run_id: st
     catalog = None
     backend = None
     try:
+        # A signed request is not enough for a delete: the runner's own settings must allow real deletes as well.
         backend = factory_api_backend(request.backend, env.get("AIF_FACTORY_API_URL") or "http://127.0.0.1:8765",
-                                      secret_value(env, "factory", vault), env.get("AIF_FACTORY_FOLDER"))
+                                      secret_value(env, "factory", vault), env.get("AIF_FACTORY_FOLDER"),
+                                      allow_deletes=(env.get("AIF_ALLOW_REAL_DELETES") or "").strip().lower() == "true")
         if request.action == "catalog":
             catalog = backend.catalog_payload()
         elif request.action == "prepare":

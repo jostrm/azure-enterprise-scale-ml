@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from ..domain.errors import UnknownId, UpstreamError, ValidationFailed
+from ..domain.errors import DeletesDisabled, UnknownId, UpstreamError, ValidationFailed
 from ..domain.operation import Preview, StepKind
 from ..domain.scenarios import Scenario
 from ..ports import Catalog, ConfirmResult, StepRequest
@@ -93,15 +93,23 @@ def preview_from_api(response: dict[str, Any]) -> Preview:
                    confirmation_phrase=response.get("confirmation_phrase"), backend_ref=reference, warnings=warnings)
 
 
+def refuse_deletes(delete_mode: str, request: StepRequest) -> None:
+    """Real deletes need an explicit opt-in (AIF_DELETES=allow, or AIF_ALLOW_REAL_DELETES=true on the runner)."""
+    if request.scenario.destructive and delete_mode != "allow":
+        raise DeletesDisabled(f"{request.scenario.value} for {request.target} was not sent to the Factory API: real "
+                              "deletes are off here. Set AIF_DELETES=simulate to rehearse it, or allow to delete.")
+
+
 class FactoryApiBackend(ABC):
     """Steps -> Factory API calls. Subclasses implement the primitive calls (REST or SDK)."""
 
     name = "api"
 
-    def __init__(self, folder: str):
+    def __init__(self, folder: str, *, allow_deletes: bool = False):
         if not folder:
             raise ValidationFailed("AIF_FACTORY_FOLDER (the consumer repo's azurefactory folder on the API host) is required.")
         self.folder = folder
+        self.delete_mode = "allow" if allow_deletes else "refuse"
 
     # ----- FactoryBackend port -----
 
@@ -117,6 +125,7 @@ class FactoryApiBackend(ABC):
             return {"revision": "", "factories": []}
 
     def prepare(self, request: StepRequest) -> Preview:
+        refuse_deletes(self.delete_mode, request)
         try:
             revision = self._catalog_list().get("revision")
         except UnknownId:
@@ -126,6 +135,7 @@ class FactoryApiBackend(ABC):
         return preview_from_api(self._prepare_call(request, revision))
 
     def confirm(self, request: StepRequest, preview: Preview, phrase: str | None) -> ConfirmResult:
+        refuse_deletes(self.delete_mode, request)
         ref = preview.backend_ref
         name = request.step_name
         if request.kind is StepKind.CONFIGURE:

@@ -107,6 +107,29 @@ def test_sdk_and_rest_report_the_same_review(function):
     assert bodies["rest"]["preview"] == bodies["sdk"]["preview"]
 
 
+def delete_request():
+    return StepRequest(operation_id="00000000-0000-4000-8000-000000000001", scenario=Scenario.DELETE_SCALESET,
+                       step_index=1, step_name="delete-scaleset", kind=StepKind.DELETE, target="aif-121-sdc-dev-001",
+                       resolved={"factory_id": FACTORY_ID, "scale_set_id": SCALESET_ID, "environment": "dev"},
+                       settings={}, options={})
+
+
+@pytest.mark.parametrize("allowed, outcome", [(None, "error"), ("false", "error"), ("true", "ok")])
+def test_the_runner_refuses_a_signed_delete_request_unless_its_settings_allow_deletes(function, allowed, outcome):
+    with FakeFactoryApi() as api:
+        env = env_for(api.url, function, {"action": "prepare", "request": delete_request()})
+        if allowed is not None:
+            env["AIF_ALLOW_REAL_DELETES"] = allowed
+        assert runner.main(env) == 0
+    result = function.result()
+    assert result["outcome"] == outcome
+    posts = [call["path"] for call in api.calls if call["method"] == "POST"]
+    if outcome == "error":
+        assert result["error"]["code"] == "deletes-disabled" and posts == []
+    else:
+        assert posts == ["/api/v1/factory-catalog/prepare"]
+
+
 def test_confirm_is_submitted_once_and_reports_the_job(function):
     preview = parse_result({"v": 1, "action": "prepare", "nonce": "x", "operationId": None, "step": None,
                             "outcome": "ok", "preview": _preview_dict()}).preview

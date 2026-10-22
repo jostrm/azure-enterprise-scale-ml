@@ -58,7 +58,7 @@ class FakeGitHub:
 
 
 def make_service(clock, *, protected=(), github: FakeGitHub | None = None, review_ttl_seconds=600,
-                 poll_after_seconds=120, store=None, simulate_deletes=False):
+                 poll_after_seconds=120, store=None):
     store = store or MemoryStore()
     backend = MockFactoryBackend(store, clock=clock, review_ttl_seconds=review_ttl_seconds, ids=sequential_ids())
     if github is None:
@@ -67,7 +67,7 @@ def make_service(clock, *, protected=(), github: FakeGitHub | None = None, revie
         tracker = DummyWorkflowTracker(github, workflow="aif-dummy-step.yml", ref="main", duration_seconds=60)
     service = LifecycleService(backend=backend, tracker=tracker, store=store, guard=SelfProtection(protected),
                                clock=clock, ids=sequential_ids(), poll_after_seconds=poll_after_seconds,
-                               github_repository="jostrm/byor", simulate_deletes=simulate_deletes)
+                               github_repository="jostrm/byor")
     return service
 
 

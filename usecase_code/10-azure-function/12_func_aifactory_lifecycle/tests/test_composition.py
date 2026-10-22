@@ -94,9 +94,17 @@ def test_build_runtime_wires_the_mock_loop_with_self_protection():
         runtime.service.prepare("delete-project", {"projectId": SELF})
 
 
-def test_deletes_are_allowed_by_default_and_simulate_reaches_the_service():
-    assert Settings.from_env({}).deletes == "allow"
-    assert build_runtime({"AIF_DELETES": "Simulate"}).service.health()["deletes"] == "simulate"
+@pytest.mark.parametrize("deletes, mode", [(None, "refuse"), ("Simulate", "simulate"), ("allow", "allow")])
+def test_real_backends_refuse_deletes_unless_the_setting_says_otherwise(deletes, mode):
+    env = {"AIF_BACKEND": "rest", "AIF_FACTORY_FOLDER": "C:/repos/byor-121/azurefactory", "AIF_FACTORY_API_KEY": "k"}
+    if deletes:
+        env["AIF_DELETES"] = deletes
+    assert Settings.from_env(env).deletes == mode
+    assert build_runtime(env).service.health()["deletes"] == mode
+
+
+def test_the_mock_backend_reports_its_own_deletes():
+    assert build_runtime({}).service.health()["deletes"] == "mock"
 
 
 def test_build_runtime_wires_the_github_dummy_executor_without_network():
