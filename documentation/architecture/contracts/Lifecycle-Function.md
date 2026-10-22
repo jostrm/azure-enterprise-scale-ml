@@ -77,7 +77,10 @@ GitHub runs through `workflow_run` events.
   the event secret and an expiry; the runner verifies it, checks that the workflow inputs describe it, makes the one
   call through the REST or SDK adapter and posts one signed result to `/api/v1/runner/results`. The step waits in
   `preparing` or `confirming`; a review that never reports fails, a confirmation that never reports (or whose run ends
-  without a result) is `uncertain`, and a re-run never submits a confirmation again. Planning uses a catalog snapshot
+  without a result) is `uncertain`, and a re-run never submits a confirmation again. One Factory API call may take
+  `AIF_FACTORY_API_TIMEOUT_SECONDS` (2700 s): on the real API a runtime review took 13 minutes and its confirmation
+  held the catalog lock for 18 minutes while it built the run, so the `aif-ops` job (60 minutes) outlasts one call
+  and the Function's hand-off window (`AIF_RUNNER_TIMEOUT_SECONDS`, 4200 s) outlasts the job. Planning uses a catalog snapshot
   that every result refreshes. Because the Factory API refuses to dispatch `factory-lifecycle.yml` while any other
   workflow of the factory repo runs, the Function's workflows live in a separate ops repository, and API-dispatched
   runs are followed through the API's job status.
@@ -92,6 +95,11 @@ GitHub runs through `workflow_run` events.
   then stops as `uncertain` with only `stage-execution-interrupted` in phase `authorization-continuation` (the API logs
   nothing). Reader on the one peered hub network fixed it; the API's verified-boundary recovery resumed the workflow
   without repeating verified stages. The Function's scenario 1 operation stays terminal and does not follow it.
+  Observed the same day: the first COMMON run's `azure/login` fails (`AADSTS700213`) for factory repositories created
+  after July 15, 2026, because GitHub then issues the immutable OIDC subject (owner and repository IDs), while the
+  bootstrap's federated credential (`bootstrap/lib/factory_enrollment.py`) and the API's ownership handoff use the
+  classic `repo:OWNER/REPO:environment:ENV` subject. The Factory API v0.47.31 has no HTTP surface to retire such a
+  dispatched COMMON attempt (`terminal-common-before-azure-mutation-v1` exists only internally).
 - **Events**: the relay workflow signs `workflow_run` payloads like a GitHub webhook; the Function checks
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.

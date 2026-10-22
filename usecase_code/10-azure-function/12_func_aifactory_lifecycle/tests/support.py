@@ -11,6 +11,7 @@ from aif_lifecycle.adapters.stores import MemoryStore
 from aif_lifecycle.adapters.trackers import DummyWorkflowTracker, InstantTracker
 from aif_lifecycle.application.guard import SelfProtection
 from aif_lifecycle.application.service import LifecycleService
+from aif_lifecycle.settings import RUNNER_TIMEOUT_SECONDS
 
 
 def sequential_ids():
@@ -67,7 +68,7 @@ def make_service(clock, *, protected=(), github: FakeGitHub | None = None, revie
         tracker = DummyWorkflowTracker(github, workflow="aif-dummy-step.yml", ref="main", duration_seconds=60)
     service = LifecycleService(backend=backend, tracker=tracker, store=store, guard=SelfProtection(protected),
                                clock=clock, ids=sequential_ids(), poll_after_seconds=poll_after_seconds,
-                               github_repository="jostrm/byor")
+                               github_repository="jostrm/byor", runner_timeout_seconds=RUNNER_TIMEOUT_SECONDS)
     return service
 
 

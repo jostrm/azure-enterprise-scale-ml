@@ -130,7 +130,8 @@ Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, 
 | `AIF_EVENT_SECRET_NAME` | secret name | HMAC secret for the events route and queued messages; a secret value may hold two comma-separated values while rotating |
 | `AIF_GITHUB_REPOSITORY`, `AIF_GITHUB_TOKEN_NAME` | `owner/repo`, secret name | Fine-grained token or GitHub App limited to that repo's Actions |
 | `AIF_FACTORY_API_URL`, `AIF_FACTORY_API_KEY_NAME`, `AIF_FACTORY_FOLDER` | `http://127.0.0.1:8765`, secret name, path | REST/SDK with `inprocess`; plain http only to loopback. With `github-runner` they belong to the runner (`runner.json`), not the Function |
-| `AIF_OPS_WORKFLOW`, `AIF_RUNNER_TIMEOUT_SECONDS` | `aif-ops.yml`, 900 | `github-runner`: the workflow it dispatches in `AIF_GITHUB_REPOSITORY`, and how long a hand-off may stay silent |
+| `AIF_OPS_WORKFLOW`, `AIF_RUNNER_TIMEOUT_SECONDS` | `aif-ops.yml`, 4200 | `github-runner`: the workflow it dispatches in `AIF_GITHUB_REPOSITORY`, and how long a hand-off may stay silent (longer than `aif-ops.yml`'s 60-minute job) |
+| `AIF_FACTORY_API_TIMEOUT_SECONDS` | 2700 | How long one Factory API call may take on the runner: on the real API a runtime deploy review took 13 minutes and its confirmation held the catalog lock for 18 minutes while it built the run. A machine environment variable on the VM overrides `runner.json`, which the installer rewrites. In-process calls are also capped by the Function's `functionTimeout` (10 minutes) |
 | `AIF_REQUIRED_ROLE` | app role, for example `Lifecycle.Operator` | Lifecycle routes also need this role in the caller's Entra token; refused at startup unless App Service authentication is on (`authClientId`) |
 | `AIF_REVIEW_TTL_SECONDS`, `AIF_POLL_AFTER_SECONDS` | 600, 120 | |
 
@@ -249,6 +250,9 @@ Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Au
   `AIF_FACTORY_API_KEY_NAME` (the VM's managed identity reads the key). The ops repository gets variable
   `AIF_LIFECYCLE_RESULTS_URL` (`https://<app>.azurewebsites.net/api/v1/runner/results`); the result is signed with
   `AIF_LIFECYCLE_EVENT_SECRET`.
+- One management runner and the Factory API's catalog lock serialize every Factory API call, so run long operations
+  (runtime deploys) one at a time: a confirm that waits behind another long call can find its API review expired and
+  is rejected (409), never retried.
 - Requests travel as workflow inputs, which anyone with read access to the ops repository can see: reviews and catalog
   IDs, never secrets. The Function signs each request with the event secret and an expiry (`AIF_RUNNER_TIMEOUT_SECONDS`);
   the runner refuses a request it can't verify, one that expired, or one whose workflow inputs differ from it. The run
@@ -261,3 +265,7 @@ Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Au
 
 A consumer repo copies this folder to `aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/` and the
 workflow templates from `workflows/` to its `.github/workflows/`, then adds its own `settings.<consumer>.json`.
+
+Upgrading a copy from before the longer Factory API timeouts: set `AIF_RUNNER_TIMEOUT_SECONDS` to 4200 (or remove it)
+in `settings.<consumer>.json` and redeploy (the Bicep replaces all app settings), copy `workflows/aif-ops.yml` to the
+ops repository again, then reinstall the runner entry point with `scripts/install-lifecycle-runner.ps1`.

@@ -43,10 +43,21 @@ def test_protected_ids_start_with_the_functions_own_project():
     {"AIF_EXECUTOR": "github-runner", "AIF_BACKEND": "rest", "AIF_GITHUB_REPOSITORY": "o/r", "AIF_GITHUB_TOKEN": "t"},
     {"AIF_REQUIRED_ROLE": "Lifecycle.Operator"},  # without App Service authentication the principal header is forgeable
     {"AIF_DELETES": "sometimes"},
+    {"AIF_FACTORY_API_TIMEOUT_SECONDS": "0"},
+    {"AIF_FACTORY_API_TIMEOUT_SECONDS": "a while"},
 ])
 def test_invalid_settings_fail_fast(env):
     with pytest.raises(ValidationFailed):
         Settings.from_env(env)
+
+
+def test_factory_api_calls_may_take_as_long_as_a_runtime_review():
+    # Observed 2026-10-22 on the real API: a runtime deploy review took 13 minutes and its confirmation held the catalog
+    # lock for 18 minutes while it built the run, so a 30-second HTTP timeout turns real reviews into upstream-timeout.
+    settings = Settings.from_env({})
+    assert settings.factory_api_timeout_seconds == 2700
+    assert settings.runner_timeout_seconds == 4200 > settings.factory_api_timeout_seconds
+    assert Settings.from_env({"AIF_FACTORY_API_TIMEOUT_SECONDS": "90"}).factory_api_timeout_seconds == 90
 
 
 def test_a_required_role_needs_app_service_authentication_on_the_app():

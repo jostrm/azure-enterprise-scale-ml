@@ -18,6 +18,7 @@ from aif_lifecycle.adapters.stores import MemoryStore
 from aif_lifecycle.adapters.trackers import ApiJobTracker, DummyWorkflowTracker, RunnerJobTracker
 from aif_lifecycle.application.guard import SelfProtection
 from aif_lifecycle.application.service import LifecycleService
+from aif_lifecycle.settings import RUNNER_TIMEOUT_SECONDS
 from aif_lifecycle.domain.errors import DeletesDisabled
 from aif_lifecycle.domain.operation import Preview, Status, StepKind
 from aif_lifecycle.domain.scenarios import Scenario
@@ -98,7 +99,8 @@ def test_a_refused_delete_is_a_403_problem_before_any_operation_or_dispatch_exis
     github, store = FakeGitHub(), MemoryStore()
     backend = runner_backend(clock, github, store)
     service = LifecycleService(backend=backend, tracker=RunnerJobTracker(backend, github), store=store,
-                               guard=SelfProtection([]), clock=clock, ids=sequential_ids())
+                               guard=SelfProtection([]), clock=clock, ids=sequential_ids(),
+                               runner_timeout_seconds=RUNNER_TIMEOUT_SECONDS)
     api = LifecycleHttpApi(service, event_secrets=[SECRET])
     response = api.prepare(ApiRequest(method="POST", path="/api/v1/lifecycle/delete-project/prepare",
                                       route_params={"scenario": "delete-project"}, headers={},
@@ -119,7 +121,7 @@ def test_a_simulated_delete_runs_end_to_end_on_the_mock_and_a_dummy_workflow_wit
         tracker = DeleteRoutingTracker(ApiJobTracker(real), DummyWorkflowTracker(
             github, workflow="aif-dummy-step.yml", ref="main", duration_seconds=60))
         service = LifecycleService(backend=backend, tracker=tracker, store=store, guard=SelfProtection([]),
-                                   clock=clock, ids=sequential_ids())
+                                   clock=clock, ids=sequential_ids(), runner_timeout_seconds=RUNNER_TIMEOUT_SECONDS)
         http = LifecycleHttpApi(service, event_secrets=[SECRET])
         operation = service.prepare("delete-project", {"projectId": PROJECT})
         assert operation.status is Status.AWAITING_CONFIRMATION

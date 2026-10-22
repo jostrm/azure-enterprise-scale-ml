@@ -98,6 +98,20 @@ def test_prepare_goes_through_rest_and_posts_a_signed_result_with_the_catalog(fu
     assert parse_result(result).preview.plan[0] == PREVIEW["summary"]
 
 
+@pytest.mark.parametrize("backend", ["rest", "sdk"])
+def test_the_runner_waits_for_a_slow_factory_api_call_as_long_as_its_setting_allows(function, backend):
+    # A real runtime review takes minutes; AIF_FACTORY_API_TIMEOUT_SECONDS (runner.json or environment) bounds the call.
+    with FakeFactoryApi(slow={"/api/v1/factory-catalog/prepare": 1.5}) as api:
+        env = env_for(api.url, function, {"action": "prepare", "request": step_request()}, backend)
+        runner.main({**env, "AIF_FACTORY_API_TIMEOUT_SECONDS": "1"})
+        timed_out = function.result()
+        env = env_for(api.url, function, {"action": "prepare", "request": step_request()}, backend)
+        runner.main({**env, "AIF_FACTORY_API_TIMEOUT_SECONDS": "10"})
+        answered = function.result()
+    assert timed_out["outcome"] == "error" and timed_out["error"]["code"] == "upstream-timeout"
+    assert answered["outcome"] == "ok" and answered["preview"]["backend_ref"]["confirmation_id"] == CONFIRMATION_ID
+
+
 def test_sdk_and_rest_report_the_same_review(function):
     bodies = {}
     for backend in ("rest", "sdk"):

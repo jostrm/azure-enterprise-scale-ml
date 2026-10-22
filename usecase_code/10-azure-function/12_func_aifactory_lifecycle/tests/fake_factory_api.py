@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qsl, urlsplit
 
@@ -63,9 +64,11 @@ def _response(method: str, path: str, body):
 
 
 class FakeFactoryApi:
-    def __init__(self, api_key: str = "test-key", *, missing_catalog: bool = False):
+    def __init__(self, api_key: str = "test-key", *, missing_catalog: bool = False,
+                 slow: dict[str, float] | None = None):
         self.api_key = api_key
         self.missing_catalog = missing_catalog  # a new consumer folder: the API answers its catalog with 404
+        self.slow = slow or {}  # path -> seconds before answering, like a real runtime review
         self.calls: list[dict] = []
         outer = self
 
@@ -86,7 +89,11 @@ class FakeFactoryApi:
                     payload = None
                 status = 200 if payload is not None else 404
                 data = json.dumps(payload if payload is not None else {"detail": "not found"}).encode()
-                self.send_response(status)
+                time.sleep(outer.slow.get(parts.path, 0))
+                try:
+                    self.send_response(status)
+                except OSError:  # the caller timed out and closed the connection
+                    return
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()

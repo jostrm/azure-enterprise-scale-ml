@@ -47,7 +47,9 @@ permissions: {}
 jobs:
   call:
     runs-on: [self-hosted, aif-lifecycle-mgmt]
-    timeout-minutes: 10  # under the Function's AIF_RUNNER_TIMEOUT_SECONDS (900 s by default)
+    # Over one Factory API call (AIF_FACTORY_API_TIMEOUT_SECONDS, 2700 s by default: a runtime review or confirmation
+    # can take 10-20 minutes) and under the Function's AIF_RUNNER_TIMEOUT_SECONDS (4200 s by default).
+    timeout-minutes: 60
     steps:
       - name: Call the Factory API and report the result
         shell: powershell

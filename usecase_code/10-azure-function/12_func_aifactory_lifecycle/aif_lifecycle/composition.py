@@ -11,7 +11,7 @@ from .application.guard import SelfProtection
 from .application.service import LifecycleService
 from .domain.errors import ValidationFailed
 from .http_api import LifecycleHttpApi
-from .settings import Settings
+from .settings import FACTORY_API_TIMEOUT_SECONDS, Settings
 
 
 class SystemClock:
@@ -36,15 +36,16 @@ def _store(settings: Settings):
     return stores.MemoryStore()
 
 
-def factory_api_backend(name: str, url: str, key: str | None, folder: str | None, *, allow_deletes: bool = False):
+def factory_api_backend(name: str, url: str, key: str | None, folder: str | None, *, allow_deletes: bool = False,
+                        timeout: float = FACTORY_API_TIMEOUT_SECONDS):
     """Option 1 (REST) or option 2 (SDK) against a Factory API on this host's loopback (the Function or the runner).
-    Deletes are refused unless allow_deletes is set explicitly."""
+    Deletes are refused unless allow_deletes is set explicitly; one call may take `timeout` seconds."""
     if name == "rest":
         from .adapters.rest_backend import RestFactoryBackend, RestTransport
-        return RestFactoryBackend(RestTransport(url, key), folder or "", allow_deletes=allow_deletes)
+        return RestFactoryBackend(RestTransport(url, key, timeout), folder or "", allow_deletes=allow_deletes)
     if name == "sdk":
         from .adapters.sdk_backend import SdkFactoryBackend
-        return SdkFactoryBackend(url, key, folder or "", allow_deletes=allow_deletes)
+        return SdkFactoryBackend(url, key, folder or "", timeout, allow_deletes=allow_deletes)
     raise ValidationFailed(f"'{name}' is not a Factory API backend; use rest or sdk.")
 
 
@@ -77,7 +78,8 @@ def _backend_and_tracker(settings: Settings, store, clock):
         return backend, tracker  # the mock is a simulation already; AIF_DELETES governs the real API only
     else:
         backend = factory_api_backend(settings.backend, settings.factory_api_url, settings.factory_api_key,
-                                      settings.factory_folder, allow_deletes=allow_deletes)
+                                      settings.factory_folder, allow_deletes=allow_deletes,
+                                      timeout=settings.factory_api_timeout_seconds)
         tracker = _dummy_tracker(settings) if settings.executor == "github-dummy" else trackers.ApiJobTracker(backend)
     if settings.deletes == "simulate":
         from .adapters.simulated_deletes import CatalogMirror, DeleteRoutingTracker, DeleteSimulation

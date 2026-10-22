@@ -9,6 +9,7 @@ from aif_lifecycle.application.events import WorkflowRunObservation, correlate, 
 from aif_lifecycle.adapters.runner_backend import RunnerBackend
 from aif_lifecycle.adapters.stores import MemoryStore
 from aif_lifecycle.adapters.trackers import DummyWorkflowTracker
+from aif_lifecycle.settings import FACTORY_API_TIMEOUT_SECONDS, RUNNER_TIMEOUT_SECONDS
 
 from conftest import TEMPLATE_ROOT
 from support import FakeGitHub, confirm_current, make_service
@@ -81,7 +82,9 @@ def test_the_aif_ops_run_name_carries_the_nonce_and_correlates_as_a_runner_call(
 def test_aif_ops_runs_the_installed_entry_point_safely_on_the_api_host():
     workflow = load("aif-ops.yml")
     job = workflow["jobs"]["call"]
-    assert "aif-lifecycle-mgmt" in job["runs-on"] and job["timeout-minutes"] <= 10
+    assert "aif-lifecycle-mgmt" in job["runs-on"]
+    # The job outlasts one Factory API call plus the result post, and ends before the Function stops waiting for it.
+    assert FACTORY_API_TIMEOUT_SECONDS + 120 <= job["timeout-minutes"] * 60 <= RUNNER_TIMEOUT_SECONDS - 120
     step = job["steps"][0]
     for name, source in (("AIF_RUNNER_REQUEST", "request"), ("AIF_OPERATION_ID", "operation_id"),
                          ("AIF_STEP", "step"), ("AIF_ACTION", "action"), ("AIF_NONCE", "nonce")):

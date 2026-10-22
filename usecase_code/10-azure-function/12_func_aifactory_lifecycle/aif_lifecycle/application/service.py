@@ -40,7 +40,7 @@ log = logging.getLogger("aif_lifecycle")
 class LifecycleService:
     def __init__(self, *, backend: FactoryBackend, tracker: ExecutionTracker, store: StateStore,
                  guard: SelfProtection, clock, ids: Callable[[], str] | None = None, poll_after_seconds: int = 120,
-                 github_repository: str | None = None, runner_timeout_seconds: int = 900):
+                 github_repository: str | None = None, runner_timeout_seconds: int):
         self._backend = backend
         self._tracker = tracker
         self._store = store

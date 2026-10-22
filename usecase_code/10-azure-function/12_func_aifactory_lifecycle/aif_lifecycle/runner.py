@@ -29,7 +29,7 @@ from .adapters.rest_backend import is_loopback
 from .application.runner_protocol import RunnerRequest, classify_confirm_failure, decode_request, result_body
 from .composition import factory_api_backend
 from .domain.errors import LifecycleError, ValidationFailed
-from .settings import secret_value
+from .settings import factory_api_timeout, secret_value
 from .signatures import sign
 
 ATTEMPTS = 3
@@ -76,7 +76,8 @@ def execute(request: RunnerRequest, env: Mapping[str, str], vault, *, run_id: st
         # A signed request is not enough for a delete: the runner's own settings must allow real deletes as well.
         backend = factory_api_backend(request.backend, env.get("AIF_FACTORY_API_URL") or "http://127.0.0.1:8765",
                                       secret_value(env, "factory", vault), env.get("AIF_FACTORY_FOLDER"),
-                                      allow_deletes=(env.get("AIF_ALLOW_REAL_DELETES") or "").strip().lower() == "true")
+                                      allow_deletes=(env.get("AIF_ALLOW_REAL_DELETES") or "").strip().lower() == "true",
+                                      timeout=factory_api_timeout(env))
         if request.action == "catalog":
             catalog = backend.catalog_payload()
         elif request.action == "prepare":

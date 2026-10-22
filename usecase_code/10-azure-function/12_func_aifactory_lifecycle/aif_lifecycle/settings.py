@@ -21,6 +21,10 @@ EXECUTORS = ("inprocess", "github-dummy", "github-runner")
 STORES = ("memory", "file", "table")
 EVENT_PROCESSING = ("inline", "queue")
 DELETES = ("refuse", "simulate", "allow")
+# One Factory API call may take many minutes: on the real API (2026-10-22) a runtime deploy review took 13 minutes
+# and its confirmation held the catalog lock for 18 minutes while it built the run. A runner hand-off covers one call.
+FACTORY_API_TIMEOUT_SECONDS = 2700
+RUNNER_TIMEOUT_SECONDS = 4200
 _REFERENCE = "@Microsoft.KeyVault("
 # (plain value setting, Key Vault secret name setting)
 _SECRETS = {"event": ("AIF_EVENT_SECRET", "AIF_EVENT_SECRET_NAME"),
@@ -64,6 +68,11 @@ def _int(env: Mapping[str, str], name: str, default: int, low: int, high: int) -
     return value
 
 
+def factory_api_timeout(env: Mapping[str, str]) -> int:
+    """How long one Factory API call may take (the Function in-process and the runner read the same setting)."""
+    return _int(env, "AIF_FACTORY_API_TIMEOUT_SECONDS", FACTORY_API_TIMEOUT_SECONDS, 1, 3600)
+
+
 def _list(value: str | None) -> list[str]:
     return [item.strip() for item in (value or "").split(",") if item.strip()]
 
@@ -79,6 +88,7 @@ class Settings:
     factory_api_url: str = "http://127.0.0.1:8765"
     factory_api_key: str | None = field(default=None, repr=False)
     factory_folder: str | None = None
+    factory_api_timeout_seconds: int = FACTORY_API_TIMEOUT_SECONDS
     github_repository: str | None = None
     github_token: str | None = field(default=None, repr=False)
     github_api_url: str = "https://api.github.com"
@@ -86,7 +96,7 @@ class Settings:
     dummy_workflow: str = "aif-dummy-step.yml"
     dummy_duration_seconds: int = 75
     ops_workflow: str = "aif-ops.yml"
-    runner_timeout_seconds: int = 900
+    runner_timeout_seconds: int = RUNNER_TIMEOUT_SECONDS
     event_secrets: list[bytes] = field(default_factory=list, repr=False)
     event_processing: str = "inline"
     event_queue: str = "aif-github-events"
@@ -117,6 +127,7 @@ class Settings:
             factory_api_url=env.get("AIF_FACTORY_API_URL") or cls.factory_api_url,
             factory_api_key=factory_key,
             factory_folder=env.get("AIF_FACTORY_FOLDER") or None,
+            factory_api_timeout_seconds=factory_api_timeout(env),
             github_repository=env.get("AIF_GITHUB_REPOSITORY") or None,
             github_token=github_token,
             github_api_url=env.get("AIF_GITHUB_API_URL") or cls.github_api_url,
@@ -124,7 +135,7 @@ class Settings:
             dummy_workflow=env.get("AIF_DUMMY_WORKFLOW") or cls.dummy_workflow,
             dummy_duration_seconds=_int(env, "AIF_DUMMY_DURATION_SECONDS", 75, 5, 600),
             ops_workflow=env.get("AIF_OPS_WORKFLOW") or cls.ops_workflow,
-            runner_timeout_seconds=_int(env, "AIF_RUNNER_TIMEOUT_SECONDS", 900, 120, 7200),
+            runner_timeout_seconds=_int(env, "AIF_RUNNER_TIMEOUT_SECONDS", RUNNER_TIMEOUT_SECONDS, 120, 7200),
             event_secrets=[item.encode("utf-8") for item in _list(event_secret)],
             event_processing=_choice(env, "AIF_EVENT_PROCESSING", EVENT_PROCESSING, "inline"),
             event_queue=env.get("AIF_EVENT_QUEUE") or cls.event_queue,
