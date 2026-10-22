@@ -6,6 +6,8 @@ confirmation, and the Function follows the resulting GitHub workflow runs until 
 
 Template: [usecase_code/10-azure-function/12_func_aifactory_lifecycle](../../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md).
 Design and constraints: [Lifecycle Function](../../architecture/contracts/Lifecycle-Function.md).
+Every secret and identity, with copyable examples of the full solution:
+[README_More_Info.md](../../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md).
 
 ## When to use it
 
@@ -74,7 +76,9 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
    entry point with `scripts\install-lifecycle-runner.ps1` (the API URL, the factory repo's `azurefactory` folder and
    the Key Vault names go into `runner.json`). `scripts\install-factory-api-host.ps1` installs the API with SYSTEM as
    that user. Before you run it: `az login --identity` for SYSTEM; the VM's managed identity needs Owner on the factory
-   subscription plus the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All`; Key Vault needs
+   subscription plus the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All`, and Reader on every
+   network in another subscription that is peered with a network in the factory subscription (for example a
+   connectivity hub's: the bootstrap's network-foundation stage reads it); Key Vault needs
    `aif-factory-api-key` (a long random value) and `aif-factory-api-gh-token`, a classic GitHub PAT with exactly `repo`,
    `workflow` and `read:org` (`gh auth login` refuses a classic token without `read:org`).
 3. The first prepare answers 503 `catalog-pending` while the runner reads the catalog; `POST /api/v1/catalog/refresh`

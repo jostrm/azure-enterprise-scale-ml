@@ -27,6 +27,7 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-lifecycle-runner.ps1
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/simulated_deletes.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -45,7 +46,7 @@ graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: '6df0d00e + working tree; observed 2026-10-22'
+reviewed_source: '35a3d32c + working tree; observed 2026-10-22'
 ---
 # Lifecycle Function
 
@@ -84,7 +85,13 @@ GitHub runs through `workflow_run` events.
   SYSTEM's own logins, because it passes no token variables to `az`, `gh` and `git`. `az` uses the VM's managed
   identity (Owner on the factory subscription, Graph `Group.ReadWrite.All` and `User.Read.All` for the team group);
   `gh` uses a classic PAT from Key Vault with `repo`, `workflow` and `read:org`, checked before the script changes
-  anything (observed 2026-10-22: `gh auth login` refused a classic token without `read:org`).
+  anything (observed 2026-10-22: `gh auth login` refused a classic token without `read:org`). The same identity needs
+  Reader on every network in another subscription that is peered with a network in the factory subscription
+  (observed 2026-10-22 on the real pass): the bootstrap's network-foundation review follows those peerings to check
+  address overlaps, an ARM 403 makes it a blocked review, and under whole-workflow consent the API's own continuation
+  then stops as `uncertain` with only `stage-execution-interrupted` in phase `authorization-continuation` (the API logs
+  nothing). Reader on the one peered hub network fixed it; the API's verified-boundary recovery resumed the workflow
+  without repeating verified stages. The Function's scenario 1 operation stays terminal and does not follow it.
 - **Events**: the relay workflow signs `workflow_run` payloads like a GitHub webhook; the Function checks
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.

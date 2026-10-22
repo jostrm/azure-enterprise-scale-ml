@@ -4,6 +4,8 @@ A reusable Azure Functions template (Python v2 model) that runs six AI Factory l
 Factory API - over REST (option 1) or the `azurefactory` Python SDK (option 2) - and follows every run through
 GitHub workflow events until it succeeds or fails.
 
+Every secret and identity, and the full solution with copyable examples: [README_More_Info.md](README_More_Info.md).
+
 | # | Scenario | Route segment | Input | What it does |
 |---|---|---|---|---|
 | 1 | Init AI Factory | `init-factory` | `factoryId` | Catalog entry, then connectivity, scale set 001 (common RG + vNet) and project001 |
@@ -233,6 +235,10 @@ Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Au
   - SYSTEM's `az` logged in with `az login --identity`; the VM's managed identity has Owner on the factory
     subscription and the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All` (a Privileged Role
     Administrator grants them; the bootstrap creates the team group);
+  - Reader for the same identity on every virtual network in another subscription that is peered with a network in
+    the factory subscription, for example a connectivity hub's: the bootstrap's network-foundation stage follows those
+    peerings, and an ARM 403 there stops a whole-workflow bootstrap as `uncertain` (recovery steps in
+    [README_More_Info.md](README_More_Info.md));
   - Key Vault secret `aif-factory-api-key`: any long random value, the API's `X-API-Key`;
   - Key Vault secret `aif-factory-api-gh-token`: a classic GitHub PAT with `repo`, `workflow` and `read:org`, nothing
     more (`gh auth login` refuses a classic token without `read:org`, and the bootstrap pushes workflow files). The
