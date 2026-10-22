@@ -18,12 +18,41 @@ There are three ways to run it:
 | Playground experiment (`retrieval_only.py ask`) | LLM only, native multi-index MCP retrieval | Retrieval from both indexes; full summation still fails in the observed runs |
 | Full-text control (`retrieval_only.py full-text-sum`) | Same model, **no tools** | Exact LLM summation succeeded twice when both complete texts were supplied directly |
 
-**Where things stand:** the code and cloud runner are implemented; cloud writes
-and paid calls require approval. The full-text LLM test worked twice, but the
-Playground agent did not produce a complete total. The original native-ACL
-pipeline is still blocked by Text Split completeness checks. These are separate
-results, not a claim that the full split/ACL/image demo has passed. Source code
-and unit tests alone cannot establish that.
+**How the ACL scenario (S09) tests document-level security:** S09 checks that a
+user gets only the files their ADLS Gen2 folder ACLs allow, in every layer:
+Storage, Azure AI Search, the Foundry IQ knowledge base and a Foundry agent. Two
+folders under `s09-acl-demo/v1` hold synthetic files:
+
+| Folder | Files | Operator | Test user |
+| --- | --- | --- | --- |
+| `site-a-sales-team` | `north-region-q3-sales-memo.md`, `dealer-pricing-guide.md` | read | read (ACL entry) |
+| `site-b-finance-board` | `board-margin-forecast.md`, `executive-bonus-plan.md` | read | no entry |
+
+- **The test user needs no Azure RBAC role on Storage or AI Search.** Only POSIX
+  ACL entries give it access: read on the site A folder and its files, and
+  execute (traverse) on the container root and the parent folders. Its one role
+  is Foundry User, so it can call the agent. Don't give test or end users Storage
+  Blob Data Reader, Contributor or Owner: those data roles bypass ACLs.
+- Only the AI Search managed identity needs a data role: Storage Blob Data Reader,
+  limited by an ABAC condition to the S09 paths, so the indexer can read the
+  files and their ACLs.
+- The indexer stores each file's ACL in the permission fields `UserIds` and
+  `GroupIds`. Every query passes the signed-in user's Entra token in the
+  `x-ms-query-source-authorization` header, and AI Search drops the documents
+  that user can't read. The agent's knowledge-base MCP tool forwards the same
+  header.
+- Each file holds a unique access marker (for example `SITE-A-AURORA-12`), so you
+  can see which files reached an answer. `acl_scenario.py` runs the same
+  commands (`storage-check`, `search`, `retrieve`, `ask`) as the operator, or as
+  the test user with `--profile` pointing to the test user's own Azure CLI sign-in.
+
+Observed on 22 October 2026: the operator got all four files in every layer
+(its Storage Blob Data Contributor role also bypasses ACLs). The test user read
+both site A files and got HTTP 403 for both site B files; AI Search, the
+knowledge base and the agent returned site A only. Trimming follows the identity
+that calls the agent, so an application must call the agent on behalf of the
+signed-in user, never with a shared identity. Setup and commands:
+[S09: per-folder ACLs end to end](#s09-per-folder-acls-end-to-end-storage-ai-search-foundry-agent).
 
 ## Start here: run and check the calculator-free test
 
