@@ -7,7 +7,8 @@
     The Factory API runs az, gh and git with its own Windows user's logins and passes no token variables to them, and
     it seals confirmations for that user. This script makes SYSTEM that user:
     - gh is logged in for SYSTEM with a GitHub token read from Key Vault by the VM's managed identity (never printed),
-      with gh as git's credential helper, a git identity and long paths (the API publishes to the factory repo);
+      with gh as git's credential helper, a git identity and long paths (the API publishes to the factory repo).
+      A classic PAT needs the scopes repo, workflow and read:org; the script checks them before it changes anything;
     - az for SYSTEM must already be logged in with `az login --identity` (the managed identity needs the factory
       subscription's Owner role, plus Microsoft Graph Group.ReadWrite.All and User.Read.All for the team group);
     - the pinned release asset is downloaded with gh and checked against the release's SHA256SUMS.txt;
@@ -50,6 +51,32 @@ function Get-VaultSecret([string]$Name) {
     return (Invoke-RestMethod -Headers @{ Authorization = "Bearer $token" } -Uri $uri -TimeoutSec 15).value
 }
 
+function Get-MissingGitHubScope([string]$Granted) {
+    # A classic token for the API host: gh auth login requires repo and read:org (write:org and admin:org include it),
+    # and the bootstrap pushes workflow files to the factory repo, which needs workflow.
+    $have = @($Granted -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $missing = @()
+    if ($have -notcontains 'repo') { $missing += 'repo' }
+    if ($have -notcontains 'workflow') { $missing += 'workflow' }
+    if (-not ($have | Where-Object { @('read:org', 'write:org', 'admin:org') -contains $_ })) { $missing += 'read:org' }
+    return $missing
+}
+
+function Assert-GitHubTokenScope([string]$Token) {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri 'https://api.github.com/user' -TimeoutSec 15 `
+        -Headers @{ Authorization = "token $Token"; 'User-Agent' = 'aif-factory-api-host' }
+    if (-not $response.Headers.ContainsKey('X-OAuth-Scopes')) { return }  # fine-grained tokens list no scopes
+    $missing = @(Get-MissingGitHubScope ([string]::Join(',', @($response.Headers['X-OAuth-Scopes']))))
+    if ($missing.Count) {
+        throw ("The GitHub token in Key Vault secret '$GitHubTokenSecretName' lacks $($missing -join ', '). " +
+               'A classic PAT for the API host needs repo, workflow and read:org.')
+    }
+}
+
+# The GitHub token is checked before anything changes; it goes from Key Vault to gh's stdin, never written or printed.
+$token = Get-VaultSecret $GitHubTokenSecretName
+Assert-GitHubTokenScope $token
+
 foreach ($folder in @($InstallRoot, $ConsumerRoot)) {
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
     # SYSTEM and Administrators only: the runner account calls the API over loopback and never needs these folders.
@@ -57,8 +84,7 @@ foreach ($folder in @($InstallRoot, $ConsumerRoot)) {
     Invoke-Native icacls @((Join-Path $folder '*'), '/reset', '/T', '/C', '/Q')
 }
 
-# GitHub for SYSTEM: the token goes from Key Vault to gh's stdin and is never written or printed.
-$token = Get-VaultSecret $GitHubTokenSecretName
+# GitHub for SYSTEM.
 $token | gh auth login --hostname github.com --with-token
 if ($LASTEXITCODE -ne 0) { throw 'gh auth login failed.' }
 $token = $null

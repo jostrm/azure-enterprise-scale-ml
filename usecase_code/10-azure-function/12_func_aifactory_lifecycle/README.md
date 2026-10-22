@@ -219,6 +219,18 @@ Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Au
   are sealed for that user) with a fixed `AIFACTORY_CATALOG_OWNER`, and with that user's own `az` and `gh` logins: the
   API passes no token variables to the CLIs it runs. Keep a persistent clone of the factory repository outside the
   runner's `_work` folder; the API's `folder` is its `azurefactory` subfolder.
+  `scripts/install-factory-api-host.ps1` sets this up with SYSTEM as that user (run it on the VM, for example with
+  `az vm run-command invoke --command-id RunPowerShellScript --scripts @install-factory-api-host.ps1 --parameters
+  KeyVaultName=<vault>`): a pinned release checked against its `SHA256SUMS.txt`, a startup task, `gh` logged in from Key
+  Vault. It needs, before it runs:
+  - SYSTEM's `az` logged in with `az login --identity`; the VM's managed identity has Owner on the factory
+    subscription and the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All` (a Privileged Role
+    Administrator grants them; the bootstrap creates the team group);
+  - Key Vault secret `aif-factory-api-key`: any long random value, the API's `X-API-Key`;
+  - Key Vault secret `aif-factory-api-gh-token`: a classic GitHub PAT with `repo`, `workflow` and `read:org`, nothing
+    more (`gh auth login` refuses a classic token without `read:org`, and the bootstrap pushes workflow files). The
+    script checks the scopes before it changes anything. Classic, because the factory repository doesn't exist yet
+    when the bootstrap creates it.
 - **The runner entry point** on the same VM: `C:\aif-lifecycle\app` (this folder), `venv\` with `requirements.txt`, and
   `runner.json` with `AIF_FACTORY_API_URL`, `AIF_FACTORY_FOLDER`, `AIF_KEY_VAULT_NAME` and
   `AIF_FACTORY_API_KEY_NAME` (the VM's managed identity reads the key). The ops repository gets variable

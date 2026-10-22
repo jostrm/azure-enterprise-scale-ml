@@ -72,7 +72,11 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
 2. On the management VM, run the Factory API (loopback only) as a service of one fixed Windows user with that user's
    own `az` and `gh` logins, keep a clone of the factory repo outside the runner's work folder, and install the runner
    entry point with `scripts\install-lifecycle-runner.ps1` (the API URL, the factory repo's `azurefactory` folder and
-   the Key Vault names go into `runner.json`).
+   the Key Vault names go into `runner.json`). `scripts\install-factory-api-host.ps1` installs the API with SYSTEM as
+   that user. Before you run it: `az login --identity` for SYSTEM; the VM's managed identity needs Owner on the factory
+   subscription plus the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All`; Key Vault needs
+   `aif-factory-api-key` (a long random value) and `aif-factory-api-gh-token`, a classic GitHub PAT with exactly `repo`,
+   `workflow` and `read:org` (`gh auth login` refuses a classic token without `read:org`).
 3. The first prepare answers 503 `catalog-pending` while the runner reads the catalog; `POST /api/v1/catalog/refresh`
    reads it again after changes made outside the Function.
 

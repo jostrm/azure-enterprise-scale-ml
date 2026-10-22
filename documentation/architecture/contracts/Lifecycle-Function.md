@@ -25,6 +25,7 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-dummy-step.yml
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-ops.yml
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-lifecycle-runner.ps1
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -36,12 +37,13 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_runner_executor.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_runner_cli.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_workflow_templates.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_api_host_installer.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: 'd37376d1 + working tree; observed 2026-10-22'
+reviewed_source: '6df0d00e + working tree; observed 2026-10-22'
 ---
 # Lifecycle Function
 
@@ -76,6 +78,11 @@ GitHub runs through `workflow_run` events.
   that every result refreshes. Because the Factory API refuses to dispatch `factory-lifecycle.yml` while any other
   workflow of the factory repo runs, the Function's workflows live in a separate ops repository, and API-dispatched
   runs are followed through the API's job status.
+- **Factory API host** (`scripts/install-factory-api-host.ps1`): the API runs as SYSTEM on the management VM with
+  SYSTEM's own logins, because it passes no token variables to `az`, `gh` and `git`. `az` uses the VM's managed
+  identity (Owner on the factory subscription, Graph `Group.ReadWrite.All` and `User.Read.All` for the team group);
+  `gh` uses a classic PAT from Key Vault with `repo`, `workflow` and `read:org`, checked before the script changes
+  anything (observed 2026-10-22: `gh auth login` refused a classic token without `read:org`).
 - **Events**: the relay workflow signs `workflow_run` payloads like a GitHub webhook; the Function checks
   `X-Hub-Signature-256`, deduplicates on `X-GitHub-Delivery`, correlates through the run name and can process through a
   storage queue whose messages it signs itself. A timer polls runs whose events are late.
