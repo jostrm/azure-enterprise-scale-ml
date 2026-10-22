@@ -1,0 +1,7 @@
+[
+  {"id": "REWARDS-TIERS", "Category": "Rewards", "ProductName": "Zava Rewards loyalty tiers", "ProductDescription": "Zava Rewards has three tiers based on spend in the last 12 months. Bronze: under $500, 5% member discount. Silver: $500 to $1,999, 10% member discount. Gold: $2,000 or more, 15% member discount and free delivery."},
+  {"id": "REWARDS-BLACK-FRIDAY", "Category": "Rewards", "ProductName": "Black Friday promotional tiers", "ProductDescription": "Black Friday weekend adds a promotional discount on top of the member discount. Bronze members get 10% extra, Silver members 15% extra and Gold members 20% extra on paint and painting supplies. Tools get 10% extra for every tier. The combined discount is capped at 30%."},
+  {"id": "CUSTOMER-C1001", "Category": "Customer loyalty", "ProductName": "Customer Anna Berg", "ProductDescription": "Customer Anna Berg (customer id C1001) is a Gold member with $2,640 spend in the last 12 months."},
+  {"id": "CUSTOMER-C1002", "Category": "Customer loyalty", "ProductName": "Customer Lars Nilsson", "ProductDescription": "Customer Lars Nilsson (customer id C1002) is a Silver member with $910 spend in the last 12 months."},
+  {"id": "CUSTOMER-C1003", "Category": "Customer loyalty", "ProductName": "Customer Mia Holm", "ProductDescription": "Customer Mia Holm (customer id C1003) is a Bronze member with $180 spend in the last 12 months."}
+]

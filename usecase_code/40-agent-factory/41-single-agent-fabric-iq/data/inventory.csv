@@ -1,0 +1,13 @@
+ProductId,ProductName,StoreLocation,QuantityOnHand,ReorderPoint,InventoryStatus
+PROD000030,Zava Pure White Interior Paint 4L,Stockholm City,6,20,At risk of stockout
+PROD000145,Zava Sage Green Interior Paint 4L,Stockholm City,4,15,At risk of stockout
+PROD000222,Zava Midnight Blue Accent Paint 2.5L,Gothenburg,3,10,At risk of stockout
+PROD000262,Zava Warm Sand Interior Paint 4L,Malmo,5,15,At risk of stockout
+PROD000281,Zava Pro Paint Sprayer 600W,Stockholm City,2,5,At risk of stockout
+PROD000302,Zava Precision Masking Tape 36mm x 50m,Gothenburg,12,40,At risk of stockout
+PROD000375,Zava Roller and Tray Kit 9in,Malmo,7,20,At risk of stockout
+PROD000478,Zava Angled Sash Brush Set (3),Stockholm City,6,15,At risk of stockout
+PROD000486,Zava Drop Cloth Canvas 3.6 x 2.7m,Gothenburg,3,10,At risk of stockout
+PROD000511,Zava Oak Floating Shelf 90cm,Malmo,1,4,At risk of stockout
+PROD000590,Zava Linen Look Curtains 140 x 250cm,Stockholm City,38,10,In stock
+PROD000612,Zava Primer and Sealer 4L,Gothenburg,54,15,In stock

@@ -1,0 +1,6 @@
+python-dotenv
+openai==2.54.0
+azure-identity
+azure-ai-projects==2.4.0
+aiohttp
+requests

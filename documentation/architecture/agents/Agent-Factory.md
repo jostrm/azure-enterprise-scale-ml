@@ -50,6 +50,16 @@ sources:
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted_package.py
   - environment_setup/aifactory/bicep/README.md
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/readme.md
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/agents.py
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/chat.py
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/setup_knowledge.py
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/workflow.yaml
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/parameters.env.template
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/requirements.txt
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/data/products.json
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/data/rewards.json
+  - usecase_code/40-agent-factory/41-single-agent-fabric-iq/data/inventory.csv
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -77,13 +87,14 @@ tests:
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_usecases.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_offline.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_cli.py
+  - usecase_code/40-agent-factory/tests/test_fabric_iq_usecase.py
 graph_symbols:
   - usecase_code/40-agent-factory/agent_factory/cli.py::function:run
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py::class:AgentServiceFactory
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/runtime.py::class:SalesRuntime
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/runtime.py::class:MLRuntime
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted.py::class:HostedAgent
-reviewed_source: 'af75afe9; observed 2026-10-21; no live deployment asserted'
+reviewed_source: 'af75afe9 + 41-single-agent-fabric-iq; observed 2026-10-22 (41 run live on project001 Foundry IQ path; Fabric IQ path not run); no other live deployment asserted'
 ---
 # Agent Factory
 
@@ -95,6 +106,7 @@ reviewed_source: 'af75afe9; observed 2026-10-21; no live deployment asserted'
 | Prompt agents | Persistent versioned Foundry definitions with catalogued roles and allowed tools. |
 | Hosted examples | Framework-specific runtime and package construction; they are not independent factory provisioning engines. |
 | Multi-agent examples | Knowledge/reviewer collaboration pattern; role names alone do not grant additional tools or permissions. |
+| `41-single-agent-fabric-iq` | Standalone lab-style example outside the operator CLI: `setup_knowledge.py` creates a Search knowledge base and its RemoteTool project connection, `agents.py` versions four prompt agents plus a Foundry workflow (the supervisor routes by agent name), `chat.py` invokes it. Inventory uses `FabricIQPreviewTool` only when a Fabric connection is set; otherwise a tool-less agent refuses to guess stock. Foundry workflows retire 2026-12-01. |
 | `40-aifactory-agent` application | Grounded Factory Chat, exact-scope authorization, existing API adapters and durable human-approved operations. |
 | Backend functions | Execute client-side tool implementations. Creating a Foundry definition alone does not host those functions. |
 | Factory Chat Agent step (`46-factory-chat-agent`, task `70-factory-chat-agent`, `enableFactoryChatAgent`) | Opt-in late project-pipeline step that creates or versions the owned Foundry prompt agent from the canonical definition; idempotent by definition hash, never deletes, refuses a foreign owner. A delete-all flag conflicts with it and fails validation. |

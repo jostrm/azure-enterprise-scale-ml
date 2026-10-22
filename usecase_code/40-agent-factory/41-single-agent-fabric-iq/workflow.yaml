@@ -1,0 +1,65 @@
+kind: workflow
+trigger:
+    kind: OnConversationStart
+    id: trigger_wf
+    actions:
+        - kind: SetVariable
+          id: action-1768237669100
+          variable: Local.Var2679
+          value: =System.LastMessage
+        - kind: InvokeAzureAgent
+          id: action-1768237693978
+          agent:
+            name: Supervisor-Agent
+          conversationId: =System.ConversationId
+          input:
+            messages: =Local.Var2679
+          output:
+            autoSend: false
+            messages: Local.Var5755
+        - kind: ConditionGroup
+          conditions:
+            - condition: =Last(Local.Var5755).Text = "Sales-Associate-Agent"
+              actions:
+                - kind: InvokeAzureAgent
+                  id: action-1768237857121
+                  agent:
+                    name: Sales-Associate-Agent
+                  conversationId: =System.ConversationId
+                  input:
+                    messages: =Local.Var2679
+                  output:
+                    autoSend: true
+              id: if-action-1768237712578-0
+            - condition: =Last(Local.Var5755).Text = "Rewards-Campaign-Agent"
+              actions:
+                - kind: InvokeAzureAgent
+                  id: action-1768237897049
+                  agent:
+                    name: Rewards-Campaign-Agent
+                  conversationId: =System.ConversationId
+                  input:
+                    messages: =Local.Var2679
+                  output:
+                    autoSend: true
+              id: if-action-1768237712578-0p9xo7ga
+            - condition: =Last(Local.Var5755).Text = "Inventory-Agent"
+              actions:
+                - kind: InvokeAzureAgent
+                  id: action-1768237934785
+                  agent:
+                    name: Inventory-Agent
+                  conversationId: =System.ConversationId
+                  input:
+                    messages: =Local.Var2679
+                  output:
+                    autoSend: true
+              id: if-action-1768237712578-ma22fceo
+          id: action-1768237712578
+          elseActions:
+            - kind: SendActivity
+              activity: " "
+              id: action-1768238054760
+id: ""
+name: FoundryIQ-Workflow
+description: ""
