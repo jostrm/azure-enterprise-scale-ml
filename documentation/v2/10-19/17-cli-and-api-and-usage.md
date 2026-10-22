@@ -10,6 +10,20 @@ SDK**, or direct **HTTP requests** to integrate AI Factory configuration into
 their own UX. These are clients of the Config Wizard API, not separate
 implementations of Azure provisioning logic.
 
+## 6 common scenarios all tools support
+
+The Configuration Wizard, CLI, REST API and Python SDK cover the same six
+common scenarios. Each SDK call below is a client of the same Config Wizard API.
+
+| Scenario | SDK call |
+|---|---|
+| 1. Init AI Factory | `factory_create_prepare` / `bootstrap_*` |
+| 2. Add scaleset | `scaleset_add_prepare` |
+| 3. Add or update project | `project_add_prepare` + `project_deployment_*` |
+| 4. Delete project | `project_delete_prepare` |
+| 5. Delete scaleset | `scaleset_delete_prepare` |
+| 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` |
+
 ## Shared API: Tkinter and MAUI
 
 The Tkinter application is the canonical backend. The MAUI build packages that
