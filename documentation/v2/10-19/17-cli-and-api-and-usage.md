@@ -15,14 +15,14 @@ implementations of Azure provisioning logic.
 The Configuration Wizard, CLI, REST API and Python SDK cover the same six
 common scenarios. Each SDK call below is a client of the same Config Wizard API.
 
-| Scenario | SDK call |
-|---|---|
-| 1. Init AI Factory | `factory_create_prepare` / `bootstrap_*` |
-| 2. Add scaleset | `scaleset_add_prepare` |
-| 3. Add or update project | `project_add_prepare` + `project_deployment_*` |
-| 4. Delete project | `project_delete_prepare` |
-| 5. Delete scaleset | `scaleset_delete_prepare` |
-| 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` |
+| Scenario | SDK call | Outcome |
+|---|---|---|
+| 1. Init AI Factory | `factory_create_prepare` / `bootstrap_*` | Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones. |
+| 2. Add scaleset | `scaleset_add_prepare` | Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group. |
+| 3. Add or update project | `project_add_prepare` + `project_deployment_*` | Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists. |
+| 4. Delete project | `project_delete_prepare` | The project resource group is deleted. |
+| 5. Delete scaleset | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. |
+| 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. |
 
 ## Shared API: Tkinter and MAUI
 
