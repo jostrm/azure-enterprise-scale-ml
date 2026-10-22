@@ -37,6 +37,8 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/retrieval_experiment.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/check_sum.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/sum_evaluation.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/acl_scenario.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/acl_scenario.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/readme.md
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/main.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/hosted_main.py
@@ -80,6 +82,7 @@ tests:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/tests/test_sync_cli.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/tests/test_retrieval_experiment.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/tests/test_sum_evaluation.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/tests/test_acl_scenario.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_agent.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_plan.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/tests/test_runtime.py
@@ -95,7 +98,7 @@ graph_symbols:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/runtime.py::class:SalesRuntime
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/runtime.py::class:MLRuntime
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted.py::class:HostedAgent
-reviewed_source: 'af75afe9 + 42-multi-agent-fabric-iq; observed 2026-10-22 (42-multi-agent-fabric-iq run live on project001 incl. Fabric IQ on an F2 capacity, paused after the run); no other live deployment asserted'
+reviewed_source: '117f877e + 48 S09 per-folder ACL scenario (offline tests only at review time); observed 2026-10-22 (42-multi-agent-fabric-iq run live on project001 incl. Fabric IQ on an F2 capacity, paused after the run); no other live deployment asserted'
 ---
 # Agent Factory
 
@@ -167,6 +170,18 @@ text or accepts inconsistent offsets merely because three chunks were returned.
 Deferred primary/regional/additional-service RBAC and network parity work is
 tracked in the [Bicep README](../../../environment_setup/aifactory/bicep/README.md)'s
 project-creation TODO list, not silently implemented through use-case deployment scripts.
+
+Scenario S09 (`acl_scenario.py`, `sales_demo/acl_scenario.py`) is a separate,
+synthetic per-folder ACL check without Text Split, embeddings or a calculator. Two
+task-owned "site" folders admit a test user to one and the operator to both. Search
+ingests only `userIds`/`groupIds` (never `rbacScope`, so broad operator data roles
+cannot widen results) into a permission-filtered index and trims queries by
+`x-ms-query-source-authorization`. The S09 agent's MCP tool forwards a required
+per-request structured input as that header, because permission-enabled knowledge
+sources return unfiltered results without a user token. Shared ancestors (the
+container root) are read and reported, never changed by the code; the Search
+identity's read grant is a printed path-scoped ABAC condition. Azure RBAC data
+roles override ACLs, so the denied half needs a test user without Storage roles.
 
 The optional Graph extension uses stable tenant/drive/item IDs and permission-aware
 root delta, with `Prefer: includesecuritywebhooks` on business security-subscription

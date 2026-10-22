@@ -698,6 +698,80 @@ and client authentication each have their own delays, so this is not an
 instantaneous-revocation SLA. Keep access disabled while a required resync is
 unfinished rather than serving a cached answer.
 
+## S09: per-folder ACLs end to end (Storage, AI Search, Foundry agent)
+
+S09 answers one question: **does a user see only the documents their ADLS Gen2
+folder ACLs allow, all the way from Storage through AI Search to a Foundry
+agent?** It is separate from the split-table pipeline: one document per file, no
+Text Split, embeddings or calculator, so the Text Split blocker does not apply.
+
+`acl_scenario.py` publishes four short synthetic documents under one task-owned
+folder, in two simulated "sites":
+
+| Folder | Test user | Operator |
+| --- | --- | --- |
+| `<root>/site-a-sales-team/` | read | read |
+| `<root>/site-b-finance-board/` | no entry | read |
+
+Each document carries an access marker (for example `SITE-B-ORION-77`), so an
+answer shows exactly which files reached the model.
+
+- **Storage** enforces the folder ACLs on the user's own direct reads.
+- **AI Search** ingests the ACLs (`indexerPermissionOptions: userIds, groupIds`,
+  deliberately **without** `rbacScope`) into a permission-filtered index and trims
+  each query by the token in `x-ms-query-source-authorization`.
+- **The agent** forwards that token per request. Its MCP tool sends
+  `x-ms-query-source-authorization: {{search_auth_token}}`, a required structured
+  input, so the knowledge base retrieves as the calling user.
+
+**Identities matter.** Azure RBAC data roles override ACLs: an operator with
+Storage Blob Data Contributor reads every folder directly whatever the ACL says.
+Use a **test user with no Storage data role** for the "denied" half. `rbacScope`
+is excluded from ingestion so such broad roles cannot widen Search results either.
+Without a user token, permission-enabled knowledge sources return unfiltered
+results, which is why the agent declares the token as required.
+
+Keep the consumer approval and identities outside the template, for example
+`$State\s09-acl-scenario.json`:
+
+```json
+{"approved": true, "root": "s09-acl-demo/v1", "test_user_id": "<test user object ID>",
+ "operator_user_id": "<operator object ID>", "model_deployment": "<model deployment>"}
+```
+
+Shared ancestors are checked, never broadened by the code. A Storage superuser
+adds traversal (`--x`) for both readers on the container root; `root-acl` prints
+the exact ACL to set. The Search identity needs read access to exactly the S09
+objects; `condition` prints a path-scoped ABAC condition for its Storage Blob Data
+Reader assignment. The project identity needs Search Index Data Reader. The test
+user needs no Azure role at all.
+
+```powershell
+$Scenario = "$State\s09-acl-scenario.json"
+& $Python acl_scenario.py plan --config $Config --scenario $Scenario
+& $Python acl_scenario.py root-acl --config $Config --scenario $Scenario
+& $Python acl_scenario.py condition --config $Config --scenario $Scenario
+# Only after approval of the folder, ACL, Search and agent changes:
+& $Python acl_scenario.py publish --config $Config --scenario $Scenario --apply
+& $Python acl_scenario.py configure --config $Config --scenario $Scenario --apply
+& $Python acl_scenario.py deploy --config $Config --scenario $Scenario --apply
+
+# Sign the test user in to its own Azure CLI profile (az login --allow-no-subscriptions
+# with a temporary AZURE_CONFIG_DIR), then compare both identities:
+$TestUser = "<folder of the test user's Azure CLI profile>"
+foreach ($profile in @($null, $TestUser)) {
+  $who = if ($profile) { @("--profile", $profile) } else { @() }
+  & $Python acl_scenario.py storage-check --config $Config --scenario $Scenario @who
+  & $Python acl_scenario.py search --config $Config --scenario $Scenario @who
+  & $Python acl_scenario.py retrieve --config $Config --scenario $Scenario @who
+  & $Python acl_scenario.py ask --config $Config --scenario $Scenario --allow-paid @who
+}
+```
+
+Each user command prints the caller's identity, the result and the titles the ACL
+plan expects for that identity. Permission changes reach Search only on the next
+indexer run, so rerun the indexer after changing an ACL.
+
 ## Separate image-serving branch
 
 The DOCX contains an original car illustration with a visual detail that is not
