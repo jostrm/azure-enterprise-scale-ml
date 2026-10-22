@@ -28,6 +28,19 @@ else
   exit 1
 fi
 
+# Upload names whose .env key has another spelling (.env.template keeps the old keys, union rule).
+# A value under the upload name wins; otherwise the other spelling fills it.
+declare -A env_spellings=(
+  [ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET]=ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET
+  [INPUT_COMMON_SPSECRET_KEY]=INPUT_COMMON_SP_SECRET_KEY
+)
+for upload_name in "${!env_spellings[@]}"; do
+  spelling="${env_spellings[$upload_name]}"
+  if [[ -z "${!upload_name:-}" && -n "${!spelling:-}" ]]; then
+    printf -v "$upload_name" '%s' "${!spelling}"
+  fi
+done
+
 if [ -z "$GITHUB_NEW_REPO" ]; then
   echo -e "${RED}Error: GITHUB_NEW_REPO is not set in .env. Example: org/repo or user/repo.${NC}"
   exit 1

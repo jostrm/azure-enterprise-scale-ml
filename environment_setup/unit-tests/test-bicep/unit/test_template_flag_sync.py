@@ -3,10 +3,13 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 import pytest
 import yaml
+
+import run_ci
 
 ROOT = Path(__file__).resolve().parents[4]
 INFRA = ROOT / "environment_setup/aifactory"
@@ -38,6 +41,12 @@ ENV_NAMES = {
     "skipDiagSpeech": "SKIP_DIAG_SPEECH", "skipDiagVision": "SKIP_DIAG_VISION",
 }
 UPLOAD_SCRIPT = GHA / "03a-GH-create-or-update-github-variables.sh"
+# Names 03a reads from .env although .env.template leaves them out on purpose: name -> reason.
+UNTEMPLATED_UPLOADS = {
+    "PROJECT_IP_WHITELIST": "no workflow reads vars.PROJECT_IP_WHITELIST; preflight only falls back to it after "
+                            "project_IP_whitelist, which the workflows set from the PROJECT_MEMBERS_IP_ADDRESS "
+                            "secret, and that secret must not become a plain variable",
+}
 
 
 def variables_uploaded_by_03a():
@@ -45,6 +54,36 @@ def variables_uploaded_by_03a():
     repo_level = re.search(r"^repo_level_vars=\((.*?)^\)", script, re.M | re.S).group(1)
     names = set(re.findall(r'^\s*"([A-Z][A-Z0-9_]*)"', repo_level, re.M))
     return names | set(re.findall(r'create_or_update_variable \S+ "([A-Z][A-Z0-9_]*)"', script))
+
+
+def env_names_read_by_03a():
+    """The .env names 03a uploads: each repo-level name, and the source of each explicit upload."""
+    script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
+    repo_level = re.search(r"^repo_level_vars=\((.*?)^\)", script, re.M | re.S).group(1)
+    names = set(re.findall(r'^\s*"([A-Z][A-Z0-9_]*)"', repo_level, re.M))
+    return names | set(re.findall(
+        r'create_or_update_(?:variable|secret) \S+ "[A-Z][A-Z0-9_]*" "\$\{?([A-Z][A-Z0-9_]*)', script))
+
+
+def upload_spellings():
+    """03a's env_spellings map: upload name -> the other .env spelling that fills it."""
+    block = re.search(r"^declare -A env_spellings=\((.*?)^\)", UPLOAD_SCRIPT.read_text(encoding="utf-8"),
+                      re.M | re.S)
+    assert block, "03a lost its env_spellings map"
+    return dict(re.findall(r"\[([A-Z][A-Z0-9_]*)\]=([A-Z][A-Z0-9_]*)", block.group(1)))
+
+
+def env_after_03a_spellings(env_file):
+    """Source env_file the way 03a does, apply its spelling block, print the resolved names."""
+    script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
+    block = re.search(r"^declare -A env_spellings=\(.*?^done$", script, re.M | re.S).group(0)
+    names = " ".join(upload_spellings())
+    probe = (f"set -eo pipefail\nset -o allexport\nsource {env_file.name}\nset +o allexport\n{block}\n"
+             f'for name in {names}; do printf "%s=%s\\n" "$name" "${{!name:-}}"; done\n')
+    result = subprocess.run([run_ci.find_bash(), "--noprofile", "--norc", "-c", probe], cwd=env_file.parent,
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
 
 def load_override():
@@ -148,6 +187,37 @@ def test_every_env_key_the_github_workflows_read_is_uploaded_by_03a():
     read = {name for workflow in GHA.glob("*.yml")
             for name in re.findall(r"\bvars\.([A-Z][A-Z0-9_]*)", workflow.read_text(encoding="utf-8"))}
     assert sorted((read & env) - variables_uploaded_by_03a()) == []
+
+
+def test_every_name_03a_uploads_comes_from_the_env_template_or_a_spelling_alias():
+    # 03a uploaded ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET while the template spells it ..._BEHINDVNET, so on the
+    # .env route the workflows always fell back to 'false'.
+    env = set(re.findall(r"^([A-Z][A-Z0-9_]*)=", (GHA / ".env.template").read_text(encoding="utf-8"), re.M))
+    spellings = upload_spellings()
+    assert sorted(spellings.keys() - env_names_read_by_03a()) == [], "map only names 03a uploads"
+    assert sorted(spellings.keys() & set(spellings.values())) == [], "no chained spellings"
+    assert sorted(spelling for spelling in spellings.values() if spelling not in env) == []
+    assert all(reason.strip() for reason in UNTEMPLATED_UPLOADS.values())
+    assert sorted(UNTEMPLATED_UPLOADS.keys() & env) == [], "remove exceptions the template now defines"
+    assert sorted(env_names_read_by_03a() - env - spellings.keys() - UNTEMPLATED_UPLOADS.keys()) == []
+
+
+PUBLIC_ACCESS = "ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET"
+
+
+@pytest.mark.parametrize("lines,name,expected", [
+    (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="true"'], PUBLIC_ACCESS, "true"),
+    (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="false"'], PUBLIC_ACCESS, "false"),
+    (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="false"', 'ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET="true"'], PUBLIC_ACCESS, "true"),
+    (['ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="true"', 'ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET=""'], PUBLIC_ACCESS, "true"),
+    (['ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET="false"'], PUBLIC_ACCESS, "false"),
+    ([], PUBLIC_ACCESS, ""),
+    (['INPUT_COMMON_SP_SECRET_KEY="esml-common-sp-secret"'], "INPUT_COMMON_SPSECRET_KEY", "esml-common-sp-secret"),
+])
+def test_03a_fills_upload_names_from_either_spelling(tmp_path, lines, name, expected):
+    env_file = tmp_path / ".env"
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    assert env_after_03a_spellings(env_file)[name] == expected
 
 
 def test_github_source_coverage_accounts_for_provider_aliases_and_exclusions():

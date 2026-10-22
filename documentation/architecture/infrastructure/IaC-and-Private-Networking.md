@@ -222,10 +222,22 @@ public network access disabled (and outbound access restricted) when the effecti
 `allowPublicAccessWhenBehindVnet` is false, so IP-allow-list access from outside the VNet
 stops. To keep public access, set the GitHub variable
 `ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET=true` or `allowPublicAccessWhenBehindVnet: "true"`
-in variables.json. With the `.env` route the effective value is `false` whatever `.env`
-says: `.env.template` spells the key `ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET`, while
-`03a-GH-create-or-update-github-variables.sh` uploads only
-`ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET`. `unit/test_genai_parameter_parity.py` compares the
+in variables.json. On the `.env` route, `.env.template` spells the key
+`ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET`. Until 2026-10-22,
+`03a-GH-create-or-update-github-variables.sh` uploaded only
+`ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET`, so a `.env` with only the template key fell back to
+`false` whatever that key said (bootstrap-written `.env` files carry both spellings and were
+not affected). Its `env_spellings` map now fills the upload name from either spelling; the
+upload name wins when both are set. Upgrade note: rerunning the upload then publishes the
+template key's value, and the template default is `"true"`. A factory that ran effectively
+private then gets public endpoints limited to its IP allow list on the next infra run
+(AI Foundry and, since 7040e1f6, the four cognitive accounts). To stay private, set
+`ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET="false"` first. Consumers run their root copy
+`10-GH-create-or-update-github-variables.sh`, so after bumping the submodule refresh it
+(`bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh`) before running it.
+`unit/test_template_flag_sync.py` checks that every name 03a reads from `.env` comes from
+`.env.template` or that map, except the reviewed `PROJECT_IP_WHITELIST`.
+`unit/test_genai_parameter_parity.py` compares the
 parameter names each provider passes to every GenAI phase template. Its `KNOWN_GAPS`
 lists the remaining reviewed differences, and closing one must remove its entry.
 
