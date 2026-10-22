@@ -28,7 +28,7 @@ own commands, required inputs and expected results.
 <sub><code>Agents</code> <code>Hosted agents</code> <code>RAG</code></sub>
 </td>
 <td align="center" valign="top" width="33%">
-<a href="41-single-agent-fabric-iq/readme.md"><b>Retail agents on Foundry IQ and Fabric IQ</b></a><br>
+<a href="42-multi-agent-fabric-iq/readme.md"><b>Retail agents on Foundry IQ and Fabric IQ</b></a><br>
 <sub>A supervisor workflow routes retail questions to Foundry IQ and Fabric IQ prompt agents.</sub><br>
 <sub><code>Multi-agent</code> <code>Foundry IQ</code> <code>Fabric IQ</code></sub>
 </td>
@@ -103,8 +103,8 @@ own commands, required inputs and expected results.
       github-copilot-sdk\
       custom\
       anthropic-agents\
-  41-single-agent-fabric-iq\   Minimal lab code: supervisor workflow over Foundry IQ and Fabric IQ agents
   42-multi-agent\              Hosted knowledge -> reviewer -> synthesis team
+  42-multi-agent-fabric-iq\    Minimal lab code: supervisor workflow over Foundry IQ and Fabric IQ agents
   43-data\                     Managed-identity ingestion and optional Azure-hosted worker
   44-azure-mcp\                Private, read-only Azure inventory service setup
   45-rag-agent\                Explicit source-bound common/project storage RAG
@@ -119,8 +119,8 @@ own commands, required inputs and expected results.
 | [40-aifactory-agent](40-aifactory-agent/readme.md) | Its own environment/configuration and `python -m aifactory_agent`; optional private web service. |
 | [40-aifactory-agent-v2](40-aifactory-agent-v2/readme.txt) | Not runnable; use the implemented sibling above. |
 | [41-single-agent](41-single-agent/readme.md) | Choose a [prompt agent](41-single-agent/prompt-agent/readme.md) or [hosted framework](41-single-agent/hosted-agent/readme.md), then shared `plan`, `deploy`, `invoke`. |
-| [41-single-agent-fabric-iq](41-single-agent-fabric-iq/readme.md) | Its own environment and `parameters.env`: `setup_knowledge.py`, optional `setup_fabric.py` (paid F2 Fabric capacity), `agents.py`, then `chat.py`; no operator CLI. |
 | [42-multi-agent](42-multi-agent/readme.md) | Deploy knowledge/reviewer participants, then the hosted team; invoke its persisted name. |
+| [42-multi-agent-fabric-iq](42-multi-agent-fabric-iq/readme.md) | Its own environment and `parameters.env`: `setup_knowledge.py`, optional `setup_fabric.py` (paid F2 Fabric capacity), `agents.py`, then `chat.py`; no operator CLI. |
 | [43-data](43-data/readme.md) | Shared `*-datafactory` commands; optional `worker.py` runs only on approved managed-identity compute. |
 | [44-azure-mcp](44-azure-mcp/readme.md) | `44-azure-mcp\deploy.py` for infrastructure planning; shared commands configure/verify the connection. |
 | [45-rag-agent](45-rag-agent/readme.md) | `45-rag-agent\main.py` with one explicit `--source`; its own prepare/deploy/ask lifecycle. |

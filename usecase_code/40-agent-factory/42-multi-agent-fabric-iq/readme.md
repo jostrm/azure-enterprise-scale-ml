@@ -78,7 +78,7 @@ stock can't be checked yet and never guesses.
 ## How to set up the Python environment
 
 ```powershell
-Set-Location "C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml\usecase_code\40-agent-factory\41-single-agent-fabric-iq"
+Set-Location "C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml\usecase_code\40-agent-factory\42-multi-agent-fabric-iq"
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
 Copy-Item .\parameters.env.template .\parameters.env
@@ -137,7 +137,7 @@ az rest --method post --url "https://management.azure.com$CapacityId/resume?api-
 Offline contract tests (no Azure calls), from the factory root `40-agent-factory`:
 
 ```powershell
-.\41-single-agent-fabric-iq\.venv\Scripts\python.exe -m unittest tests.test_fabric_iq_usecase -v
+.\42-multi-agent-fabric-iq\.venv\Scripts\python.exe -m unittest tests.test_fabric_iq_usecase -v
 ```
 
 ## Lifecycle notes

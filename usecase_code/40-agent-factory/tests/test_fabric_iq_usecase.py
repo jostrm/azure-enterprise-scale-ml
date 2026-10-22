@@ -1,4 +1,4 @@
-"""Offline contract tests for 41-single-agent-fabric-iq (no Azure calls)."""
+"""Offline contract tests for 42-multi-agent-fabric-iq (no Azure calls)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "41-single-agent-fabric-iq"
+EXAMPLE = Path(__file__).resolve().parents[1] / "42-multi-agent-fabric-iq"
 SPECIALISTS = {"Sales-Associate-Agent", "Rewards-Campaign-Agent", "Inventory-Agent"}
 
 
