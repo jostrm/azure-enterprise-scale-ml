@@ -1,5 +1,9 @@
 # Split tables: native ADLS permissions, multi-index RAG and exact sales
 
+<p align="center">
+  <img src="./images/rag-split-tables-acl.gif" alt="Animated DataOps and RAG flow: governed knowledge and the user's verified access context limit retrieval before a grounded answer" width="720">
+</p>
+
 Can an LLM add up every sale when the data spans two search indexes? What happens
 when a table is too large to embed in one piece?
 

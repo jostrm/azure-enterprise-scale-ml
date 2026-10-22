@@ -1,5 +1,9 @@
 # RAG from the AI Factory shared lake or project storage
 
+<p align="center">
+  <img src="./images/rag-agent.gif" alt="Animated RAG flow: approved documents are chunked and indexed, then authorized retrieval grounds a cited answer" width="720">
+</p>
+
 This is an explicit, runnable text-RAG example with two source choices: an
 existing versioned corpus in the **AI Factory shared lake**, or the existing
 Kaggle helpdesk publication in project data storage. Each binding gets its own

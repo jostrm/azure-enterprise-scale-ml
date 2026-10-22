@@ -1,5 +1,9 @@
 # 49 Agent training: ML churn prediction
 
+<p align="center">
+  <img src="./images/agent-training-ml-churn.gif" alt="Animated MLOps lifecycle: governed data, training, held-out evaluation, registration, approved deployment and monitored feedback" width="720">
+</p>
+
 **Purpose:** a Foundry agent that creates, trains, retrains and batch-scores Azure ML use cases
 through the ESML v2 SDK (`azure_esml`) and the canonical model-factory engines. It has two entry
 points with the same plan-bound tools: a CLI prompt agent (`main.py ask`) and a Foundry hosted agent

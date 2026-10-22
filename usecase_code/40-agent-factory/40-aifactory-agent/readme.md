@@ -1,5 +1,9 @@
 # Enterprise Scale AI Factory Agent
 
+<p align="center">
+  <img src="./images/aifactory-agent.gif" alt="Animated RAG flow: indexed documentation is retrieved within the user's access scope to ground the agent's answer" width="720">
+</p>
+
 A versioned Microsoft Foundry prompt agent with Azure AI Search grounding,
 backend-enforced scope/authorization, existing Factory API/CLI adapters, and a
 private web frontend. Selecting Platform or Project changes explanations, not

@@ -12,6 +12,75 @@ Start with [prerequisites](#prerequisites),
 [how to run the code](#how-to-run-the-code). Each folder's README then gives its
 own commands, required inputs and expected results.
 
+## Use cases
+
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="40-aifactory-agent/readme.md"><img src="images/aifactory-agent-thumb.gif" width="260" alt="Animated RAG flow behind the Enterprise Scale AI Factory Agent"></a><br>
+<a href="40-aifactory-agent/readme.md"><b>Enterprise Scale AI Factory Agent</b></a><br>
+<sub>Versioned Foundry prompt agent grounded in Azure AI Search, with a private web frontend.</sub><br>
+<sub><code>Agent</code> <code>RAG</code> <code>Web app</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="41-single-agent/readme.md"><b>Single-agent examples</b></a><br>
+<sub>Prompt and hosted framework agents that answer questions with Foundry knowledge retrieval.</sub><br>
+<sub><code>Agents</code> <code>Hosted agents</code> <code>RAG</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="42-multi-agent/readme.md"><b>Multi-agent helpdesk: retrieve, review and synthesize</b></a><br>
+<sub>A hosted team coordinates knowledge and reviewer agents into one reviewed answer.</sub><br>
+<sub><code>Multi-agent</code> <code>Hosted agents</code></sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="43-data/readme.md"><b>Prepare the synthetic helpdesk corpus for RAG</b></a><br>
+<sub>Prepares a public Kaggle dataset for private Foundry IQ retrieval, keeping evaluation answers separate.</sub><br>
+<sub><code>Data</code> <code>Data Factory</code> <code>Foundry IQ</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="44-azure-mcp/readme.md"><b>Private Azure inventory tool for Foundry agents</b></a><br>
+<sub>Private Azure MCP service, so agents read real project resources instead of guessing.</sub><br>
+<sub><code>MCP</code> <code>Tools</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="45-aifactory-mcp-gateway/readme.md"><b>AI Factory MCP and AI Gateway SKU (project001 Dev)</b></a><br>
+<sub>Opt-in pipeline step that hosts the governed AI Factory MCP and the Azure AI Gateway.</sub><br>
+<sub><code>MCP</code> <code>AI Gateway</code> <code>Pipeline</code></sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="45-rag-agent/readme.md"><img src="images/rag-agent-thumb.gif" width="260" alt="Animated RAG flow from documents to a grounded answer"></a><br>
+<a href="45-rag-agent/readme.md"><b>RAG from the AI Factory shared lake or project storage</b></a><br>
+<sub>Runnable text RAG over the shared lake or project storage, one agent per source.</sub><br>
+<sub><code>RAG</code> <code>Azure AI Search</code> <code>Foundry IQ</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="47-aifactory-agent-live-voice/readme.md"><b>AI Factory Agent live voice (project001 Dev)</b></a><br>
+<sub>Opt-in pipeline step that deploys the private chat app with Azure Voice Live.</sub><br>
+<sub><code>Voice</code> <code>Web app</code> <code>Pipeline</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="48-rag-with-splitted-tables-acl-adlsgen2/readme.md"><img src="images/rag-split-tables-acl-thumb.gif" width="260" alt="Animated DataOps and RAG flow with access-controlled retrieval"></a><br>
+<a href="48-rag-with-splitted-tables-acl-adlsgen2/readme.md"><b>Split tables: native ADLS permissions, multi-index RAG and exact sales</b></a><br>
+<sub>Multi-index RAG over split tables, with native ADLS Gen2 permissions and exact sales totals.</sub><br>
+<sub><code>RAG</code> <code>ADLS Gen2 ACL</code> <code>Multi-index</code></sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="49-agent-training-ml-churn-prediction/readme.md"><img src="images/agent-training-ml-churn-thumb.gif" width="260" alt="Animated MLOps lifecycle from governed data to monitored feedback"></a><br>
+<a href="49-agent-training-ml-churn-prediction/readme.md"><b>49 Agent training: ML churn prediction</b></a><br>
+<sub>A Foundry agent that trains, retrains and batch-scores Azure ML models through ESML v2.</sub><br>
+<sub><code>Agents</code> <code>MLOps</code> <code>Azure ML</code></sub>
+</td>
+<td width="33%"></td>
+<td width="33%"></td>
+</tr>
+</table>
+
 ## Folder layout
 
 ```text

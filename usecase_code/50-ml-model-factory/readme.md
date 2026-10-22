@@ -4,6 +4,41 @@
 **Ownership:** `user-config` and project copies of examples are user-editable; `accelerator` is maintainer-owned; `data/out` and `ml-environment` contain generated artifacts.
 **Status:** 8/105 implementations are **Tested and works** and 97/105 are **Impl TBA** in the Azure matrix recorded on 2026-10-08 to 2026-10-09. Templates exist for 124 of 126 catalog leaves, but a template is not proof of a working deployment. **Impl TBA** includes failed implementations and routes not run because of dataset, quota or private-connectivity prerequisites; see [Azure test status](#azure-test-status).
 
+## At a glance
+
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="user-config/readme.md"><b>user config</b></a><br>
+<sub>Configure one customer project without modifying the shared accelerator.</sub><br>
+<sub><code>Configuration</code> <code>User-editable</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="usecase-type/readme.md"><b>usecase type</b></a><br>
+<sub>Pick a serving pattern, model task and tech stack across 192 generated notebooks.</sub><br>
+<sub><code>Batch</code> <code>Online</code> <code>Streaming</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="data/readme.md"><b>data</b></a><br>
+<sub>Local raw input and processed datasets; not the Azure storage account.</sub><br>
+<sub><code>Data</code> <code>Local</code></sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="ml-environment/readme.md"><b>ml environment</b></a><br>
+<sub>Generated models, reports, MLflow tracking and package metadata.</sub><br>
+<sub><code>Generated</code> <code>MLflow</code></sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="accelerator/readme.md"><b>accelerator</b></a><br>
+<sub>Reusable, maintainer-owned implementation behind every model example.</sub><br>
+<sub><code>Maintainer-owned</code> <code>Python</code></sub>
+</td>
+<td width="33%"></td>
+</tr>
+</table>
+
 ## Folder layout
 
 ```text
