@@ -119,7 +119,7 @@ own commands, required inputs and expected results.
 | [40-aifactory-agent](40-aifactory-agent/readme.md) | Its own environment/configuration and `python -m aifactory_agent`; optional private web service. |
 | [40-aifactory-agent-v2](40-aifactory-agent-v2/readme.txt) | Not runnable; use the implemented sibling above. |
 | [41-single-agent](41-single-agent/readme.md) | Choose a [prompt agent](41-single-agent/prompt-agent/readme.md) or [hosted framework](41-single-agent/hosted-agent/readme.md), then shared `plan`, `deploy`, `invoke`. |
-| [41-single-agent-fabric-iq](41-single-agent-fabric-iq/readme.md) | Its own environment and `parameters.env`: `setup_knowledge.py`, `agents.py`, then `chat.py`; no operator CLI. Fabric IQ inventory is optional. |
+| [41-single-agent-fabric-iq](41-single-agent-fabric-iq/readme.md) | Its own environment and `parameters.env`: `setup_knowledge.py`, optional `setup_fabric.py` (paid F2 Fabric capacity), `agents.py`, then `chat.py`; no operator CLI. |
 | [42-multi-agent](42-multi-agent/readme.md) | Deploy knowledge/reviewer participants, then the hosted team; invoke its persisted name. |
 | [43-data](43-data/readme.md) | Shared `*-datafactory` commands; optional `worker.py` runs only on approved managed-identity compute. |
 | [44-azure-mcp](44-azure-mcp/readme.md) | `44-azure-mcp\deploy.py` for infrastructure planning; shared commands configure/verify the connection. |

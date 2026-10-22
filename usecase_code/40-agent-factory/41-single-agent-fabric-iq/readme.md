@@ -32,13 +32,14 @@ question --> FoundryIQ-Workflow
                |-- Supervisor-Agent  -> replies with one agent name (not shown to the user)
                |-- "Sales-Associate-Agent"  -> MCP tool -> AI Search knowledge base (products)
                |-- "Rewards-Campaign-Agent" -> MCP tool -> AI Search knowledge base (rewards)
-               |-- "Inventory-Agent"        -> Fabric IQ tool -> Fabric data agent -> lakehouse
+               |-- "Inventory-Agent"        -> Fabric IQ tool (your Entra token) -> Fabric data agent MCP -> lakehouse table
                '-- anything else            -> empty reply
 ```
 
 | File | What it does |
 |---|---|
 | [setup_knowledge.py](setup_knowledge.py) | Creates the AI Search index from `data/*.json`, the knowledge source, the knowledge base (minimal effort, extractive, no Search-side model) and the Foundry project connection to its MCP endpoint. |
+| [setup_fabric.py](setup_fabric.py) | On an existing Fabric capacity: creates the workspace `zava-fabric-iq`, the lakehouse table `inventory` from [data/inventory.csv](data/inventory.csv), a published Fabric data agent over it and the Foundry Fabric IQ connection (`RemoteTool`, the caller's Entra token). Optional. |
 | [agents.py](agents.py) | Creates a new version of the four agents and the workflow from [workflow.yaml](workflow.yaml). |
 | [chat.py](chat.py) | Asks the workflow, or one agent with `--agent`, a question and prints the answering agent and its reply. |
 | [parameters.env.template](parameters.env.template) | Settings to copy to `parameters.env` (git-ignored). |
@@ -63,13 +64,16 @@ stock can't be checked yet and never guesses.
   **Search Index Data Contributor** on Search to run `setup_knowledge.py`;
   **Azure AI User** (Foundry User) on the project to create and call agents; a
   role that can write project connections (Azure AI Project Manager or Owner).
-- For `Inventory-Agent` with real data (optional):
-  - a Microsoft Fabric workspace on a paid **F2 or larger** capacity (Fabric
-    trial capacity does not support data agents);
-  - a lakehouse with [data/inventory.csv](data/inventory.csv) loaded as a table;
-  - a **published** Fabric data agent over that table;
-  - a Fabric IQ connection in the Foundry project (Foundry portal: agent >
-    Tools > Fabric IQ), using the same tenant and region.
+- For `Inventory-Agent` with real data (optional, step 2 below):
+  - a paid Microsoft Fabric capacity, **F2 or larger** (Fabric trial capacity
+    does not support data agents), in the same tenant as Foundry, where you are a
+    capacity admin. F2 costs money while Active: pause it when you are done;
+  - Fabric tenant settings that allow data agents: "Users can use Copilot and
+    other features powered by Azure OpenAI" and "Capacities can be designated as
+    Fabric Copilot capacities" (Fabric admin portal). Regions outside the EU data
+    boundary and the US also need cross-geo processing;
+  - every user who chats with `Inventory-Agent` needs read access to the Fabric
+    workspace (the Fabric IQ connection passes their own Entra token).
 
 ## How to set up the Python environment
 
@@ -90,10 +94,20 @@ and `setup_knowledge.py` derives the index and knowledge source names from it.
 # 1. Foundry IQ: search index, sample documents, knowledge base and project connection (re-runnable)
 .\.venv\Scripts\python.exe .\setup_knowledge.py
 
-# 2. Agents and workflow (each run creates a new version only when the definition changed)
+# 2. Optional, Fabric IQ: a paid F2 capacity (skip if you have one), then workspace, table, data agent, connection.
+#    Set fabric_capacity_name and fabric_connection_name (for example zava-fabric-iq) in parameters.env first.
+$Sub = "<subscription-id>"; $Rg = "<resource-group>"; $Capacity = "<fabric-capacity>"
+az provider register -n Microsoft.Fabric --subscription $Sub --wait
+@{ location = "swedencentral"; sku = @{ name = "F2"; tier = "Fabric" }
+   properties = @{ administration = @{ members = @("<you@tenant>") } } } | ConvertTo-Json -Depth 5 | Set-Content "$env:TEMP\capacity.json"
+az rest --method put --body "@$env:TEMP\capacity.json" `
+  --url "https://management.azure.com/subscriptions/$Sub/resourceGroups/$Rg/providers/Microsoft.Fabric/capacities/$Capacity`?api-version=2023-11-01"
+.\.venv\Scripts\python.exe .\setup_fabric.py
+
+# 3. Agents and workflow (each run creates a new version only when the definition changed)
 .\.venv\Scripts\python.exe .\agents.py
 
-# 3. Ask the workflow; the supervisor picks the agent
+# 4. Ask the workflow; the supervisor picks the agent
 .\.venv\Scripts\python.exe .\chat.py "Want paint recommendation for my living room"
 .\.venv\Scripts\python.exe .\chat.py "I am Anna Berg. What discount do I get on paint this Black Friday?"
 .\.venv\Scripts\python.exe .\chat.py "Is PROD000281 in stock?"
@@ -107,9 +121,18 @@ Expected output: each answer starts with the agent that wrote it, for example
 You can also open `FoundryIQ-Workflow` in the Foundry portal (Build > Workflows)
 to see the visual flow and chat with it in the playground.
 
-To ground `Inventory-Agent` in Fabric later: complete the Fabric prerequisites,
-set `fabric_connection_name` to the Fabric IQ connection name and run
-`agents.py` again.
+With Fabric IQ set up, inventory answers come from the lakehouse table, for example
+`[Inventory-Agent] ProductId: PROD000281 ... QuantityOnHand: 2, InventoryStatus: At risk of stockout, StoreLocation: Stockholm City`.
+Without it, `Inventory-Agent` says it cannot check stock.
+
+Pause the capacity when you are done, and resume it before the next demo
+(Fabric items stay; queries fail while it is paused):
+
+```powershell
+$CapacityId = "/subscriptions/$Sub/resourceGroups/$Rg/providers/Microsoft.Fabric/capacities/$Capacity"
+az rest --method post --url "https://management.azure.com$CapacityId/suspend?api-version=2023-11-01"
+az rest --method post --url "https://management.azure.com$CapacityId/resume?api-version=2023-11-01"
+```
 
 Offline contract tests (no Azure calls), from the factory root `40-agent-factory`:
 
@@ -124,8 +147,9 @@ Offline contract tests (no Azure calls), from the factory root `40-agent-factory
 - The lab's original `MicrosoftFabricPreviewTool` (Fabric data agent tool) is
   deprecated on 2026-11-06. This example uses its replacement,
   `FabricIQPreviewTool`.
-- Clean up in the Foundry portal (delete the four agents and the workflow) and in
-  AI Search (knowledge base, knowledge source, index).
+- Clean up in the Foundry portal (delete the four agents, the workflow and the two
+  project connections), in AI Search (knowledge base, knowledge source, index),
+  in Fabric (workspace `zava-fabric-iq`) and in Azure (the Fabric capacity).
 
 ## Troubleshooting
 
@@ -136,4 +160,7 @@ Offline contract tests (no Azure calls), from the factory root `40-agent-factory
 | Name resolution or connection errors to `*.services.ai.azure.com` or `*.search.windows.net` | The endpoints are private: connect the Azure VPN and check that the names resolve to private IPs. |
 | `403` from Search in `setup_knowledge.py` | Your user needs Search Service Contributor (or Contributor/Owner) and Search Index Data Contributor on the search service. |
 | Agents answer without products or citations | Check the project managed identity has Search Index Data Reader, and that `server_url` and `project_connection_id` match what `setup_knowledge.py` created. |
-| Inventory answers "not configured" | Expected until `fabric_connection_name` is set; see the Fabric prerequisites. |
+| Inventory answers "not configured" | Expected until `fabric_connection_name` is set and `agents.py` has run again; see step 2. |
+| `setup_fabric.py`: capacity not found or not Active | The capacity is paused or you are not its admin: resume it, or add yourself to `administration.members`. |
+| Inventory errors or empty answers while the capacity is paused | Fabric data agents need an Active capacity: resume it. |
+| Inventory says a product is not found although it is in the table | The data agent writes SQL from the question. Use the ProductId, or improve `INSTRUCTIONS` in `setup_fabric.py` and run it again (it republishes the agent). |

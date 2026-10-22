@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import os
@@ -66,8 +67,42 @@ class FabricIqUseCaseTests(unittest.TestCase):
             self.assertIn(name, supervisor)
 
     def test_template_lists_every_setting_the_scripts_read(self):
-        module, setup = _load_agents_module(), _load("setup_knowledge")
-        self.assertEqual(set(module.REQUIRED) | set(module.OPTIONAL) | set(setup.SETUP), _template_keys())
+        module, setup, fabric = _load_agents_module(), _load("setup_knowledge"), _load("setup_fabric")
+        self.assertEqual(
+            set(module.REQUIRED) | set(module.OPTIONAL) | set(setup.SETUP) | set(fabric.SETUP), _template_keys(),
+        )
+
+    def _definition_files(self):
+        fabric = _load("setup_fabric")
+        definition = fabric.data_agent_definition("ws-id", "lh-id")
+        return {part["path"]: json.loads(base64.b64decode(part["payload"])) for part in definition["parts"]}
+
+    def test_data_agent_definition_is_published_so_its_mcp_endpoint_answers(self):
+        files = self._definition_files()
+        self.assertIn("Files/Config/publish_info.json", files)
+        draft = {path.replace("/draft/", "/published/") for path in files if "/draft/" in path}
+        self.assertLessEqual(draft, set(files))
+        self.assertEqual(files["Files/Config/data_agent.json"], {"$schema": "2.1.0"})
+
+    def test_data_agent_selects_the_inventory_table_with_every_csv_column(self):
+        files = self._definition_files()
+        source = next(value for path, value in files.items() if "/published/" in path and path.endswith("datasource.json"))
+        self.assertEqual((source["workspaceId"], source["artifactId"], source["type"]), ("ws-id", "lh-id", "lakehouse_tables"))
+        table = source["elements"][0]["children"][0]
+        self.assertEqual((table["display_name"], table["is_selected"]), ("inventory", True))
+        header = _source("data/inventory.csv").splitlines()[0].split(",")
+        self.assertEqual([column["display_name"] for column in table["children"]], header)
+
+    def test_fabric_iq_connection_passes_the_callers_entra_token_to_the_data_agent_mcp(self):
+        fabric = _load("setup_fabric")
+        properties = fabric.connection_definition("ws-id", "agent-id")["properties"]
+        self.assertEqual(
+            (properties["category"], properties["authType"], properties["audience"]),
+            ("RemoteTool", "UserEntraToken", "https://analysis.windows.net/powerbi/api"),
+        )
+        self.assertEqual(
+            properties["target"], "https://api.fabric.microsoft.com/v1/mcp/workspaces/ws-id/dataagents/agent-id/agent",
+        )
 
     def test_setup_derives_search_names_from_the_agents_server_url(self):
         setup = _load("setup_knowledge")
