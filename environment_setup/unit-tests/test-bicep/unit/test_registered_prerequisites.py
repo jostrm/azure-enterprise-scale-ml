@@ -1072,6 +1072,80 @@ def test_group_and_vault_execute_with_durable_proof_and_one_use(workspace):
     assert runtime.writes == writes
 
 
+class LaggingGraph(Runtime):
+    """Graph right after a write, as observed on 2026-10-22: the new group answers 404 by ID, and the group and its
+    new member are missing from filter and member-list reads for a while. Writes themselves are never affected."""
+
+    def __init__(self, *, group_exists=False, id_misses=0, member_misses=0, filter_misses=0):
+        super().__init__(group_exists=group_exists)
+        self.id_misses, self.member_misses, self.filter_misses = id_misses, member_misses, filter_misses
+        self.written = False
+
+    def graph(self, method, path, body=None, allowed=(200,)):
+        if method == "GET" and self.written:
+            if path.startswith("groups?") and self.filter_misses:
+                self.filter_misses -= 1
+                return {"value": []}
+            if path.startswith("groups/" + GROUP + "/members?") and self.member_misses:
+                self.member_misses -= 1
+                return {"value": []}
+            if path.startswith("groups/" + GROUP + "?") and self.id_misses:
+                self.id_misses -= 1
+                if 404 not in allowed:
+                    raise core.PrerequisiteError("graph-request-failed-404")
+                return {"error": {"code": "Request_ResourceNotFound", "message": "Not replicated yet."}}
+        value = super().graph(method, path, body, allowed)
+        self.written = self.written or method == "POST"
+        return value
+
+
+def execute_with_waits(plan, workspace, runtime, waits):
+    return core.execute(plan, expected_plan_hash=plan["plan_hash"], state_dir=workspace[2], runtime=runtime,
+                        acknowledge_exclusive_writer_governance=True, sleep=waits.append)
+
+
+def graph_posts(runtime, path):
+    return [write for write in runtime.writes if write[:3] == ("graph", "POST", path)]
+
+
+def test_a_new_group_is_read_back_until_graph_shows_it_with_its_member_and_name(workspace):
+    runtime = LaggingGraph(id_misses=2, member_misses=1, filter_misses=2)
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+    waits = []
+    result = execute_with_waits(plan, workspace, runtime, waits)
+    assert result["status"] == "succeeded", result
+    assert result["bindings"]["team_group_id"] == GROUP
+    assert len(graph_posts(runtime, "groups")) == 1, "only reads are repeated, never the create"
+    assert len(waits) == 5 and sum(waits) < 60
+
+
+def test_an_added_member_is_read_back_until_graph_lists_it(workspace):
+    runtime = LaggingGraph(group_exists=True, member_misses=2)
+    runtime.members[GROUP] = []
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+    waits = []
+    result = execute_with_waits(plan, workspace, runtime, waits)
+    assert result["status"] == "succeeded", result
+    assert len(graph_posts(runtime, "groups/" + GROUP + "/members/$ref")) == 1
+    assert len(waits) == 2
+
+
+@pytest.mark.parametrize("lag, code", [
+    ({"id_misses": 1000}, "created-entra-group-not-verified"),
+    ({"member_misses": 1000}, "created-entra-group-membership-not-verified"),
+    ({"filter_misses": 1000}, "post-prerequisite-state-not-verified"),
+])
+def test_a_group_graph_never_shows_stays_uncertain_after_a_bounded_wait(workspace, lag, code):
+    runtime = LaggingGraph(**lag)
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+    waits = []
+    result = execute_with_waits(plan, workspace, runtime, waits)
+    assert result["status"] == "uncertain" and result["error"] == code, result
+    assert result["bindings"]["team_group_id"] == GROUP
+    assert len(graph_posts(runtime, "groups")) == 1
+    assert 0 < sum(waits) <= 180
+
+
 @pytest.mark.parametrize("include_member_fields", [False, True])
 def test_explicit_group_reuse_preserves_members_without_user_lookup(workspace, monkeypatch, include_member_fields):
     runtime = Runtime()

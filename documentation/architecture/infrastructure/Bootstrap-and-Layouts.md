@@ -19,7 +19,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_bootstrap_scoped_creation_guard.py
 graph_symbols:
   - bootstrap/lib/registered_creation.py::function:prepare
-reviewed_source: 'aecd686a + runner apt-source change; observed 2026-10-19'
+reviewed_source: '4a2e0973 + Graph read-back in registered_prerequisites; observed 2026-10-22'
 ---
 # Bootstrap and layouts
 
@@ -42,7 +42,7 @@ files and credentials remain ignored.
 
 Changing the requested release does **not** migrate layouts. Registered roots reject ordinary legacy update/copy operations; migration requires separate API review and confirmation.
 
-Full bootstrap coordinates prerequisites, identity/provider setup, common infrastructure and selected project stages. Enrollment, runner readiness, network readiness and deployment are distinct milestones. `runner_bootstrap.py` provides a separate plan/ensure route for the exact existing common resource group/subnet; it is not whole-factory creation or permission to change OS/ownership of existing VMs.
+Full bootstrap coordinates prerequisites, identity/provider setup, common infrastructure and selected project stages. Enrollment, runner readiness, network readiness and deployment are distinct milestones. The privileged prerequisites stage (`registered_prerequisites.execute`) reads Microsoft Graph back after creating the team group or adding its member, and before its read-only final verification, for up to about 100 s (`GRAPH_VISIBILITY_DELAYS`): a group created a moment ago answered 404 by ID on 2026-10-22 and left the whole stage uncertain. Writes are never repeated; still-invisible state fails closed with the existing codes. `runner_bootstrap.py` provides a separate plan/ensure route for the exact existing common resource group/subnet; it is not whole-factory creation or permission to change OS/ownership of existing VMs.
 
 On Linux runners, `runner-prerequisites.sh` installs Azure CLI and PowerShell only from signed Microsoft apt repositories. apt rejects one repository (URL and suite) with two different `signed-by` keyrings, and Defender for Endpoint (`MDE.Linux`, often installed by governance automation) already configures `packages.microsoft.com/ubuntu/<version>/prod` with its own keyring. Before writing `aifactory-<kind>.list`, the script scans `sources.list`, `sources.list.d/*.list` and deb822 `*.sources` for enabled entries of that URL and suite. It reuses them only when their single `signed-by` keyring holds only the Microsoft key `BC528686B50D79E339D3721CEB3E94ADBE1229CF` (the same check its own download must pass). A missing or non-path `signed-by`, other or extra keys, differing keyrings or a differing own source next to them fail closed and name the file. It never edits or deletes files it did not create.
 

@@ -1682,6 +1682,21 @@ def _persist(path, value, retry_sleep=time.sleep):
             retry_sleep(0.05)
 
 
+# Microsoft Graph is eventually consistent right after a write: for a while a new group can answer 404 by ID, and a
+# new group or member can be missing from filter and member-list reads (observed 2026-10-22). Reads are repeated
+# within this bound (100 s in total); a write is never repeated.
+GRAPH_VISIBILITY_DELAYS = (2, 3, 5, 5, 10, 10, 15, 15, 15, 20)
+
+
+def _graph_visible(runtime, path, ready, code, sleep):
+    for delay in (*GRAPH_VISIBILITY_DELAYS, None):
+        value = runtime.graph("GET", path, allowed=(200, 404)) or {}
+        if "error" not in value and ready(value):
+            return value
+        require(delay is not None, code)
+        sleep(delay)
+
+
 def _wait(runtime, identifier, api, assert_held, sleep):
     for _ in range(240):
         assert_held()
@@ -1882,18 +1897,18 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                 group_id = _guid(group.get("id"))
                 receipt["bindings"]["team_group_id"] = group_id
                 persist()
-                require(runtime.graph("GET", "groups/" + group_id + "?$select=id,securityEnabled").get("securityEnabled") is True,
-                        "created-entra-group-not-verified")
-                members = runtime.graph("GET", "groups/" + group_id + "/members?$select=id")
                 expected_member = effect["body"]["members@odata.bind"][0].rsplit("/", 1)[1]
-                require(any(x.get("id") == expected_member for x in members.get("value", [])),
-                        "created-entra-group-membership-not-verified")
+                _graph_visible(runtime, "groups/" + group_id + "?$select=id,securityEnabled",
+                               lambda value: value.get("securityEnabled") is True, "created-entra-group-not-verified", sleep)
+                _graph_visible(runtime, "groups/" + group_id + "/members?$select=id",
+                               lambda value: any(x.get("id") == expected_member for x in value.get("value", [])),
+                               "created-entra-group-membership-not-verified", sleep)
             elif kind == "group-member-add":
                 runtime.graph("POST", "groups/" + effect["group_id"] + "/members/$ref",
                               {"@odata.id": GRAPH + "v1.0/directoryObjects/" + effect["member_id"]}, allowed=(204,))
-                members = runtime.graph("GET", "groups/" + effect["group_id"] + "/members?$select=id")
-                require(any(x.get("id") == effect["member_id"] for x in members.get("value", [])),
-                        "entra-membership-not-verified")
+                _graph_visible(runtime, "groups/" + effect["group_id"] + "/members?$select=id",
+                               lambda value: any(x.get("id") == effect["member_id"] for x in value.get("value", [])),
+                               "entra-membership-not-verified", sleep)
             elif kind == "first-party-app-create":
                 app = effect["body"]["appId"]
                 path = "servicePrincipals?$filter=" + quote("appId eq '" + app + "'", safe="") + "&$select=id,appId"
@@ -1932,9 +1947,21 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
             receipt.pop("pending_effect", None)
             persist()
         runtime.read_only = True
-        verified = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
-                           scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
-                           expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
+        for delay in (*GRAPH_VISIBILITY_DELAYS, None):
+            try:
+                verified = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
+                                   scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
+                                   expected_revision=plan["expected_revision"], context=plan["context"],
+                                   runtime=runtime)
+            except PrerequisiteError as exc:
+                if exc.code != "graph-request-failed-404" or delay is None:
+                    raise
+                sleep(delay)
+                continue
+            if delay is None or (verified["can_execute"] and not verified["effects"] and
+                                 verified["bindings"].get("team_group_id") == receipt["bindings"]["team_group_id"]):
+                break
+            sleep(delay)  # the new group or member can still be missing from Graph's filter and member-list reads
         require(verified["can_execute"] and not verified["effects"], "post-prerequisite-state-not-verified")
         require(verified["bindings"]["team_group_id"] == receipt["bindings"]["team_group_id"],
                 "post-prerequisite-group-id-changed")

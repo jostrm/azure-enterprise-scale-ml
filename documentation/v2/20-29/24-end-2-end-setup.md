@@ -408,6 +408,11 @@ with `cold_start_supported=false` and `supports_restricted_wizard=false`.
 Its plan exposes commands, effects, authentication scopes, source/input hashes,
 stage readiness, and preconditions. Execution returns stage results, nonsecret
 outputs, changed/uncertain state, and the durable receipt path.
+Microsoft Graph is eventually consistent: right after `execute(...)` creates the
+team group or adds its member, Graph can answer 404 for the new group and leave
+the group or member out of filter and member-list reads for a while. `execute`
+therefore reads back for up to about 100 seconds before it reports the group,
+membership or final state as not verified; it never repeats the write.
 `verify_source_snapshot(...)` verifies an explicitly pinned five-file local
 helper bundle and its loaded dependencies; missing helpers or changed bytes fail
 before cloud discovery. Local verification records `published_ref_verified=false`.
