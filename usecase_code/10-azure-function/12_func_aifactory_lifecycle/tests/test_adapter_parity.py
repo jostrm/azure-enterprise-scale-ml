@@ -134,9 +134,11 @@ def test_bodies_carry_the_catalog_ids_revision_and_explicit_delete_options():
 def test_init_factory_saves_through_creation_and_starts_one_whole_workflow_approval():
     calls = record("rest", SCENARIOS["1-init-factory"])
     by_route = {f"{call['method']} {call['path']}": call["body"] for call in calls}
+    # No expected_revision even though the catalog has one: the API refuses a factory creation that selects an
+    # existing scope or revision (observed 2026-10-22 once the consumer folder had a catalog revision).
     assert by_route["POST /api/v1/creation/prepare"] == {
         "contract_version": 1, "mode": "full-bootstrap", "folder": REPO, "orchestrator": "gha",
-        "config": SAVED_CONFIG, "region_short_name": "sdc", "expected_revision": "a" * 64}
+        "config": SAVED_CONFIG, "region_short_name": "sdc"}
     assert by_route["POST /api/v1/creation/confirm"] == {"contract_version": 1, "folder": REPO,
                                                          "confirmation_id": CONFIRMATION_ID}
     workflow = by_route["POST /api/v1/creation/workflows/prepare"]

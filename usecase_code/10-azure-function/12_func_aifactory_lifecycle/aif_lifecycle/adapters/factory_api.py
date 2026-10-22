@@ -163,10 +163,12 @@ class FactoryApiBackend(ABC):
         r, name = request.resolved, request.step_name
         if request.kind is StepKind.CONFIGURE:
             if request.scenario is Scenario.INIT_FACTORY:
-                body = {"contract_version": 1, "mode": "full-bootstrap", "folder": self._repository_root(),
-                        "orchestrator": "gha", "config": self._bootstrap_config(request),
-                        "region_short_name": r["region_code"], "expected_revision": revision}
-                return self._creation_prepare({key: value for key, value in body.items() if value is not None})
+                # Never an expected_revision: the API refuses a factory creation that selects an existing scope or
+                # revision, and the consumer folder's catalog has one as soon as anything was saved there.
+                return self._creation_prepare({"contract_version": 1, "mode": "full-bootstrap",
+                                               "folder": self._repository_root(), "orchestrator": "gha",
+                                               "config": self._bootstrap_config(request),
+                                               "region_short_name": r["region_code"]})
             if request.scenario is Scenario.ADD_SCALESET:
                 return self._add_scaleset(r["factory_id"], [scale_set_body(request, r["suffix"])], revision)
             if r.get("mode") == "add":
