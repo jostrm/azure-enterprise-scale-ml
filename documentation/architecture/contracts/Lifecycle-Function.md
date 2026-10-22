@@ -46,7 +46,7 @@ graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: '35a3d32c + working tree; observed 2026-10-22'
+reviewed_source: 'd7f3fbad + working tree; observed 2026-10-22'
 ---
 # Lifecycle Function
 

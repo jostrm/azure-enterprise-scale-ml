@@ -83,6 +83,10 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
    `workflow` and `read:org` (`gh auth login` refuses a classic token without `read:org`).
 3. The first prepare answers 503 `catalog-pending` while the runner reads the catalog; `POST /api/v1/catalog/refresh`
    reads it again after changes made outside the Function.
+4. Real runtime reviews and confirmations take minutes (13 and 18 minutes on the real API), so keep the defaults:
+   `AIF_FACTORY_API_TIMEOUT_SECONDS` 2700 on the runner, `aif-ops.yml`'s 60-minute job and `AIF_RUNNER_TIMEOUT_SECONDS`
+   4200 on the Function. A copy made before these defaults keeps `AIF_RUNNER_TIMEOUT_SECONDS` 900 in its settings
+   file: set it to 4200, redeploy, copy `aif-ops.yml` again and reinstall the runner entry point.
 
 ## Limits
 
