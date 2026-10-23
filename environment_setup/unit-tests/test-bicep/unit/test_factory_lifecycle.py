@@ -3,6 +3,7 @@
 import base64
 import copy
 import ctypes
+import email.message
 import importlib.util
 import io
 import json
@@ -15,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+from urllib.request import HTTPSHandler, build_opener
+from urllib.response import addinfourl
 from uuid import uuid4
 
 import pytest
@@ -2263,3 +2266,114 @@ def test_github_workload_refresh_is_job_bound_and_never_puts_tokens_in_argv(monk
     with pytest.raises(fl.Blocked, match="trusted-github-oidc-context-required"):
         cloud.token(fl.ARM)
     assert len(requests) == 4
+
+THROTTLED_URL = fl.ARM + GROUP + "?api-version=2022-09-01"
+
+
+class ScriptedHTTPS(HTTPSHandler):
+    """Answers each HTTPS request in turn from (status, Retry-After) pairs, so the opener's own error processing and
+    handlers run as in production; nothing opens a socket."""
+
+    def __init__(self, *answers):
+        super().__init__()
+        self.answers, self.methods = list(answers), []
+
+    def https_open(self, request):
+        self.methods.append(request.get_method())
+        status, retry_after = self.answers.pop(0)
+        headers = email.message.Message()
+        if retry_after is not None:
+            headers["Retry-After"] = retry_after
+        body = b'{"ok":true}' if status == 200 else b'{"error":{"code":"TooManyRequests"}}'
+        response = addinfourl(io.BytesIO(body), headers, request.full_url, status)
+        response.msg = "OK" if status == 200 else "throttled"
+        return response
+
+
+@pytest.fixture
+def throttled_reads():
+    """A Cloud whose opener is the production chain over ScriptedHTTPS; waits advance a fake clock."""
+    clock = {"now": 1000.0}
+    sleeps = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock["now"] += seconds
+
+    def cloud(*answers):
+        server = ScriptedHTTPS(*answers)
+        opener = build_opener(fl.NoRedirect, fl.ThrottledReadHandler(sleep=sleep, clock=lambda: clock["now"]), server)
+        result = fl.Cloud({"identity": {"object_id": IDENTITY}, "target": {"tenant_id": TENANT, "subscription_id": SUB},
+                           "locks": {"coordination_mode": "single-writer"}}, command_runner=Mock(), opener=opener)
+        result.token = Mock(return_value="synthetic-private-token")
+        return result, server
+
+    return SimpleNamespace(cloud=cloud, sleeps=sleeps)
+
+
+def test_default_cloud_opener_waits_out_throttled_reads(monkeypatch):
+    built = Mock(return_value="default-opener")
+    monkeypatch.setattr(fl, "build_opener", built)
+    assert fl.Cloud({"identity": {"object_id": IDENTITY}, "target": {}}).opener == "default-opener"
+    handlers = built.call_args.args
+    assert handlers[0] is fl.NoRedirect
+    assert [type(handler) for handler in handlers[1:]] == [fl.ThrottledReadHandler, fl.KeepAliveHTTPSHandler]
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_throttled_arm_reads_wait_for_retry_after_and_retry(throttled_reads, capsys, status):
+    # Observed 2026-10-23: a real COMMON run's worker stopped as reconciliation-required with
+    # remote-request-failed-429 before any Azure write, because a throttled ARM read was never repeated.
+    cloud, server = throttled_reads.cloud((status, "7"), (status, "7"), (200, None))
+    assert cloud.request("GET", THROTTLED_URL, fl.ARM)[2] == {"ok": True}
+    assert server.methods == ["GET", "GET", "GET"] and throttled_reads.sleeps == [7, 7]
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
+    assert [(event["event"], event["status"], event["attempt"], event["delay_seconds"]) for event in events] == [
+        ("remote-request-throttled", status, 1, 7), ("remote-request-throttled", status, 2, 7)]
+    assert all(event["path"] == GROUP and event["host"] == "management.azure.com" for event in events)
+    assert "synthetic-private-token" not in json.dumps(events)
+
+
+def test_a_throttled_head_is_repeated_too(throttled_reads):
+    cloud, server = throttled_reads.cloud((429, "3"), (200, None))
+    assert cloud.request("HEAD", THROTTLED_URL, fl.ARM)[0] == 200
+    assert server.methods == ["HEAD", "HEAD"] and throttled_reads.sleeps == [3]
+
+
+@pytest.mark.parametrize("retry_after, delay", [
+    (None, fl.THROTTLED_READ_DEFAULT_DELAY_SECONDS), ("Wed, 21 Oct 2026 07:28:00 GMT", fl.THROTTLED_READ_DEFAULT_DELAY_SECONDS),
+    ("soon", fl.THROTTLED_READ_DEFAULT_DELAY_SECONDS), (" 12 ", 12), ("0", 1), ("600", fl.THROTTLED_READ_MAX_DELAY_SECONDS)])
+def test_throttled_read_delay_is_retry_after_seconds_within_bounds(retry_after, delay):
+    assert fl.throttled_read_delay(retry_after) == delay
+
+
+def test_throttled_reads_stop_at_the_attempt_bound(throttled_reads):
+    cloud, server = throttled_reads.cloud(*[(429, "1")] * fl.THROTTLED_READ_ATTEMPTS)
+    with pytest.raises(fl.Blocked, match="^remote-request-failed-429$"):
+        cloud.request("GET", THROTTLED_URL, fl.ARM)
+    assert len(server.methods) == fl.THROTTLED_READ_ATTEMPTS
+    assert throttled_reads.sleeps == [1] * (fl.THROTTLED_READ_ATTEMPTS - 1)
+
+
+def test_throttled_reads_never_wait_past_the_read_window(throttled_reads):
+    # 60 s waits fit twice in the 180 s window after the first throttled answer; a third would reach its end.
+    cloud, server = throttled_reads.cloud((429, "60"), (429, "60"), (429, "60"), (200, None))
+    with pytest.raises(fl.Blocked, match="^remote-request-failed-429$"):
+        cloud.request("GET", THROTTLED_URL, fl.ARM)
+    assert len(server.methods) == 3 and throttled_reads.sleeps == [60, 60]
+
+
+@pytest.mark.parametrize("method", ["PUT", "POST", "PATCH", "DELETE"])
+def test_throttled_writes_are_never_repeated(throttled_reads, method):
+    cloud, server = throttled_reads.cloud((429, "1"), (200, None))
+    with pytest.raises(fl.Blocked, match="^remote-request-failed-429$"):
+        cloud.request(method, THROTTLED_URL, fl.ARM, data={"reviewed": True}, allowed=(200, 201, 202))
+    assert server.methods == [method] and throttled_reads.sleeps == []
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 500, 502, 504])
+def test_other_http_errors_on_reads_still_stop_at_once(throttled_reads, status):
+    cloud, server = throttled_reads.cloud((status, "1"), (200, None))
+    with pytest.raises(fl.Blocked, match="^remote-request-failed-" + str(status) + "$"):
+        cloud.request("GET", THROTTLED_URL, fl.ARM)
+    assert server.methods == ["GET"] and throttled_reads.sleeps == []

@@ -36,7 +36,7 @@ from http.client import HTTPSConnection, IncompleteRead, RemoteDisconnected
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
+from urllib.request import BaseHandler, HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 from urllib.response import addinfourl
 from uuid import uuid4
 
@@ -63,6 +63,11 @@ READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5)
 WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
 READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
+# ARM answers a burst of reads with 429 and an overloaded front end with 503, both with Retry-After. A throttled
+# GET/HEAD is sent again within the same window; writes and every other status still stop at once.
+THROTTLED_READ_ATTEMPTS = 8
+THROTTLED_READ_DEFAULT_DELAY_SECONDS = 5
+THROTTLED_READ_MAX_DELAY_SECONDS = 60
 REMOTE_SOCKET_TIMEOUT_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
 RESOURCE_CLOSURE_READ_WORKERS = 8
@@ -234,6 +239,14 @@ def arm_scope(resource_id):
 
 def guid(value):
     return isinstance(value, str) and re.fullmatch(GUID, value) is not None
+
+
+def throttled_read_delay(retry_after):
+    """Seconds to wait before repeating a throttled read: Retry-After in seconds (the form ARM sends), else a default,
+    kept between 1 and THROTTLED_READ_MAX_DELAY_SECONDS."""
+    value = (retry_after or "").strip()
+    seconds = int(value) if value.isascii() and value.isdigit() else THROTTLED_READ_DEFAULT_DELAY_SECONDS
+    return min(max(seconds, 1), THROTTLED_READ_MAX_DELAY_SECONDS)
 
 
 def hash_value(value):
@@ -734,6 +747,41 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+class ThrottledReadHandler(BaseHandler):
+    """Waits out throttling for reads only: a GET or HEAD answered 429 or 503 is sent again after Retry-After.
+
+    A resource closure makes thousands of ARM reads on parallel threads, and ARM answers such a burst with 429
+    (observed 2026-10-23: a COMMON worker stopped with remote-request-failed-429 before any Azure write). A read is
+    repeated at most THROTTLED_READ_ATTEMPTS answers and READ_TRANSPORT_RETRY_WINDOW_SECONDS after it was first
+    throttled; then, and for writes and every other status, the answer reaches Cloud.request unchanged as HTTPError,
+    which never treats a status as a transport retry.
+    """
+
+    def __init__(self, sleep=time.sleep, clock=time.monotonic):
+        self._sleep, self._clock = sleep, clock
+
+    def _throttled(self, request, response, code, message, headers):
+        if request.get_method() not in ("GET", "HEAD") or request.data is not None:
+            return None
+        attempt = getattr(request, "aifactory_throttled", 0) + 1
+        now = self._clock()
+        since = getattr(request, "aifactory_throttled_since", now)
+        delay = throttled_read_delay(headers.get("Retry-After") if headers is not None else None)
+        if attempt >= THROTTLED_READ_ATTEMPTS or now + delay - since >= READ_TRANSPORT_RETRY_WINDOW_SECONDS:
+            return None
+        response.read()
+        response.close()
+        print(json.dumps({
+            "event": "remote-request-throttled", "method": request.get_method(), "host": request.host,
+            "path": urlsplit(request.full_url).path, "status": code, "attempt": attempt, "delay_seconds": delay,
+        }, sort_keys=True), file=sys.stderr, flush=True)
+        self._sleep(delay)
+        request.aifactory_throttled, request.aifactory_throttled_since = attempt, since
+        return self.parent.open(request, timeout=request.timeout)
+
+    http_error_429 = http_error_503 = _throttled
+
+
 class KeepAliveHTTPSHandler(HTTPSHandler):
     """Pooled keep-alive HTTPS for GET/HEAD (Object Pool); every other request is unchanged.
 
@@ -812,7 +860,7 @@ class Cloud:
     def __init__(self, document, command_runner=None, opener=None, expected_object_id=None):
         self.document = document
         self.runner = command_runner or subprocess.run
-        self.opener = opener or build_opener(NoRedirect, KeepAliveHTTPSHandler())
+        self.opener = opener or build_opener(NoRedirect, ThrottledReadHandler(), KeepAliveHTTPSHandler())
         self.tokens = {}
         self.token_expiries = {}
         # Closure reads run on worker threads: one refresh per audience, never a torn cache.
