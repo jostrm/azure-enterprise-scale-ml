@@ -352,6 +352,13 @@ def test_dedicated_live_voice_options_map_to_exact_variable_names(command):
     assert cli.configuration_changes(cli.build_parser().parse_args(["config", command, *MCP_SCOPE, *extra])) == {}
 
 
+def test_agent_configuration_file_and_model_options_map_to_exact_variable_names():
+    args = cli.build_parser().parse_args([
+        "config", "review", *MCP_SCOPE, "--aifactory-agent-config-file", "aifactory/agent/project012-dev.json",
+        "--aifactory-agent-model-deployment", "agent-model"])
+    assert cli.configuration_changes(args) == {
+        "aifactoryAgentConfigFile": "aifactory/agent/project012-dev.json", "aifactoryAgentModelDeployment": "agent-model"}
+
 def test_live_voice_options_sit_next_to_the_chat_agent_option_and_share_no_destination():
     args = cli.build_parser().parse_args([
         "config", "review", *MCP_SCOPE, "--enable-factory-chat-agent", "true",

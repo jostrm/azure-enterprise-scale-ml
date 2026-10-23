@@ -138,7 +138,7 @@ pipeline:
 | Field | Manual YAML run |
 |---|---|
 | Deployment mode (`deploymentTarget`) | `manual` |
-| `deploymentProjectNumber` | `not-applicable` |
+| `deploymentProjectNumber` | `XXX` (format: 3 digits such as `001`, reviewed runs only) |
 | `deploymentConfigHash` | `not-applicable` |
 | `deploymentSettings` | Default `{}` |
 | Build agent selection | `microsoft-hosted`, when compatible with connection/network |

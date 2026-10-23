@@ -35,3 +35,4 @@ steps:
       admin_aifactorySuffixRG: '$(admin_aifactorySuffixRG)'
       projectSuffix: '$(projectSuffix)'
       modelGPTXName: '$(modelGPTXName)'
+      aifactoryAgentModelDeployment: '$(aifactoryAgentModelDeployment)'

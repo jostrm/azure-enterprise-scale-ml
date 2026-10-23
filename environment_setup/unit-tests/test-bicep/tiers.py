@@ -42,6 +42,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_ado_json_initialization.py",
         "unit/test_ado_manual_run.py",
         "unit/test_ado_run_output.py",
+        "unit/test_agent_chat_launcher.py",
         "unit/test_agent_live_voice_pipeline.py",
         "unit/test_all_scaleset_dispatcher.py",
         "unit/test_apim_gateway_workflows.py",

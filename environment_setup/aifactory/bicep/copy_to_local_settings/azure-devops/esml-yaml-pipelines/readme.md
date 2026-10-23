@@ -1,8 +1,8 @@
 # Azure Devops orchestration (.yaml): Bicep
 Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline in Azure Devops.
 
-For manual project runs, use `deploymentTarget: manual`, leave both reviewed
-project/hash fields as `not-applicable` and `deploymentSettings` as `{}`, and
+For manual project runs, use `deploymentTarget: manual`, leave the reviewed
+project field as `XXX` (format `001`), the hash as `not-applicable` and `deploymentSettings` as `{}`, and
 uncheck the JSON override when using YAML. **For Dev only, deselect Stage and
 Prod under Stages to run.** See the
 [manual ADO setup parameters](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml)

@@ -265,7 +265,8 @@ class FactoryChatAgentRequest:
             resource_group=resource_group,
             environment=environment,
             project_number=project_number,
-            model_deployment=_text(get("modelGPTXName")),
+            # The agent may use its own deployment; empty keeps the project's model (modelGPTXName).
+            model_deployment=_text(get("aifactoryAgentModelDeployment")) or _text(get("modelGPTXName")),
         )
 
 

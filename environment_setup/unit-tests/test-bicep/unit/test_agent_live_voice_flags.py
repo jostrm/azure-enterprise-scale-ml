@@ -22,6 +22,8 @@ INPUTS = {
     "aifactoryAgentReaderObjectIds": "AIFACTORY_AGENT_READER_OBJECT_IDS",
     "aifactoryAgentVoiceName": "AIFACTORY_AGENT_VOICE_NAME",
     "aifactoryAgentVoiceLanguages": "AIFACTORY_AGENT_VOICE_LANGUAGES",
+    "aifactoryAgentConfigFile": "AIFACTORY_AGENT_CONFIG_FILE",
+    "aifactoryAgentModelDeployment": "AIFACTORY_AGENT_MODEL_DEPLOYMENT",
 }
 VARIABLES_JSON = REPO_ROOT / "environment_setup/aifactory/variables.json"
 

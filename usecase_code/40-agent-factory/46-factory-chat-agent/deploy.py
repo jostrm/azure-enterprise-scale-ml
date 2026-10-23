@@ -19,7 +19,7 @@ INPUTS = (
     "deleteAllForProject", "dev_test_prod_sub_id", "tenantId", "dev_test_prod",
     "project_number_000", "admin_aifactoryPrefixRG", "projectPrefix",
     "admin_locationSuffix", "admin_aifactorySuffixRG", "projectSuffix",
-    "modelGPTXName",
+    "modelGPTXName", "aifactoryAgentModelDeployment",
 )
 
 

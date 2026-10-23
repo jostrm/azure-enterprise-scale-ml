@@ -21,10 +21,12 @@ INPUTS = {
     "aifactoryAgentReaderObjectIds": "AIFACTORY_AGENT_READER_OBJECT_IDS",
     "aifactoryAgentVoiceName": "AIFACTORY_AGENT_VOICE_NAME",
     "aifactoryAgentVoiceLanguages": "AIFACTORY_AGENT_VOICE_LANGUAGES",
+    "aifactoryAgentConfigFile": "AIFACTORY_AGENT_CONFIG_FILE",
+    "aifactoryAgentModelDeployment": "AIFACTORY_AGENT_MODEL_DEPLOYMENT",
 }
 JOB = ADO_ROOT / "esml-infra-project" / "jobs" / "job-aifactory-agent-live-voice.yaml"
 LAUNCHER = REPO_ROOT / "usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py"
-STEP = "Deploy AI Factory Agent live voice (project001 Dev)"
+STEP = "Deploy AI Factory Agent live voice (any project, Dev)"
 PREVIOUS_STEP = "Deploy AI Factory MCP and AI Gateway SKU (project001 Dev)"
 CALL = "47-aifactory-agent-live-voice/deploy.py\" apply --apply"
 

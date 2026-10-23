@@ -13,6 +13,7 @@ AIF_DUAL_LAYOUT_LAUNCHERS=(
   GHA-update-aifactory-and-run-project.sh
 )
 AIF_DUAL_LAYOUT_LIBRARIES=(
+  agent_chat_entry.py
   aifactory_private_dns.py
   aifactory_scaleset_config.py
   aifactory_vpn_profile.py
@@ -53,6 +54,29 @@ aif_route_runner() {
   elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then python_command=(python)
   elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then python_command=(py -3)
   else printf 'ERROR: Python 3.10 or newer is required for runner setup.\n' >&2; exit 2
+  fi
+  exec "${python_command[@]}" -B "$adapter" "$provider" "$@"
+}
+
+aif_route_agent_chat() {
+  local provider="$1" script_dir="$2"
+  shift 2
+  case "${1:-}" in
+    add-aifactory-agent-chat|--add-aifactory-agent-chat|-addAIFactoryAgentChat) shift ;;
+    *) return 0 ;;
+  esac
+  local candidate adapter
+  for candidate in "$script_dir/lib/agent_chat_entry.py" \
+    "$script_dir/azure-enterprise-scale-ml/bootstrap/lib/agent_chat_entry.py"; do
+    [[ ! -f "$candidate" ]] || { adapter="$candidate"; break; }
+  done
+  [[ -n "${adapter:-}" ]] || { printf 'ERROR: The AI Factory Agent chat helper (lib/agent_chat_entry.py) is missing.\n' >&2; exit 2; }
+  local -a python_command
+  if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then python_command=("$AIFACTORY_PYTHON")
+  elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then python_command=(python3)
+  elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then python_command=(python)
+  elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then python_command=(py -3)
+  else printf 'ERROR: Python 3.10 or newer is required for the AI Factory Agent chat.\n' >&2; exit 2
   fi
   exec "${python_command[@]}" -B "$adapter" "$provider" "$@"
 }

@@ -94,7 +94,7 @@ consumer, choose your **consumer branch** (for example `prj001`) and use:
 | Run pipeline field | Value for a normal YAML-based run |
 |---|---|
 | Deployment mode (`deploymentTarget`) | Keep `manual` |
-| `deploymentProjectNumber` | Keep `not-applicable` |
+| `deploymentProjectNumber` | Keep `XXX` (the format is 3 digits, e.g. `001`; only reviewed runs use it) |
 | `deploymentConfigHash` | Keep `not-applicable` |
 | `deploymentSettings` | Keep the default object `{}` |
 | Build agent selection | `microsoft-hosted`, if compatible with your service connection/network |
@@ -112,7 +112,7 @@ Microsoft-hosted agents do not grant private-network access or an agent's manage
 identity; choose a compatible existing runner.
 
 ADO's Run UI treats empty string parameters as required, even with `default: ''`.
-The nonempty `manual` / `not-applicable` defaults avoid that UI problem. If the
+The nonempty `manual` / `XXX` / `not-applicable` defaults avoid that UI problem. If the
 old labels still ask for blank reviewed fields, refresh and publish the consumer's
 copied pipeline from the fixed source before starting a new run.
 `manual` is normalized to the original empty target internally; old API callers

@@ -108,8 +108,8 @@ MCP_GATEWAY_OPTIONS = (
 )
 LIVE_VOICE_OPTIONS = (
     ("--enable-aifactory-agent-live-voice", "enableAIFactoryAgentLiveVoice", BOOLEAN,
-     "Deploy the AI Factory Agent chat application with Azure Voice Live speech and the pulsing voice orb in project001 Dev "
-     "(requires enableFactoryChatAgent, enableContainerApps, enableAIFoundry and enableAISearch)."),
+     "Deploy the AI Factory Agent chat application with Azure Voice Live speech and the pulsing voice orb in this project's Dev "
+     "(requires enableFactoryChatAgent, enableAIFoundry, enableAISearch and enableContainerApps or a named environment)."),
     ("--aifactory-agent-entra-app-id", "aifactoryAgentEntraAppId", None,
      "Client ID (GUID) of the agent's dedicated Entra single-page-app registration."),
     ("--aifactory-agent-container-apps-environment", "aifactoryAgentContainerAppsEnvironment", None,
@@ -120,6 +120,10 @@ LIVE_VOICE_OPTIONS = (
      "Azure Speech voice for spoken answers; empty uses en-US-Ava:DragonHDLatestNeural."),
     ("--aifactory-agent-voice-languages", "aifactoryAgentVoiceLanguages", None,
      "Comma-separated BCP-47 speech input languages such as sv-SE,en-US; empty uses en-US."),
+    ("--aifactory-agent-config-file", "aifactoryAgentConfigFile", None,
+     "Your own agent configuration (JSON, relative to the repository root) merged over the generated one; empty uses none."),
+    ("--aifactory-agent-model-deployment", "aifactoryAgentModelDeployment", None,
+     "Foundry model deployment used by the agent; empty uses modelGPTXName."),
 )
 DEDICATED_OPTIONS = (("mcp_gateway", MCP_GATEWAY_OPTIONS), ("live_voice", LIVE_VOICE_OPTIONS))
 

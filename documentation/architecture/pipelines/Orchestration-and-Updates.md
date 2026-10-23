@@ -50,8 +50,8 @@ writer. Noninteractive destination lookup and reviewed/registered routing remain
 unchanged. The override selects a destination; it does not grant tenant access or
 authorize a deployment.
 
-The legacy project ADO Run UI uses `deploymentTarget: manual` and
-`not-applicable` project/hash defaults because empty string parameters are treated
+The legacy project ADO Run UI uses `deploymentTarget: manual`, `XXX` project
+(3-digit format hint) and `not-applicable` hash defaults because empty string parameters are treated
 as required by that UI. A compile-time `reviewedDeploymentTarget` maps manual to
 the existing empty-target promotion flow; explicitly empty API targets remain
 compatible. The JSON override selects configuration input independently of this

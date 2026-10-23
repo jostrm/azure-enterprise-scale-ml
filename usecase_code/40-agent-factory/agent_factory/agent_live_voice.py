@@ -1,4 +1,4 @@
-"""Opt-in live voice for the AI Factory Agent chat application (project001 Dev).
+"""Opt-in live voice for the AI Factory Agent chat application (any project, Dev).
 
 The chat flag (enableFactoryChatAgent, step 70-factory-chat-agent) creates the owned Foundry prompt Agent. This module adds
 the voice-enabled chat *application* on top of it. With enableAIFactoryAgentLiveVoice (which requires the chat flag), one
@@ -9,10 +9,15 @@ account. No new speech resource is created.
 The engine only *reads* Azure (discovery). All writes are made by the existing, ownership-checked operator commands of the
 agent (ingest, deploy.py --apply), run non-interactively with a generated configuration. False never deletes or detaches
 anything; the model deployment, the Agent and the Entra registration are prerequisites, never created here.
+
+The generated configuration is a baseline. A customer's own agent configuration (aifactoryAgentConfigFile, a JSON file in
+the consumer repository) is merged over it, so the only customer-specific artefact is that configuration; identity, scope
+and discovered resources always come from the pipeline and Azure.
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -30,11 +35,13 @@ from .mcp_gateway import GUID, KNOWLEDGE_EXCLUDES, KNOWLEDGE_INCLUDES, flag
 
 CHAT_FLAG = "enableFactoryChatAgent"
 VOICE_FLAG = "enableAIFactoryAgentLiveVoice"
-PROJECT_NUMBER = "001"
 ENVIRONMENT = "dev"
-APP_NAME = "aifactory-agent-project001-dev"
 INTEGRATION = "live-voice"
-SCOPE_KEY = "project001-dev"
+OWNER_TAG = "enterprise-scale-ai-factory-agent"
+PROJECT_NUMBER = re.compile(r"^(?!000)\d{3}$")
+# Customer configuration may tune the application but never its identity, scope, discovered resources or voice switch.
+RESERVED_OVERLAY_KEYS = ("scopes", "azure", "location", "auth.client_id", "auth.audience",
+                         "knowledge.repository_root", "workloads.repository_root", "voice.enabled")
 DEFAULT_VOICE = "en-US-Ava:DragonHDLatestNeural"
 DEFAULT_LANGUAGE = "en-US"
 READ_ONLY_PERMISSIONS = ["knowledge.read", "factory.read"]
@@ -99,6 +106,8 @@ class LiveVoiceRequest:
     reader_object_ids: tuple[str, ...] = ()
     voice_name: str = ""
     voice_languages: tuple[str, ...] = ()
+    config_file: str = ""
+    config_overlay: object = field(default_factory=dict, compare=False)
 
     @classmethod
     def from_values(cls, values: Mapping[str, object]) -> "LiveVoiceRequest":
@@ -121,13 +130,47 @@ class LiveVoiceRequest:
             enable_ai_foundry=flag(get("enableAIFoundry"), "enableAIFoundry"),
             enable_ai_search=flag(get("enableAISearch"), "enableAISearch"),
             delete_requested=any(flag(get(name), name) for name in ("deleteAllServicesForProject", "deleteAllForProject")),
-            model_deployment=_text(get("modelGPTXName")),
+            # The agent may use its own deployment; empty keeps the project's model (modelGPTXName).
+            model_deployment=_text(get("aifactoryAgentModelDeployment")) or _text(get("modelGPTXName")),
             entra_app_id=_text(get("aifactoryAgentEntraAppId")).lower(),
             container_apps_environment=_text(get("aifactoryAgentContainerAppsEnvironment")),
             reader_object_ids=_list(get("aifactoryAgentReaderObjectIds")),
             voice_name=_text(get("aifactoryAgentVoiceName")),
             voice_languages=_list(get("aifactoryAgentVoiceLanguages"), fold=False),
+            config_file=_text(get("aifactoryAgentConfigFile")),
         )
+
+
+def scope_key(request: LiveVoiceRequest) -> str:
+    return f"project{request.project_number}-{request.environment}"
+
+
+def app_name(request: LiveVoiceRequest) -> str:
+    """aifactory-agent-project001-dev keeps the name of the first deployed application."""
+    return f"aifactory-agent-{scope_key(request)}"
+
+
+def _overlay_problems(overlay) -> list[str]:
+    if not isinstance(overlay, dict):
+        return ["the customer agent configuration (aifactoryAgentConfigFile) must be a JSON object"]
+    problems = []
+    for dotted in RESERVED_OVERLAY_KEYS:
+        node, parts = overlay, dotted.split(".")
+        for part in parts[:-1]:
+            node = node.get(part) if isinstance(node, dict) else None
+        if isinstance(node, dict) and parts[-1] in node:
+            problems.append(f"the customer agent configuration must not set {dotted} (it comes from the pipeline and Azure)")
+    return problems
+
+
+def _merge(base: dict, overlay: dict) -> dict:
+    merged = copy.deepcopy(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
 
 
 @dataclass
@@ -145,16 +188,19 @@ def decide(request: LiveVoiceRequest) -> Decision:
     if not request.enable_chat:
         raise ValueError(f"{VOICE_FLAG} requires {CHAT_FLAG}=true (live voice is an option of the AI Factory Agent chat, "
                          "not a separate agent).")
-    if request.project_number != PROJECT_NUMBER:
-        raise ValueError(f"The AI Factory Agent live voice application is supported only for project{PROJECT_NUMBER}; "
-                         f"this pipeline is project{request.project_number}.")
+    if not PROJECT_NUMBER.fullmatch(request.project_number):
+        raise ValueError("project_number_000 must be a 3-digit project number from 001 to 999 "
+                         f"(found '{request.project_number}').")
     if request.environment != ENVIRONMENT:
         return Decision(False, f"The AI Factory Agent live voice application runs only in Dev; skipped for '{request.environment}'.")
-    problems = []
+    problems = _overlay_problems(request.config_overlay)
     if request.delete_requested:
         problems.append("deleteAllServicesForProject/deleteAllForProject conflict with the enabled AI Factory Agent options")
-    for name, enabled in (("enableContainerApps", request.enable_container_apps),
-                          ("enableAIFoundry", request.enable_ai_foundry), ("enableAISearch", request.enable_ai_search)):
+    # A named, already existing environment is enough: discovery still requires it to be internal.
+    if not (request.enable_container_apps or request.container_apps_environment):
+        problems.append(f"{VOICE_FLAG} requires enableContainerApps=true or aifactoryAgentContainerAppsEnvironment "
+                        "naming an existing internal Container Apps environment")
+    for name, enabled in (("enableAIFoundry", request.enable_ai_foundry), ("enableAISearch", request.enable_ai_search)):
         if not enabled:
             problems.append(f"{VOICE_FLAG} requires {name}=true")
     if not MODEL_NAME.fullmatch(request.model_deployment):
@@ -178,7 +224,7 @@ def decide(request: LiveVoiceRequest) -> Decision:
         problems.append("the project resource group and admin_location are required")
     if problems:
         raise ValueError("Invalid AI Factory Agent live voice configuration: " + "; ".join(problems) + ".")
-    return Decision(True, "Validated project001 Dev AI Factory Agent live voice request.", True)
+    return Decision(True, f"Validated project{request.project_number} Dev AI Factory Agent live voice request.", True)
 
 
 @dataclass
@@ -223,24 +269,35 @@ def verify_agent(session: ArmPort, project_endpoint: str) -> str:
     return str(latest.get("version") or latest.get("id") or "")
 
 
-def check_existing_app(session: ArmPort, group_id: str) -> None:
-    """Never replace an operator-deployed app (its richer configuration would be overwritten by the generated baseline)."""
+def check_existing_app(session: ArmPort, group_id: str, request: LiveVoiceRequest) -> None:
+    """Never replace an operator-deployed app with the bare baseline (its richer configuration would be lost).
+
+    The app is adopted only when the customer supplies its own agent configuration (aifactoryAgentConfigFile), which is
+    then the reviewed source of that richer configuration. An app not owned by the agent is never touched.
+    """
+    name = app_name(request)
     try:
-        existing = session.arm("GET", f"{group_id}/providers/Microsoft.App/containerApps/{APP_NAME}", api_version=APPS_API)
+        existing = session.arm("GET", f"{group_id}/providers/Microsoft.App/containerApps/{name}", api_version=APPS_API)
     except AzureError as error:
         if error.status == 404:
             return
         raise
-    if (existing.get("tags") or {}).get("aifactory-integration") != INTEGRATION:
-        raise ValueError(f"The AI Factory Agent app '{APP_NAME}' already exists and was not created by this pipeline step, so "
-                         "it is left untouched. To enable live voice on it, set voice.enabled in your own agent configuration "
-                         "and run 40-aifactory-agent/deploy.py (the operator flow), or remove the app and let this step create it.")
+    tags = existing.get("tags") or {}
+    if tags.get("aifactory-integration") == INTEGRATION:
+        return
+    if tags.get("managed-by") != OWNER_TAG:
+        raise ValueError(f"The app '{name}' exists but is not owned by the Enterprise Scale AI Factory agent; it is left untouched.")
+    if not request.config_overlay:
+        raise ValueError(f"The AI Factory Agent app '{name}' already exists and was not created by this pipeline step, so "
+                         "it is left untouched. To let the pipeline manage it, commit your own agent configuration and set "
+                         "aifactoryAgentConfigFile to it; otherwise keep using 40-aifactory-agent/deploy.py (the operator flow), "
+                         "or remove the app and let this step create it.")
 
 
 def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
     """Resolve the project's actual Foundry, data and Container Apps resources (GET only)."""
     group_id = f"/subscriptions/{request.subscription_id}/resourceGroups/{request.resource_group}"
-    check_existing_app(session, group_id)
+    check_existing_app(session, group_id, request)
     resources = session.pages(f"{ARM}{group_id}/resources?api-version={RESOURCES_API}")
 
     def of_type(kind: str) -> list[dict]:
@@ -316,11 +373,12 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
     }
     if target.insights_name:
         azure["application_insights_name"] = target.insights_name
-    return {
+    scope = scope_key(request)
+    baseline = {
         "location": target.location,
-        "scopes": {SCOPE_KEY: {"tenant_id": request.tenant_id, "subscription_id": request.subscription_id,
-                               "resource_group": request.resource_group, "factory": request.factory_key,
-                               "project": PROJECT_NUMBER, "environment": ENVIRONMENT}},
+        "scopes": {scope: {"tenant_id": request.tenant_id, "subscription_id": request.subscription_id,
+                           "resource_group": request.resource_group, "factory": request.factory_key,
+                           "project": request.project_number, "environment": ENVIRONMENT}},
         "azure": azure,
         "knowledge": {"top_k": 3, "repository_root": root,
                       "source_base_url": "https://github.com/jostrm/azure-enterprise-scale-ml/blob/main",
@@ -330,11 +388,15 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
         "actions": {"enabled_skills": []}, "costs": {},
         "workloads": {"enabled_skills": [], "repository_root": root, "profiles": {}},
         "auth": {"client_id": request.entra_app_id, "audience": request.entra_app_id,
-                 "grants": [{"object_id": object_id, "scopes": [SCOPE_KEY], "permissions": list(READ_ONLY_PERMISSIONS)}
+                 "grants": [{"object_id": object_id, "scopes": [scope], "permissions": list(READ_ONLY_PERMISSIONS)}
                             for object_id in request.reader_object_ids]},
         "voice": {"enabled": True, "voice_name": request.voice_name or DEFAULT_VOICE,
                   "input_languages": list(request.voice_languages) or [DEFAULT_LANGUAGE]},
     }
+    problems = _overlay_problems(request.config_overlay)
+    if problems:
+        raise ValueError("Invalid AI Factory Agent live voice configuration: " + "; ".join(problems) + ".")
+    return _merge(baseline, request.config_overlay)
 
 
 def subprocess_runner(args, *, cwd, env=None) -> str:
@@ -383,7 +445,7 @@ class LiveVoiceIntegration:
         self.work_dir, self.repository_root = Path(work_dir), Path(repository_root)
         self.agent_dir = agent_dir or Path(__file__).resolve().parents[1] / "40-aifactory-agent"
 
-    def _steps(self, target: Target, config: Path) -> list[tuple[str, str, list]]:
+    def _steps(self, request: LiveVoiceRequest, target: Target, config: Path) -> list[tuple[str, str, list]]:
         env_dir = self.work_dir / "agent-env"
         python = str(env_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
         return [
@@ -397,7 +459,8 @@ class LiveVoiceIntegration:
                  "pip==25.3"]]),
             ("knowledge index", "ingest", [[python, "-m", "aifactory_agent", "--config", str(config), "ingest"]]),
             ("container app", "deploy.py", [[python, "deploy.py", "--config", str(config), "--environment",
-                                              target.environment_name, "--integration", INTEGRATION, "--apply"]]),
+                                              target.environment_name, "--app-name", app_name(request),
+                                              "--integration", INTEGRATION, "--apply"]]),
         ]
 
     def run(self, request: LiveVoiceRequest, *, apply: bool) -> dict:
@@ -412,7 +475,9 @@ class LiveVoiceIntegration:
         config = self.work_dir / "config.json"
         config.write_text(json.dumps(render_config(request, target, repository_root=self.repository_root), indent=2),
                           encoding="utf-8")
-        report.outputs = {"voice": True, "scope": SCOPE_KEY, "model_deployment": target.model["name"],
+        report.outputs = {"voice": True, "scope": scope_key(request), "app": app_name(request),
+                          "customer_configuration": request.config_file or None,
+                          "model_deployment": target.model["name"],
                           "container_apps_environment": target.environment_name,
                           "agent": {"name": AGENT_NAME, "version": target.agent_version}}
         report.prerequisites = [
@@ -433,7 +498,7 @@ class LiveVoiceIntegration:
                    "deploy.py": "owned identity, runtime and Voice Live roles, private Container App and refresh job; "
                                 "refuses unowned resources"}
         outputs: dict = {}
-        for resource, marker, commands in self._steps(target, config):
+        for resource, marker, commands in self._steps(request, target, config):
             if not apply:
                 report.add(resource, "would run", details.get(marker, ""))
                 continue

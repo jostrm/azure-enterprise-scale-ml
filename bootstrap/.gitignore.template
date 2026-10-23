@@ -17,6 +17,7 @@ eggs/
 lib/
 !/lib/
 /lib/*
+!/lib/agent_chat_entry.py
 !/lib/aifactory_private_dns.py
 !/lib/aifactory_scaleset_config.py
 !/lib/aifactory_vpn_profile.py

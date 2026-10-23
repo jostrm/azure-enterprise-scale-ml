@@ -96,7 +96,10 @@ def reviewed_calls(value):
 def test_run_ui_string_defaults_do_not_require_empty_fields():
     params = {item["name"]: item for item in pipeline()["parameters"]}
     assert params["deploymentTarget"]["default"] == "manual"
-    assert params["deploymentProjectNumber"]["default"] == "not-applicable"
+    # XXX shows the 3-digit format in the Run UI; the label says it is e.g. 001, not project001 or 1.
+    assert params["deploymentProjectNumber"]["default"] == "XXX"
+    assert "001" in params["deploymentProjectNumber"]["displayName"]
+    assert "project001" in params["deploymentProjectNumber"]["displayName"]
     assert params["deploymentConfigHash"]["default"] == "not-applicable"
     assert params["deploymentSettings"]["default"] == {}
     assert all(params[key]["default"] for key in (
@@ -173,7 +176,7 @@ def test_reviewed_preflight_rejects_manual_placeholders_before_materialization(t
         "AIFACTORY_CONFIG_JSON": "" if missing == "protected-json" else config,
         "AIFACTORY_CONFIG_HASH": "not-applicable" if missing == "hash"
         else hashlib.sha256(config.encode("utf-8")).hexdigest(),
-        "AIFACTORY_PROJECT": "not-applicable" if missing == "project" else "001",
+        "AIFACTORY_PROJECT": "XXX" if missing == "project" else "001",
         "AIFACTORY_TARGET": "dev",
     }
     result = subprocess.run(

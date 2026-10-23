@@ -6,6 +6,7 @@ import copy
 import importlib.util
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,16 @@ VALUES = {
     "admin_locationSuffix": "sdc", "admin_aifactorySuffixRG": "-001", "projectSuffix": "-rg",
     "modelGPTXName": MODEL, "aifactoryAgentEntraAppId": APP, "aifactoryAgentReaderObjectIds": f"{READER_A}, {READER_B}",
     "aifactoryAgentContainerAppsEnvironment": "", "aifactoryAgentVoiceName": "", "aifactoryAgentVoiceLanguages": "",
+    "aifactoryAgentConfigFile": "", "aifactoryAgentModelDeployment": "",
+}
+# A customer's own agent configuration (what an operator would otherwise pass to 40-aifactory-agent/deploy.py).
+OVERLAY = {
+    "max_tool_rounds": 6,
+    "auth": {"additional_client_ids": ["04b07795-8ddb-461a-bbee-02f9e1bf7b46"],
+             "grants": [{"object_id": READER_A, "scopes": ["project001-dev"],
+                         "permissions": ["knowledge.read", "factory.read", "cost.read"]}]},
+    "voice": {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "coral",
+              "input_languages": ["en-US"]},
 }
 
 
@@ -58,7 +69,8 @@ class FakeArm:
             ENV_ID.lower(): {"id": ENV_ID, "properties": {"vnetConfiguration": {"internal": True}, "defaultDomain": "internal.example"}},
         }
         if app != "missing":
-            tags = {"managed-by": "enterprise-scale-ai-factory-agent", **({"aifactory-integration": "live-voice"} if app == "pipeline" else {})}
+            tags = {} if app == "foreign" else {
+                "managed-by": "enterprise-scale-ai-factory-agent", **({"aifactory-integration": "live-voice"} if app == "pipeline" else {})}
             self.resources[APP_ID.lower()] = {"id": APP_ID, "name": "aifactory-agent-project001-dev", "tags": tags}
         self.lists = {
             f"{GROUP_ID}/resources": [
@@ -163,12 +175,35 @@ def test_live_voice_without_chat_is_a_loud_configuration_error_not_a_silent_skip
         live.decide(request(enableFactoryChatAgent="false"))
 
 
-def test_only_project001_dev_acts_other_projects_fail_and_other_environments_skip():
-    with pytest.raises(ValueError, match="only for project001"):
-        live.decide(request(project_number_000="002"))
+def test_any_project_number_acts_in_dev_and_other_environments_skip():
+    decision = live.decide(request(project_number_000="012"))
+    assert decision.act is True and decision.reason == "Validated project012 Dev AI Factory Agent live voice request."
+    for number in ("000", "12a", "1234"):
+        with pytest.raises(ValueError, match="project_number_000"):
+            live.decide(request(project_number_000=number))
     for environment in ("test", "prod"):
         decision = live.decide(request(dev_test_prod=environment))
         assert decision.act is False and "Dev" in decision.reason
+
+
+def test_the_agent_model_can_differ_from_the_projects_model():
+    req = request(modelGPTXName="gpt-infra", aifactoryAgentModelDeployment=MODEL)
+    assert req.model_deployment == MODEL and live.discover(FakeArm(), req).model["name"] == MODEL
+    assert request(aifactoryAgentModelDeployment="").model_deployment == MODEL
+
+
+def test_a_named_existing_container_apps_environment_replaces_the_container_apps_flag():
+    named = request(enableContainerApps="false", aifactoryAgentContainerAppsEnvironment="aca-env-prj001")
+    assert live.decide(named).act is True
+    with pytest.raises(ValueError, match="enableContainerApps=true or aifactoryAgentContainerAppsEnvironment"):
+        live.decide(request(enableContainerApps="false"))
+
+
+def test_names_and_scope_follow_the_project_number():
+    assert live.app_name(request()) == "aifactory-agent-project001-dev", "the existing project001 app keeps its name"
+    assert live.scope_key(request()) == "project001-dev"
+    assert live.app_name(request(project_number_000="12")) == "aifactory-agent-project012-dev"
+    assert live.scope_key(request(project_number_000="012")) == "project012-dev"
 
 
 @pytest.mark.parametrize("flag", ["deleteAllServicesForProject", "deleteAllForProject"])
@@ -266,6 +301,39 @@ def test_an_operator_deployed_app_is_never_replaced_by_the_generated_baseline():
     assert live.discover(FakeArm(app="missing"), request()).environment_name == "aca-env-prj001"
 
 
+def test_an_operator_deployed_app_is_adopted_only_with_the_customers_own_agent_configuration():
+    customer = replace(request(), config_overlay=OVERLAY)
+    assert live.discover(FakeArm(app="operator"), customer).environment_name == "aca-env-prj001"
+    with pytest.raises(ValueError, match="not owned by the Enterprise Scale AI Factory agent"):
+        live.discover(FakeArm(app="foreign"), customer)
+
+
+def test_the_customer_configuration_overlays_the_generated_baseline():
+    pytest.importorskip("pydantic")
+    from aifactory_agent.config import Settings
+    req = replace(request(), config_overlay=OVERLAY)
+    config = live.render_config(req, live.discover(FakeArm(), req), repository_root=Path("/work/checkout"))
+    assert config["voice"] == {"enabled": True, "voice_name": "coral", "input_languages": ["en-US"], "mode": "realtime",
+                               "model": "gpt-realtime-mini", "voice_type": "openai"}
+    assert config["auth"]["client_id"] == APP and config["auth"]["grants"] == OVERLAY["auth"]["grants"]
+    assert config["max_tool_rounds"] == 6 and list(config["scopes"]) == ["project001-dev"]
+    assert config["azure"]["foundry_account"] == "aifacct001"
+    settings = Settings.model_validate(config)
+    assert settings.voice.mode == "realtime"
+
+
+@pytest.mark.parametrize("overlay, key", [
+    ({"scopes": {}}, "scopes"), ({"azure": {"foundry_account": "x"}}, "azure"), ({"location": "eastus"}, "location"),
+    ({"auth": {"client_id": APP}}, "auth.client_id"), ({"auth": {"audience": APP}}, "auth.audience"),
+    ({"knowledge": {"repository_root": "/x"}}, "knowledge.repository_root"),
+    ({"workloads": {"repository_root": "/x"}}, "workloads.repository_root"),
+    ({"voice": {"enabled": False}}, "voice.enabled"), ([], "JSON object"),
+])
+def test_the_customer_configuration_cannot_replace_identity_scope_or_discovered_resources(overlay, key):
+    with pytest.raises(ValueError, match=key.replace(".", r"\.")):
+        live.decide(replace(request(), config_overlay=overlay))
+
+
 def test_the_foundry_agent_from_the_chat_step_must_exist_and_be_owned_by_the_factory():
     with pytest.raises(ValueError, match="does not exist yet.*enableFactoryChatAgent"):
         live.discover(FakeArm(agent="missing"), request())
@@ -292,6 +360,14 @@ def test_the_generated_configuration_is_valid_for_the_applications_own_schema_wi
     assert settings.voice.enabled is True and settings.azure.credential == "cli" and settings.factory.writes_enabled is False
     assert list(settings.scopes) == ["project001-dev"] and settings.scopes["project001-dev"].environment == "dev"
     assert settings.agent_name == AGENT_NAME
+
+
+def test_the_generated_configuration_follows_the_project_number():
+    target = live.discover(FakeArm(), request())  # the fake only knows one resource group; naming is what matters here
+    config = live.render_config(request(project_number_000="012"), target, repository_root=Path("/work/checkout"))
+    assert config["scopes"] == {"project012-dev": {**config["scopes"]["project012-dev"], "project": "012", "environment": "dev"}}
+    assert config["scopes"]["project012-dev"]["resource_group"] == "aif-esml-project012-sdc-dev-001-rg"
+    assert {scope for grant in config["auth"]["grants"] for scope in grant["scopes"]} == {"project012-dev"}
 
 
 def test_grants_are_read_only_and_exactly_the_listed_users_and_no_secret_is_present():
@@ -435,6 +511,41 @@ def test_plan_reads_azure_only_and_apply_runs_the_engine_in_a_work_directory_out
     assert (tmp_path / "aifactory-agent-live-voice" / "config.json").is_file()
     assert module.work_directory({"AGENT_TEMPDIRECTORY": str(tmp_path)}) == tmp_path / "aifactory-agent-live-voice"
     assert not str(module.work_directory({})).startswith(str(ROOT.parents[1]))
+
+
+def test_the_launcher_loads_the_customers_agent_configuration_from_the_consumer_checkout(tmp_path):
+    module, arm, runner = launcher(), FakeArm(app="operator"), FakeRunner()
+    (tmp_path / "aifactory" / "agent").mkdir(parents=True)
+    (tmp_path / "aifactory" / "agent" / "project001-dev.json").write_text(json.dumps(OVERLAY), encoding="utf-8")
+    environ = values(RUNNER_TEMP=str(tmp_path / "temp"), BUILD_SOURCESDIRECTORY=str(tmp_path),
+                     aifactoryAgentConfigFile="aifactory/agent/project001-dev.json")
+    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner)
+    assert plan["mode"] == "plan" and plan["outputs"]["customer_configuration"] == "aifactory/agent/project001-dev.json"
+    written = json.loads((tmp_path / "temp" / "aifactory-agent-live-voice" / "config.json").read_text("utf-8"))
+    assert written["voice"]["mode"] == "realtime" and written["max_tool_rounds"] == 6
+
+
+@pytest.mark.parametrize("path, message", [
+    ("../outside.json", "inside the repository checkout"), ("aifactory/agent/missing.json", "not found"),
+    ("aifactory/agent/list.json", "JSON object"), ("aifactory/agent/broken.json", "valid JSON"),
+])
+def test_the_launcher_refuses_unsafe_or_invalid_customer_configuration(tmp_path, path, message):
+    module = launcher()
+    folder = tmp_path / "repo" / "aifactory" / "agent"
+    folder.mkdir(parents=True)
+    (folder / "list.json").write_text("[]", encoding="utf-8")
+    (folder / "broken.json").write_text("{", encoding="utf-8")
+    (tmp_path / "outside.json").write_text("{}", encoding="utf-8")
+    environ = values(BUILD_SOURCESDIRECTORY=str(tmp_path / "repo"), aifactoryAgentConfigFile=path)
+    with pytest.raises(ValueError, match=message):
+        module.run(arguments("validate", False), environ, no_azure)
+
+
+def test_the_consumer_checkout_defaults_to_the_folder_that_contains_the_submodule():
+    module = launcher()
+    assert module.consumer_root({"GITHUB_WORKSPACE": "/gh"}) == Path("/gh")
+    assert module.consumer_root({"BUILD_SOURCESDIRECTORY": "/ado", "GITHUB_WORKSPACE": "/gh"}) == Path("/ado")
+    assert module.consumer_root({}) == ROOT.parents[2]
 
 
 def test_the_command_line_reports_configuration_and_command_errors_in_one_line(monkeypatch, capsys):

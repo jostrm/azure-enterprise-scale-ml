@@ -17,7 +17,7 @@ if not BASH.is_file():
     BASH = shutil.which("bash")
 
 CONTROL_LIBRARIES = (
-    "aifactory_private_dns.py", "aifactory_scaleset_config.py",
+    "agent_chat_entry.py", "aifactory_private_dns.py", "aifactory_scaleset_config.py",
     "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
     "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
     "github_environments.py",

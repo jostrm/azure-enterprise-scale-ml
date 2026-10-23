@@ -343,6 +343,8 @@ jobs:
       aifactoryAgentReaderObjectIds: ${{ vars.AIFACTORY_AGENT_READER_OBJECT_IDS || '' }}
       aifactoryAgentVoiceName: ${{ vars.AIFACTORY_AGENT_VOICE_NAME || '' }}
       aifactoryAgentVoiceLanguages: ${{ vars.AIFACTORY_AGENT_VOICE_LANGUAGES || '' }}
+      aifactoryAgentConfigFile: ${{ vars.AIFACTORY_AGENT_CONFIG_FILE || '' }}
+      aifactoryAgentModelDeployment: ${{ vars.AIFACTORY_AGENT_MODEL_DEPLOYMENT || '' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
       enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
@@ -4496,7 +4498,7 @@ jobs:
           set -euo pipefail
           python3 "$MCP_GATEWAY_REPOSITORY/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apply --apply
 
-      - name: Deploy AI Factory Agent live voice (project001 Dev)
+      - name: Deploy AI Factory Agent live voice (any project, Dev)
         if: success() && inputs.phase == 'foundry' && env.enableAIFactoryAgentLiveVoice == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
         shell: bash
         env:

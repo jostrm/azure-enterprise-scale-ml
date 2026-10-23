@@ -133,6 +133,12 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(MODEL, parsed.model_deployment)
         self.assertFalse(request(enableFactoryChatAgent="$(enableFactoryChatAgent)").enabled)
 
+    def test_the_agent_model_can_differ_from_the_projects_model(self):
+        # aifactoryAgentModelDeployment keeps the agent's model independent of the project's infra model (modelGPTXName).
+        self.assertEqual("agent-model", request(aifactoryAgentModelDeployment="agent-model").model_deployment)
+        self.assertEqual(MODEL, request(aifactoryAgentModelDeployment="").model_deployment)
+        self.assertEqual(MODEL, request(aifactoryAgentModelDeployment="$(aifactoryAgentModelDeployment)").model_deployment)
+
     def test_disabled_and_invalid_intent_never_contacts_azure(self):
         azure = FakeAzure()
         integration = chat.FactoryChatAgentIntegration(azure)

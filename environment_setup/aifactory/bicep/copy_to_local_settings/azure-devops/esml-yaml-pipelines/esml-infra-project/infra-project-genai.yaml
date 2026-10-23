@@ -19,9 +19,9 @@ parameters:
     type: string
     default: manual
   - name: deploymentProjectNumber
-    displayName: Reviewed project number (manual mode keeps not-applicable)
+    displayName: Project number as 3 digits, e.g. 001 (not project001 or 1). Reviewed dev/stage/prod only; manual keeps XXX and reads project_number_000 from the configuration file
     type: string
-    default: not-applicable
+    default: XXX
   - name: deploymentConfigHash
     displayName: Reviewed configuration hash (manual mode keeps not-applicable)
     type: string

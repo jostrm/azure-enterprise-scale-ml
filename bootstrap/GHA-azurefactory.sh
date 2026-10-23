@@ -13,6 +13,10 @@ enroll)
   source "$root/lib/layout_router.sh"
   aif_route_enrollment gha "$root" "$@"
   ;;
+add-aifactory-agent-chat|--add-aifactory-agent-chat|-addAIFactoryAgentChat)
+  source "$root/lib/layout_router.sh"
+  aif_route_agent_chat gha "$root" "$@"
+  ;;
 inspect|execute)
   exec bash "$root/AIFactory-lifecycle.sh" "$@" --expected-orchestrator gha
   ;;
@@ -28,6 +32,8 @@ legacy-create|legacy-update)
     '       runner defaults to dev and Linux; see runner --help. ensure requires --yes; --prereqs-only never registers an agent.' \
     '       GHA-azurefactory.sh enroll plan|ensure --consumer-root <repo> --factory-id <uuid> --scale-set-id <uuid> --environment dev|stage|prod --options <nonsecret.json> [--acknowledge-exclusive-writer-governance]' \
     '       enroll ensure additionally requires --expected-plan <plan_hash> --yes. See enroll plan --help.' \
+    '       GHA-azurefactory.sh add-aifactory-agent-chat --to-project <NNN> [--environment dev] [--config <variables.json>] [--agent-config <agent.json>] [--without-voice] [--apply]' \
+    '       deploys/updates the AI Factory Agent chat (+ live voice) for one project; plan by default, --apply writes.' \
     '       GHA-azurefactory.sh legacy-create|legacy-update [legacy launcher options]' \
     'Use the authenticated catalog UI/API to create/register configuration and prepare the exact-target manifest.' \
     'inspect is read-only; execute additionally requires --source-root, --execution-root and --receipt.' \

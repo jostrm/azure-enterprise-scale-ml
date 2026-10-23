@@ -32,8 +32,8 @@ until final source checks. A voice-only failure never signs you out of text chat
 | You want | Turn on | What happens |
 |---|---|---|
 | The agent to exist in your project Foundry | `enableFactoryChatAgent` | The late project-pipeline step `70-factory-chat-agent` creates or updates the owned prompt agent `enterprise-scale-ai-factory`. It never deletes an agent and refuses one it does not own. |
-| A web chat with **live voice** (project001 Dev) | `enableFactoryChatAgent` **and** `enableAIFactoryAgentLiveVoice` | Step `72-aifactory-agent-live-voice` verifies that agent, builds the knowledge index and deploys the private chat application with Azure Voice Live. Voice without the chat flag **fails loudly** instead of being ignored. |
-| Voice on an app you already deployed by hand | `voice.enabled` in your own agent configuration | Redeploy with `40-aifactory-agent/deploy.py`. Your grants and all other settings stay as you configured them (see [operator flow](#b-operator-flow-existing-or-customized-app)). |
+| A web chat with **live voice** (any project, Dev) | `enableFactoryChatAgent` **and** `enableAIFactoryAgentLiveVoice` | Step `72-aifactory-agent-live-voice` verifies that agent, builds the knowledge index and deploys the private chat application with Azure Voice Live. Voice without the chat flag **fails loudly** instead of being ignored. |
+| Voice on an app you already deployed by hand | Commit your agent configuration and set `aifactoryAgentConfigFile` | The pipeline adopts the app and keeps your grants and settings; or keep redeploying with `40-aifactory-agent/deploy.py` (see [operator flow](#b-operator-flow-existing-or-customized-app)). |
 
 Saving a flag only records intent. **Nothing deploys until an approved pipeline run (or an operator
 command) executes it.** A flag set to `false` skips its step; it never deletes anything.
@@ -91,7 +91,7 @@ ESML** with sources instead of from memory.
 
 ## What you need first
 
-- An **AI Factory project001 Dev** with Foundry (`enableAIFoundry`), AI Search (`enableAISearch`) and an
+- An **AI Factory project (any number) in Dev** with Foundry (`enableAIFoundry`), AI Search (`enableAISearch`) and an
   **internal** Container Apps environment (`enableContainerApps`), plus a succeeded chat model deployment
   (`modelGPTXName`) and a text-embedding deployment.
 - An **Entra registration** for web sign-in, created once by an Entra admin. Pipelines never write
@@ -112,7 +112,7 @@ ESML** with sources instead of from memory.
 
 ## Turn it on
 
-### A. Pipeline (new app, project001 Dev)
+### A. Pipeline, wizard, CLI or terminal (any project, Dev)
 
 Set these in `variables.json` / ADO `variables.yaml` / GitHub variables (or in the Config Wizard, Simple Mode
 card, or the CLI), then run the project pipeline.
@@ -126,6 +126,16 @@ card, or the CLI), then run the project pipeline.
 | `aifactoryAgentContainerAppsEnvironment` | `AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | Internal environment name; empty picks the single one in the project resource group. |
 | `aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | Speech voice; empty uses `en-US-Ava:DragonHDLatestNeural`. |
 | `aifactoryAgentVoiceLanguages` | `AIFACTORY_AGENT_VOICE_LANGUAGES` | Comma-separated input languages; empty uses `en-US`. Swedish needs `sv-SE,en-US`. |
+| `aifactoryAgentModelDeployment` | `AIFACTORY_AGENT_MODEL_DEPLOYMENT` | Optional agent model deployment for steps 70 and 72; empty uses `modelGPTXName`. |
+| `aifactoryAgentConfigFile` | `AIFACTORY_AGENT_CONFIG_FILE` | Optional JSON file in your repository (for example `aifactory/agent/project001-dev.json`) merged over the generated configuration: realtime voice, language profiles, extra grants, costs, limits. It cannot change scopes, Azure resources or the Entra client. |
+
+Run it in one of three ways, all for one project in Dev:
+
+| Route | How |
+|---|---|
+| Azure DevOps Run pipeline UI | `infra-project-genai`: Deployment mode `manual`, keep `XXX` / `not-applicable` / `{}`, and under **Stages to run** select only Dev. |
+| GitHub Actions Run workflow UI | `infra-project.yml` with environment `dev`. |
+| Terminal, no pipeline | `./ADO-azurefactory.sh add-aifactory-agent-chat --to-project 001` plans; add `--apply` to deploy (`GHA-azurefactory.sh` takes the same options). It reads the project's own variables file and runs steps 70 and 72 with your Azure CLI sign-in. |
 
 Command line:
 
@@ -147,11 +157,12 @@ carry the same seven settings side by side):
 
 !!! warning "The step never replaces an app you deployed by hand"
 
-    The pipeline step generates a **read-only baseline** configuration. It only creates or updates an app that
-    it created itself (tag `aifactory-integration: live-voice`). If `aifactory-agent-project001-dev` already
-    exists without that tag, the step stops with guidance. Use the operator flow below instead.
+    The pipeline step generates a **read-only baseline** configuration. It creates or updates an app that it
+    created itself (tag `aifactory-integration: live-voice`). An app you deployed with `40-aifactory-agent/deploy.py`
+    (for example `aifactory-agent-project001-dev`) is adopted only when `aifactoryAgentConfigFile` names your
+    configuration, so the baseline never downgrades it. Without that file the step stops with guidance.
 
-Rules that always apply: project001 Dev only (other projects fail, Stage and Prod skip); the model deployment,
+Rules that always apply: any project number in Dev (the app is `aifactory-agent-project<NNN>-dev`; Stage and Prod skip); the model deployment,
 the Foundry agent and the Entra registration are prerequisites, never created by the live voice step; delete-all
 runs skip it; the run reports every step and never prints secrets.
 

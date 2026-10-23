@@ -645,6 +645,8 @@ is merged with `--changes-json`, and a disagreeing value in that file is a
 | `--aifactory-agent-reader-object-ids` | `aifactoryAgentReaderObjectIds` | comma-separated Entra object IDs granted read-only chat access |
 | `--aifactory-agent-voice-name` | `aifactoryAgentVoiceName` | Azure Speech voice, or empty for the default |
 | `--aifactory-agent-voice-languages` | `aifactoryAgentVoiceLanguages` | comma-separated BCP-47 input languages such as `sv-SE,en-US`, or empty (`en-US`) |
+| `--aifactory-agent-config-file` | `aifactoryAgentConfigFile` | your agent configuration JSON relative to the repository root, or empty |
+| `--aifactory-agent-model-deployment` | `aifactoryAgentModelDeployment` | the agent's own Foundry model deployment, or empty (`modelGPTXName`) |
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `

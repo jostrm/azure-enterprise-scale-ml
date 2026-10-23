@@ -1,5 +1,5 @@
 # AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
-# Opt-in live voice for the AI Factory Agent chat (project001 Dev): deploys the private chat application with Azure Voice
+# Opt-in live voice for the AI Factory Agent chat (any project, Dev): deploys the private chat application with Azure Voice
 # Live on top of the Foundry Agent created by 70-factory-chat-agent. A false flag skips this step; Stage/Prod and
 # non-001 runs are rejected or skipped by the launcher; it never deletes resources.
 parameters:
@@ -45,3 +45,5 @@ steps:
       aifactoryAgentReaderObjectIds: '$(aifactoryAgentReaderObjectIds)'
       aifactoryAgentVoiceName: '$(aifactoryAgentVoiceName)'
       aifactoryAgentVoiceLanguages: '$(aifactoryAgentVoiceLanguages)'
+      aifactoryAgentConfigFile: '$(aifactoryAgentConfigFile)'
+      aifactoryAgentModelDeployment: '$(aifactoryAgentModelDeployment)'
