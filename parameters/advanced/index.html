@@ -1181,10 +1181,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#models-and-deployments" class="md-nav__link">
+  <a href="#identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Models and deployments
+        Identity, access and encryption
       
     </span>
   </a>
@@ -1192,10 +1192,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#identity-access-and-encryption" class="md-nav__link">
+  <a href="#models-and-deployments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Identity, access and encryption
+        Models and deployments
       
     </span>
   </a>
@@ -2259,10 +2259,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#models-and-deployments" class="md-nav__link">
+  <a href="#identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Models and deployments
+        Identity, access and encryption
       
     </span>
   </a>
@@ -2270,10 +2270,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#identity-access-and-encryption" class="md-nav__link">
+  <a href="#models-and-deployments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Identity, access and encryption
+        Models and deployments
       
     </span>
   </a>
@@ -2940,15 +2940,15 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">400</td>
+<td style="text-align: right;">401</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">398</td>
+<td style="text-align: right;">399</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">92</td>
+<td style="text-align: right;">93</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -2960,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">405</td>
+<td style="text-align: right;">406</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 154, 423; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 155, 424; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 425, 449; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 155, 424; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 156, 425; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 426, 450; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -4213,14 +4213,14 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter yaml:skipDiagAISearch --><!-- parameter json.dev:skipDiagAISearch --><code>skipDiagAISearch</code></td>
 <td><code>SKIP_DIAG_AI_SEARCH</code></td>
 <td>O</td>
-<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Y: <code>false</code><br>J.dev: <code>false</code></td>
 <td>Skip diag aisearch.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skipDiagAIServices --><!-- parameter json.dev:skipDiagAIServices --><code>skipDiagAIServices</code></td>
 <td><code>SKIP_DIAG_AI_SERVICES</code></td>
 <td>O</td>
-<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Y: <code>false</code><br>J.dev: <code>false</code></td>
 <td>Skip diag aiservices.</td>
 </tr>
 <tr>
@@ -5520,132 +5520,6 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="models-and-deployments">Models and deployments<a class="headerlink" href="#models-and-deployments" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>YAML / JSON key</th>
-<th>GHA binding(s)</th>
-<th>M/C/O</th>
-<th>Source defaults</th>
-<th>Description / conditions</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><!-- parameter yaml:aifactoryAgentModelDeployment --><!-- parameter json.dev:aifactoryAgentModelDeployment --><code>aifactoryAgentModelDeployment</code></td>
-<td><code>AIFACTORY_AGENT_MODEL_DEPLOYMENT</code></td>
-<td>O</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity --><code>default_embedding_capacity</code></td>
-<td><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>25</code><br>J.dev: <code>25</code></td>
-<td>Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version --><code>default_gpt_4o_version</code></td>
-<td><code>DEFAULT_GPT_4O_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2024-11-20"</code><br>J.dev: <code>"2024-11-20"</code></td>
-<td>gpt-4o version otherwise: "2024-08-06".</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version --><code>default_gpt_54_mini_version</code></td>
-<td><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
-<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity --><code>default_gpt_capacity</code></td>
-<td><code>DEFAULT_GPT_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>40</code><br>J.dev: <code>40</code></td>
-<td>GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku --><code>default_model_sku</code></td>
-<td><code>DEFAULT_MODEL_SKU</code></td>
-<td>O</td>
-<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
-<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o --><code>deployModel_gpt_4o</code></td>
-<td><code>DEPLOY_MODEL_GPT_4O</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini --><code>deployModel_gpt_54_mini</code></td>
-<td><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X --><code>deployModel_gpt_X</code></td>
-<td><code>DEPLOY_MODEL_GPT_X</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large --><code>deployModel_text_embedding_3_large</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Deploy text-embedding-3-large recommended: for production RAG scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small --><code>deployModel_text_embedding_3_small</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy text-embedding-3-small recommended: for cost-optimized scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 --><code>deployModel_text_embedding_ada_002</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy text-embedding-ada-002</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity --><code>modelGPTXCapacity</code></td>
-<td><code>MODEL_GPTX_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>30</code><br>J.dev: <code>30</code></td>
-<td>GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName --><code>modelGPTXName</code></td>
-<td><code>MODEL_GPTX_NAME</code></td>
-<td>O</td>
-<td>Y: <code>"gpt-5.4-mini"</code><br>J.dev: <code>"gpt-5.4-mini"</code></td>
-<td>GPT-X model name ensure: model is available in your Azure region with sufficient quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku --><code>modelGPTXSku</code></td>
-<td><code>MODEL_GPTX_SKU</code></td>
-<td>O</td>
-<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
-<td>GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion --><code>modelGPTXVersion</code></td>
-<td><code>MODEL_GPTX_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
-<td>GPT-X model version ensure: update the version when selecting a different model.</td>
-</tr>
-</tbody>
-</table>
 <h3 id="identity-access-and-encryption">Identity, access and encryption<a class="headerlink" href="#identity-access-and-encryption" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -5658,6 +5532,13 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><!-- parameter yaml:aiSearchDisableLocalAuth --><!-- parameter json.dev:aiSearchDisableLocalAuth --><code>aiSearchDisableLocalAuth</code></td>
+<td><code>AI_SEARCH_DISABLE_LOCAL_AUTH</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Entra ID only on AI Search (no API keys). false re-enables keys for a key-based client.</td>
+</tr>
 <tr>
 <td><!-- parameter yaml:apimGatewayManagedIdentityPrincipalId --><!-- parameter json.dev:apimGatewayManagedIdentityPrincipalId --><code>apimGatewayManagedIdentityPrincipalId</code></td>
 <td><code>APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID</code></td>
@@ -5909,6 +5790,132 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
 <td>Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="models-and-deployments">Models and deployments<a class="headerlink" href="#models-and-deployments" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>YAML / JSON key</th>
+<th>GHA binding(s)</th>
+<th>M/C/O</th>
+<th>Source defaults</th>
+<th>Description / conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentModelDeployment --><!-- parameter json.dev:aifactoryAgentModelDeployment --><code>aifactoryAgentModelDeployment</code></td>
+<td><code>AIFACTORY_AGENT_MODEL_DEPLOYMENT</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity --><code>default_embedding_capacity</code></td>
+<td><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>25</code><br>J.dev: <code>25</code></td>
+<td>Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version --><code>default_gpt_4o_version</code></td>
+<td><code>DEFAULT_GPT_4O_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2024-11-20"</code><br>J.dev: <code>"2024-11-20"</code></td>
+<td>gpt-4o version otherwise: "2024-08-06".</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version --><code>default_gpt_54_mini_version</code></td>
+<td><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
+<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity --><code>default_gpt_capacity</code></td>
+<td><code>DEFAULT_GPT_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>40</code><br>J.dev: <code>40</code></td>
+<td>GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku --><code>default_model_sku</code></td>
+<td><code>DEFAULT_MODEL_SKU</code></td>
+<td>O</td>
+<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
+<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o --><code>deployModel_gpt_4o</code></td>
+<td><code>DEPLOY_MODEL_GPT_4O</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini --><code>deployModel_gpt_54_mini</code></td>
+<td><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X --><code>deployModel_gpt_X</code></td>
+<td><code>DEPLOY_MODEL_GPT_X</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large --><code>deployModel_text_embedding_3_large</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Deploy text-embedding-3-large recommended: for production RAG scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small --><code>deployModel_text_embedding_3_small</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy text-embedding-3-small recommended: for cost-optimized scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 --><code>deployModel_text_embedding_ada_002</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy text-embedding-ada-002</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity --><code>modelGPTXCapacity</code></td>
+<td><code>MODEL_GPTX_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>30</code><br>J.dev: <code>30</code></td>
+<td>GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName --><code>modelGPTXName</code></td>
+<td><code>MODEL_GPTX_NAME</code></td>
+<td>O</td>
+<td>Y: <code>"gpt-5.4-mini"</code><br>J.dev: <code>"gpt-5.4-mini"</code></td>
+<td>GPT-X model name ensure: model is available in your Azure region with sufficient quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku --><code>modelGPTXSku</code></td>
+<td><code>MODEL_GPTX_SKU</code></td>
+<td>O</td>
+<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
+<td>GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion --><code>modelGPTXVersion</code></td>
+<td><code>MODEL_GPTX_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
+<td>GPT-X model version ensure: update the version when selecting a different model.</td>
 </tr>
 </tbody>
 </table>
@@ -6490,14 +6497,14 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter env:SKIP_DIAG_AI_SEARCH --><code>SKIP_DIAG_AI_SEARCH</code></td>
 <td><code>skipDiagAISearch</code></td>
 <td>O</td>
-<td><code>"true"</code></td>
+<td><code>"false"</code></td>
 <td>Skip diag ai search.</td>
 </tr>
 <tr>
 <td><!-- parameter env:SKIP_DIAG_AI_SERVICES --><code>SKIP_DIAG_AI_SERVICES</code></td>
 <td><code>skipDiagAIServices</code></td>
 <td>O</td>
-<td><code>"true"</code></td>
+<td><code>"false"</code></td>
 <td>Skip diag ai services.</td>
 </tr>
 <tr>
@@ -8405,6 +8412,13 @@ reported, not silently represented as multiple settings.</p>
 </thead>
 <tbody>
 <tr>
+<td><!-- parameter env:AI_SEARCH_DISABLE_LOCAL_AUTH --><code>AI_SEARCH_DISABLE_LOCAL_AUTH</code></td>
+<td><code>aiSearchDisableLocalAuth</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Entra ID only on AI Search (no API keys). false re-enables keys.</td>
+</tr>
+<tr>
 <td><!-- parameter env:APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID --><code>APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID</code></td>
 <td><code>apimGatewayManagedIdentityPrincipalId</code></td>
 <td>C</td>
@@ -9163,6 +9177,12 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td>IPv4 allowlist input; the current create prompt accepts private networking only.</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_KV_SECRET_EXPIRES --><code>AIF_KV_SECRET_EXPIRES</code></td>
+<td>O</td>
+<td><code>"$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2&gt;/dev/null &amp;#124;&amp;#124; date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')"</code></td>
+<td>Aif kv secret expires override; see create launcher.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_LOCATION --><code>AIF_LOCATION</code></td>
