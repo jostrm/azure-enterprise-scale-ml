@@ -418,7 +418,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
         if not owner and key in records:
             evidence = records[key]
             owner = fl.verified_receipt_owner(fl.BlobLocks(cloud, document),
-                                             evidence.get("ownership_evidence"), key, fl.digest(body), cache)
+                                             evidence.get("ownership_evidence"), key, fl.resource_digest(body), cache)
             fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
             proof = {**evidence, "owner": owner}
         if hub_covers(hub, key):
@@ -555,7 +555,7 @@ def validate(document):
     verify_access_hub_network(hub, data["bodies"], links)
     validate_shared_hub_links(data, links, entries)
     for key, row in entries.items():
-        fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.digest(data["bodies"][key]),
+        fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.resource_digest(data["bodies"][key]),
                    "factory-delete-resource-fingerprint-required")
         owner_number = row.get("owner", {}).get("project_id")
         owned = all(row.get("owner", {}).get(field) == document["target"][field]
@@ -1309,7 +1309,7 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
     proof = {"resource_ids": record["resources"]}
     for key, row in entries.items():
         body = data["bodies"][key]
-        fl.require(row.get("delete") is True and row.get("body_hash") == fl.digest(body)
+        fl.require(row.get("delete") is True and row.get("body_hash") == fl.resource_digest(body)
                    and fl.arm_scope(key) in document["scopes"] and row.get("project_number") is None
                    and row.get("managed_group_ids") == [], "bootstrap-teardown-inventory-unbound")
         fl.require(not protected(body, document["protected_resource_ids"], proof),

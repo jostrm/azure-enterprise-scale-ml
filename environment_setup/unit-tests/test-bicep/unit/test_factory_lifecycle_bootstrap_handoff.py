@@ -29,7 +29,7 @@ def exact_document(cloud):
         proof["resources"][identifier] = {
             "type": "microsoft.resources/resourcegroups" if identifier == GROUP.lower() else body["type"].lower(),
             "api_version": fl.RG_API if identifier == GROUP.lower() else "2024-05-01",
-            "scope": GROUP.lower(), "body_hash": fl.digest(body), "etag": body.get("etag"),
+            "scope": GROUP.lower(), "body_hash": fl.resource_digest(body), "etag": fl.resource_etag(body, {}),
             "disposition": "owned", "owner": copy.deepcopy(CORE_OWNER),
             "receipt": {"plan_id": plan_id, "plan_hash": plan_hash,
                         "receipt_hash": "e" * 64, "resource_id": identifier}}
@@ -580,7 +580,7 @@ def reviewed_children(monkeypatch):
     }
     cloud.bodies.update(additions)
     metadata = {key: {"type": body["type"].lower(), "api_version": "2024-03-01", "scope": GROUP.lower(),
-                      "body_hash": fl.digest(body), "etag": None} for key, body in additions.items()}
+                      "body_hash": fl.resource_digest(body), "etag": None} for key, body in additions.items()}
     vm_receipt = {"plan_id": str(uuid4()), "plan_hash": "1" * 64, "receipt_hash": "2" * 64, "resource_id": vm}
     proof["resources"][vm] = {**metadata[vm], "disposition": "preserve", "preservation": "bootstrap-prerequisite",
                               "receipt": vm_receipt}
@@ -613,7 +613,7 @@ def reviewed_children(monkeypatch):
         resources = {key: body for key, body in cloud.bodies.items() if key != GROUP.lower()}
         return ({"groups": {GROUP.lower(): {"body_hash": fl.digest(cloud.bodies[GROUP.lower()]), "etag": None}},
                  "resources": {key: {"type": fl.resource_type_from_id(key), "api_version": "2024-03-01",
-                                    "body_hash": fl.digest(body), "etag": body.get("etag")}
+                                    "body_hash": fl.resource_digest(body), "etag": fl.resource_etag(body, {})}
                                for key, body in resources.items()}}, copy.deepcopy(cloud.bodies))
 
     monkeypatch.setattr(fl, "collect_resource_closure", closure)
@@ -661,7 +661,8 @@ def test_native_preservation_permit_fails_closed(reviewed_children, defect):
     elif defect == "scope":
         case.proof["resources"][case.extension]["scope"] = GROUP.lower() + "-foreign"
     elif defect == "body":
-        case.cloud.bodies[case.extension]["properties"]["provisioningState"] = "Updating"
+        # Defender owns the extension's state; which VM it protects is part of what was reviewed.
+        case.cloud.bodies[case.extension]["properties"]["settings"]["azureResourceId"] = case.vm + "-other"
     elif defect == "running":
         case.execution["executionState"] = "Running"
     elif defect == "ownership":
@@ -674,6 +675,19 @@ def test_native_preservation_permit_fails_closed(reviewed_children, defect):
         case.document["operation"] = "delete"
     with pytest.raises(fl.Blocked):
         fl.bootstrap_ownership_snapshot(case.cloud, case.document)
+
+
+def test_defender_retry_and_a_night_keep_the_reviewed_preservation(reviewed_children):
+    # Defender for Cloud retried MDE.Linux on aif-124's runner hours after its review (2026-10-23, 15:33-15:43 CEST),
+    # and every deallocate/start rewrites the VM's provisioning state and etag: neither changes what was reviewed.
+    case = reviewed_children
+    expected = fl.bootstrap_ownership_snapshot(case.cloud, case.document)
+    case.cloud.bodies[case.extension]["properties"].update(
+        provisioningState="Updating", forceUpdateTag=str(uuid4()), typeHandlerVersion="1.1")
+    vm = case.cloud.bodies[case.vm]
+    vm["properties"]["provisioningState"] = "Updating"
+    vm.update(etag='"26"', resources=[copy.deepcopy(case.cloud.bodies[case.extension])])
+    assert fl.bootstrap_ownership_snapshot(case.cloud, case.document) == expected
 
 
 def _execute_reviewed_worker(case, monkeypatch, *, after_apply=None, creates=()):
@@ -767,8 +781,8 @@ def test_worker_requires_approved_final_preserved_fingerprints(reviewed_children
         result, bodies = original(cloud, scopes, resource_versions)
         if cloud.arm_writes:
             if changed == "body":
-                bodies[case.extension]["properties"]["changed"] = True
-                result["resources"][case.extension]["body_hash"] = fl.digest(bodies[case.extension])
+                bodies[case.extension]["properties"]["type"] = "MDE.Windows"
+                result["resources"][case.extension]["body_hash"] = fl.resource_digest(bodies[case.extension])
             else:
                 result["resources"][case.extension][changed] = "changed"
         return result, bodies

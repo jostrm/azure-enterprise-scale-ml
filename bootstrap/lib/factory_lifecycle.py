@@ -204,6 +204,63 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+# Fields the platform or subscription governance rewrites on a resource without any write of ours, observed on AI
+# Factory runners from 2026-10-15 to 2026-10-23 (Resource Graph change history): each deallocate/start rewrites a
+# VM's provisioning state, its view of the OS disk's size and type, and its etag, and a NIC's default outbound flag,
+# DNS suffix and etag; the OS disk's state and ownership time follow the VM. Governance (MCAPS) sets runner OS disks
+# to Standard HDD and removes their tags. A VM body also embeds its extensions, which the closure walks as resources
+# of their own. Fingerprints leave these out, so a night, a disk downgrade or a Defender retry is not a changed
+# reviewed resource; every other field still is.
+VOLATILE_FIELDS = {
+    "microsoft.compute/virtualmachines": (
+        ("etag",), ("resources",), ("properties", "provisioningState"),
+        ("properties", "storageProfile", "osDisk", "diskSizeGB"),
+        ("properties", "storageProfile", "osDisk", "managedDisk", "storageAccountType")),
+    "microsoft.compute/disks": (
+        ("sku",), ("tags",), ("properties", "diskState"), ("properties", "LastOwnershipUpdateTime"),
+        ("properties", "diskIOPSReadWrite"), ("properties", "diskMBpsReadWrite"), ("properties", "tier")),
+    "microsoft.network/networkinterfaces": (
+        ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
+        ("properties", "dnsSettings", "internalDomainNameSuffix")),
+}
+DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
+
+
+def fingerprint_body(body, kind=None):
+    """The part of an ARM resource body a review fingerprints: everything except VOLATILE_FIELDS."""
+    if not isinstance(body, dict):
+        return body
+    kind = (kind or str(body.get("type") or "")).lower()
+    properties = body.get("properties") if isinstance(body.get("properties"), dict) else {}
+    if kind == "microsoft.compute/virtualmachines/extensions" and properties.get("publisher") == DEFENDER_EXTENSION_PUBLISHER:
+        # Defender for Cloud owns this extension and retries a failed one on its own schedule: keep what identifies it.
+        settings = properties.get("settings") if isinstance(properties.get("settings"), dict) else {}
+        return {"id": body.get("id"), "name": body.get("name"), "type": body.get("type"), "location": body.get("location"),
+                "properties": {"publisher": properties.get("publisher"), "type": properties.get("type"),
+                               "settings": {"azureResourceId": settings.get("azureResourceId")}}}
+    if kind not in VOLATILE_FIELDS:
+        return body
+    result = copy.deepcopy(body)
+    for path in VOLATILE_FIELDS[kind]:
+        parent = result
+        for field in path[:-1]:
+            parent = parent.get(field) if isinstance(parent, dict) else None
+        if isinstance(parent, dict):
+            parent.pop(path[-1], None)
+    return result
+
+
+def resource_digest(body, kind=None):
+    return digest(fingerprint_body(body, kind))
+
+
+def resource_etag(body, headers, kind=None):
+    """The etag a fingerprint compares: none where every deallocate/start rewrites it (VMs, NICs)."""
+    if ("etag",) in VOLATILE_FIELDS.get((kind or str(body.get("type") or "")).lower(), ()):
+        return None
+    return body.get("etag") or next((value for key, value in headers.items() if key.lower() == "etag"), None)
+
+
 def manifest_digest(document):
     return digest({key: value for key, value in document.items() if key != "manifest_hash"})
 
@@ -1488,6 +1545,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             rows, unsupported = ([] if status == 404 else [body]), None
         else:
             rows, unsupported = reader.get(collection_read(path, api, extension))
+        rows = [fingerprint_body(row) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
                  "body_hash": digest(rows), "unsupported": unsupported}
@@ -1516,10 +1574,10 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         closure["groups"][scope.lower()] = {"body_hash": digest(body), "etag": body.get("etag") or
                                             next((v for k, v in headers.items() if k.lower() == "etag"), None)}
         roots = reader.get(("list_resources", (scope,), ()))
+        listed = sorted((fingerprint_body(row) for row in roots), key=lambda row: row["id"].lower())
         closure["collections"][scope.lower() + "/resources"] = {
             "api_version": RG_API, "ids": sorted(row["id"].lower() for row in roots),
-            "items": sorted(roots, key=lambda row: row["id"].lower()),
-            "body_hash": digest(sorted(roots, key=lambda row: row["id"].lower())), "unsupported": None}
+            "items": listed, "body_hash": digest(listed), "unsupported": None}
         for row in roots if ahead else ():
             # Each root's provider loads now or when the root is walked: start them together.
             kind = resource_type_from_id(row["id"])
@@ -1548,8 +1606,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
         require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
-        closure["resources"][key] = {"type": kind, "api_version": api, "body_hash": digest(body),
-                                    "etag": body.get("etag") or next((v for k, v in headers.items() if k.lower() == "etag"), None)}
+        closure["resources"][key] = {"type": kind, "api_version": api, "body_hash": resource_digest(body, kind),
+                                    "etag": resource_etag(body, headers, kind)}
         references = resource_references(body)
         closure["references"][key] = sorted(references - {key})
         for reference in sorted(references):
@@ -1576,7 +1634,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         for step, path, value, single in child_steps(resource_id, kind):
             read_children_ahead(resource_id, kind)
             if step == "inline":
-                closure["collections"][path] = {"inline_parent_hash": digest(body)}
+                closure["collections"][path] = {"inline_parent_hash": resource_digest(body, kind)}
             elif step == "metadata":
                 closure["collections"][path] = {"non_resource_metadata": value}
             else:
@@ -1591,7 +1649,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                     isinstance(row, dict) and isinstance(row.get("id"), str)
                     and row["id"].lower() == reference for row in entries) == 1,
                 "inline-resource-parent-unverified")
-        metadata["parent_body_hash"] = digest(bodies[parent])
+        metadata["parent_body_hash"] = resource_digest(bodies[parent])
     return closure, bodies
 
 
@@ -1837,7 +1895,7 @@ def validate_project_deletion(document):
         is_group = identifier in group_ids
         require((RG_ID if is_group else NESTED_ID).fullmatch(identifier)
                 and arm_scope(identifier) in scopes and type(item.get("delete")) is bool
-                and hash_value(item.get("body_hash")) and item["body_hash"] == digest(bodies[identifier]),
+                and hash_value(item.get("body_hash")) and item["body_hash"] == resource_digest(bodies[identifier]),
                 "invalid-project-resource-proof")
         require(item.get("etag") is None or isinstance(item["etag"], str), "invalid-project-resource-etag")
         if not is_group:
@@ -1896,7 +1954,7 @@ def project_owner(cloud, document, body, records, cache):
     record = records.get(key, {})
     if record.get("ownership_source") == "deployment-receipt":
         evidence = record.get("ownership_evidence")
-        verified = verified_receipt_owner(BlobLocks(cloud, document), evidence, key, digest(body), cache)
+        verified = verified_receipt_owner(BlobLocks(cloud, document), evidence, key, resource_digest(body), cache)
         require(verified == record.get("owner"), "project-receipt-owner-mismatch")
         return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
     return {"owner": {}, "ownership_source": "retained-unowned"}
@@ -2059,10 +2117,10 @@ def verify_project_inventory(cloud, document, removed=()):
                      and bool(resource_references((before.get("properties") or {}).get("subnets", [])) & removed))
         stripped = _without_removed_backlinks(before, removed)
         if any(identifier.startswith(key + "/") for identifier in removed) or backlinks or stripped != before:
-            require(_without_deleted_children(_without_removed_backlinks(body, removed), removed)
-                    == _without_deleted_children(stripped, removed), "project-retained-parent-changed")
+            require(fingerprint_body(_without_deleted_children(_without_removed_backlinks(body, removed), removed))
+                    == fingerprint_body(_without_deleted_children(stripped, removed)), "project-retained-parent-changed")
         else:
-            require(digest(body) == digest(before), "project-resource-instance-changed")
+            require(resource_digest(body) == resource_digest(before), "project-resource-instance-changed")
     expected_collections = {key: value for key, value in expected["collections"].items()
                             if not any(key == item or key.startswith(item + "/") for item in removed)}
     require(set(closure["collections"]) == set(expected_collections), "project-child-collections-changed")
@@ -2677,8 +2735,8 @@ def verify_ownership(body, owner):
 def verify_fingerprint(item, body, headers):
     require(isinstance(body, dict) and str(body.get("id", "")).lower() == item["id"].lower(),
             "live-resource-identity-mismatch")
-    etag = body.get("etag") or next((value for key, value in headers.items() if key.lower() == "etag"), None)
-    require(etag == item.get("etag") and digest(body) == item["body_hash"], "inventory-changed-since-prepare")
+    require(resource_etag(body, headers) == item.get("etag") and resource_digest(body) == item["body_hash"],
+            "inventory-changed-since-prepare")
 
 
 def verify_inventory(cloud, document, remaining=None):
@@ -2861,8 +2919,8 @@ def arm_changes(body, unchanged_resources=None):
         require(change.get("changeType") in ("Create", "Modify", "NoChange"), "unresolved-or-destructive-arm-what-if")
         require(isinstance(change.get("resourceId"), str), "invalid-arm-what-if-resource")
         result.append({"resource_id": change["resourceId"].lower(), "change_type": change["changeType"],
-                       "before_hash": digest(change["before"]) if change.get("before") is not None else None,
-                       "after_hash": digest(change["after"]) if change.get("after") is not None else None})
+                       "before_hash": resource_digest(change["before"]) if change.get("before") is not None else None,
+                       "after_hash": resource_digest(change["after"]) if change.get("after") is not None else None})
     require(len({row["resource_id"] for row in result}) == len(result), "duplicate-arm-what-if-resource")
     return sorted(result, key=lambda row: row["resource_id"])
 
@@ -4178,7 +4236,7 @@ def foundry_inventory_observations(document, closure, bodies=None):
     if bodies is not None:
         require(set(bodies) == set(observed)
                 and all(str(bodies[key].get("id", "")).lower() == key
-                        and digest(bodies[key]) == row["body_hash"] for key, row in observed.items()),
+                        and resource_digest(bodies[key]) == row["body_hash"] for key, row in observed.items()),
                 "native-foundry-inventory-body-mismatch")
     return observed
 
@@ -4219,7 +4277,7 @@ def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
     expected = {**unchanged, **initial, **readiness, **previous}
     observed = {}
     for identifier in sorted(identifiers):
-        current_hash = digest(bodies[identifier])
+        current_hash = resource_digest(bodies[identifier])
         # Cumulative preview membership never permits rebasing a resource this phase did not write.
         require(identifier in written or current_hash == expected.get(identifier, {}).get("body_hash"),
                 "native-foundry-phase-instance-changed")
@@ -5048,13 +5106,14 @@ def exact_bootstrap_snapshot(cloud, document):
         proposal = permit["proposal"]
         for identifier, row in proposal["resources"].items():
             props = bodies[identifier].get("properties", {})
-            require(props.get("provisioningState") == row["provisioning_state"],
-                    "reviewed-preservation-instance-state-changed")
             if row["type"].endswith("/extensions"):
+                # Defender for Cloud retries a failed extension on its own schedule: its state is not part of the review.
                 require(props.get("publisher") == row["publisher"] and props.get("type") == row["extension_type"]
                         and props.get("settings", {}).get("azureResourceId", "").lower() == proposal["runner"]["resource_id"],
                         "reviewed-defender-instance-changed")
             else:
+                require(props.get("provisioningState") == row["provisioning_state"],
+                        "reviewed-preservation-instance-state-changed")
                 script = clean_path(Path(__file__).parent / "runner-registration.sh").read_text(encoding="utf-8").strip()
                 require(hashlib.sha256(script.encode()).hexdigest() == row["script_sha256"]
                         and props.get("source", {}).get("script", "").replace("\r\n", "\n").strip() == script,
@@ -5134,7 +5193,7 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     for key in protected:
         require(all(resources[key].get(field) == proof["resources"][key].get(field)
                     for field in ("type", "api_version", "body_hash", "etag"))
-                and (bodies is None or digest(bodies[key]) == resources[key]["body_hash"]),
+                and (bodies is None or resource_digest(bodies[key]) == resources[key]["body_hash"]),
                 "bootstrap-preserved-resource-changed-during-deployment")
     return preserved
 

@@ -25,6 +25,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_project_deletion_pipelines.py
   - environment_setup/unit-tests/test-bicep/unit/test_resource_closure_parallel_reads.py
   - environment_setup/unit-tests/test-bicep/unit/test_cloud_keepalive_reads.py
+  - environment_setup/unit-tests/test-bicep/unit/test_resource_fingerprint_churn.py
 graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:execute
   - bootstrap/lib/factory_deletion_pipeline.py::function:connectivity_groups
@@ -34,7 +35,8 @@ graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::class:ClosureReads
   - bootstrap/lib/factory_lifecycle.py::class:KeepAliveHTTPSHandler
   - bootstrap/lib/factory_lifecycle.py::class:ThrottledReadHandler
-reviewed_source: '01f06fa1 + connectivity-retention port (main's factory-owned hub wins); observed 2026-10-21; throttled reads 4130c8bf, 2026-10-23'
+  - bootstrap/lib/factory_lifecycle.py::function:fingerprint_body
+reviewed_source: '01f06fa1 + connectivity-retention port (main's factory-owned hub wins); observed 2026-10-21; throttled reads 4130c8bf, 2026-10-23; volatile-field fingerprints 2026-10-23'
 ---
 # Lifecycle and recovery
 
@@ -53,6 +55,8 @@ Default coordination uses Blob leases and durable claims/receipts. Explicit sing
 `Cloud`'s default opener adds `KeepAliveHTTPSHandler`: GET/HEAD borrow a pooled TLS connection to their host, one per concurrent reader, and a reused connection the server closed while idle is replaced once. Writes and proxy-tunnelled requests keep urllib's one connection per request with `Connection: close`. One lock makes token refreshes single-flight. An opener injected by a caller (pink's bundled helpers) is used as given, so it must be thread-safe, and the parallel speedup depends on it allowing concurrent requests. Why: on aif-119 (2026-10-20) a common-deployment review made 2,706 serial ARM reads (695 s of 728 s, about 190 s of it TCP and TLS setup) and overran the Factory API's evidence window.
 
 The default opener also adds `ThrottledReadHandler`, a urllib error handler for reads only: a GET or HEAD that ARM answers 429 (throttling) or 503 is sent again after `Retry-After` (seconds; otherwise 5 s, kept within 1 to 60 s), at most `THROTTLED_READ_ATTEMPTS` (8) answers and `READ_TRANSPORT_RETRY_WINDOW_SECONDS` (180 s) after the first throttled answer, each logged as a `remote-request-throttled` event without credentials. Writes and every other status pass through, so `Cloud.request` still sees each final status once and never treats a status as a transport retry. Why: on aif-124 (2026-10-23) the first COMMON run's worker stopped as `reconciliation-required` with `remote-request-failed-429` about 37 s into its pre-write reads, before any Azure write. Pink's dispatched reconciliation (v0.47.33) retires such an attempt.
+
+Resource fingerprints (`resource_digest`, `resource_etag`) hash `fingerprint_body`: the ARM body without the fields the platform or subscription governance rewrites with no write of ours (`VOLATILE_FIELDS`). For a VM that is its etag, embedded `resources` (extensions are closure resources of their own), provisioning state and its view of the OS disk's size and type. For a managed disk it is SKU, tags, disk state, last ownership time, IOPS/MBps and tier. For a NIC it is its etag, `defaultOutboundConnectivityEnabled` and DNS suffix. A Defender for Cloud extension (publisher `Microsoft.Azure.AzureDefenderForServers`) counts only its identity: name, type, location, publisher, extension type and protected VM. VMs and NICs compare no etag. The closure stores collection rows the same way, and the reviewed Defender permit no longer pins the extension's provisioning state. Every other field still counts. Why: after COMMON, every later deploy of a scale set re-checks the preserved runner VM, OS disk, NIC and Defender extension (pink `_registered_resources`). From 2026-10-15 to 2026-10-23 each nightly governance deallocate/start (about 01:47 CEST), the Standard HDD downgrade with removed tags (about 01:55) and Defender's retries of a failed MDE.Linux (aif-124: 04:13 and 15:33) rewrote exactly these fields, so the first night after COMMON would block every later deploy.
 
 ## Deletion and recovery
 
