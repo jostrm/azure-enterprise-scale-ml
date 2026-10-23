@@ -41,6 +41,10 @@ creation, automatic promotion, or a request to deploy every project.**
    Review `main` resolved to its exact commit, frozen inputs, what-if effects,
    ownership, private runner access and non-deletion settings. Common-only and
    provider support depend on the installed runtime; a blocked preview stays blocked.
+   Reviewed preserve-only consents from the bootstrap (runner children, DNS SOA)
+   stay valid when `main` has only moved forward and the runner scripts are
+   unchanged; otherwise the review stays blocked (see
+   [Lifecycle and recovery](../../architecture/pipelines/Lifecycle-and-Recovery.md)).
 5. **Prepare the selected project separately.** Include its exact `project_id`
    and existing scale-set placement. Use a fresh catalog revision and a separate
    deployment review/approval. Do not implicitly select Stage, Prod or another project.

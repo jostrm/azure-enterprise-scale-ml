@@ -595,6 +595,47 @@ def test_reviewed_commit_stays_published_while_the_published_ref_contains_it(wor
     assert any("fetch" in argv for argv in commands) == (listing in ("moved", "annotated"))
 
 
+@pytest.mark.parametrize("published", [True, False])
+@pytest.mark.parametrize("merge_base,carried", [
+    ("c", True),          # the reviewed consent commit is an ancestor of the published deploy commit
+    ("d", False),         # rewritten or unrelated history
+    ("missing", False),   # merge-base fails: the consent commit is not in the deploy commit's history
+])
+def test_carried_consent_commits_must_be_ancestors_of_the_deploy_commit(workspace, merge_base, carried, published):
+    document = manifest()
+    commit, ref = document["source"]["commit"], document["source"]["ref"]
+    document["deployment"] = {"bootstrap_foundation": {"consent_ancestors": ["c" * 40]}}
+    asked = []
+
+    def command(argv, cwd=None):
+        if argv[1:] == ["rev-parse", "--show-toplevel"]:
+            return str(workspace)
+        if argv[1:] == ["rev-parse", "HEAD"]:
+            return commit
+        if argv[1] == "status":
+            return ""
+        if argv[1] == "remote":
+            return fl.SOURCE_ORIGIN
+        if argv[1] == "ls-remote":
+            return commit + "\t" + ref
+        if argv[1] == "merge-base":
+            asked.append(argv[2:])
+            if merge_base == "missing":
+                raise fl.Blocked("command-failed")
+            return merge_base * 40
+        if argv[1] == "show":
+            return Path(fl.__file__).read_text(encoding="utf-8").strip()
+        raise AssertionError(argv)
+
+    cloud = SimpleNamespace(command=command, document=document)
+    if carried:
+        assert fl._verify_source(cloud, workspace, document["source"], published=published) == workspace
+    else:
+        with pytest.raises(fl.Blocked, match="consent-source-not-published-ancestor"):
+            fl._verify_source(cloud, workspace, document["source"], published=published)
+    assert asked == [["c" * 40, commit]]
+
+
 def test_tokens_are_bound_to_expected_object_not_only_subscription(monkeypatch):
     document = manifest()
 

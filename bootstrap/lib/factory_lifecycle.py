@@ -98,6 +98,7 @@ SUBSCRIPTION_RESOURCE_ID = re.compile(r"/subscriptions/(" + GUID
 EXACT_BOOTSTRAP_CONTRACT = "exact-bootstrap-resources-v2"
 PRESERVATION_PERMIT_CONTRACT = "reviewed-bootstrap-preservation-v1"
 DNS_SOA_PERMIT_CONTRACT = "reviewed-bootstrap-dns-soa-preservation-v1"
+CONSENT_ANCESTORS_CONTRACT = "published-ancestor-consent-v1"
 DNS_SOA_ZONE_ID = re.compile(RG_ID.pattern + r"/providers/Microsoft.Network/privateDnsZones/" + DNS_ZONE_NAME, re.I)
 DNS_RECORD_TYPES = ("a", "aaaa", "cname", "mx", "ptr", "soa", "srv", "txt")
 NON_RESOURCE_METADATA = {"microsoft.compute/virtualmachines/metricdefinitions"}
@@ -772,6 +773,7 @@ def capabilities():
         "bootstrap_resource_ownership": EXACT_BOOTSTRAP_CONTRACT,
         "bootstrap_preservation_permit": PRESERVATION_PERMIT_CONTRACT,
         "bootstrap_dns_soa_preservation_permit": DNS_SOA_PERMIT_CONTRACT,
+        "bootstrap_consent_ancestors": CONSENT_ANCESTORS_CONTRACT,
         "resource_closure": "arm-resource-only-closure-v2",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
@@ -2726,6 +2728,7 @@ def _verify_source(cloud, root, source, *, published):
             except Blocked:
                 base = None
             require(base == source["commit"], "version-no-longer-published-at-reviewed-commit")
+    verify_consent_ancestors(cloud, root, source)
     published_helper = cloud.command(["git", "show", source["commit"] + ":bootstrap/lib/factory_lifecycle.py"], cwd=str(root))
     require(published_helper == Path(__file__).read_text(encoding="utf-8").strip(),
             "published-lifecycle-adapter-mismatch")
@@ -4809,6 +4812,31 @@ def verify_foundry_provider_readiness_receipt(document, receipt):
                 "native-foundry-capability-host-receipt-incomplete")
 
 
+def consent_sources(document):
+    """The deploy commit plus the earlier commits whose reviewed consents it carries; ancestry is git-proven in verify_source."""
+    ancestors = document["deployment"]["bootstrap_foundation"].get("consent_ancestors", [])
+    require(isinstance(ancestors, list) and ancestors == sorted(set(ancestors))
+            and all(isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)
+                    and commit != document["source"]["commit"] for commit in ancestors),
+            "consent-ancestors-invalid")
+    return {document["source"]["commit"], *ancestors}
+
+
+def verify_consent_ancestors(cloud, root, source):
+    # A consent carries forward only along the published history; a rewritten or foreign commit fails closed.
+    document = getattr(cloud, "document", None)
+    proof = document.get("deployment", {}).get("bootstrap_foundation", {}) if isinstance(document, dict) else {}
+    if not isinstance(proof, dict) or "consent_ancestors" not in proof:
+        return
+    require(document["source"] == source, "consent-source-not-published-ancestor")
+    for commit in sorted(consent_sources(document) - {source["commit"]}):
+        try:
+            base = cloud.command(["git", "merge-base", commit, source["commit"]], cwd=str(root))
+        except Blocked:
+            base = None
+        require(base == commit, "consent-source-not-published-ancestor")
+
+
 def validate_preservation_permit(document):
     foundation = document["deployment"]["bootstrap_foundation"]
     permit = foundation.get("preservation_permit")
@@ -4822,7 +4850,7 @@ def validate_preservation_permit(document):
     require(isinstance(proposal, dict) and permit.get("proposal_hash") == digest(proposal)
             and proposal.get("owner_hash") == permit["owner_hash"]
             and proposal.get("workflow_id") == permit["workflow_id"] == foundation["workflow_id"]
-            and proposal.get("source_commit") == document["source"]["commit"]
+            and proposal.get("source_commit") in consent_sources(document)
             and hash_value(proposal.get("bootstrap_hash"))
             and proposal.get("operator_id") == document["identity"]["object_id"]
             and proposal.get("deployment_object_id") == document["identity"]["deployment_object_id"]
@@ -4932,7 +4960,8 @@ def validate_dns_soa_preservation_permit(document):
         and proposal["workflow_id"] == baseline["workflow_id"]
         and proposal["bootstrap_hash"] == baseline["bootstrap_hash"]
         and proposal["baseline_hash"] == digest(baseline)
-        and proposal["source_commit"] == document["source"]["commit"] == proof.get("source_commit")
+        and proposal["source_commit"] in consent_sources(document)
+        and document["source"]["commit"] == proof.get("source_commit")
         and proposal["operator_id"] == document["identity"]["object_id"]
         and proposal["deployment_object_id"] == document["identity"]["deployment_object_id"]
         and proposal["target"] == document["target"]
@@ -5039,6 +5068,8 @@ def validate_exact_bootstrap(document):
     dns_permit = validate_dns_soa_preservation_permit(document) if has_dns_soa_permit(proof) else None
     dns_rows = dns_permit["proposal"]["resources"] if dns_permit else {}
     require(not set(dns_rows) & set(permit_rows), "dns-soa-permits-must-be-independent")
+    carried = {row["proposal"]["source_commit"] for row in (permit, dns_permit) if row}
+    require(consent_sources(document) - {document["source"]["commit"]} <= carried, "consent-ancestors-unused")
     require(set(permit_rows) <= set(resources), "reviewed-preservation-resources-missing")
     for group, receipt in groups.items():
         require(group == group.lower() and RG_ID.fullmatch(group) and isinstance(receipt, dict)

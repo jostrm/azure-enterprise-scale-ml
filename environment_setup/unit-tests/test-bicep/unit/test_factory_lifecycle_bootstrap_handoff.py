@@ -1793,3 +1793,77 @@ def test_worker_receipt_preserves_exact_accepted_parent_basis(runner_and_dns_con
     case.cloud.runs["runs/" + case.document["run_id"] + ".worker.json"] = tampered
     with pytest.raises(fl.Blocked):
         fl.verify_worker_receipt(fl.BlobLocks(case.cloud, case.document), case.document)
+
+
+LATER = "9" * 40
+
+
+def move_to_later_push(document, ancestors=True):
+    """A later published push: the deploy commit moves on, the reviewed consents stay at their review commit."""
+    consent = document["source"]["commit"]
+    document["source"]["commit"] = LATER
+    proof = document["deployment"]["bootstrap_foundation"]
+    proof["source_commit"] = LATER
+    if ancestors:
+        proof["consent_ancestors"] = [consent]
+    return consent
+
+
+def test_worker_carries_both_consents_to_a_declared_published_descendant(runner_and_dns_consent, monkeypatch):
+    # aif-125 (2026-10-24): every purple push after a factory's bootstrap stranded its registered consents.
+    case = runner_and_dns_consent
+    move_to_later_push(case.document)
+    result = _execute_reviewed_worker(case, monkeypatch)
+    assert result["status"] == "succeeded", result
+    assert result["source_commit"] == LATER
+    assert result["bootstrap_preservation_permit"] == case.permit
+    assert result["bootstrap_dns_soa_preservation_permit"] == case.dns.permit
+    assert not {case.extension, case.command, case.dns.soa} & {row["resource_id"] for row in result["ownership"]}
+    assert fl.verify_worker_receipt(fl.BlobLocks(case.cloud, case.document), case.document) == result
+    assert fl.capabilities()["bootstrap_consent_ancestors"] == fl.CONSENT_ANCESTORS_CONTRACT
+
+
+@pytest.mark.parametrize("defect,code", [
+    ("undeclared", "reviewed-preservation-context-mismatch"),
+    ("unused", "consent-ancestors-unused"),
+    ("self", "consent-ancestors-invalid"),
+    ("malformed", "consent-ancestors-invalid"),
+    ("duplicate", "consent-ancestors-invalid"),
+    ("not-list", "consent-ancestors-invalid"),
+    ("foundation", "exact-bootstrap-source-proof-required"),
+])
+def test_carried_runner_permit_requires_exactly_its_declared_ancestor(reviewed_children, defect, code):
+    case = reviewed_children
+    consent = move_to_later_push(case.document, ancestors=defect != "undeclared")
+    proof = case.proof
+    if defect == "unused":
+        proof["consent_ancestors"] = sorted([consent, "8" * 40])
+    elif defect == "self":
+        proof["consent_ancestors"] = [consent, LATER]
+    elif defect == "malformed":
+        proof["consent_ancestors"] = [consent.upper()]
+    elif defect == "duplicate":
+        proof["consent_ancestors"] = [consent, consent]
+    elif defect == "not-list":
+        proof["consent_ancestors"] = consent
+    elif defect == "foundation":
+        proof["source_commit"] = consent
+    with pytest.raises(fl.Blocked, match=code):
+        fl.validate_exact_bootstrap(case.document)
+
+
+def test_carried_dns_soa_consent_requires_its_declared_ancestor(dns_consent):
+    case = dns_consent
+    move_to_later_push(case.document)
+    assert fl.validate_dns_soa_preservation_permit(case.document) == case.permit
+    fl.validate_exact_bootstrap(case.document)
+    case.proof.pop("consent_ancestors")
+    with pytest.raises(fl.Blocked, match="dns-soa-preservation-context-mismatch"):
+        fl.validate_dns_soa_preservation_permit(case.document)
+
+
+def test_ancestors_are_nothing_without_a_carried_consent():
+    document = exact_document(ClosureCloud())
+    move_to_later_push(document)
+    with pytest.raises(fl.Blocked, match="consent-ancestors-unused"):
+        fl.validate_exact_bootstrap(document)
