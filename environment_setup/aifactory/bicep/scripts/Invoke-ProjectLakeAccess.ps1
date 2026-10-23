@@ -135,6 +135,20 @@ $amlWorkspaces = @($workspaces | Where-Object { (Get-IdentityProperty $_ @('kind
 if ($amlRequired -and $amlWorkspaces.Count -eq 0) {
     throw "Azure Machine Learning is enabled but no current AML workspace was found in project resource group '$projectRg'."
 }
+# az ml needs the ml CLI extension, which a fresh AzureCLI@2 configuration installs from PyPI on first use; a private
+# runner that cannot reach PyPI then never returns. ARM lists the same computes with their identities, no extension.
+function Get-WorkspaceComputes([string]$Workspace) {
+    $url = "https://management.azure.com/subscriptions/$subscription/resourceGroups/$projectRg/providers/" +
+        "Microsoft.MachineLearningServices/workspaces/$Workspace/computes?api-version=2024-10-01"
+    $items = @()
+    while ($url) {
+        $page = Invoke-AzJson @('rest', '--method', 'get', '--url', $url)
+        $items += @($page.value | Where-Object { $null -ne $_ })
+        $url = [string](Get-IdentityProperty $page @('nextLink'))
+    }
+    return $items
+}
+
 $writers = @($contract.managedIdentityObjectIds)
 $readers = @($contract.readOnlyObjectIds)
 foreach ($workspace in $amlWorkspaces) {
@@ -144,7 +158,7 @@ foreach ($workspace in $amlWorkspaces) {
     }
     $current = Invoke-AzJson @('resource', 'show', '--subscription', $subscription, '--resource-group', $projectRg, '--resource-type', $workspaceType, '--name', $workspaceName)
     $readers += @(Resolve-ResourceIdentity (Get-IdentityProperty $current @('identity')) $workspaceName $true)
-    $computes = @(Invoke-AzJson @('ml', 'compute', 'list', '--subscription', $subscription, '--resource-group', $projectRg, '--workspace-name', $workspaceName))
+    $computes = @(Get-WorkspaceComputes $workspaceName)
     foreach ($compute in $computes) {
         $computeName = [string](Get-IdentityProperty $compute @('name'))
         $writers += @(Resolve-ResourceIdentity (Get-IdentityProperty $compute @('identity')) "$workspaceName/$computeName" $false)

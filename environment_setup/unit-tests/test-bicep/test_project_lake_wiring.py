@@ -95,9 +95,13 @@ def run_caller():
                 if ($arguments[1] -eq 'list') { return $env:MOCK_WORKSPACES }
                 if ($arguments[1] -eq 'show') { return $env:MOCK_WORKSPACE }
             }
-            if ($arguments[0] -eq 'ml' -and $arguments[1] -eq 'compute' -and $arguments[2] -eq 'list') {
+            if ($arguments[0] -eq 'ml') { throw 'The az ml extension must not be required' }
+            if ($arguments[0] -eq 'rest' -and ($arguments -join ' ') -match '/computes') {
                 $global:LASTEXITCODE = [int]$env:MOCK_COMPUTE_EXIT
-                return $env:MOCK_COMPUTES
+                $url = $arguments[[array]::IndexOf($arguments, '--url') + 1]
+                $pages = $env:MOCK_COMPUTE_PAGES | ConvertFrom-Json
+                if ($pages) { return ($pages.PSObject.Properties | Where-Object { $url.EndsWith($_.Name) }).Value | ConvertTo-Json -Depth 10 -Compress }
+                return '{"value":' + $env:MOCK_COMPUTES + '}'
             }
             if ($arguments[0] -eq 'identity' -and $arguments[1] -eq 'show') { return $env:MOCK_UAMI }
             throw 'Unexpected cloud command'
@@ -110,7 +114,7 @@ def run_caller():
     )
 
     def run(value=None, *, flags=None, accounts=None, execute=False, az_exit=0, acl_failure=False,
-            workspaces=None, workspace=None, computes=None, uami=None, compute_exit=0):
+            workspaces=None, workspace=None, computes=None, uami=None, compute_exit=0, compute_pages=None):
         for log in ("az.jsonl", "acl.jsonl"):
             (work / log).unlink(missing_ok=True)
         (work / "contract.json").write_text(json.dumps(value or contract()), encoding="utf-8")
@@ -131,6 +135,7 @@ def run_caller():
             "MOCK_COMPUTES": json.dumps(computes if computes is not None else []),
             "MOCK_UAMI": json.dumps(uami if uami is not None else {"principalId": UAMI}),
             "MOCK_COMPUTE_EXIT": str(compute_exit),
+            "MOCK_COMPUTE_PAGES": json.dumps(compute_pages) if compute_pages else "",
             "MOCK_AZ_LOG": str(work / "az.jsonl"),
             "MOCK_ACL_LOG": str(work / "acl.jsonl"),
             "MOCK_AZ_EXIT": str(az_exit),
@@ -195,9 +200,15 @@ def test_refreshes_new_workspace_and_compute_identities_without_stale_contract_i
     assert result.returncode == 0, result.stderr
     assert acl[0]["readOnlyObjectIds"] == [AML]
     assert acl[0]["managedIdentityObjectIds"] == [MI, COMPUTE]
-    compute_call = next(call for call in calls if call[:3] == ["ml", "compute", "list"])
-    assert compute_call[compute_call.index("--workspace-name") + 1] == "new-workspace"
+    compute_call = next(call for call in calls if call[0] == "rest")
+    url = compute_call[compute_call.index("--url") + 1]
+    assert url.startswith("https://management.azure.com/subscriptions/00000000-0000-0000-0000-000000000001/"
+                          "resourceGroups/actual-project-rg/providers/Microsoft.MachineLearningServices/"
+                          "workspaces/new-workspace/computes?api-version=")
+    assert compute_call[compute_call.index("--method") + 1] == "get"
     for call in calls:
+        if call[0] == "rest":
+            continue
         assert "--subscription" in call
         expected_rg = "actual-common-rg" if call[0] == "storage" else "actual-project-rg"
         assert call[call.index("--resource-group") + 1] == expected_rg
@@ -233,7 +244,7 @@ def test_current_compute_ids_are_deduplicated_and_workspace_stays_read_only(run_
     assert result.returncode == 0, result.stderr
     assert acl[0]["managedIdentityObjectIds"] == [MI, COMPUTE]
     assert acl[0]["readOnlyObjectIds"] == [AML]
-    assert len([call for call in calls if call[:3] == ["ml", "compute", "list"]]) == 2
+    assert len([call for call in calls if call[0] == "rest"]) == 2
     assert not any(call[0] == "identity" for call in calls)
 
 
@@ -439,3 +450,37 @@ def test_manual_bicep_lake_roles_are_container_arm_reader_only(name):
     assert "readerRoleDefinition.id" in role
     assert "acdd72a7-3385-48ef-bd42-f606fba81ae7" in source
     assert "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1" not in source
+
+
+def test_compute_identities_come_from_arm_without_the_az_ml_extension(run_caller):
+    # A fresh AzureCLI@2 config has no ml extension; installing it needs PyPI, which a private runner may not reach
+    # (spider run 2383 hung in step 102 on "The command requires the extension ml").
+    result, calls, acl = run_caller(
+        workspaces=[{"name": "existing-workspace"}],
+        computes=[{"name": "cpu", "identity": {"type": "SystemAssigned", "principalId": COMPUTE}}],
+    )
+    assert result.returncode == 0, result.stderr
+    assert acl[0]["managedIdentityObjectIds"] == [MI, COMPUTE]
+    assert not any(call[0] == "ml" for call in calls)
+    assert [call[0] for call in calls].count("rest") == 1
+
+
+def test_compute_listing_follows_arm_paging(run_caller):
+    base = ("https://management.azure.com/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/"
+            "actual-project-rg/providers/Microsoft.MachineLearningServices/workspaces/existing-workspace/computes")
+    second = base + "?api-version=2024-10-01&$skiptoken=page2"
+    result, calls, acl = run_caller(
+        workspaces=[{"name": "existing-workspace"}],
+        compute_pages={
+            "computes?api-version=2024-10-01": {
+                "value": [{"name": "cpu", "identity": {"type": "SystemAssigned", "principalId": COMPUTE}}],
+                "nextLink": second},
+            "skiptoken=page2": {
+                "value": [{"name": "uami", "identity": {"type": "UserAssigned", "userAssignedIdentities": {
+                    UAMI_RESOURCE: {"principalId": UAMI}}}}]},
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert acl[0]["managedIdentityObjectIds"] == sorted([MI, COMPUTE, UAMI])
+    urls = [call[call.index("--url") + 1] for call in calls if call[0] == "rest"]
+    assert urls == [base + "?api-version=2024-10-01", second]
