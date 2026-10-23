@@ -328,6 +328,10 @@ def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
     searches = of_type("Microsoft.Search/searchServices")
     if not searches:
         raise ValueError("The agent requires the project AI Search service (enableAISearch=true).")
+    # The AI Factory names the project's own service ...prj<NNN>...; another service in the group (a demo or sample)
+    # must never receive the agent's index, so several unnamed candidates are an error, not a silent first pick.
+    own = [item for item in searches if f"prj{request.project_number}" in item["name"].lower()]
+    search = _one(own or searches, f"project AI Search service (name containing prj{request.project_number})")
     storages = of_type("Microsoft.Storage/storageAccounts")
     data = [item for item in storages if "2001" in item["name"]] or storages
     if not data:
@@ -347,7 +351,7 @@ def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
         model={"name": wanted, "model": model["name"], "version": model.get("version", ""),
                "sku": (chat.get("sku") or {}).get("name", "DataZoneStandard"),
                "capacity": int((chat.get("sku") or {}).get("capacity") or 10)},
-        embedding=embeddings[0], search_name=searches[0]["name"], storage_name=data[0]["name"],
+        embedding=embeddings[0], search_name=search["name"], storage_name=data[0]["name"],
         insights_name=insights[0]["name"] if insights else "", environment_name=environment_name(environment),
         agent_version=agent_version,
     )

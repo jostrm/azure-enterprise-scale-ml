@@ -32,7 +32,7 @@ with Azure Voice Live: a voice card with a pulsing orb that listens, thinks and 
 - **Dependencies are validated, never ignored:** `enableAIFoundry` and `enableAISearch` must be `true`, and
   either `enableContainerApps` is `true` or `aifactoryAgentContainerAppsEnvironment` names an existing environment; the Entra app ID and reader object IDs must be GUIDs; the model
   deployment and a text-embedding deployment must have succeeded in the project Foundry account; the
-  owned Foundry Agent from step 70 must exist; the project needs one AI Search service, a data storage
+  owned Foundry Agent from step 70 must exist; the project needs one AI Search service (with several, the one named ...prj<NNN>...; other services such as demos never receive the index), a data storage
   account and exactly one (or the named) **internal** Container Apps environment.
 - **This step never creates the Agent or a model deployment**, and it refuses an Agent that the
   Enterprise Scale AI Factory does not own.

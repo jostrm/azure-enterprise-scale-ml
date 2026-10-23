@@ -238,6 +238,24 @@ def test_invalid_inputs_fail_with_the_exact_variable_name(changes, message):
         live.decide(request(**changes))
 
 
+def with_searches(*names):
+    arm = FakeArm()
+    resources = [item for item in arm.lists[f"{GROUP_ID}/resources"] if item["type"] != "Microsoft.Search/searchServices"]
+    arm.lists[f"{GROUP_ID}/resources"] = resources + [
+        {"id": f"{GROUP_ID}/providers/Microsoft.Search/searchServices/{name}", "name": name,
+         "type": "Microsoft.Search/searchServices"} for name in names]
+    return arm
+
+
+def test_the_projects_own_search_service_wins_over_other_search_services_in_the_group():
+    # A demo or sample may add another search service to the project group; it must never receive the agent's index.
+    arm = with_searches("aif48-project001-dev-frc-s1", "aisearchprj001sdcdev001")
+    assert live.discover(arm, request()).search_name == "aisearchprj001sdcdev001"
+    assert live.discover(with_searches("srch001"), request()).search_name == "srch001", "a single service needs no naming"
+    with pytest.raises(ValueError, match="project AI Search service"):
+        live.discover(with_searches("search-a", "search-b"), request())
+
+
 def test_flags_accept_only_canonical_booleans_and_treat_unset_ado_macros_as_false():
     with pytest.raises(ValueError, match="enableAIFactoryAgentLiveVoice must be true or false"):
         live.LiveVoiceRequest.from_values(values(enableAIFactoryAgentLiveVoice="yes"))
