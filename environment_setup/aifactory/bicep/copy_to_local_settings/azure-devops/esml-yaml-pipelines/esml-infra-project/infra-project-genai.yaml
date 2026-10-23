@@ -38,9 +38,9 @@ parameters:
     type: boolean
     default: true
   - name: runnerSelection
-    displayName: Build agent selection
+    displayName: Build agent selection (from-config uses the runner in your configuration; Microsoft-hosted cannot reach private endpoints)
     type: string
-    default: microsoft-hosted
+    default: from-config
     values:
       - from-config
       - microsoft-hosted

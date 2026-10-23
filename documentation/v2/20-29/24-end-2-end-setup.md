@@ -97,7 +97,7 @@ consumer, choose your **consumer branch** (for example `prj001`) and use:
 | `deploymentProjectNumber` | Keep `XXX` (the format is 3 digits, e.g. `001`; only reviewed runs use it) |
 | `deploymentConfigHash` | Keep `not-applicable` |
 | `deploymentSettings` | Keep the default object `{}` |
-| Build agent selection | `microsoft-hosted`, if compatible with your service connection/network |
+| Build agent selection | Keep `from-config` (your self-hosted runner); `microsoft-hosted` cannot resolve private endpoints such as the seeding Key Vault |
 | Override variables.yaml with variables.json | **Unchecked** |
 | `configFile` | Leave its default; ignored while the override is unchecked |
 

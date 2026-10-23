@@ -93,6 +93,14 @@ def reviewed_calls(value):
             yield from reviewed_calls(item)
 
 
+def test_run_ui_uses_the_configured_build_agent_by_default():
+    # A Microsoft-hosted agent sits outside the factory network and cannot resolve its private endpoints
+    # (for example the seeding Key Vault), so the Run UI must not default to it.
+    params = {item["name"]: item for item in pipeline()["parameters"]}
+    assert params["runnerSelection"]["default"] == "from-config"
+    assert params["runnerSelection"]["values"] == ["from-config", "microsoft-hosted", "self-hosted"]
+
+
 def test_run_ui_string_defaults_do_not_require_empty_fields():
     params = {item["name"]: item for item in pipeline()["parameters"]}
     assert params["deploymentTarget"]["default"] == "manual"

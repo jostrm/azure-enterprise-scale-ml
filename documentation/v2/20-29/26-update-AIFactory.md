@@ -141,7 +141,7 @@ pipeline:
 | `deploymentProjectNumber` | `XXX` (format: 3 digits such as `001`, reviewed runs only) |
 | `deploymentConfigHash` | `not-applicable` |
 | `deploymentSettings` | Default `{}` |
-| Build agent selection | `microsoft-hosted`, when compatible with connection/network |
+| Build agent selection | `from-config` (default; `microsoft-hosted` cannot reach private endpoints) |
 | Override variables.yaml with variables.json | **Unchecked** |
 | `configFile` | Default value; ignored with override unchecked |
 
