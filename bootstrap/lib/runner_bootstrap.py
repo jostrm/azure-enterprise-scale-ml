@@ -700,7 +700,13 @@ def ensure_vm(request, *, yes=False, cloud=None, ssh_public_key=None):
                 "osProfile": {"computerName": request["vm_name"], "adminUsername": "aifrunneradmin",
                               "linuxConfiguration": {"disablePasswordAuthentication": True, "provisionVMAgent": True,
                                                      "ssh": {"publicKeys": [{"path": "/home/aifrunneradmin/.ssh/authorized_keys",
-                                                                             "keyData": key}]}}},
+                                                                             "keyData": key}]},
+                                                     # The values subscription governance (MCAPS) enforces on its first
+                                                     # pass: created compliant, the VM is not rewritten after review.
+                                                     "patchSettings": {"patchMode": "AutomaticByPlatform",
+                                                                       "assessmentMode": "AutomaticByPlatform",
+                                                                       "automaticByPlatformSettings": {
+                                                                           "bypassPlatformSafetyChecksOnUserSchedule": True}}}},
                 "networkProfile": {"networkInterfaces": [{"id": ids["nic"], "properties": {"deleteOption": "Detach"}}]},
                 "securityProfile": {"securityType": "TrustedLaunch",
                                     "uefiSettings": {"secureBootEnabled": True, "vTpmEnabled": True}}}})

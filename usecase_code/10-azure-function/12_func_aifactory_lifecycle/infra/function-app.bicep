@@ -1,27 +1,36 @@
 // Private Linux Python Function App for the AI Factory lifecycle template, in an existing AI Factory project.
-// Reuses the project's VNet integration subnet (snt-prjNNN-webapp, delegated to Microsoft.Web/serverFarms), a
-// private endpoint subnet, the project's storage account (identity-based, no keys) and Application Insights.
-// Public network access and basic publishing credentials are off; deploy over the VPN with Entra auth.
-// Route-all stays off: private endpoints (RFC1918) go through the VNet, GitHub egress uses the platform's outbound IPs.
+// Runs on the Flex Consumption plan (FC1), which has no Always On: the platform starts instances for HTTP, timer and
+// queue triggers alike. On a Dedicated plan those triggers need Always On, which subscription governance switched off
+// every night (observed 2026-10-22 and 2026-10-23); see README.md, "Hosting plan".
+// VNet integration needs its own subnet delegated to Microsoft.App/environments. A private endpoint subnet, the
+// project's storage account (identity-based, no keys; it also holds the deployment package container) and
+// Application Insights are reused. Public network access and basic publishing credentials are off; deploy over the
+// VPN with Entra auth. Private endpoints (RFC1918) are reached through the VNet; GitHub and Azure Resource Manager
+// traffic leaves from the app's platform outbound addresses unless the subnet routes it elsewhere.
 
 targetScope = 'resourceGroup'
 
 @description('Function App name. Keep it outside purple\'s own project Function pattern func-prj<NNN>-..., for example aiflc-prj001-<loc>-<env>-<uniq5>-001.')
 param functionAppName string
 
-@description('App Service plan name.')
+@description('Flex Consumption plan name.')
 param planName string = 'asp-${functionAppName}'
-
-@description('Dedicated Linux plan SKU. Elastic Premium is not supported here: it needs an Azure Files content share, which needs storage keys.')
-@allowed(['B1', 'B2', 'B3', 'S1', 'P0v3', 'P1v3'])
-param planSku string = 'B1'
 
 param location string = resourceGroup().location
 
 @allowed(['3.11', '3.12'])
 param pythonVersion string = '3.11'
 
-@description('Subnet resource ID for regional VNet integration (delegated to Microsoft.Web/serverFarms; /26 or larger when plans share it).')
+@description('Memory per instance in MB. Billing is per GB-second while functions run, so smaller is cheaper.')
+@allowed([512, 2048, 4096])
+param instanceMemoryMB int = 2048
+
+@description('Highest number of instances the app scales out to.')
+@minValue(1)
+@maxValue(1000)
+param maximumInstanceCount int = 40
+
+@description('Subnet resource ID for VNet integration: delegated to Microsoft.App/environments, /27 or larger, not used by Container Apps or private endpoints.')
 param integrationSubnetId string
 
 @description('Subnet resource ID for the private endpoint.')
@@ -30,7 +39,7 @@ param privateEndpointSubnetId string
 @description('privatelink.azurewebsites.net zone ID. Empty when a central DNS policy (centralDnsZoneByPolicyInHub) adds the zone group.')
 param privateDnsZoneId string = ''
 
-@description('Existing storage account in this resource group for AzureWebJobsStorage, the event queue and the state table.')
+@description('Existing storage account in this resource group for AzureWebJobsStorage, the deployment package, the event queue and the state table.')
 param storageAccountName string
 
 @description('Existing Application Insights component in this resource group.')
@@ -66,6 +75,20 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
 
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' existing = {
+  parent: storage
+  name: 'default'
+}
+
+// The deployment service keeps the ready-to-run package here; the app reads it with its own identity.
+resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobService
+  name: 'app-package-${uniqueString(resourceGroup().id, functionAppName)}'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource insights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: appInsightsName
 }
@@ -74,9 +97,10 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: planName
   location: location
   tags: tags
-  kind: 'linux'
+  kind: 'functionapp'
   sku: {
-    name: planSku
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   properties: {
     reserved: true
@@ -84,11 +108,8 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
 }
 
 var baseSettings = [
-  { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
-  { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
   { name: 'AzureWebJobsStorage__accountName', value: storage.name }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
-  { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'true' }
   { name: 'AIF_STORE', value: 'table' }
   { name: 'AIF_TABLE_ACCOUNT', value: storage.name }
 ]
@@ -96,18 +117,22 @@ var baseSettings = [
 var authSettings = empty(authClientId) ? [] : [
   { name: 'AIF_REQUIRED_ROLE', value: requiredRole }
 ]
-var baseNames = [
-  'FUNCTIONS_EXTENSION_VERSION'
-  'FUNCTIONS_WORKER_RUNTIME'
+// Settings the template owns, plus the ones Flex Consumption rejects (runtime, build and package settings moved to
+// functionAppConfig and the deploy call), so a settings file written for the Dedicated plan cannot break the app.
+var reservedNames = [
   'AzureWebJobsStorage__accountName'
   'APPLICATIONINSIGHTS_CONNECTION_STRING'
-  'SCM_DO_BUILD_DURING_DEPLOYMENT'
   'AIF_STORE'
   'AIF_TABLE_ACCOUNT'
   'AIF_REQUIRED_ROLE'
+  'FUNCTIONS_EXTENSION_VERSION'
+  'FUNCTIONS_WORKER_RUNTIME'
+  'SCM_DO_BUILD_DURING_DEPLOYMENT'
+  'ENABLE_ORYX_BUILD'
+  'WEBSITE_RUN_FROM_PACKAGE'
 ]
 // WEBSITE_AUTH_* belong to the platform: passing one through could fake the Function's App Service authentication check.
-var extraSettings = [for setting in filter(items(appSettings), item => !contains(baseNames, item.key) && !startsWith(toUpper(item.key), 'WEBSITE_AUTH_')): {
+var extraSettings = [for setting in filter(items(appSettings), item => !contains(reservedNames, item.key) && !startsWith(toUpper(item.key), 'WEBSITE_AUTH_')): {
   name: setting.key
   value: string(setting.value)
 }]
@@ -126,15 +151,29 @@ resource site 'Microsoft.Web/sites@2024-04-01' = {
     clientAffinityEnabled: false
     publicNetworkAccess: 'Disabled'
     virtualNetworkSubnetId: integrationSubnetId
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${storage.properties.primaryEndpoints.blob}${deploymentContainer.name}'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: maximumInstanceCount
+        instanceMemoryMB: instanceMemoryMB
+      }
+      runtime: {
+        name: 'python'
+        version: pythonVersion
+      }
+    }
     siteConfig: {
-      linuxFxVersion: 'Python|${pythonVersion}'
-      alwaysOn: true
-      healthCheckPath: '/api/v1/health'
-      ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       scmMinTlsVersion: '1.2'
       http20Enabled: true
-      vnetRouteAllEnabled: false
       ipSecurityRestrictionsDefaultAction: 'Deny'
       scmIpSecurityRestrictionsDefaultAction: 'Deny'
       appSettings: concat(baseSettings, authSettings, extraSettings)

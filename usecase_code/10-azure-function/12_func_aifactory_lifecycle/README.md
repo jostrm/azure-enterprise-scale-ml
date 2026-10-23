@@ -160,7 +160,9 @@ With the wizard's Factory API on the same machine, set `AIF_BACKEND=rest` (or `s
    Application Insights, Log Analytics, Key Vault and DNS zone. Never put secret values in it. Name the app outside
    purple's `func-prj<NNN>-...` pattern (for example `aiflc-prj001-sdc-dev-<uniq5>-001`): purple's project pipelines
    treat such an app as the project Function and can delete it; `deploy.ps1` refuses such a name unless you pass
-   `-AcceptPurpleFunctionName`. The integration subnet needs /26 or more when several plans share it.
+   `-AcceptPurpleFunctionName`. The integration subnet must be delegated to `Microsoft.App/environments`, /27 or
+   larger, and not used by Container Apps or private endpoints (a project's `snt-prjNNN-aca` subnets are taken by
+   Container Apps, and `snt-prjNNN-webapp` is delegated to Dedicated plans): add one, for example `snt-prj001-func`.
 2. Connect to the factory's VPN (the app and its deployment endpoint are private), then run PowerShell 7:
 
    ```powershell
@@ -168,13 +170,30 @@ With the wizard's Factory API on the same machine, set `AIF_BACKEND=rest` (or `s
    .\deploy.ps1 -SettingsFile .\settings.<consumer>.json
    ```
 
-   `infra/function-app.bicep` creates a private dedicated Linux plan (B1 by default; Elastic Premium is not supported
-   because it needs a key-based content share) and app with VNet integration, a private endpoint, identity-based
-   storage roles, an optional Key Vault Secrets User grant, diagnostics to Log Analytics and no basic publishing
-   credentials. The code is deployed with
+   `infra/function-app.bicep` creates a private Linux app on the Flex Consumption plan with VNet integration, a
+   private endpoint, a deployment package container in the project's storage account (read with the app's identity),
+   identity-based storage roles, an optional Key Vault Secrets User grant, diagnostics to Log Analytics and no basic
+   publishing credentials. The code is deployed with
    `az functionapp deployment source config-zip --build-remote` (Microsoft Entra), which **replaces every function in
    the app**: give this template its own app.
 3. Get the function key with `az functionapp keys list` and call `GET /api/v1/health`.
+
+### Hosting plan
+
+The app runs on the Flex Consumption plan because it needs no Always On. On a Dedicated (App Service) plan the
+Functions host goes idle after a few minutes without Always On, and only HTTP requests wake it, so the 2-minute
+`reconcile` timer and the GitHub-events queue trigger stop. Subscription governance (MCAPS) switched Always On off on
+the Spider app every night at about 01:36 CEST (2026-10-22 and 2026-10-23). Flex Consumption starts instances for
+every trigger by itself.
+
+Cost (Sweden Central list prices, October 2026): the Dedicated B1 plan was about USD 13 per month. Flex Consumption
+bills execution time only, after a monthly free grant of 100,000 GB-seconds and 250,000 executions; the reconcile
+timer runs about 22,000 times a month, so expect roughly USD 0-10 per month. Optional always-ready instances (to avoid
+cold starts) cost about USD 5 per month per 512 MB instance, USD 21 per 2,048 MB. Elastic Premium (EP1, about USD 154
+per month) is not used.
+
+An existing Dedicated app cannot be moved to Flex Consumption in place: deploy a new app (new name, Flex-delegated
+integration subnet), switch its callers (event relay, runner results, operators) to it, then retire the old app.
 
 Use function keys for the mock passes. Before real deployments, add App Service authentication with an Entra app role:
 

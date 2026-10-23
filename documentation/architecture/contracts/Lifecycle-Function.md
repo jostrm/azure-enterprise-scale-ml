@@ -41,12 +41,13 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_workflow_templates.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_api_host_installer.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_simulated_deletes.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_infra_template.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: '98711370 + working tree; observed 2026-10-22'
+reviewed_source: '98711370 + working tree; observed 2026-10-22; Flex Consumption hosting 2026-10-23'
 ---
 # Lifecycle Function
 
@@ -115,8 +116,14 @@ GitHub runs through `workflow_run` events.
 
 ## Constraints
 
-- Secrets are read from Key Vault by name with the managed identity. Key Vault references are avoided because Linux
-  apps outside Flex need route-all to resolve them against a private vault, which would cut GitHub egress.
+- Hosting is the Flex Consumption plan (`infra/function-app.bicep`): no Always On, an integration subnet delegated to
+  `Microsoft.App/environments` and a deployment package container read with the app's identity. Why: on the Dedicated
+  B1 plan subscription governance switched Always On off every night (about 01:36 CEST, 2026-10-22 and 2026-10-23),
+  after which the host idles and the reconcile timer and the event queue stop until an HTTP request wakes it. A
+  Dedicated app cannot move to Flex in place: a new app (name, subnet) replaces it.
+- Secrets are read from Key Vault by name with the managed identity. Key Vault references were avoided because Linux
+  apps outside Flex need route-all to resolve them against a private vault, which would cut GitHub egress; reading by
+  name stays on Flex.
 - The Function's own name must stay outside purple's `func-prj<NNN>-...` pattern: purple's project pipelines treat such
   an app as the project Function and can delete it (`delete-services-if-disabled.sh`).
 - A consumer copy is configuration plus a template copy; the template does not change factory Bicep or pipelines.

@@ -51,12 +51,15 @@ expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application
 
 1. Copy the template to your consumer repo (`aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/`)
    and the workflows from its `workflows/` folder to `.github/workflows/` of the factory repo.
-2. Create `settings.<consumer>.json` from `settings.example.json`: the project's VNet integration and private endpoint
-   subnets, storage account, Application Insights, Log Analytics and Key Vault. Name the app outside purple's
-   `func-prj<NNN>-` pattern, for example `aiflc-prj001-sdc-dev-<uniq>-001`.
+2. Create `settings.<consumer>.json` from `settings.example.json`: a VNet integration subnet delegated to
+   `Microsoft.App/environments` (/27 or larger, not used by Container Apps; add one such as `snt-prj001-func`), the
+   private endpoint subnet, storage account, Application Insights, Log Analytics and Key Vault. Name the app outside
+   purple's `func-prj<NNN>-` pattern, for example `aiflc-prj001-sdc-dev-<uniq>-001`.
 3. Over the factory VPN, in PowerShell 7: `.\deploy.ps1 -SettingsFile .\settings.<consumer>.json -WhatIf`, then
-   without `-WhatIf`. It creates a private B1 Linux plan and app (no public access, no basic publishing credentials)
-   and deploys the code with a remote build.
+   without `-WhatIf`. It creates a private Linux app on the Flex Consumption plan (no public access, no basic
+   publishing credentials) and deploys the code with a remote build. Flex Consumption needs no Always On, which
+   subscription governance switched off nightly on the earlier Dedicated (B1) plan and so stopped the timer and queue
+   triggers; it costs execution time only (roughly USD 0-10 a month here, against about USD 13 for B1).
 4. Put the event secret and the GitHub token in the project Key Vault and set `AIF_KEY_VAULT_NAME`,
    `AIF_EVENT_SECRET_NAME` and `AIF_GITHUB_TOKEN_NAME`. Use a fine-grained token limited to the factory repo's Actions.
 5. For events, register the management runner for the factory repo with its own label (for example

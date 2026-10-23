@@ -4,8 +4,9 @@
   Provision (idempotently) and publish the AI Factory lifecycle Function into an AI Factory project.
 
 .DESCRIPTION
-  1. Infrastructure: infra/function-app.bicep - a private Linux Python Function App with VNet integration, a
-     private endpoint, identity-based storage and no basic publishing credentials. Shows what-if first.
+  1. Infrastructure: infra/function-app.bicep - a private Linux Python Function App on the Flex Consumption plan
+     with VNet integration, a private endpoint, identity-based storage and no basic publishing credentials. Checks
+     that the integration subnet is delegated to Microsoft.App/environments, then shows what-if.
   2. Code: zips the Function sources and deploys them with a remote build, using your Microsoft Entra login
      (az functionapp deployment source config-zip), so basic authentication stays off. Waits until the private
      DNS name of the deployment endpoint resolves before publishing.
@@ -14,9 +15,10 @@
   The publish replaces every function in the app: deploy this template only to an app that is dedicated to it.
 
 .PARAMETER SettingsFile
-  JSON with subscriptionId, resourceGroup, functionAppName, planName (optional), authClientId (optional), planSku, pythonVersion,
-  integrationSubnetId, privateEndpointSubnetId, privateDnsZoneId, storageAccountName, appInsightsName,
-  logAnalyticsWorkspaceId, keyVaultName, appSettings and tags. See settings.example.json. No secret values.
+  JSON with subscriptionId, resourceGroup, functionAppName, planName (optional), authClientId (optional), pythonVersion,
+  instanceMemoryMB (optional), maximumInstanceCount (optional), integrationSubnetId, privateEndpointSubnetId,
+  privateDnsZoneId, storageAccountName, appInsightsName, logAnalyticsWorkspaceId, keyVaultName, appSettings and tags.
+  See settings.example.json. No secret values.
 
 .PARAMETER AcceptPurpleFunctionName
   Allow a name of purple's own project Function pattern (func-prj<NNN>-...). Purple's project pipelines treat such
@@ -65,9 +67,15 @@ Write-Host "Function App $($settings.functionAppName) in $($settings.resourceGro
 $temporary = @()
 try {
     if (-not $SkipInfrastructure) {
+        # Flex Consumption integrates only with a subnet delegated to Microsoft.App/environments (a Dedicated plan's
+        # Microsoft.Web/serverFarms subnet is refused by the platform): fail before any deployment starts.
+        $delegations = @(Invoke-Az network vnet subnet show --ids $settings.integrationSubnetId --query 'delegations[].serviceName' -o tsv)
+        if ($delegations -notcontains 'Microsoft.App/environments') {
+            throw "integrationSubnetId must be delegated to Microsoft.App/environments (Flex Consumption), /27 or larger " +
+                  "and not used by Container Apps; it is delegated to '$($delegations -join ', ')'."
+        }
         $values = @{
             functionAppName         = $settings.functionAppName
-            planSku                 = $settings.planSku ?? 'B1'
             pythonVersion           = $settings.pythonVersion ?? '3.11'
             integrationSubnetId     = $settings.integrationSubnetId
             privateEndpointSubnetId = $settings.privateEndpointSubnetId
@@ -82,6 +90,8 @@ try {
             tags                    = $settings.tags ?? @{}
         }
         if ($settings.planName) { $values.planName = $settings.planName }
+        if ($settings.instanceMemoryMB) { $values.instanceMemoryMB = [int] $settings.instanceMemoryMB }
+        if ($settings.maximumInstanceCount) { $values.maximumInstanceCount = [int] $settings.maximumInstanceCount }
         if ($settings.authAllowedClientApplications) { $values.authAllowedClientApplications = @($settings.authAllowedClientApplications) }
         $parameters = @{
             '$schema'      = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'

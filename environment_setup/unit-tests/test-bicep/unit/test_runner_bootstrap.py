@@ -1682,6 +1682,20 @@ class RunnerEnsureTests(unittest.TestCase):
         self.assertTrue(all(identifier.startswith(request["rg_id"] + "/providers/") for identifier in first))
         self.assertFalse(any("publicIPAddresses" in identifier or "deployments" in identifier for identifier in first))
 
+    def test_new_linux_runner_starts_with_the_patch_settings_governance_enforces(self):
+        # MCAPS governance rewrote every new runner's patch settings on its first morning (observed 2026-10-16..23),
+        # which changed the VM body and etag after the COMMON review. Creating the VM compliant leaves nothing to rewrite.
+        request = self.request()
+        cloud = self.cloud(request)
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        with mock.patch.object(self.core.subprocess, "run", side_effect=AssertionError("host install/keygen")):
+            self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        linux = cloud.data[request["vm_id"]]["properties"]["osProfile"]["linuxConfiguration"]
+        self.assertEqual(linux["patchSettings"], {
+            "patchMode": "AutomaticByPlatform", "assessmentMode": "AutomaticByPlatform",
+            "automaticByPlatformSettings": {"bypassPlatformSafetyChecksOnUserSchedule": True}})
+
     def test_exact_existing_windows_reused_without_ownership_adoption(self):
         request = self.request("ado")
         cloud = self.cloud(request)
