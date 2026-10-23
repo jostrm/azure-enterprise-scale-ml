@@ -279,8 +279,9 @@ jobs:
       enableAzureAIVision: ${{ vars.ENABLE_AZURE_AI_VISION || 'false' }}
       enableAzureSpeech: ${{ vars.ENABLE_AZURE_SPEECH || 'false' }}
       enableAIDocIntelligence: ${{ vars.ENABLE_AI_DOC_INTELLIGENCE || 'false' }}
-      skipDiagAISearch: ${{ vars.SKIP_DIAG_AI_SEARCH || 'true' }}
-      skipDiagAIServices: ${{ vars.SKIP_DIAG_AI_SERVICES || 'true' }}
+      skipDiagAISearch: ${{ vars.SKIP_DIAG_AI_SEARCH || 'false' }}
+      skipDiagAIServices: ${{ vars.SKIP_DIAG_AI_SERVICES || 'false' }}
+      aiSearchDisableLocalAuth: ${{ vars.AI_SEARCH_DISABLE_LOCAL_AUTH || 'true' }}
       skipDiagAOAI: ${{ vars.SKIP_DIAG_AOAI || 'true' }}
       skipDiagContentSafety: ${{ vars.SKIP_DIAG_CONTENT_SAFETY || 'true' }}
       skipDiagDocIntelligence: ${{ vars.SKIP_DIAG_DOC_INTELLIGENCE || 'true' }}
@@ -2211,6 +2212,7 @@ jobs:
               --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
               --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters skipDiagAISearch="${{ env.skipDiagAISearch }}" \
+              --parameters aiSearchDisableLocalAuth="${{ env.aiSearchDisableLocalAuth }}" \
               --parameters skipDiagAIServices="${{ env.skipDiagAIServices }}" \
               --parameters skipDiagAOAI="${{ env.skipDiagAOAI }}" \
               --parameters skipDiagContentSafety="${{ env.skipDiagContentSafety }}" \

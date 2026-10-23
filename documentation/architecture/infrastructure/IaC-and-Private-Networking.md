@@ -30,6 +30,11 @@ sources:
   - environment_setup/aifactory/bicep/esml-project/22-main.bicep
   - environment_setup/aifactory/bicep/modules/machineLearning.bicep
   - environment_setup/aifactory/bicep/modules/aksCluster.bicep
+  - environment_setup/aifactory/bicep/modules/aiSearch.bicep
+  - environment_setup/aifactory/bicep/modules/storageAccount.bicep
+  - environment_setup/aifactory/bicep/esml-genai-1/07-ml-data-platform.bicep
+  - environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-configuration.bicep
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_aks_outbound_type.py
   - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
@@ -44,6 +49,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_capacity_resource_deployment.py
   - environment_setup/unit-tests/test-bicep/unit/test_capacity_preflight.py
   - environment_setup/unit-tests/test-bicep/unit/test_region_reports.py
+  - environment_setup/unit-tests/test-bicep/unit/test_defender_service_defaults.py
 graph_symbols:
   - bootstrap/lib/common_network_preservation.py::function:prepare_common_network
   - bootstrap/lib/common_network_preservation.py::function:execute_common_network
@@ -292,6 +298,40 @@ Dashboard source update (2026-10-08): `projectDash01.bicep` uses compact four-ro
 The My Project workbook source now defaults to a generic project view: `genericProjectWorkbookItems.bicep` outputs native account usage, RG inventory and Azure Cost Management query items, while a separate conditional group retains optional instrumented business scenarios. The generic group has no canonical factory/store/coverage dependency and creates no collectors or service resources. Billing currencies come from the API; an absent-currency USD display fallback must not invent an amount or convert reported currency. Read-only Portal observation confirmed that workbook `durationMs: 0` serializes to a zero-second Logs request, not "Set in query"; removing it restores matching request-log observations. Token log items bind their transport window to the token time parameter, and business predicates continue owning local dates/history. Native cache metrics and logged cached tokens remain distinct evidence planes. These follow-up workbook changes are not established as deployed by the earlier dashboard-only rollout.
 
 The shared-dashboard activity extension adds a timestamped aggregate snapshot beside each accumulated-cost tile. Its six measures deliberately separate email-caller management events and completed ADF runs over 30 days from current Foundry/AML/Search inventory and latest storage capacity. Native dashboard reload does not rerun the Python collector; a dashboard pipeline refresh is required. Reads cover every applicable resource in the exact RG and must not silently turn access, network, schema or paging failures into zero. Failed refreshes retain valid prior same-RG measurements as explicitly dated last-known values, never as fresh evidence. Their original observation window is retained; successful new reads and confirmed absence supersede them. Known transient read failures use bounded retries, while private-network/auth denials remain explicit safe error codes. Counts do not establish manual human interaction or business value; inventories do not establish runtime traffic. Data-plane access for Foundry/Search is independent of ARM access and is not provisioned by this change. The dashboard-only command boundary must allow only the collector's bounded read shapes while retaining its existing dashboard/workbook-only write contract. This source work is not proof of deployment.
+
+Defender for Cloud defaults (source 3f0711f0 plus this change, 2026-10-23; offline evidence only, not a
+Defender scan of a deployed factory):
+
+- Resource logs: the common and common-admin vaults send `AuditEvent` (silver/bronze; gold sends allLogs)
+  to the common Log Analytics workspace (`13-rgLevel.bicep`, `keyVaultDiagnostics.bicep`); project vaults
+  already did (`02-core`). AI Search and AI Services diagnostics are now on by default:
+  `skipDiagAISearch`/`skipDiagAIServices` default false in Bicep and the three variable templates.
+  Foundry accounts already had diagnostics. A tenant whose Azure Policy deployIfNotExists already sends
+  the same categories to the same workspace gets a 409 on a second setting; set the skip flag there.
+  Databricks workspaces (`07`, AVM `diagnosticSettings`) send allLogs.
+- AI Search key access: `aiSearch.bicep` sets `disableLocalAuth: true` and drops `authOptions` (ARM
+  rejects them together) unless `aiSearchDisableLocalAuth` (`AI_SEARCH_DISABLE_LOCAL_AUTH`) is false. No
+  consumer in the repository uses a Search key: the agent knowledge index, Foundry, hub and project
+  connections (`authType: 'AAD'`), indexers and ADF (managed identity `ResourceId=`), the ACL RAG demo,
+  pipelines (control plane only) and the MCP (no Search calls). Unverified: the external azd notebook
+  `create-azure-search.ipynb` that `bootstrap/20-genai-agentic-post-bicep.sh` runs is not in the
+  repository. The legacy `foundry-apim` v2 path (`standard-dependent-resources.bicep`) still hardcodes
+  `disableLocalAuth: false`; the pipelines deploy v4.
+- Storage network rules: the private project storage path already uses `defaultAction: 'Deny'`, VNet
+  rules, private endpoints and `bypass: 'AzureServices'`, and the common lake is Deny. Only
+  `enablePublicAccessWithPerimeter` (true in the shipped templates) opens storage with `Allow`, by design
+  of that public-perimeter mode; the recommendation clears when that flag is false.
+- Databricks private link: `07` injects the workspace into the VNet by default (premium SKU), and with
+  `enablePublicAccessWithPerimeter` false it sets `publicNetworkAccess: 'Disabled'`,
+  `NoAzureDatabricksRules` and creates the `databricks_ui_api` and `browser_authentication` private
+  endpoints. The template default perimeter=true leaves it public. The legacy `esml-project` path uses the
+  deprecated standard SKU, and `databricksPrivate.bicep` hardcodes `requiredNsgRules: 'AllRules'`.
+- APIM backends: the AI gateway backends (`apim-configuration.bicep`) authenticate in API policy with
+  the APIM system identity (`authentication-managed-identity`, audience cognitiveservices). The ARM
+  backend `credentials` contract, through api-version 2025-09-01-preview, has no managed-identity
+  member, so the Defender check, which reads `credentials`, cannot see it; a static header would be
+  weaker. The APIM identity gets Cognitive Services OpenAI User only when `assignOpenAIUserRole`
+  (default false) is set; the MCP backend sends a token only when `mcpEntraAppId` is set.
 
 ## Intended constraints
 

@@ -4,6 +4,9 @@
 param speechAccountName string
 param keyvaultName string
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource csAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
   name: speechAccountName
 }
@@ -21,6 +24,7 @@ resource kValueSpeech 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

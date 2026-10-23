@@ -25,6 +25,10 @@ param keyOps array = [
   'unwrapKey'
 ]
 
+// Keys expire too (Defender: Key Vault keys should have an expiration date); the rotation policy below renews them.
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
@@ -39,6 +43,24 @@ resource key 'Microsoft.KeyVault/vaults/keys@2023-07-01' = {
     keyOps: keyOps
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
+    }
+    // Key Vault rotates the key 30 days before it expires and gives each new version one more year, so a
+    // customer-managed key never lapses; services that use the versionless key URI pick up the new version.
+    rotationPolicy: {
+      attributes: {
+        expiryTime: 'P1Y'
+      }
+      lifetimeActions: [
+        {
+          action: {
+            type: 'rotate'
+          }
+          trigger: {
+            timeBeforeExpiry: 'P30D'
+          }
+        }
+      ]
     }
   }
 }

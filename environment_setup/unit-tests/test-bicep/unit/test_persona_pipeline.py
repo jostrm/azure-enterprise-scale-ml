@@ -279,10 +279,11 @@ def test_new_mode_guards_broad_workload_lake_grants_and_shared_keys():
     storage_end = core.index("containers:", storage_start)
     assert "tags: union(tagsProject, {" in core[storage_start:storage_end]
     vault = (BICEP / "modules/keyVault.bicep").read_text(encoding="utf-8")
-    assert "enableRbacAuthorization: contains(tags, 'AIF-Persona-Access')" in vault
+    # Every vault uses Azure RBAC in both modes; the persona mode decides who gets roles, not the model.
+    assert "enableRbacAuthorization: true" in vault
     common = (BICEP / "esml-common/main/13-rgLevel.bicep").read_text(encoding="utf-8")
     for line in common.splitlines():
-        if line.startswith("module ") and "kvCmnAccessPolicys.bicep" in line:
+        if line.startswith("module ") and "kvRbacPrincipals.bicep" in line:
             assert "!personaGroupsEnabled" in line
 
 

@@ -1,5 +1,7 @@
 targetScope = 'subscription'
 
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @allowed(['Premium', 'Standard', 'Basic'])
 param containerRegistrySkuName string = 'Premium'
 param vmSKU array = [
@@ -566,6 +568,7 @@ module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep
   scope: esmlCommonResourceGroup
   name: 'LogAnCmn4${uniqueInAIFenv}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     name: laName
     tags: tags
     location: location
@@ -700,6 +703,7 @@ module kvCmn '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking)
   scope: esmlCommonResourceGroup
   name: '${kvNameCommonNoDash}-depl-${uniqueInAIFenv}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyvaultName: kvNameCommon
     location: location
     tags: tags
@@ -713,7 +717,6 @@ module kvCmn '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking)
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
-    accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: ip
@@ -726,32 +729,30 @@ module kvCmn '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking)
   ]
 }
 
-var secretGet = {
-  secrets: [ 
-    'get'
-  ]
-}
-var secretGetList = {
-  secrets: [ 
-    'get'
-    'list'
+// Resource logs (AuditEvent) of the common vault to the common Log Analytics workspace.
+module kvCmnDiagnostics '../../modules/diagnostics/keyVaultDiagnostics.bicep' = if(!deployOnlyAIGatewayNetworking) {
+  scope: esmlCommonResourceGroup
+  name: '${kvNameCommonNoDash}-diag-${uniqueInAIFenv}'
+  params: {
+    keyVaultName: kvNameCommon
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight!.outputs.logAnalyticsWkspId
+  }
+  dependsOn: [
+    kvCmn
   ]
 }
 
-var secretAll = {
-  secrets: [ 
-    'all'
-  ]
-}
+// Key Vault access is Azure RBAC (kvRbacPrincipals.bicep). Each grant below is the role equivalent of the
+// access policy it replaced: secrets get or get/list -> secretsUser, secrets all -> secretsOfficer.
 
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
-module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !empty(databricksOID) && !deployOnlyAIGatewayNetworking) {
+module spDatabricksKvSecretsUser '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !empty(databricksOID) && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
-  name: 'spDBXAPGet${uniqueInAIFenv}'
+  name: 'spDBXKvRbac${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     principalId: databricksOID
     additionalPrincipalIds:[]
   }
@@ -769,29 +770,28 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = if(!deploy
 var var_useCommonSP_OID = !empty(commonServicePrincipleOIDKey) && !contains(toLower(commonServicePrincipleOIDKey), '<todo>') && !contains(toLower(commonServicePrincipleOIDKey), '<optional>')
 var var_useCommonSP_ID = !empty(inputCommonSPIDKey) && !contains(toLower(inputCommonSPIDKey), '<todo>') && !contains(toLower(inputCommonSPIDKey), '<optional>')
 var var_useCommonSP_Secret = !empty(inputCommonSPSecretKey) && !contains(toLower(inputCommonSPSecretKey), '<todo>') && !contains(toLower(inputCommonSPSecretKey), '<optional>')
-module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID) {
+module spCmnKvSecretsUser '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID) {
   scope: esmlCommonResourceGroup
-  name: 'spCmnAPGet${uniqueInAIFenv}'
+  name: 'spCmnKvRbac${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     #disable-next-line BCP422
     principalId: externalKv.getSecret(commonServicePrincipleOIDKey) // commonServicePrincipleOID
     additionalPrincipalIds:[]
   }
   dependsOn: [
     kvCmn
-    spDatabricksAccessPolicyGet
   ]
 }
-module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
+module adfKvSecretsUser '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
   scope: esmlCommonResourceGroup
-  name: 'adfAPGet${uniqueInAIFenv}'
+  name: 'adfKvRbac${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     #disable-next-line BCP318
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
@@ -799,25 +799,19 @@ module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!persona
   dependsOn: [
     kvCmn
     adf
-    spDatabricksAccessPolicyGet
-    spCmnAccessPolicyGet
   ]
 }
-module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking) {
+module kvCmnTechnicalContactSecretsOfficer '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
-  name: 'kvCmnAPTechContact${uniqueInAIFenv}'
+  name: 'kvCmnRbacTechContact${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretAll
+    keyVaultRole: 'secretsOfficer'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:technicalAdminsObjectID_array_safe
   }
   dependsOn: [
     kvCmn
-    spDatabricksAccessPolicyGet
-    spCmnAccessPolicyGet
-    adfAccessPolicyGet
   ]
 }
 
@@ -825,6 +819,7 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewa
   name: '${kvNameCommonNoDash}sec${uniqueInAIFenv}'
   scope: esmlCommonResourceGroup
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     #disable-next-line BCP422
     esmlCommonSpIDSecret: externalKv.getSecret(inputCommonSPIDKey)
     #disable-next-line BCP422
@@ -836,10 +831,6 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewa
   }
   dependsOn: [
     kvCmn
-    spDatabricksAccessPolicyGet
-    spCmnAccessPolicyGet
-    adfAccessPolicyGet
-    kvCmnAccessPolicyTechnicalContactAll
   ]
 }
 
@@ -848,6 +839,7 @@ module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworkin
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}${uniqueInAIFenv}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyvaultName: kvNameCommonAdmin
     location: location
     tags: tags
@@ -861,7 +853,6 @@ module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworkin
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
-    accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: ip
@@ -872,13 +863,23 @@ module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworkin
     subnetCommonDefaultResource
   ]
 }
-module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking){
+module kvAdminDiagnostics '../../modules/diagnostics/keyVaultDiagnostics.bicep' = if(!deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}AP${uniqueInAIFenv}' 
+  name: '${kvAdminNoDash}diag${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretAll
+    keyVaultName: kvNameCommonAdmin
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight!.outputs.logAnalyticsWkspId
+  }
+  dependsOn: [
+    kvAdmin
+  ]
+}
+module kvAdminTechnicalContactSecretsOfficer '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking){
+  scope: esmlCommonResourceGroup
+  name: '${kvAdminNoDash}Rbac${uniqueInAIFenv}'
+  params: {
+    keyVaultRole: 'secretsOfficer'
     keyVaultResourceName: kvNameCommonAdmin
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:technicalAdminsObjectID_array_safe
   }
@@ -886,30 +887,29 @@ module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.
     kvAdmin
   ]
 }
-module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID){
+module kvAdminCommonSPSecretsUser '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID){
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}AP2${uniqueInAIFenv}'
+  name: '${kvAdminNoDash}Rbac2${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kvNameCommonAdmin
-    policyName: 'add'
     #disable-next-line BCP422
     principalId: externalKv.getSecret(commonServicePrincipleOIDKey)
     additionalPrincipalIds:[]
   }
   dependsOn: [
     kvAdmin
-    kvAdminAccessPolicyTechnicalContactAll
   ]
 }
 
-module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
+module kvAdminAdfSecretsUser '../../modules/kvRbacPrincipals.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}APadf${uniqueInAIFenv}'
+  name: '${kvAdminNoDash}Rbacadf${uniqueInAIFenv}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kvNameCommonAdmin
-    policyName: 'add'
     #disable-next-line BCP318
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
@@ -917,8 +917,6 @@ module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!
   dependsOn: [
     kvAdmin
     adf
-    kvAdminAccessPolicyTechnicalContactAll
-    kvAdminAccessPolicyCommonSP
   ]
 }
 

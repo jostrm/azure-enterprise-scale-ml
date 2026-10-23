@@ -9,6 +9,8 @@
 # normal infrastructure pipeline. See ../personas/groups.py --help for naming,
 # permissions, immutable seed records and canonical-name adoption requirements.
 # No arguments retain the historical interactive route below unchanged.
+AIF_KV_SECRET_EXPIRES="${AIF_KV_SECRET_EXPIRES:-$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')}" # Key Vault secrets expire one year from now (UTC)
+
 if [ "$#" -gt 0 ]; then
     if [ "$1" != "--persona-manifest" ] || [ "$#" -lt 2 ] || [ -z "$2" ] || [[ "$2" == --* ]]; then
         echo "Usage: $0 --persona-manifest PATH --operation discover|create [--scope common|project] [--execute]" >&2
@@ -102,7 +104,7 @@ store_group_id_in_keyvault() {
 
     if [[ $group_name =~ (prj[0-9]{3}).*(p[0-9]{3}) ]]; then
         local secret_name="group-${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
-        az keyvault secret set --vault-name $SEEDING_KEYVAULT_NAME --name ${secret_name} --value ${group_id}
+        az keyvault secret set --vault-name $SEEDING_KEYVAULT_NAME --name ${secret_name} --value ${group_id} --expires "$AIF_KV_SECRET_EXPIRES"
         #az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID
         echo "Stored Object ID $group_id in Key Vault as secret $secret_name"
     fi

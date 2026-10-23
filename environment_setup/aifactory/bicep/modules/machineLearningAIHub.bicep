@@ -68,6 +68,9 @@ var privateDnsZoneNameNotebooks = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: applicationInsightsName
 }
@@ -797,6 +800,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -982,6 +986,7 @@ resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

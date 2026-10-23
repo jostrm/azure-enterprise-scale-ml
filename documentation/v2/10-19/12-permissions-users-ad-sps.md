@@ -45,8 +45,18 @@ Each `ProjectTeam` has its own Service Principal, for unatteded Automation & Dat
 ## AD-GROUPS & USERS
 The users object-ids (or AD groups object id) is used to set permissions on
 - **Specific datalake folder (ACL):** Execute, Read, Write
-- **Keyvault access policys**: GET, SET, DELETE LIST is the highest permissions
+- **Key Vault roles (Azure RBAC)**: Key Vault Secrets Officer is the highest secret permission (see below)
 - **Azure services**
+
+### Key Vault: Azure RBAC and secret expiry
+Every Key Vault the AI Factory creates uses Azure RBAC; there are no access policies. Former access policies are role assignments for the same users, groups, service principals and managed identities:
+- Secrets get or get/list (Databricks, common and project service principals, Data Factory, team leads on the common vault): **Key Vault Secrets User**
+- Secrets get/list/set or all (technical contact and technical admins): **Key Vault Secrets Officer**
+- Customer-managed keys: **Key Vault Crypto Service Encryption User**; the classic AML workspace identity: **Key Vault Administrator**
+
+Every secret and key the templates create expires one year after the deployment (Bicep parameter `keyVaultSecretExpiry`), and the setup scripts that run `az keyvault secret set` pass `--expires` one year ahead (override: `AIF_KV_SECRET_EXPIRES`). Redeploying renews the expiry; rotate secrets that scripts set before they expire.
+
+Upgrading a factory whose common vaults still use access policies: create the role assignments first, then run the common pipeline, then the project pipelines. The steps and the full grant table are in the architecture note [Identity and personas](../../architecture/infrastructure/Identity-and-Personas.md).
 
 ### Datalake folder access - project
 Below you can ses what access users, service principals, ad groups, are assigned. 

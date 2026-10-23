@@ -22,6 +22,9 @@ param keyvaultName string
 param logAnalyticsWkspRentationDays int = 30
 param enableAMPLS bool = false
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource alyt 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: name
   tags: tags
@@ -58,6 +61,7 @@ resource keyLogAnalyticsWS 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

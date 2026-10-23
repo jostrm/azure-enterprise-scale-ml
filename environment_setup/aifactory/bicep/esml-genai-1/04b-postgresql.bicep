@@ -1,5 +1,7 @@
 targetScope = 'subscription'
 
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @allowed(['dev', 'test', 'prod'])
 param env string
 param projectNumber string
@@ -127,6 +129,7 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = if (deployPostgreSQL) {
 module postgresql '../modules/services/postgresqlDeployment.bicep' = if (deployPostgreSQL) {
   name: '04b-postgresql-${standaloneDeploymentSuffix}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     context: context
     deploymentSuffix: '${projectNumber}${env}${context.targetResourceGroup}'
     location: location

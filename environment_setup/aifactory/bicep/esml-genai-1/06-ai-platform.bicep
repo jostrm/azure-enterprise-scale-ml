@@ -6,6 +6,8 @@ targetScope = 'subscription'
 // - RBAC and permissions for AI platform
 // ================================================================
 
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
@@ -421,6 +423,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('06-aiHubModule${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     name: aifV1HubName
     managedIdentities: {
       systemAssigned: true 

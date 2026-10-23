@@ -28,9 +28,6 @@ param esmlSubscriptionID string = 'esml-subscription-id'
 @description('secret value of Subscripton ID of current ESML environment')
 param esmlSubscriptionIDSecret string = subscription().subscriptionId
 
-@description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
-param expiration_date_default_2025_01_10_epoch int =1799626400 // 2027 if created 2022 (3yr)
-
 @description('secret name of Object ID for service principle')
 param spOIDKey string = 'esml-project-sp-oid'
 @secure()
@@ -38,6 +35,9 @@ param spOIDKey string = 'esml-project-sp-oid'
 param spOIDValue string //= 'Added from ADO variable, or manually'
 
 var esml_project_dbx_token_key = 'esml-project-dbx-token'
+
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 
 resource prjKeyvault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
@@ -52,7 +52,7 @@ resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2024-11-01' 
     contentType: 'ESML generated. TODO:Databricks token - needed for Azure ML pipelines with DatabricksSteps'//'ESML generated dummy.SP-AppId. AAD-admin need to add real service-principle AppID guid.'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [
@@ -68,7 +68,7 @@ resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
     contentType: 'Application ID of service principle'//'ESML generated dummy.SP-AppId. AAD-admin need to add real service-principle AppID guid.'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [
@@ -84,7 +84,7 @@ resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
     contentType: 'ESML generated. From seeding keyvalt (esml-project-sp-secret). Project specific service principle secret'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [
@@ -100,7 +100,7 @@ resource kvSecretspOID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
     contentType: 'OBJECT ID of service principle'//'ESML generated dummy.SP-AppId. AAD-admin need to add real service-principle AppID guid.'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [
@@ -116,7 +116,7 @@ resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
     contentType:'ESML generated - tenant ID'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [
@@ -132,7 +132,7 @@ resource kvSecretSubscriptionID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' =
     contentType: 'ESML generated - Subscription ID for current ESML environment'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
   dependsOn: [

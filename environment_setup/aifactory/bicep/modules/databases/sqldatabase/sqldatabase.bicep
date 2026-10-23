@@ -52,6 +52,9 @@ var keyNameFromUri = useCMK ? split(keyVaultKeyUri, '/')[4] : ''
 var keyVersionFromUri = useCMK ? split(keyVaultKeyUri, '/')[5] : ''
 var sqlServerKeyName = '${keyVaultNameFromUri}_${keyNameFromUri}_${keyVersionFromUri}'
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   name: serverName
   location: location
@@ -140,6 +143,7 @@ resource sqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' =
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -152,6 +156,7 @@ resource appUserPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = 
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -164,6 +169,7 @@ resource sqlAzureConnectionStringSercret 'Microsoft.KeyVault/vaults/secrets@2024
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

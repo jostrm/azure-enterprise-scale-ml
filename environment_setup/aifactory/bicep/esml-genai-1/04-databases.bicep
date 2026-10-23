@@ -9,6 +9,8 @@ targetScope = 'subscription'
 // - SQL Server and Database
 //  inputKeyvault, inputKeyvaultResourcegroup, inputKeyvaultSubscription, projectServicePrincipleAppID_SeedingKeyvaultName, projectServicePrincipleOID_SeedingKeyvaultName, projectServicePrincipleSecret_SeedingKeyvaultName
 // ================================================================
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @description('Enable Cosmos DB free tier (one per subscription)')
 param enableCosmosFreeTier bool = false
 // ============================================================================
@@ -383,6 +385,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-CosmosDB4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     logAnalyticsWorkspaceResourceId: laWorkspaceName
     managedIdentities: {
       systemAssigned: true
@@ -503,6 +506,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
 module postgreSQL '../modules/services/postgresqlDeployment.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
   name: take('04-postgresql-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     context: {
       subscriptionId: subscriptionIdDevTestProd
       targetResourceGroup: targetResourceGroup
@@ -550,6 +554,7 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-RedisCache4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     name: redisName
     location: location
     tags: tagsProject
@@ -640,6 +645,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-SqlServer4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     serverName: sqlServerName
     databaseName: sqlDBName
     location: location

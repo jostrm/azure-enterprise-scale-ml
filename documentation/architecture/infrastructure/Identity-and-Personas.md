@@ -11,7 +11,9 @@ sources:
   - bootstrap/lib/factory_enrollment.py
   - bootstrap/lib/create-new-aifactory-scaleset.sh
   - environment_setup/aifactory/bicep/modules/dataLake.bicep
-  - environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep
+  - environment_setup/aifactory/bicep/modules/kvRbacPrincipals.bicep
+  - environment_setup/aifactory/bicep/modules/keyVault.bicep
+  - environment_setup/aifactory/bicep/modules/common/keyVaultDefaults.json
   - environment_setup/aifactory/bicep/scripts/kv_principal_object_ids.py
   - environment_setup/aifactory/bicep/scripts/preflight.sh
   - environment_setup/aifactory/bicep/modules/common/objectIds.bicep
@@ -30,9 +32,10 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_kv_access_policy_principals.py
   - environment_setup/unit-tests/test-bicep/unit/test_kv_principal_preflight.py
   - environment_setup/unit-tests/test-bicep/unit/test_admin_object_ids.py
+  - environment_setup/unit-tests/test-bicep/unit/test_key_vault_security_defaults.py
 graph_symbols:
   - bootstrap/lib/registered_personas.py
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20; GitHub federation subject 98711370 + working tree, 2026-10-22'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Key Vault principals 427b850f + working tree, 2026-10-20; admin object IDs 32458a63 + working tree, 2026-10-20; GitHub federation subject 98711370 + working tree, 2026-10-22; Key Vault RBAC and secret expiry 3f0711f0 + working tree, 2026-10-23'
 ---
 # Identity and personas
 
@@ -49,11 +52,11 @@ tag-driven shared-key policy: `AIF-Persona-Access=groups-v1` disables shared key
 legacy or absent persona tags retain the legacy policy. Enrollment does not
 re-enable keys to make coordination work.
 
-Legacy common Key Vault access policies (source 427b850f plus this change,
-2026-10-20): `kvCmnAccessPolicys.bicep` grants only trimmed, lower-cased
-GUID-shaped principals and skips anything else without failing the deployment.
-The shipped `technical_admins_ad_object_id` placeholder would therefore leave
-the common/admin vaults without an admin policy. `preflight.sh` closes that gap
+Common Key Vault principals (source 427b850f, 2026-10-20; RBAC since 3f0711f0 plus this change,
+2026-10-23): `kvRbacPrincipals.bicep` (formerly the access-policy module `kvCmnAccessPolicys.bicep`)
+grants only trimmed, lower-cased GUID-shaped principals and skips anything else without failing the
+deployment. The shipped `technical_admins_ad_object_id` placeholder would therefore leave
+the common/admin vaults without an admin role assignment. `preflight.sh` closes that gap
 with a gate that `kv_principal_object_ids.py` evaluates and that blocks even in
 WARN_ONLY mode. `technical_admins_ad_object_id` (.env `PROJECT_MEMBERS`) must
 be comma-separated GUIDs, or empty for none. `'null'` is rejected, although the
@@ -68,7 +71,7 @@ ADO tasks map the principals explicitly, because secret variables are never
 auto-mapped. Otherwise each of variables.json (per target environment overlay),
 variables.yaml and .env is checked on its own. `groups-v1` skips both
 principals, because the persona bridge clears the human channels and
-`13-rgLevel.bicep` does not grant the Databricks policy in that mode. A
+`13-rgLevel.bicep` does not grant the Databricks role in that mode. A
 groups-v1 mode resolved in the pipeline environment also covers the settings
 files. `PREFLIGHT_SKIP` still bypasses the whole preflight. These are offline
 contracts. They do not prove which principals any deployed vault grants.
@@ -81,7 +84,7 @@ empty or `'null'` entries. Importing a user-defined function compiles a template
 to ARM languageVersion 2.0, which changes how its `existing` resources deploy. So
 only `CmnAIfactoryNaming.bicep`, already 2.0, imports it; its
 `p011_genai_team_lead_array` feeds the GenAI RBAC modules. The classic templates
-`11-rgCommon.bicep`, `13-rgLevel.bicep` and `kvCmnAccessPolicys.bicep` (before its
+`11-rgCommon.bicep`, `13-rgLevel.bicep` and `kvRbacPrincipals.bicep` (before its
 GUID filter) inline the exact body. `esml-project/22-main.bicep` inlines it too,
 although it already compiles to 2.0 and so could import it.
 `test_admin_object_ids.py` pins every copy and keeps the classic templates classic.
@@ -95,6 +98,73 @@ older assignment for the same principal, role and scope is deleted.
 `technical_admins_email` has fewer entries than the IDs; before, that case failed
 11-rgCommon and 22-main with an index out of bounds. The manual `esml-util`
 templates still parse the list themselves.
+
+Key Vault permission model (3f0711f0 plus this change, 2026-10-23): every vault purple creates uses Azure
+RBAC (`enableRbacAuthorization: true` in `keyVault.bicep`, now the only vault module; `kvRbacKeyVault.bicep`
+and the unused `kvAccessPolicy.bicep` are gone). Before, `keyVault.bicep` used access policies unless the
+factory tag was `AIF-Persona-Access=groups-v1`, so the common, common-admin and legacy `esml-project`
+vaults were access-policy vaults; GenAI project vaults were already RBAC. Each former access policy is the
+equivalent built-in role for the same principal, granted by `kvRbacPrincipals.bicep` with the role
+assignment name `guid(vault id, object ID, role ID)`:
+
+| Vault | Principal | Former policy | Role now |
+|---|---|---|---|
+| common, common-admin | technical contact + technical admins | secrets all | Key Vault Secrets Officer |
+| common | AzureDatabricks app (`databricksOID`), common SP, common ADF | secrets get / get,list | Key Vault Secrets User |
+| common-admin | common SP, common ADF | secrets get,list / get | Key Vault Secrets User |
+| common (from `02-core`) | technical contact + project team leads; project SP | secrets get,list; get | Key Vault Secrets User |
+| `esml-project` kv1/kv2 | technical contact + team leads | secrets get,list,set | Key Vault Secrets Officer |
+| `esml-project` kv1 | project SP, ADF, Databricks | secrets get / get,list | Key Vault Secrets User |
+| `esml-project` kv1, kv2 | classic AML workspace, managed AML workspace (`alsoManagedMLStudio`) identities | AML added its own policy | Key Vault Administrator |
+| project vault (`pgFlexibleServer.bicep`) | PostgreSQL CMK identity | keys get,wrapKey,unwrapKey | Key Vault Crypto Service Encryption User |
+
+Human grants keep their persona gate (legacy mode only; groups-v1 grants people through the persona
+bridge), and the service grants keep their original conditions, so groups-v1 factories, whose vaults were
+already RBAC, change nothing. The deployment identity needs `Microsoft.Authorization/roleAssignments/write`
+on the vaults: the bootstrap gives it Contributor and User Access Administrator on each subscription, which
+also covers switching an existing vault's permission model. Readers outside Bicep already used RBAC: the
+MCP (`mcp/infra/modules/role-assignments.bicep`), the lifecycle Function (`infra/roles.bicep`) and the
+seeding vault (created with `--enable-rbac-authorization true`; a BYO access-policy seeding vault keeps
+its policies).
+
+Secret and key expiry: every secret and key a purple template creates gets `exp` from one deployment
+parameter, `keyVaultSecretExpiry`, whose default is one year after the deployment runs
+(`dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))`; the rule is `secretExpiresAfter` in
+`modules/common/keyVaultDefaults.json`). ARM allows no `variables()` in a parameter default, so each
+template inlines that expression and `test_key_vault_security_defaults.py` pins every copy. Entry
+templates pass their value down, so one override sets it everywhere. A secret the template rewrites on
+every run gets a new version with a new expiry; secrets written only on first deployment (for example
+the project seeding copies behind `!keyvaultExists`, the PostgreSQL connection string) are not renewed
+and must be rotated within the year. An ARM PUT returns an existing key unchanged, so `keyVaultKey.bicep`
+also sets a rotation policy: Key Vault creates a new version 30 days before expiry, valid one more year,
+which services that use the versionless key URI pick up (AKS disk encryption sets need automatic key
+rotation enabled for that). The scripts that run `az keyvault secret set` (`29`, `29b`, `32`,
+`create-new-aifactory-scaleset.sh`) pass `--expires` one year ahead in UTC (`AIF_KV_SECRET_EXPIRES`
+overrides), and the MCP rollout sets `expires_on` the same way. The VM modules
+(`virtualMachinePrivate.bicep`, `virtualMachinePublic.bicep`, `avdSessionHost.bicep`) still carry their
+own fixed, already past expiry and are not yet migrated.
+
+Migration of an existing access-policy vault (common, common-admin, legacy project vaults). Switching
+`enableRbacAuthorization` makes Key Vault ignore every access policy at once, and in the template the role
+assignments are created after the vault update. So grant the roles first:
+
+1. Inventory: `az keyvault show -n <vault> --query "properties.accessPolicies[].{oid:objectId,secrets:permissions.secrets,keys:permissions.keys,certs:permissions.certificates}"`.
+   Map each principal with the table above. Policies added by hand need a role too: secrets get/list ->
+   Key Vault Secrets User, secrets set/delete -> Secrets Officer, keys wrap/unwrap -> Crypto Service
+   Encryption User, certificates -> Certificates Officer, all of it -> Key Vault Administrator.
+2. Pre-create the template's own grants with the same deterministic names, so the later pipeline run is
+   idempotent instead of failing with RoleAssignmentExists (409): run `modules/kvRbacPrincipals.bicep`
+   against the existing vault with the same inputs, for example
+   `az deployment group create -g <common-rg> -f modules/kvRbacPrincipals.bicep -p keyVaultResourceName=<vault> principalId=<technicalContactId> additionalPrincipalIds='["<admin oid>"]' keyVaultRole=secretsOfficer`
+   (add `principalType=ServicePrincipal` for an SP or managed identity). Role assignments on a vault
+   that still uses access policies are inert, so this step is safe. Create the hand-added principals'
+   roles with `az role assignment create --assignee-object-id ... --assignee-principal-type ... --role ... --scope <vault id>`.
+3. Wait for propagation (up to about ten minutes), then run the common pipeline (`13-rgLevel.bicep`
+   switches the common and admin vaults), then each project pipeline (`02-core` grants the project's team
+   leads and project SP on the common vault).
+4. Verify `properties.enableRbacAuthorization` is true and that each consumer still reads its secrets
+   (Databricks Key Vault-backed scopes, ADF linked services, pipelines, people). The old policies stay
+   stored but unused; `az keyvault update --enable-rbac-authorization false` rolls back to them.
 
 Deployment identities, runtime managed identities, human principals and provider service connections serve different purposes. Application runtime inference/search grants do not imply permission to deploy agents, mutate infrastructure or retrieve arbitrary secrets.
 

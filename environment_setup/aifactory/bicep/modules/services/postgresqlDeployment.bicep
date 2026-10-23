@@ -1,5 +1,7 @@
 targetScope = 'subscription'
 
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 param context object
 param deploymentSuffix string
 param location string
@@ -36,6 +38,7 @@ module postgreSQL '../databases/postgreSQL/pgFlexibleServer.bicep' = {
   name: take('04-PostgreSQL4${deploymentSuffix}', 64)
   scope: resourceGroup(context.subscriptionId, context.targetResourceGroup)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     name: context.names.postgreSQLName
     location: location
     tags: tagsProject

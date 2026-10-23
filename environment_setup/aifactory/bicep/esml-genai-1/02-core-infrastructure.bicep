@@ -14,6 +14,8 @@ targetScope = 'subscription'
 // SKU for services
 // ============================================================================
 // Per-environment Storage Account SKU: 'dev' uses the Dev SKU, 'test'(Stage) and 'prod' use the StageProd SKU.
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
 param skuStorageAccountDev string = 'Standard_LRS'
 @allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
@@ -386,6 +388,7 @@ module cmkKey '../modules/keyVaultKey.bicep' = if (cmk) {
   name: take('02-cmkKey-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyVaultName: inputKeyvault
     keyName: cmkKeyName
     kty: 'RSA'
@@ -502,10 +505,11 @@ var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: []
 // ============== KEY VAULT ==============
 // Resource ID for Databricks public subnet (optional, only if name provided)
 var databricksPublicSubnetResourceId = !empty(dbxPubSubnetName) ? resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, dbxPubSubnetName) : ''
-module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
+module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyvaultName: keyvaultName
     location: location
     tags: tagsProject
@@ -747,6 +751,7 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists && !empty(
   name: take('02-kvSecretsS2P${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     spAppIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleAppID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleAppID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleAppID_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) : ''
     spOIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
     spSecretValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleSecret_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleSecret_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleSecret_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName) : ''
@@ -788,20 +793,14 @@ module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultE
   ]
 }
 
-// Note: Common key vault still uses access policies (not changed per requirements)
-// Common key vault access policy for technical contact
-module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(technicalContactId)) {
+// The common key vault uses Azure RBAC too (13-rgLevel.bicep). These are the role equivalents of the former
+// secrets get/list (technical contact, team leads) and get (project SP) access policies: Key Vault Secrets User.
+module kvCommonSecretsUser '../modules/kvRbacPrincipals.bicep' = if(!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('02-kvSecretsGL${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('02-kvCmnRbacGL${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    keyVaultPermissions: {
-      secrets: [
-        'get'
-        'list'
-      ]
-    }
+    keyVaultRole: 'secretsUser'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds: p011_genai_team_lead_array
   }
@@ -810,19 +809,14 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!(
   ]
 }
 
-// Service principal access to common key vault (keeping access policy model)
 // SP removal support: skip entirely when the SP OID seeding secret name is empty or a placeholder (<todo>/<optional>).
-module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) {
+module spCommonKeyvaultSecretsUser '../modules/kvRbacPrincipals.bicep' = if (!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('02-spGetList${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('02-spCmnKvRbac${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    keyVaultPermissions: {
-      secrets: [
-        'get'
-      ]
-    }
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: commonKv.name
-    policyName: 'add'
     principalId: externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds: []
   }

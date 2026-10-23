@@ -26,6 +26,9 @@ param eHRuleName string = 'rule'
 
 param keyvaultName string
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource namespaceNameEV 'Microsoft.EventHub/namespaces@2021-11-01' = {
   identity:{
     type:'SystemAssigned'
@@ -81,6 +84,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

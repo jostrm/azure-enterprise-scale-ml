@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the Entra object IDs that AI Factory grants Key Vault access policies.
+"""Validate the Entra object IDs that AI Factory grants Key Vault roles (Azure RBAC).
 
-modules/kvCmnAccessPolicys.bicep skips every principal that is not a GUID, so a shipped
+modules/kvRbacPrincipals.bicep skips every principal that is not a GUID, so a shipped
 placeholder such as <todo>_EntraID_ObjectID silently leaves the common and admin Key Vaults
-without an admin policy. preflight.sh turns every FAIL line printed here into a finding that
+without an admin role assignment. preflight.sh turns every FAIL line printed here into a finding that
 blocks the deployment even in WARN_ONLY mode.
 
 Sources, checked per principal:
@@ -223,7 +223,7 @@ def validate(environ: Mapping[str, str], environments: Sequence[str], variables_
             if not text:
                 if principal.switch:
                     notes.append(f"{name} is empty in {label} while {principal.switch} is true: "
-                                 "no Key Vault access policy is granted for it.")
+                                 "no Key Vault role is granted for it.")
                 continue
             reason = problem(principal, text)
             if reason:

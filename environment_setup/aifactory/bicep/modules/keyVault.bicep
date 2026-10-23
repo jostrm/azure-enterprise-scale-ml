@@ -10,9 +10,6 @@ param tenantIdentity string
 @description('(Optional) Specifies an object containing network policies')
 param keyvaultNetworkPolicySubnets array = []
 
-@description('(Optional) Specifies an array of objects containing access policies')
-param accessPolicies array = []
-
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 
@@ -40,7 +37,8 @@ param vnetResourceGroupName string
 
 
 
-//var subnetRef = '${vnetId}/subnets/${subnetName}'
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -63,7 +61,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   properties: {
     enabledForDeployment: true          // VMs can retrieve certificates
     enabledForTemplateDeployment: true  // ARM can retrieve values
-    enableRbacAuthorization: contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1'
+    enableRbacAuthorization: true       // Azure RBAC on every vault; access is granted with role assignments (kvRbacPrincipals.bicep)
     enabledForDiskEncryption: false
     enableSoftDelete: true
     softDeleteRetentionInDays:enablePurgeProtection?soft_delete_days: null // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
@@ -77,7 +75,6 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
       ipRules: ipRules
       virtualNetworkRules: rules
     }:null
-    accessPolicies: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? [] : accessPolicies
     sku: {
       name: 'standard'
       family: 'A'
@@ -86,15 +83,17 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
 }
 
 // Create secrets in the Key Vault
-resource keyVaultSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [for secret in secrets: {
+resource keyVaultSecrets 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [for secret in secrets: {
   name: secret.name
   parent: keyVault
   properties: {
     value: secret.value
     contentType: contains(secret, 'contentType') ? secret.contentType : 'text/plain'
-    attributes: contains(secret, 'attributes') ? secret.attributes : {
+    // Every secret expires on the shared date unless the caller sets its own exp.
+    attributes: union({
       enabled: true
-    }
+      exp: keyVaultSecretExpiry
+    }, secret.?attributes ?? {})
   }
 }]
 

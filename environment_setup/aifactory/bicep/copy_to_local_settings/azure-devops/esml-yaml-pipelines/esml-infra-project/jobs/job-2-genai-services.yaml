@@ -3146,11 +3146,21 @@ steps:
   displayName: '63-cognitive-services'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
+  env:
+    AI_SEARCH_DISABLE_LOCAL_AUTH: $(aiSearchDisableLocalAuth)
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+     # A variables.yaml from before aiSearchDisableLocalAuth leaves the macro unexpanded: keep the Bicep default.
+     # Split the legacy-macro sentinel so ADO cannot expand the comparison.
+     AI_SEARCH_DISABLE_LOCAL_AUTH="${AI_SEARCH_DISABLE_LOCAL_AUTH-true}"
+     [[ "$AI_SEARCH_DISABLE_LOCAL_AUTH" != '$''(aiSearchDisableLocalAuth)' ]] || AI_SEARCH_DISABLE_LOCAL_AUTH=true
+     case "$AI_SEARCH_DISABLE_LOCAL_AUTH" in
+       true|false|True|False) ;;
+       *) echo "##vso[task.logissue type=error]aiSearchDisableLocalAuth must be true or false."; exit 1 ;;
+     esac
      az account set --subscription "$(dev_test_prod_sub_id)"
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-cognitive-services" \
@@ -3215,6 +3225,7 @@ steps:
      --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters skipDiagAISearch="$(skipDiagAISearch)" \
+     --parameters aiSearchDisableLocalAuth="$AI_SEARCH_DISABLE_LOCAL_AUTH" \
      --parameters skipDiagAIServices="$(skipDiagAIServices)" \
      --parameters skipDiagAOAI="$(skipDiagAOAI)" \
      --parameters skipDiagContentSafety="$(skipDiagContentSafety)" \

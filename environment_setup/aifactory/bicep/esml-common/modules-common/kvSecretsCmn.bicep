@@ -31,8 +31,8 @@ param esmlSubscriptionID string = 'esml-subscription-id'
 @description('secret value of Subscripton ID of current ESML environment')
 param esmlSubscriptionIDSecret string = subscription().subscriptionId
 
-@description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
-param expiration_date_default_2025_01_10_epoch int = 1736467877
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 
 resource kvSecretESMLCommonSpID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
   name: '${keyvaultName}/${esmlCommonSpID}'
@@ -41,7 +41,7 @@ resource kvSecretESMLCommonSpID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' =
     contentType: 'ESML generated - Common service principle App ID'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -54,7 +54,7 @@ resource kvSecretESMLCommonSpOID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' 
     contentType: 'ESML generated - Common service principle OBJECT ID, for RBAC in BICEP or ACL on lake'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -67,7 +67,7 @@ resource kvSecretESMLCommonSpSecret 'Microsoft.KeyVault/vaults/secrets@2019-09-0
     contentType: 'ESML generated - Common service principle secret'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -80,7 +80,7 @@ resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
     contentType:'ESML generated - tenant ID'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
   }
 }
@@ -93,7 +93,7 @@ resource kvSecretSubscriptionID 'Microsoft.KeyVault/vaults/secrets@2021-10-01' =
     contentType: 'ESML generated - Subscription ID for current ESML environment'
     attributes: {
       enabled: true
-      exp:expiration_date_default_2025_01_10_epoch
+      exp: keyVaultSecretExpiry
     }
     
   }

@@ -197,6 +197,8 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 
 resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = if (!resourceExists) {
   parent: keyVault
@@ -206,32 +208,27 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }
 
-var keyVaultPermissions = {
-  keys: [
-    'get'
-    'wrapKey'
-    'unwrapKey'
-  ]
-}
 
 resource cmkIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if (useCMK) {
   name: last(split(cmkUserAssignedIdentityId, '/'))
   scope: resourceGroup(split(cmkUserAssignedIdentityId, '/')[2], split(cmkUserAssignedIdentityId, '/')[4])
 }
 
-resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = if(useCMK)  {
-  parent:keyVault
-  name:'add'
+// Key Vault Crypto Service Encryption User: the Azure RBAC equivalent of the former keys get/wrapKey/unwrapKey access policy.
+var cryptoServiceEncryptionUserRoleId = loadJsonContent('../../common/keyVaultDefaults.json', '$.roleDefinitionIds').cryptoServiceEncryptionUser
+resource cmkIdentityKeyVaultCrypto 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useCMK) {
+  name: guid(keyVault.id, cmkUserAssignedIdentityId, cryptoServiceEncryptionUserRoleId)
+  scope: keyVault
   properties: {
-    accessPolicies: [{
-      objectId: cmkIdentity!.properties.principalId
-      permissions: keyVaultPermissions
-      tenantId: subscription().tenantId
-    }]
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cryptoServiceEncryptionUserRoleId)
+    principalId: cmkIdentity!.properties.principalId
+    principalType: 'ServicePrincipal'
+    description: 'PostgreSQL CMK identity - Key Vault Crypto Service Encryption User'
   }
 }
 

@@ -4,7 +4,7 @@
 // (RoleAssignmentExists on redeploy).
 // Importing a user-defined function compiles a template to ARM languageVersion 2.0, which changes how its 'existing'
 // resources deploy. So only CmnAIfactoryNaming (already 2.0) imports it. The classic templates 11-rgCommon, 13-rgLevel
-// and kvCmnAccessPolicys inline this exact body. esml-project/22-main inlines it too, although it already compiles to
+// and kvRbacPrincipals inline this exact body. esml-project/22-main inlines it too, although it already compiles to
 // 2.0 and so could import it. unit/test_admin_object_ids.py pins every copy.
 
 @export()

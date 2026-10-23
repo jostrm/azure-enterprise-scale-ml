@@ -46,6 +46,9 @@ param useCMK bool = false
 param keyVaultKeyUri string = ''
 param cmkUserAssignedIdentityId string = ''
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -276,6 +279,7 @@ resource cosmosConnectionString 'Microsoft.KeyVault/vaults/secrets@2024-11-01' =
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

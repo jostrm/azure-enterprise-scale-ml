@@ -563,6 +563,8 @@ output amlId string = (env=='dev')? machineLearningStudio.id: machineLearningStu
 output amlName string =(env=='dev')? machineLearningStudio.name: machineLearningStudioTestProd.name
 output principalId string = (env=='dev')?machineLearningStudio.identity.principalId:  machineLearningStudioTestProd.identity.principalId
 output amlManagedName string = alsoManagedMLStudio? machineLearningStudioManaged.name: ''
+// The managed workspace's identity, for its Key Vault Administrator role on kvName2 (RBAC vault).
+output principalIdManaged string = alsoManagedMLStudio ? machineLearningStudioManaged!.identity.principalId : ''
 
 // ###############  AML networking - custom networking ###############
 output dnsConfig array = [

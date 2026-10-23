@@ -1012,9 +1012,9 @@ PY
 # Windows Python cannot open Git Bash /c/... paths.
 native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
-# --- Config: Key Vault principal object IDs. modules/kvCmnAccessPolicys.bicep silently skips
+# --- Config: Key Vault principal object IDs. modules/kvRbacPrincipals.bicep silently skips
 # every principal that is not a GUID, so a placeholder such as <todo>_EntraID_ObjectID would
-# leave the common/admin vaults without an admin policy. Hard gate, even in WARN_ONLY mode.
+# leave the common/admin vaults without an admin role assignment. Hard gate, even in WARN_ONLY mode.
 check_kv_principals() {
   local checker="$SCRIPT_DIR/kv_principal_object_ids.py" out kind code msg hint config_env args=()
   if [ -z "$PYBIN" ] || [ ! -f "$checker" ]; then

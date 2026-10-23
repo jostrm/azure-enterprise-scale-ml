@@ -406,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 400 |
-| `env` | 398 |
-| `bootstrap` | 92 |
+| `yaml` | 401 |
+| `env` | 399 |
+| `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 405 |
+| `json.dev` | 406 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 154, 423; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 155, 424; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 425, 449; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 155, 424; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 156, 425; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 426, 450; one reference row.
 
 ## YAML and variables.json reference
 
@@ -605,8 +605,8 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:projectPrefix --><!-- parameter json.dev:projectPrefix -->`projectPrefix` | `PROJECT_PREFIX` | O | Y: `"esml-"`<br>J.dev: `"esml-"` | Project resource group prefix |
 | <!-- parameter yaml:projectSuffix --><!-- parameter json.dev:projectSuffix -->`projectSuffix` | `PROJECT_SUFFIX` | O | Y: `"-rg"`<br>J.dev: `"-rg"` | Project resource group suffix |
 | <!-- parameter yaml:project_number_000 --><!-- parameter json.dev:project_number_000 -->`project_number_000` | `PROJECT_NUMBER` | M | Y: `"001"`<br>J.dev: `"001"` | Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc. |
-| <!-- parameter yaml:skipDiagAISearch --><!-- parameter json.dev:skipDiagAISearch -->`skipDiagAISearch` | `SKIP_DIAG_AI_SEARCH` | O | Y: `true`<br>J.dev: `true` | Skip diag aisearch. |
-| <!-- parameter yaml:skipDiagAIServices --><!-- parameter json.dev:skipDiagAIServices -->`skipDiagAIServices` | `SKIP_DIAG_AI_SERVICES` | O | Y: `true`<br>J.dev: `true` | Skip diag aiservices. |
+| <!-- parameter yaml:skipDiagAISearch --><!-- parameter json.dev:skipDiagAISearch -->`skipDiagAISearch` | `SKIP_DIAG_AI_SEARCH` | O | Y: `false`<br>J.dev: `false` | Skip diag aisearch. |
+| <!-- parameter yaml:skipDiagAIServices --><!-- parameter json.dev:skipDiagAIServices -->`skipDiagAIServices` | `SKIP_DIAG_AI_SERVICES` | O | Y: `false`<br>J.dev: `false` | Skip diag aiservices. |
 | <!-- parameter yaml:skipDiagAOAI --><!-- parameter json.dev:skipDiagAOAI -->`skipDiagAOAI` | `SKIP_DIAG_AOAI` | O | Y: `true`<br>J.dev: `true` | Skip diag aoai. |
 | <!-- parameter yaml:skipDiagContentSafety --><!-- parameter json.dev:skipDiagContentSafety -->`skipDiagContentSafety` | `SKIP_DIAG_CONTENT_SAFETY` | O | Y: `true`<br>J.dev: `true` | Skip diag content safety. |
 | <!-- parameter yaml:skipDiagDocIntelligence --><!-- parameter json.dev:skipDiagDocIntelligence -->`skipDiagDocIntelligence` | `SKIP_DIAG_DOC_INTELLIGENCE` | O | Y: `true`<br>J.dev: `true` | Skip diag doc intelligence. |
@@ -802,31 +802,11 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:skuWebAppDev --><!-- parameter json.dev:skuWebAppDev -->`skuWebAppDev` | `SKU_WEBAPP_DEV` | O | Y: `"P1v3"`<br>J.dev: `"P1v3"` | Web App plan SKU Dev |
 | <!-- parameter yaml:skuWebAppStageProd --><!-- parameter json.dev:skuWebAppStageProd -->`skuWebAppStageProd` | `SKU_WEBAPP_STAGEPROD` | O | Y: `"P1v3"`<br>J.dev: `"P1v3"` | Web App plan SKU Stage/Prod |
 
-### Models and deployments
-
-| YAML / JSON key | GHA binding(s) | M/C/O | Source defaults | Description / conditions |
-|---|---|---|---|---|
-| <!-- parameter yaml:aifactoryAgentModelDeployment --><!-- parameter json.dev:aifactoryAgentModelDeployment -->`aifactoryAgentModelDeployment` | `AIFACTORY_AGENT_MODEL_DEPLOYMENT` | O | Y: `""`<br>J.dev: `""` | Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'. |
-| <!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity -->`default_embedding_capacity` | `DEFAULT_EMBEDDING_CAPACITY` | O | Y: `25`<br>J.dev: `25` | Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute. |
-| <!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version -->`default_gpt_4o_version` | `DEFAULT_GPT_4O_VERSION` | O | Y: `"2024-11-20"`<br>J.dev: `"2024-11-20"` | gpt-4o version otherwise: "2024-08-06". |
-| <!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version -->`default_gpt_54_mini_version` | `DEFAULT_GPT_54_MINI_VERSION` | O | Y: `"2026-03-17"`<br>J.dev: `"2026-03-17"` | Version for the separately named GPT-5.4-mini deployment toggle. |
-| <!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity -->`default_gpt_capacity` | `DEFAULT_GPT_CAPACITY` | O | Y: `40`<br>J.dev: `40` | GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute. |
-| <!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku -->`default_model_sku` | `DEFAULT_MODEL_SKU` | O | Y: `"DataZoneStandard"`<br>J.dev: `"DataZoneStandard"` | Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
-| <!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o -->`deployModel_gpt_4o` | `DEPLOY_MODEL_GPT_4O` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios. |
-| <!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini -->`deployModel_gpt_54_mini` | `DEPLOY_MODEL_GPT_54_MINI` | O | Y: `"false"`<br>J.dev: `"false"` | Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X. |
-| <!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X -->`deployModel_gpt_X` | `DEPLOY_MODEL_GPT_X` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName. |
-| <!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large -->`deployModel_text_embedding_3_large` | `DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy text-embedding-3-large recommended: for production RAG scenarios. |
-| <!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small -->`deployModel_text_embedding_3_small` | `DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy text-embedding-3-small recommended: for cost-optimized scenarios. |
-| <!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 -->`deployModel_text_embedding_ada_002` | `DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy text-embedding-ada-002 |
-| <!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity -->`modelGPTXCapacity` | `MODEL_GPTX_CAPACITY` | O | Y: `30`<br>J.dev: `30` | GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute. |
-| <!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName -->`modelGPTXName` | `MODEL_GPTX_NAME` | O | Y: `"gpt-5.4-mini"`<br>J.dev: `"gpt-5.4-mini"` | GPT-X model name ensure: model is available in your Azure region with sufficient quota. |
-| <!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku -->`modelGPTXSku` | `MODEL_GPTX_SKU` | O | Y: `"DataZoneStandard"`<br>J.dev: `"DataZoneStandard"` | GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
-| <!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion -->`modelGPTXVersion` | `MODEL_GPTX_VERSION` | O | Y: `"2026-03-17"`<br>J.dev: `"2026-03-17"` | GPT-X model version ensure: update the version when selecting a different model. |
-
 ### Identity, access and encryption
 
 | YAML / JSON key | GHA binding(s) | M/C/O | Source defaults | Description / conditions |
 |---|---|---|---|---|
+| <!-- parameter yaml:aiSearchDisableLocalAuth --><!-- parameter json.dev:aiSearchDisableLocalAuth -->`aiSearchDisableLocalAuth` | `AI_SEARCH_DISABLE_LOCAL_AUTH` | O | Y: `true`<br>J.dev: `true` | Entra ID only on AI Search (no API keys). false re-enables keys for a key-based client. |
 | <!-- parameter yaml:apimGatewayManagedIdentityPrincipalId --><!-- parameter json.dev:apimGatewayManagedIdentityPrincipalId -->`apimGatewayManagedIdentityPrincipalId` | `APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID` | C | Y: `""`<br>J.dev: `""` | APIM system-assigned managed identity object ID. Required when assigning the OpenAI user role to the APIM managed identity. |
 | <!-- parameter yaml:azureDevOpsTenantId --><!-- parameter json.dev:azureDevOpsTenantId -->`azureDevOpsTenantId` | No verified binding | M | Y: `"<todo>_AzureDevOpsTenantId"`<br>J.dev: `"<todo>_AzureDevOpsTenantId"` | Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. mandatory: Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. |
 | <!-- parameter yaml:azure_machinelearning_sp_oid --><!-- parameter json.dev:azure_machinelearning_sp_oid -->`azure_machinelearning_sp_oid` | `AZURE_MACHINELEARNING_SP_OID`, `TENANT_AZUREML_OID` | C | Y: `"<todo>_ObjectID"`<br>J.dev: `"<todo>_ObjectID"` | Azure ML service principal OID mandatory: Azure ML service principal OID ensure: find in Entra ID as "Azure Machine Learning" app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). otherwise: optional if enableAIFoundry:'false'. |
@@ -863,6 +843,27 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:updateKeyvaultRbac --><!-- parameter json.dev:updateKeyvaultRbac -->`updateKeyvaultRbac` | `UPDATE_KEYVAULT_RBAC` | O | Y: `"false"`<br>J.dev: `"false"` | Update Key Vault RBAC otherwise: true, re-run to update RBAC properties. |
 | <!-- parameter yaml:updateRbac --><!-- parameter json.dev:updateRbac -->`updateRbac` | `UPDATE_RBAC` | O | Y: `false`<br>J.dev: `false` | Update rbac. |
 | <!-- parameter yaml:use_ad_groups --><!-- parameter json.dev:use_ad_groups -->`use_ad_groups` | `USE_AD_GROUPS` | O | Y: `"true"`<br>J.dev: `"true"` | Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas. |
+
+### Models and deployments
+
+| YAML / JSON key | GHA binding(s) | M/C/O | Source defaults | Description / conditions |
+|---|---|---|---|---|
+| <!-- parameter yaml:aifactoryAgentModelDeployment --><!-- parameter json.dev:aifactoryAgentModelDeployment -->`aifactoryAgentModelDeployment` | `AIFACTORY_AGENT_MODEL_DEPLOYMENT` | O | Y: `""`<br>J.dev: `""` | Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'. |
+| <!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity -->`default_embedding_capacity` | `DEFAULT_EMBEDDING_CAPACITY` | O | Y: `25`<br>J.dev: `25` | Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute. |
+| <!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version -->`default_gpt_4o_version` | `DEFAULT_GPT_4O_VERSION` | O | Y: `"2024-11-20"`<br>J.dev: `"2024-11-20"` | gpt-4o version otherwise: "2024-08-06". |
+| <!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version -->`default_gpt_54_mini_version` | `DEFAULT_GPT_54_MINI_VERSION` | O | Y: `"2026-03-17"`<br>J.dev: `"2026-03-17"` | Version for the separately named GPT-5.4-mini deployment toggle. |
+| <!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity -->`default_gpt_capacity` | `DEFAULT_GPT_CAPACITY` | O | Y: `40`<br>J.dev: `40` | GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute. |
+| <!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku -->`default_model_sku` | `DEFAULT_MODEL_SKU` | O | Y: `"DataZoneStandard"`<br>J.dev: `"DataZoneStandard"` | Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
+| <!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o -->`deployModel_gpt_4o` | `DEPLOY_MODEL_GPT_4O` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios. |
+| <!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini -->`deployModel_gpt_54_mini` | `DEPLOY_MODEL_GPT_54_MINI` | O | Y: `"false"`<br>J.dev: `"false"` | Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X. |
+| <!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X -->`deployModel_gpt_X` | `DEPLOY_MODEL_GPT_X` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName. |
+| <!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large -->`deployModel_text_embedding_3_large` | `DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy text-embedding-3-large recommended: for production RAG scenarios. |
+| <!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small -->`deployModel_text_embedding_3_small` | `DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy text-embedding-3-small recommended: for cost-optimized scenarios. |
+| <!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 -->`deployModel_text_embedding_ada_002` | `DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy text-embedding-ada-002 |
+| <!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity -->`modelGPTXCapacity` | `MODEL_GPTX_CAPACITY` | O | Y: `30`<br>J.dev: `30` | GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute. |
+| <!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName -->`modelGPTXName` | `MODEL_GPTX_NAME` | O | Y: `"gpt-5.4-mini"`<br>J.dev: `"gpt-5.4-mini"` | GPT-X model name ensure: model is available in your Azure region with sufficient quota. |
+| <!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku -->`modelGPTXSku` | `MODEL_GPTX_SKU` | O | Y: `"DataZoneStandard"`<br>J.dev: `"DataZoneStandard"` | GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
+| <!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion -->`modelGPTXVersion` | `MODEL_GPTX_VERSION` | O | Y: `"2026-03-17"`<br>J.dev: `"2026-03-17"` | GPT-X model version ensure: update the version when selecting a different model. |
 
 ## GitHub Actions .env reference
 
@@ -952,8 +953,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:PROJECT_PREFIX -->`PROJECT_PREFIX` | `projectPrefix` | O | `"esml-"` | Project resource name prefix |
 | <!-- parameter env:PROJECT_SUFFIX -->`PROJECT_SUFFIX` | `projectSuffix` | O | `"-rg"` | Project resource name suffix |
 | <!-- parameter env:PROJECT_TYPE -->`PROJECT_TYPE` | `admin_projectType` | O | `"all"` | Project type keep-as-is: Not used anymore. Leave as is. |
-| <!-- parameter env:SKIP_DIAG_AI_SEARCH -->`SKIP_DIAG_AI_SEARCH` | `skipDiagAISearch` | O | `"true"` | Skip diag ai search. |
-| <!-- parameter env:SKIP_DIAG_AI_SERVICES -->`SKIP_DIAG_AI_SERVICES` | `skipDiagAIServices` | O | `"true"` | Skip diag ai services. |
+| <!-- parameter env:SKIP_DIAG_AI_SEARCH -->`SKIP_DIAG_AI_SEARCH` | `skipDiagAISearch` | O | `"false"` | Skip diag ai search. |
+| <!-- parameter env:SKIP_DIAG_AI_SERVICES -->`SKIP_DIAG_AI_SERVICES` | `skipDiagAIServices` | O | `"false"` | Skip diag ai services. |
 | <!-- parameter env:SKIP_DIAG_AOAI -->`SKIP_DIAG_AOAI` | `skipDiagAOAI` | O | `"true"` | Skip diag aoai. |
 | <!-- parameter env:SKIP_DIAG_CONTENT_SAFETY -->`SKIP_DIAG_CONTENT_SAFETY` | `skipDiagContentSafety` | O | `"true"` | Skip diag content safety. |
 | <!-- parameter env:SKIP_DIAG_DOC_INTELLIGENCE -->`SKIP_DIAG_DOC_INTELLIGENCE` | `skipDiagDocIntelligence` | O | `"true"` | Skip diag doc intelligence. |
@@ -1241,6 +1242,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 
 | Exact environment key | YAML / JSON counterpart(s) | M/C/O | Template value | Description / conditions |
 |---|---|---|---|---|
+| <!-- parameter env:AI_SEARCH_DISABLE_LOCAL_AUTH -->`AI_SEARCH_DISABLE_LOCAL_AUTH` | `aiSearchDisableLocalAuth` | O | `"true"` | Entra ID only on AI Search (no API keys). false re-enables keys. |
 | <!-- parameter env:APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID -->`APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID` | `apimGatewayManagedIdentityPrincipalId` | C | `""` | Apim gateway managed identity principal id. Required when assigning the OpenAI user role to the APIM managed identity. |
 | <!-- parameter env:AZURE_MACHINELEARNING_SP_OID -->`AZURE_MACHINELEARNING_SP_OID` | `azure_machinelearning_sp_oid` | C | `"<todo>"` | Azure ML service principal OID mandatory: Azure ML service principal OID ensure: find in Entra ID as 'Azure Machine Learning' app. otherwise: optional if ENABLE_AI_FOUNDRY:'false'. |
 | <!-- parameter env:CMK -->`CMK` | `cmk` | O | `"false"` | Customer Managed Key encryption otherwise: true enables CMEK where supported. Requires KEYVAULT_SOFT_DELETE &gt; 7 days. |
@@ -1373,6 +1375,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_HUB_VNET_RESOURCE_GROUP -->`AIF_HUB_VNET_RESOURCE_GROUP` | C | `"$AIF_HUB_RESOURCE_GROUP"` | Hub vNet resource group |
 | <!-- parameter bootstrap:AIF_IDENTITY_MODE -->`AIF_IDENTITY_MODE` | O | `"c"` | Deployment identity: create managed identity (c), existing managed identity (mi), or existing service principal (sp); allowed: c mi sp |
 | <!-- parameter bootstrap:AIF_IP_ALLOWLIST -->`AIF_IP_ALLOWLIST` | O | `""` | IPv4 allowlist input; the current create prompt accepts private networking only. |
+| <!-- parameter bootstrap:AIF_KV_SECRET_EXPIRES -->`AIF_KV_SECRET_EXPIRES` | O | `"$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null &#124;&#124; date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')"` | Aif kv secret expires override; see create launcher. |
 | <!-- parameter bootstrap:AIF_LOCATION -->`AIF_LOCATION` | O | `"swedencentral"` | Azure region (swedencentral, westeurope, northeurope, eastus, eastus2, uksouth, westgermany) |
 | <!-- parameter bootstrap:AIF_MI_RESOURCE_ID -->`AIF_MI_RESOURCE_ID` | C | `""` | Existing user-assigned managed identity resource ID |
 | <!-- parameter bootstrap:AIF_NETWORK_MODE -->`AIF_NETWORK_MODE` | O | `"priv"` | Networking: private-only (priv; enforced by policy); allowed: priv |

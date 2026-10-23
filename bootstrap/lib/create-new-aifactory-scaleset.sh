@@ -1815,11 +1815,14 @@ aif_ensure_admin_group() {
 aif_set_keyvault_secret() {
   local name="$1" mode="$2" value="$3"
   local attempt output=""
+  # Key Vault secrets expire one year from now (UTC), the same rule as the Bicep keyVaultSecretExpiry default.
+  AIF_KV_SECRET_EXPIRES="${AIF_KV_SECRET_EXPIRES:-$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')}"
   local -a args=(
     keyvault secret set
     --subscription "$AIF_DEV_SUBSCRIPTION_ID"
     --vault-name "$AIF_SEEDING_KEYVAULT_NAME"
     --name "$name"
+    --expires "$AIF_KV_SECRET_EXPIRES"
     --output none
   )
   if [[ "$mode" == "file" ]]; then

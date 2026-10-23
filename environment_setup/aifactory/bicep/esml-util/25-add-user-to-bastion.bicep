@@ -46,24 +46,18 @@ module rbacReadUsersToCmnVnetBastion '../../azure-enterprise-scale-ml/environmen
   ]
 }
 
-var secretGetList = {
-  secrets: [ 
-    'get'
-    'list'
-  ]
-}
 
 var projectSP_OID_list_array = array(split(projectSP_OID_list,','))
 var projectSP_OIDs_array_safe = projectSP_OID_list == 'null'? []: projectSP_OID_list_array
 var users_and_serviceprincipals = union(technicalAdminsObjectID_array_safe, projectSP_OIDs_array_safe)
 
-module kvCommonAccessPolicyGetListUtil '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep' = {
+// Key Vault Secrets User on the common vault: the Azure RBAC equivalent of the former secrets get/list access policy.
+module kvCommonSecretsUserUtil '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/kvRbacPrincipals.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '${cmndevKeyvault}GetListUtil${projectNumber}${locationSuffix}${env}'
+  name: '${cmndevKeyvault}RbacGetListUtil${projectNumber}${locationSuffix}${env}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultRole: 'secretsUser'
     keyVaultResourceName: cmndevKeyvault
-    policyName: 'add'
     principalId: users_and_serviceprincipals[0]
     additionalPrincipalIds:users_and_serviceprincipals
   }

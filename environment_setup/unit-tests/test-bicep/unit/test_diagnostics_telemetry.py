@@ -209,7 +209,8 @@ class TestDiagnosticsTelemetry(unittest.TestCase):
                     self.assertIsNotNone(condition)
                     self.assertEqual(expected, re.sub(r"\s+", "", condition.group(1)))
         self.assertIn("param skipDiagAOAI bool = true", self.cognitive_services)
-        self.assertIn("param skipDiagAIServices bool = true", self.cognitive_services)
+        # AI Services sends resource logs by default (Defender for Cloud); the operator switch remains.
+        self.assertIn("param skipDiagAIServices bool = false", self.cognitive_services)
 
 
 class TestCompiledDiagnosticDefaults(unittest.TestCase):

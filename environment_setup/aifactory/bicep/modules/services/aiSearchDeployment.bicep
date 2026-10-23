@@ -18,7 +18,9 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param IPwhiteList string = ''
 param centralDnsZoneByPolicyInHub bool = false
-param skipDiagAISearch bool = true
+param skipDiagAISearch bool = false
+@description('AI Search accepts only Entra ID tokens (API keys disabled, Defender for Cloud). Set false only for a client that needs keys.')
+param aiSearchDisableLocalAuth bool = true
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'gold'
 param cmk bool = false
@@ -55,6 +57,7 @@ module aiSearchService '../aiSearch.bicep' = {
     tags: tagsProject
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess
+    disableLocalAuth: aiSearchDisableLocalAuth
     skuName: skuName
     enableSharedPrivateLink: !empty(sharedPrivateLinks)
     sharedPrivateLinks: sharedPrivateLinks

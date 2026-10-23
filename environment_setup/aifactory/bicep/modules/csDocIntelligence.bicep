@@ -16,6 +16,9 @@ param disableLocalAuth bool = false
 
 var nameCleaned = toLower(replace(name, '-', ''))
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -96,6 +99,7 @@ resource kValueDocInt2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

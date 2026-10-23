@@ -42,6 +42,8 @@ param privateEndpointName string
 ])
 param semanticSearchTier string = 'disabled'
 param publicNetworkAccess bool = false
+@description('Entra ID only: API keys are disabled (Defender for Cloud). false keeps keys next to Entra ID.')
+param disableLocalAuth bool = true
 param ipRules array = []
 param enablePublicAccessWithPerimeter bool = false
 param vnetName string
@@ -89,7 +91,9 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
   }
   identity: identity
   properties: {
-    authOptions: {
+    disableLocalAuth: disableLocalAuth
+    // ARM rejects authOptions when local authentication is disabled.
+    authOptions: disableLocalAuth ? null : {
       aadOrApiKey: {
         aadAuthFailureMode:'http401WithBearerChallenge' // or 'http403'
       }

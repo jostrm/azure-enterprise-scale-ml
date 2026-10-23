@@ -142,6 +142,9 @@ var identity = identityType != 'None' ? {
   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
 } : null
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
@@ -191,6 +194,7 @@ resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

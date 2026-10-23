@@ -26,10 +26,14 @@ DEFAULTS = {
     # JSON mode (v1.25+) needs the same keys and defaults in variables.json.
     "adminVMSize": "Standard_D2s_v5",
     "enableAzureMcpServer": False,
+    # AI Search and AI Services send resource logs by default (Defender for Cloud); the others stay opt-in.
+    "skipDiagAISearch": False,
+    "skipDiagAIServices": False,
     **{key: True for key in (
-        "skipDiagAISearch", "skipDiagAIServices", "skipDiagAOAI",
-        "skipDiagContentSafety", "skipDiagDocIntelligence", "skipDiagSpeech", "skipDiagVision",
+        "skipDiagAOAI", "skipDiagContentSafety", "skipDiagDocIntelligence", "skipDiagSpeech", "skipDiagVision",
     )},
+    # AI Search accepts only Entra ID unless an operator re-enables keys (Defender for Cloud).
+    "aiSearchDisableLocalAuth": True,
 }
 ENV_NAMES = {
     "enablePersonas": "ENABLE_PERSONAS", "aksSkuTier": "AKS_SKU_TIER",
@@ -39,6 +43,7 @@ ENV_NAMES = {
     "skipDiagAOAI": "SKIP_DIAG_AOAI", "skipDiagContentSafety": "SKIP_DIAG_CONTENT_SAFETY",
     "skipDiagDocIntelligence": "SKIP_DIAG_DOC_INTELLIGENCE",
     "skipDiagSpeech": "SKIP_DIAG_SPEECH", "skipDiagVision": "SKIP_DIAG_VISION",
+    "aiSearchDisableLocalAuth": "AI_SEARCH_DISABLE_LOCAL_AUTH",
 }
 UPLOAD_SCRIPT = GHA / "03a-GH-create-or-update-github-variables.sh"
 # Names 03a reads from .env although .env.template leaves them out on purpose: name -> reason.

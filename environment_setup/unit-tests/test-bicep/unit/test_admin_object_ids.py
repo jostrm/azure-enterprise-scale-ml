@@ -23,7 +23,7 @@ RG_COMMON = BICEP / "esml-common/main/11-rgCommon.bicep"
 RG_LEVEL = BICEP / "esml-common/main/13-rgLevel.bicep"
 NAMING = BICEP / "modules/common/CmnAIfactoryNaming.bicep"
 CONTRIBUTOR = BICEP / "modules/contributorRbac.bicep"
-KEY_VAULT = BICEP / "modules/kvCmnAccessPolicys.bicep"
+KEY_VAULT = BICEP / "modules/kvRbacPrincipals.bicep"
 
 A = "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b"
 B = "24ad8636-1b2c-4d5e-8f90-a1b2c3d4e5f6"
@@ -137,10 +137,10 @@ def test_contributor_rbac_falls_back_to_the_object_id_when_an_email_is_missing()
         f"Contributor to user {B} to get Contributor on resource group: rg-cmn"]
 
 
-# --- 13-rgLevel: common Key Vault access policies for admins -------------------------------------------------
+# --- 13-rgLevel: common Key Vault role assignments for admins ----------------------------------------------
 
 def rg_level_admin_policies(raw, tags=None):
-    """additionalPrincipalIds of the cmn and admin Key Vault policies that 13-rgLevel grants the technical contact."""
+    """additionalPrincipalIds of the cmn and admin Key Vault role grants 13-rgLevel gives the technical contact."""
     template = compile_bicep(RG_LEVEL)
     modules = [item for item in resources(template) if item["type"] == "Microsoft.Resources/deployments"
                and item["properties"]["parameters"].get("principalId") == {"value": "[parameters('technicalContactId')]"}]
@@ -174,7 +174,7 @@ def test_naming_team_lead_array_is_normalized(raw, expected):
 CSV = "split(technicalAdminsObjectID, ',')"
 INLINED = {"esml-common/main/11-rgCommon.bicep": CSV, "esml-common/main/13-rgLevel.bicep": CSV,
            "esml-project/22-main.bicep": CSV,
-           "modules/kvCmnAccessPolicys.bicep": "union(main_principal_2_array, additionalPrincipalIds)"}
+           "modules/kvRbacPrincipals.bicep": "union(main_principal_2_array, additionalPrincipalIds)"}
 IMPORTED = {"modules/common/CmnAIfactoryNaming.bicep": f"normalizedObjectIds({CSV})"}
 
 

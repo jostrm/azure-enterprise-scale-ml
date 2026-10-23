@@ -587,6 +587,18 @@ module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databric
     // Private Link AML workspace is unsupported and breaks every Databricks MLflow run (see Microsoft Learn,
     // how-to-use-mlflow-azure-databricks). Use exclusive tracking with azureml-mlflow instead.
     amlWorkspaceResourceId: (enablePublicAccessWithPerimeter && !amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
+    // Resource logs to the common Log Analytics workspace (Defender for Cloud: resource logs in Databricks).
+    diagnosticSettings: [
+      {
+        name: 'diag-${databricksName}'
+        workspaceResourceId: logAnalyticsWorkspaceOpInsight.id
+        logCategoriesAndGroups: [
+          {
+            categoryGroup: 'allLogs'
+          }
+        ]
+      }
+    ]
   }
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])

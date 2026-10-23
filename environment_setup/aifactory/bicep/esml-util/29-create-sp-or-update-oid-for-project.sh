@@ -21,6 +21,8 @@ PROJECT_NUMBER_XXX="${PROJECT_NUMBER_XXX:-001}" # A string with three characters
 PROJECT_NUMBER_TO="${PROJECT_NUMBER_TO:-}" # OPTIONAL batch: last project of a range, e.g. "010" creates 001..010. Empty = only PROJECT_NUMBER_XXX
 ALSO_CREATE_MCP_API_SP="${ALSO_CREATE_MCP_API_SP:-false}" # OPTIONAL: "true" also runs 29b-create-mcp-api-sp-for-projects.sh for the same projects (secretless AI Factory MCP API SP)
 
+AIF_KV_SECRET_EXPIRES="${AIF_KV_SECRET_EXPIRES:-$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')}" # Key Vault secrets expire one year from now (UTC)
+
 # 3* OPTIONAL Variable: Only need to set if using [Y] in SERVICE_PRINCIPAL_NAME_TEMPLATE
 PROJECT_NUMBER_Y="" # A string number between 1-999. Example: "2" 
 
@@ -125,9 +127,9 @@ if [ -z "$SP_EXISTS" ]; then
     echo -e "${GREEN}APP_ID: {$APP_ID} ${NC}"
     echo -e "${GREEN}OBJECT_ID: {$OBJECT_ID} ${NC}"
 
-    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID
-    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_OID} --value $OBJECT_ID
-    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_SECRET} --value $PASSWORD > /dev/null
+    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID --expires "$AIF_KV_SECRET_EXPIRES"
+    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_OID} --value $OBJECT_ID --expires "$AIF_KV_SECRET_EXPIRES"
+    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_SECRET} --value $PASSWORD --expires "$AIF_KV_SECRET_EXPIRES" > /dev/null
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Service principal credentials stored in Key Vault successfully${NC}"
@@ -145,8 +147,8 @@ else
     echo -e "${GREEN}OBJECT_ID: {$OBJECT_ID} ${NC}"
     #echo -e "${GREEN}PASSWORD: {$PASSWORD} ${NC}"
     
-    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_OID} --value $OBJECT_ID
-    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID
+    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_OID} --value $OBJECT_ID --expires "$AIF_KV_SECRET_EXPIRES"
+    az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID --expires "$AIF_KV_SECRET_EXPIRES"
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Service principal credentials stored in Key Vault successfully${NC}"

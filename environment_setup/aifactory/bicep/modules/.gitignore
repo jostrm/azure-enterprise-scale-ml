@@ -1,2 +1,3 @@
 *.json
 !workbooks/my-project/tokens-metrics.json
+!common/keyVaultDefaults.json

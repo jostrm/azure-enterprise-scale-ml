@@ -10,6 +10,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 from uuid import NAMESPACE_URL, uuid4, uuid5
@@ -189,8 +190,18 @@ class AzureCloud:
             if current is not None:
                 raise ValueError("The dedicated API-key secret already exists; inspect rather than overwrite.")
             created = vault.set_secret(TARGET["apiKeySecretName"], secrets.token_hex(32),
+                                       expires_on=one_year_from_now(),
                                        tags={"managed-by": OWNER, "session": SESSION})
             return {"secret_id": created.id}
+
+
+def one_year_from_now(now: datetime | None = None) -> datetime:
+    """Key Vault secrets expire one year after they are created (UTC); 29 February maps to 28 February."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        return now.replace(year=now.year + 1)
+    except ValueError:
+        return now.replace(year=now.year + 1, day=28)
 
 
 def _owned(resource: dict) -> None:

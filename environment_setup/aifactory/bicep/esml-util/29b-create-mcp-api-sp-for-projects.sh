@@ -28,6 +28,8 @@ PROJECT_NUMBER_FROM="${PROJECT_NUMBER_FROM:-001}"
 PROJECT_NUMBER_TO="${PROJECT_NUMBER_TO:-}" # empty = only PROJECT_NUMBER_FROM
 SKIP_LOGIN="${SKIP_LOGIN:-false}"          # true when already signed in to the right tenant
 
+AIF_KV_SECRET_EXPIRES="${AIF_KV_SECRET_EXPIRES:-$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')}" # Key Vault secrets expire one year from now (UTC)
+
 ##################### DO NOT CHANGE ANYTHING BELOW #####################
 APP_ROLE_VALUE="AiFactory.Mcp.Read"
 KV_APP_ID_TEMPLATE="esml-projectXXX-mcp-app-id"
@@ -94,8 +96,8 @@ provision_project() {
     if [ -z "$sp_oid" ]; then
         sp_oid=$(az ad sp create --id "$app_id" --query id -o tsv) || return 1
     fi
-    az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "${KV_APP_ID_TEMPLATE/XXX/$nnn}" --value "$app_id" > /dev/null || return 1
-    az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "${KV_SP_OID_TEMPLATE/XXX/$nnn}" --value "$sp_oid" > /dev/null || return 1
+    az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "${KV_APP_ID_TEMPLATE/XXX/$nnn}" --value "$app_id" --expires "$AIF_KV_SECRET_EXPIRES" > /dev/null || return 1
+    az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "${KV_SP_OID_TEMPLATE/XXX/$nnn}" --value "$sp_oid" --expires "$AIF_KV_SECRET_EXPIRES" > /dev/null || return 1
     echo -e "${GREEN}Stored ${KV_APP_ID_TEMPLATE/XXX/$nnn}=${app_id} and ${KV_SP_OID_TEMPLATE/XXX/$nnn} in ${KEY_VAULT_NAME}${NC}"
 }
 

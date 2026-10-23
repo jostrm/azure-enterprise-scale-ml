@@ -6,9 +6,11 @@ variables:
   aksSkuTier: "Standard"
   enableProjectVM: false
   updateRbac: false
-  # Match Bicep defaults: diagnostic deployment remains opt-in per service.
-  skipDiagAISearch: true
-  skipDiagAIServices: true
+  # Match Bicep defaults: AI Search and AI Services send resource logs to Log Analytics by default
+  # (Defender for Cloud); the other services remain opt-in.
+  skipDiagAISearch: false
+  skipDiagAIServices: false
+  aiSearchDisableLocalAuth: true # Entra ID only on AI Search (no API keys). false re-enables keys for a key-based client.
   skipDiagAOAI: true
   skipDiagContentSafety: true
   skipDiagDocIntelligence: true

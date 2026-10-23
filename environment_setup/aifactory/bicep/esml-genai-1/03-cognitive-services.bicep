@@ -15,6 +15,8 @@ targetScope = 'subscription'
 // ============================================================================
 // SKU for services
 // ============================================================================
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @allowed(['disabled', 'free', 'standard'])
 param semanticSearchTier string = 'free'
 param aiSearchReplicaCount int = 1
@@ -78,10 +80,12 @@ param diagnosticSettingLevel string = 'gold'
 //    for category 'Audit'."
 @description('Skip creating the AOAI diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one; bicep-created setting would 409 on sink+category reuse).')
 param skipDiagAOAI bool = true
-@description('Skip creating the AI Search diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
-param skipDiagAISearch bool = true
-@description('Skip creating the AI Services diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
-param skipDiagAIServices bool = true
+@description('Skip creating the AI Search diagnostic setting. Default false: resource logs to Log Analytics (Defender for Cloud). Set true when an Azure Policy deployIfNotExists already sends the same categories to the same workspace (409).')
+param skipDiagAISearch bool = false
+@description('AI Search accepts only Entra ID tokens (API keys disabled, Defender for Cloud). Set false only for a client that needs keys.')
+param aiSearchDisableLocalAuth bool = true
+@description('Skip creating the AI Services diagnostic setting. Default false: resource logs to Log Analytics (Defender for Cloud). Set true when an Azure Policy deployIfNotExists already sends the same categories to the same workspace (409).')
+param skipDiagAIServices bool = false
 @description('Skip creating the Content Safety diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
 param skipDiagContentSafety bool = true
 @description('Skip creating the Vision diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
@@ -478,6 +482,7 @@ module csVision '../modules/csVision.bicep' = if(enableAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-Vision4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     csSKU: csVisionSKU
     location: (!empty(serviceSettingOverrideRegionAzureAIVision)) ? serviceSettingOverrideRegionAzureAIVision : location
     restore: restore
@@ -510,6 +515,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(enableAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AISpeech4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     csSKU: csSpeechSKU
     location: location
     restore: restore
@@ -542,6 +548,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AIDocInt4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     csSKU: csDocIntelligenceSKU
     location: location
     restore: restore
@@ -713,6 +720,7 @@ module aiSearchService '../modules/services/aiSearchDeployment.bicep' = if (need
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     skipDiagAISearch: skipDiagAISearch
+    aiSearchDisableLocalAuth: aiSearchDisableLocalAuth
     diagnosticSettingLevel: diagnosticSettingLevel
     cmk: cmk
     cmkDisableForAISearch: cmkDisableForAISearch
@@ -736,6 +744,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AIServices4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     location: location
     managedIdentities: {
     systemAssigned: true
@@ -800,6 +809,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && enableAzu
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AzureOpenAI4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     cognitiveName: aoaiName
     tags: tagsProject
     laWorkspaceName: laWorkspaceName

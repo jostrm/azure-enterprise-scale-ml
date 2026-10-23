@@ -1,8 +1,8 @@
 """Key Vault principal object IDs block the factory preflight, even in WARN_ONLY mode.
 
-modules/kvCmnAccessPolicys.bicep skips every principal that is not a GUID (purple 6383fdd3),
-so the shipped technical_admins_ad_object_id default "<todo>_EntraID_ObjectID" would leave the
-common/admin vaults without an admin policy. The preflight must stop it before any deployment.
+modules/kvRbacPrincipals.bicep (formerly kvCmnAccessPolicys.bicep) skips every principal that is not a GUID
+(purple 6383fdd3), so the shipped technical_admins_ad_object_id default "<todo>_EntraID_ObjectID" would leave the
+common/admin vaults without an admin role assignment. The preflight must stop it before any deployment.
 """
 
 import importlib.util

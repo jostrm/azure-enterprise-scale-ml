@@ -39,6 +39,9 @@ param enablePublicAccessWithPerimeter bool = false
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
+@description('Expiry of every secret and key this template creates, in Unix epoch seconds. Default: one year after the deployment runs (keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
+
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: laWorkspaceName
   scope: resourceGroup(commonResourceGroupName)
@@ -212,6 +215,7 @@ resource kValueOpenAI 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     contentType: 'text/plain'
     attributes: {
       enabled: true
+      exp: keyVaultSecretExpiry
     }
   }
 }

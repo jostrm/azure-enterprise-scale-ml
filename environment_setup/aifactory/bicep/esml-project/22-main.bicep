@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('Expiry of every secret and key this deployment creates, in Unix epoch seconds. Default: one year after the deployment runs (modules/common/keyVaultDefaults.json secretExpiresAfter).')
+param keyVaultSecretExpiry int = dateTimeToEpoch(dateTimeAdd(utcNow(), 'P1Y'))
 @description('UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)')
 param aifactoryVersionMajor int = 1
 param aifactoryVersionMinor int = 20
@@ -904,6 +906,7 @@ module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyvaultName: keyvaultName
     location: location
     tags: projecttags
@@ -919,7 +922,6 @@ module kv1 '../modules/keyVault.bicep' = {
       subnet_aks_ref.id
       subnet_dbx_pub_ref.id
     ]
-    accessPolicies: [] 
     ipRules: empty(processedIpRulesKv)?[]:processedIpRulesKv
     enablePublicGenAIAccess: !empty(processedIpRulesKv)
   }
@@ -941,6 +943,7 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault42${deploymentProjSpecificUniqueSuffix}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     keyvaultName: keyvaultName2
     location: location
     tags: projecttags
@@ -957,7 +960,6 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
       subnet_aks_ref.id
       subnet_dbx_pub_ref.id
     ]
-    accessPolicies: [] 
     ipRules: empty(processedIpRulesKv)?[]:processedIpRulesKv
   }
   dependsOn: [
@@ -988,6 +990,7 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
   name: '${keyvaultName}addSecret2${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
@@ -1000,20 +1003,14 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
   ]
 }
 
-var secretGetListSet = {
-  secrets: [ 
-    'get'
-    'list'
-    'set'
-  ]
-}
-module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
+// Key Vault access is Azure RBAC (kvRbacPrincipals.bicep): the former secrets get/list/set access policies
+// are Key Vault Secrets Officer, get or get/list are Key Vault Secrets User.
+module kvTechnicalContactSecretsOfficer '../modules/kvRbacPrincipals.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${keyvaultName}APTechContact${deploymentProjSpecificUniqueSuffix}'
+  name: '${keyvaultName}RbacTechContact${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetListSet
+    keyVaultRole: 'secretsOfficer'
     keyVaultResourceName: kv1.outputs.keyvaultName
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:p011_genai_team_lead_array
   }
@@ -1021,13 +1018,12 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     addSecret
   ]
 }
-module kv2CmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
+module kv2TechnicalContactSecretsOfficer '../modules/kvRbacPrincipals.bicep' = if(alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${keyvaultName2}APTechContact${deploymentProjSpecificUniqueSuffix}'
+  name: '${keyvaultName2}RbacTechContact${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetListSet
+    keyVaultRole: 'secretsOfficer'
     keyVaultResourceName: kv2.outputs.keyvaultName
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:p011_genai_team_lead_array
   }
@@ -1041,13 +1037,12 @@ resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
 }
 
-module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
+module kvCommonSecretsUser '../modules/kvRbacPrincipals.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '${kvNameCommon}GetList${deploymentProjSpecificUniqueSuffix}'
+  name: '${kvNameCommon}RbacGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultRole: 'secretsUser'
     keyVaultResourceName: kvNameCommon
-    policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:p011_genai_team_lead_array
   }
@@ -1227,6 +1222,7 @@ module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'EventHub4${deploymentProjSpecificUniqueSuffix}'
   params: {
+    keyVaultSecretExpiry: keyVaultSecretExpiry
     namespaceName: evenhubNameSpaceAndWsName
     location:location
     privateEndpointName:'pend-${projectName}-ev-to-vnt-mlcmn'
@@ -1414,27 +1410,42 @@ module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZo
   ]
 }
 
-// RBAC
-var secretGet = {
-  secrets: [ 
-    'get'
-  ]
+// RBAC: Key Vault Secrets User for the principals that had secrets get or get/list access policies.
+
+// The classic AML workspace added an access policy for its identity on kv1 by itself. With Azure RBAC the
+// workspace identity needs Key Vault Administrator (data plane) on its vault (Microsoft Learn, AML identities).
+module amlKvAdministrator '../modules/kvRbacPrincipals.bicep' = if(enableAML) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'amlKvRbac${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultRole: 'administrator'
+    principalType: 'ServicePrincipal'
+    keyVaultResourceName: kv1.outputs.keyvaultName
+    principalId: aml!.outputs.principalId
+    additionalPrincipalIds:[]
+  }
 }
-var secretGetList = {
-  secrets: [ 
-    'get'
-    'list'
-  ]
+
+module amlManagedKvAdministrator '../modules/kvRbacPrincipals.bicep' = if(enableAML && alsoManagedMLStudio == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'amlMgdKvRbac${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultRole: 'administrator'
+    principalType: 'ServicePrincipal'
+    keyVaultResourceName: kv2!.outputs.keyvaultName
+    principalId: aml!.outputs.principalIdManaged
+    additionalPrincipalIds:[]
+  }
 }
 
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
-module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+module spProjectSPSecretsUser '../modules/kvRbacPrincipals.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'spPRJSP${deploymentProjSpecificUniqueSuffix}' //'${keyvaultName}/add'
+  name: 'spPRJSPRbac${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kv1.outputs.keyvaultName
-    policyName: 'add'
     principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
   }
@@ -1444,48 +1455,46 @@ module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(dat
   ]
 }
 
-module adfAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if((databricksOID != null) && (sweden_central_adf_missing==false)) {
+module adfSecretsUser '../modules/kvRbacPrincipals.bicep' = if((databricksOID != null) && (sweden_central_adf_missing==false)) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'adfAP1Get${deploymentProjSpecificUniqueSuffix}'
+  name: 'adfRbac1Get${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kv1.outputs.keyvaultName
-    policyName: 'add'
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
   }
   dependsOn: [
     kv1
     aml
-    spProjectSPAccessPolicyGet
   ]
 }
 
 
-module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+module spDatabricksSecretsUser '../modules/kvRbacPrincipals.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'spDBXAPGetList${deploymentProjSpecificUniqueSuffix}'
+  name: 'spDBXRbacGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: kv1.outputs.keyvaultName
-    policyName: 'add'
     principalId: databricksOID
     additionalPrincipalIds:[]
   }
   dependsOn: [
     kv1
     aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-    adfAccessPolicyGet
   ]
 }
 
-module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+module spCommonKeyvaultSecretsUser '../modules/kvRbacPrincipals.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'spCmnKVGetList${deploymentProjSpecificUniqueSuffix}'
+  name: 'spCmnKVRbacGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultRole: 'secretsUser'
+    principalType: 'ServicePrincipal'
     keyVaultResourceName: commonKv.name
-    policyName: 'add'
     principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
   }
