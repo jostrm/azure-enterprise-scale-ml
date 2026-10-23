@@ -1,3 +1,5 @@
+import { trustedLaunch, windowsGen2Image, windowsPatchSettings } from 'common/vmSecurity.bicep'
+
 @description('default is -001 such as esml-dsvm-username-001 as secret name in keyvault Ex: creating multipe VM -001, -002,-003')
 param kvSecretNameSuffix string = '-001'
 @secure()
@@ -8,7 +10,7 @@ param adminPassword string
 param adminUsername string
 
 @description('Size of the virtual machine.')
-param vmSize string = 'Standard_D2_v3'
+param vmSize string = 'Standard_D2s_v5'
 
 @description('location for all resources')
 param location string
@@ -32,6 +34,12 @@ param hybridBenefit bool = true
 
 @description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
 param expiration_date_default_2025_01_10_epoch int = 1736467877
+
+@description('Defender for Cloud: encryption at host. Needs the subscription feature Microsoft.Compute/EncryptionAtHost. Set false to opt out.')
+param enableEncryptionAtHost bool = true
+
+@description('Opt-in Azure Backup: Recovery Services vault + daily Enhanced policy, protecting this VM.')
+param enableVmBackup bool = false
 
 // Two different names are generated because of the conditional resources.
 // Without this we get a duplicate resource error
@@ -80,7 +88,7 @@ resource nInter 'Microsoft.Network/networkInterfaces@2020-08-01' = {
   }
 }
 
-resource virtualMachineWithPublicIp 'Microsoft.Compute/virtualMachines@2020-12-01' = {
+resource virtualMachineWithPublicIp 'Microsoft.Compute/virtualMachines@2024-07-01' = {
   name: vmName
   location: location
   tags: tags
@@ -99,19 +107,15 @@ resource virtualMachineWithPublicIp 'Microsoft.Compute/virtualMachines@2020-12-0
       windowsConfiguration: {
         enableAutomaticUpdates: true
         provisionVMAgent: true
-        patchSettings: {
-          enableHotpatching: false
-          patchMode: 'AutomaticByOS'
-        }
+        patchSettings: windowsPatchSettings
       }
     }
+    securityProfile: union(trustedLaunch, {
+      encryptionAtHost: enableEncryptionAtHost
+    })
     storageProfile: {
-      imageReference: {
-        publisher: 'microsoft-dsvm'
-        offer: 'dsvm-win-2019'
-        sku: 'server-2019'
-        version: 'latest'
-      }
+      // Gen2 + Trusted Launch. The former microsoft-dsvm dsvm-win-2019:server-2019 image is Gen1 only.
+      imageReference: windowsGen2Image
       osDisk: {
         createOption: 'FromImage'
         diskSizeGB:256
@@ -122,6 +126,9 @@ resource virtualMachineWithPublicIp 'Microsoft.Compute/virtualMachines@2020-12-0
       dataDisks: [
         {
           diskSizeGB: 1024
+          managedDisk: {
+            storageAccountType: 'StandardSSD_LRS'
+          }
           lun: 0
           createOption: 'Empty'
         }
@@ -145,7 +152,7 @@ resource virtualMachineWithPublicIp 'Microsoft.Compute/virtualMachines@2020-12-0
 //Extentions - MicrosoftMonitoringAgent AADLoginForWindows, AzurePolicyforWindows,MDE.Windows, MicrosoftMonitoringAgent, MDE.Windows
 //AzureNetworkWatcherExtension
 
-resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2020-06-01' = {
+resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2024-07-01' = {
   name: '${vmName}/AADLoginForWindows'
   location:location
   properties:{
@@ -159,6 +166,30 @@ resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2020-06-01' =
   ]
 }
 
+module securityExtensions 'vmSecurityExtensions.bicep' = {
+  name: take('vmSecExt-${vmName}', 64)
+  params: {
+    vmName: virtualMachineWithPublicIp.name
+    location: location
+    osType: 'Windows'
+    tags: tags
+  }
+  dependsOn: [
+    extAADLogin
+  ]
+}
+
+module backup 'vmBackup.bicep' = if (enableVmBackup) {
+  name: take('vmBackup-${vmName}', 64)
+  params: {
+    vmName: virtualMachineWithPublicIp.name
+    location: location
+    tags: tags
+  }
+  dependsOn: [
+    securityExtensions
+  ]
+}
 resource automaticShutdown 'Microsoft.DevTestLab/schedules@2018-09-15' = {
   name: 'shutdown-computevm-${virtualMachineWithPublicIp.name}'
   location: location

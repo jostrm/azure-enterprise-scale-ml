@@ -224,6 +224,12 @@ VOLATILE_FIELDS = {
         ("properties", "dnsSettings", "internalDomainNameSuffix")),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
+# The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them
+# (version, provisioning state) on its own schedule: like Defender's extension, only their identity counts.
+AUTO_UPGRADED_EXTENSION_PUBLISHERS = {
+    "microsoft.guestconfiguration", "microsoft.azure.security.windowsattestation",
+    "microsoft.azure.security.linuxattestation",
+}
 
 
 def fingerprint_body(body, kind=None):
@@ -238,6 +244,10 @@ def fingerprint_body(body, kind=None):
         return {"id": body.get("id"), "name": body.get("name"), "type": body.get("type"), "location": body.get("location"),
                 "properties": {"publisher": properties.get("publisher"), "type": properties.get("type"),
                                "settings": {"azureResourceId": settings.get("azureResourceId")}}}
+    if (kind == "microsoft.compute/virtualmachines/extensions"
+            and str(properties.get("publisher") or "").lower() in AUTO_UPGRADED_EXTENSION_PUBLISHERS):
+        return {"id": body.get("id"), "name": body.get("name"), "type": body.get("type"), "location": body.get("location"),
+                "properties": {"publisher": properties.get("publisher"), "type": properties.get("type")}}
     if kind not in VOLATILE_FIELDS:
         return body
     result = copy.deepcopy(body)

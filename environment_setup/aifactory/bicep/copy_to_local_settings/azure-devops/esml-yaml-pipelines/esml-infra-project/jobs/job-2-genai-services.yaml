@@ -3074,6 +3074,8 @@ steps:
      _subnet_common="$(subnetCommon)"
      if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
 
+     # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+     bash "scripts/ensure-encryption-at-host.sh" "$(enableEncryptionAtHost)" "$(dev_test_prod_sub_id)" "$(enableProjectVM)" || exit 1
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-core-infrastructure" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -3137,6 +3139,8 @@ steps:
      --parameters acr_dedicated="$(acr_dedicated)" \
      --parameters containerRegistrySkuName="$(acr_SKU)" \
      --parameters enableProjectVM="$(enableProjectVM)" \
+     --parameters enableEncryptionAtHost="$(enableEncryptionAtHost)" \
+     --parameters enableVmBackup="$(enableVmBackup)" \
      --parameters enableApplicationInsights="$(enableApplicationInsights)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
@@ -3382,6 +3386,8 @@ steps:
      _aiFoundryV2Exists="$(aiFoundryV2Exists)"
      if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
 
+     # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+     bash "scripts/ensure-encryption-at-host.sh" "$(enableEncryptionAtHost)" "$(dev_test_prod_sub_id)" "$(enableAKS)" || exit 1
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-65-compute-services" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -3465,6 +3471,7 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters enableAKS="$(enableAKS)" \
+     --parameters enableEncryptionAtHost="$(enableEncryptionAtHost)" \
      --parameters aksExists="$(aksExists)" \
      --parameters aksEnablePrivateCluster="$(aksEnablePrivateCluster)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
@@ -3594,6 +3601,8 @@ steps:
          --random-value="$(deployment_random_value)") || exit 1
        echo "Verified AML AKS attachment exists: $_aksComputeExists"
      fi
+     # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+     bash "scripts/ensure-encryption-at-host.sh" "$(enableEncryptionAtHost)" "$(dev_test_prod_sub_id)" "$( [ "$(enableAzureMachineLearning)" = "true" ] && echo "$(enableAksForAzureML)" || echo false )" || exit 1
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-data-ml-platform" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -3661,6 +3670,7 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
      --parameters enableAksForAzureML="$(enableAksForAzureML)" \
+     --parameters enableEncryptionAtHost="$(enableEncryptionAtHost)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
      --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)" \
      --parameters cmk="$(cmk)" \

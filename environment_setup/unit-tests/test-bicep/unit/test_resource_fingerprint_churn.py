@@ -129,6 +129,28 @@ def test_defender_extension_counts_only_its_identity_and_other_extensions_count_
     assert fl.resource_digest(retried) != fl.resource_digest(script)
 
 
+def baseline_extension(publisher, extension_type, name, state="Succeeded", version="1.0"):
+    return {"id": VM + "/extensions/" + name, "name": name, "location": "swedencentral",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "properties": {"autoUpgradeMinorVersion": True, "enableAutomaticUpgrade": True, "provisioningState": state,
+                           "publisher": publisher, "type": extension_type, "typeHandlerVersion": version,
+                           "settings": {}}}
+
+
+@pytest.mark.parametrize("publisher, extension_type, name", [
+    ("Microsoft.Azure.Security.LinuxAttestation", "GuestAttestation", "GuestAttestation"),
+    ("Microsoft.GuestConfiguration", "ConfigurationForLinux", "AzurePolicyforLinux"),
+])
+def test_auto_upgraded_baseline_extensions_count_only_their_identity(publisher, extension_type, name):
+    """The Defender for Cloud baseline installs these with enableAutomaticUpgrade: the platform upgrades them."""
+    reviewed = baseline_extension(publisher, extension_type, name)
+    upgraded = baseline_extension(publisher, extension_type, name, state="Updating", version="1.4")
+    assert fl.resource_digest(upgraded) == fl.resource_digest(reviewed)
+    for field, value in (("publisher", "Contoso.Security"), ("type", "Other")):
+        changed = baseline_extension(publisher, extension_type, name)
+        changed["properties"][field] = value
+        assert fl.resource_digest(changed) != fl.resource_digest(reviewed)
+
 def test_other_resources_keep_their_raw_fingerprint_and_etag():
     body = {"id": SCOPE + "/providers/Microsoft.Storage/storageAccounts/st", "type": "Microsoft.Storage/storageAccounts",
             "etag": '"7"', "sku": {"name": "Standard_LRS"}, "tags": {"a": "b"},

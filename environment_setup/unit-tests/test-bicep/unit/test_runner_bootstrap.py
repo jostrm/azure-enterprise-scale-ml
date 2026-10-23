@@ -951,6 +951,8 @@ class RunnerEnsureTests(unittest.TestCase):
                         for identifier in (request["rg_id"], request["subnet"], request["subnet"].rsplit("/subnets/", 1)[0]):
                             self.data[identifier] = {"id": identifier, "location": request["location"],
                                                      "properties": {"provisioningState": "Succeeded"}}
+                        feature = core.encryption_at_host_feature_id(request)
+                        self.data[feature] = {"id": feature, "properties": {"state": "Registered"}}
                     def az(self, *args):
                         assert args == ("account", "show", "--subscription", request["target"]["subscription_id"])
                         return {"tenantId": request["target"]["tenant_id"], "id": request["target"]["subscription_id"], "state": "Enabled"}
@@ -1175,6 +1177,83 @@ class RunnerEnsureTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), data)
         self.assertFalse((self.root / ".env").exists())
 
+    def assert_defender_baseline(self, request, cloud, writes):
+        """A new runner VM follows the Defender for Cloud compute baseline (test_defender_compute_baseline.py)."""
+        vm = cloud.data[request["vm_id"]]
+        self.assertEqual(vm["identity"], {"type": "SystemAssigned"})
+        properties = vm["properties"]
+        self.assertEqual(properties["securityProfile"], {
+            "encryptionAtHost": True, "securityType": "TrustedLaunch",
+            "uefiSettings": {"secureBootEnabled": True, "vTpmEnabled": True}})
+        # Periodic missing-update assessment; the patch mode follows the governance-compliant runner settings.
+        self.assertEqual(properties["osProfile"]["linuxConfiguration"]["patchSettings"]["assessmentMode"],
+                         "AutomaticByPlatform")
+        self.assertEqual(self.core.plan(request, cloud)["os_disk_sku"], "StandardSSD_LRS")
+        extensions = {identifier.rsplit("/", 1)[-1]: cloud.data[identifier]["properties"] for identifier in writes
+                      if identifier.startswith(request["vm_id"] + "/extensions/")}
+        self.assertEqual(set(extensions), {"GuestAttestation", "AzurePolicyforLinux"})
+        self.assertEqual(extensions["GuestAttestation"]["publisher"], "Microsoft.Azure.Security.LinuxAttestation")
+        self.assertEqual(extensions["AzurePolicyforLinux"]["publisher"], "Microsoft.GuestConfiguration")
+        self.assertEqual(extensions["AzurePolicyforLinux"]["type"], "ConfigurationForLinux")
+        for extension in extensions.values():
+            self.assertTrue(extension["autoUpgradeMinorVersion"] and extension["enableAutomaticUpgrade"])
+        # Guest Attestation first: parallel extension operations on one VM can conflict.
+        self.assertLess(writes.index(request["vm_id"] + "/extensions/GuestAttestation"),
+                        writes.index(request["vm_id"] + "/extensions/AzurePolicyforLinux"))
+        self.assertEqual(self.core.plan(request, cloud)["managed_identity"], "system-assigned-on-new-vm")
+
+    def test_new_runner_needs_the_encryption_at_host_feature_before_any_write(self):
+        request = self.request()
+        cloud = self.cloud(request)
+        cloud.data[self.core.encryption_at_host_feature_id(request)]["properties"]["state"] = "NotRegistered"
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        with self.assertRaisesRegex(self.core.EnrollmentError, "encryption-at-host-feature-not-registered"):
+            self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        self.assertEqual(cloud.writes, [])
+
+    def test_encryption_at_host_opt_out_reaches_the_runner(self):
+        self.values["enableEncryptionAtHost"] = "false"
+        self.save()
+        request = self.request()
+        self.assertFalse(request["encryption_at_host"])
+        cloud = self.cloud(request)
+        del cloud.data[self.core.encryption_at_host_feature_id(request)]
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        profile = cloud.data[request["vm_id"]]["properties"]["securityProfile"]
+        self.assertFalse(profile["encryptionAtHost"])
+        self.assertEqual(profile["securityType"], "TrustedLaunch")
+        self.values["enableEncryptionAtHost"] = "maybe"
+        self.save()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "invalid-encryption-at-host-flag"):
+            self.request()
+
+    def test_runner_identity_accepts_the_baseline_system_assigned_identity(self):
+        identity_id = (f"/subscriptions/{self.values['dev_sub_id']}/resourceGroups/fixture-esml-common-sdc-dev-001"
+                       "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/deploy")
+        plain, bound = self.request(), self.request(deployment_identity_id=identity_id)
+        accepted = [
+            (plain, {"type": "SystemAssigned"}),
+            (bound, {"type": "SystemAssigned"}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id.upper(): {}}}),
+            (bound, {"type": "UserAssigned", "userAssignedIdentities": {identity_id: {}}}),
+            (plain, {"type": "None"}),
+        ]
+        rejected = [
+            (plain, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id: {}}}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {
+                identity_id: {}, identity_id + "-extra": {}}}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id + "-other": {}}}),
+        ]
+        for request, identity in accepted:
+            with self.subTest(identity=identity):
+                self.assertTrue(self.core.runner_identity_matches(request, identity))
+        for request, identity in rejected:
+            with self.subTest(identity=identity):
+                self.assertFalse(self.core.runner_identity_matches(request, identity))
+
     def test_no_flag_needs_no_unrelated_config_or_cloud(self):
         self.path.write_text('{"useSelfHostedBuildAgent":false}', encoding="utf-8")
         request = self.request()
@@ -1199,7 +1278,7 @@ class RunnerEnsureTests(unittest.TestCase):
         self.assertEqual(cloud.writes, first)
         self.assertEqual(self.core.plan(request, cloud)["actions"]["vm"], "reuse")
         vm = cloud.data[request["vm_id"]]
-        self.assertNotIn("identity", vm)
+        self.assert_defender_baseline(request, cloud, first)
         self.assertEqual(vm["properties"]["storageProfile"]["imageReference"], self.core.IMAGE)
         self.assertEqual(vm["properties"]["hardwareProfile"]["vmSize"], "Standard_D4s_v5")
         self.assertTrue(all(identifier.startswith(request["rg_id"] + "/providers/") for identifier in first))
@@ -1238,18 +1317,18 @@ class RunnerEnsureTests(unittest.TestCase):
         with self.assertRaisesRegex(self.core.EnrollmentError, "size-or-identity-mismatch"):
             self.core.plan(request, cloud)
 
-    def test_existing_linux_runner_rejects_system_assigned_only_with_deployment_uami(self):
+    def test_existing_linux_runner_accepts_baseline_system_assigned_before_deployment_uami(self):
+        # New runners get a system-assigned identity for Guest Configuration (Defender for Cloud baseline).
         request = self.request(deployment_identity_id=self.deployment_identity_id())
         cloud = self.existing_linux_runner(request)
         cloud.data[request["vm_id"]]["identity"] = {"type": "SystemAssigned"}
-        with self.assertRaisesRegex(self.core.EnrollmentError, "size-or-identity-mismatch"):
-            self.core.plan(request, cloud)
+        self.assertEqual(self.core.plan(request, cloud)["actions"]["vm"], "reuse")
 
     def test_existing_linux_runner_rejects_deployment_uami_mismatches(self):
         identity_id = self.deployment_identity_id()
         request = self.request(deployment_identity_id=identity_id)
         cases = [
-            {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id: {}}},
+            {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {self.deployment_identity_id("other"): {}}},
             {"type": "UserAssigned", "userAssignedIdentities": {
                 identity_id: {}, self.deployment_identity_id("extra"): {}}},
             {"type": "UserAssigned", "userAssignedIdentities": {self.deployment_identity_id("other"): {}}},
@@ -1432,6 +1511,8 @@ class RunnerEnsureTests(unittest.TestCase):
                         for identifier in (request["rg_id"], request["subnet"], request["subnet"].rsplit("/subnets/", 1)[0]):
                             self.data[identifier] = {"id": identifier, "location": request["location"],
                                                      "properties": {"provisioningState": "Succeeded"}}
+                        feature = core.encryption_at_host_feature_id(request)
+                        self.data[feature] = {"id": feature, "properties": {"state": "Registered"}}
                     def az(self, *args):
                         assert args == ("account", "show", "--subscription", request["target"]["subscription_id"])
                         return {"tenantId": request["target"]["tenant_id"], "id": request["target"]["subscription_id"], "state": "Enabled"}
@@ -1652,6 +1733,83 @@ class RunnerEnsureTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), data)
         self.assertFalse((self.root / ".env").exists())
 
+    def assert_defender_baseline(self, request, cloud, writes):
+        """A new runner VM follows the Defender for Cloud compute baseline (test_defender_compute_baseline.py)."""
+        vm = cloud.data[request["vm_id"]]
+        self.assertEqual(vm["identity"], {"type": "SystemAssigned"})
+        properties = vm["properties"]
+        self.assertEqual(properties["securityProfile"], {
+            "encryptionAtHost": True, "securityType": "TrustedLaunch",
+            "uefiSettings": {"secureBootEnabled": True, "vTpmEnabled": True}})
+        # Periodic missing-update assessment; the patch mode follows the governance-compliant runner settings.
+        self.assertEqual(properties["osProfile"]["linuxConfiguration"]["patchSettings"]["assessmentMode"],
+                         "AutomaticByPlatform")
+        self.assertEqual(self.core.plan(request, cloud)["os_disk_sku"], "StandardSSD_LRS")
+        extensions = {identifier.rsplit("/", 1)[-1]: cloud.data[identifier]["properties"] for identifier in writes
+                      if identifier.startswith(request["vm_id"] + "/extensions/")}
+        self.assertEqual(set(extensions), {"GuestAttestation", "AzurePolicyforLinux"})
+        self.assertEqual(extensions["GuestAttestation"]["publisher"], "Microsoft.Azure.Security.LinuxAttestation")
+        self.assertEqual(extensions["AzurePolicyforLinux"]["publisher"], "Microsoft.GuestConfiguration")
+        self.assertEqual(extensions["AzurePolicyforLinux"]["type"], "ConfigurationForLinux")
+        for extension in extensions.values():
+            self.assertTrue(extension["autoUpgradeMinorVersion"] and extension["enableAutomaticUpgrade"])
+        # Guest Attestation first: parallel extension operations on one VM can conflict.
+        self.assertLess(writes.index(request["vm_id"] + "/extensions/GuestAttestation"),
+                        writes.index(request["vm_id"] + "/extensions/AzurePolicyforLinux"))
+        self.assertEqual(self.core.plan(request, cloud)["managed_identity"], "system-assigned-on-new-vm")
+
+    def test_new_runner_needs_the_encryption_at_host_feature_before_any_write(self):
+        request = self.request()
+        cloud = self.cloud(request)
+        cloud.data[self.core.encryption_at_host_feature_id(request)]["properties"]["state"] = "NotRegistered"
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        with self.assertRaisesRegex(self.core.EnrollmentError, "encryption-at-host-feature-not-registered"):
+            self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        self.assertEqual(cloud.writes, [])
+
+    def test_encryption_at_host_opt_out_reaches_the_runner(self):
+        self.values["enableEncryptionAtHost"] = "false"
+        self.save()
+        request = self.request()
+        self.assertFalse(request["encryption_at_host"])
+        cloud = self.cloud(request)
+        del cloud.data[self.core.encryption_at_host_feature_id(request)]
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        profile = cloud.data[request["vm_id"]]["properties"]["securityProfile"]
+        self.assertFalse(profile["encryptionAtHost"])
+        self.assertEqual(profile["securityType"], "TrustedLaunch")
+        self.values["enableEncryptionAtHost"] = "maybe"
+        self.save()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "invalid-encryption-at-host-flag"):
+            self.request()
+
+    def test_runner_identity_accepts_the_baseline_system_assigned_identity(self):
+        identity_id = (f"/subscriptions/{self.values['dev_sub_id']}/resourceGroups/fixture-esml-common-sdc-dev-001"
+                       "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/deploy")
+        plain, bound = self.request(), self.request(deployment_identity_id=identity_id)
+        accepted = [
+            (plain, {"type": "SystemAssigned"}),
+            (bound, {"type": "SystemAssigned"}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id.upper(): {}}}),
+            (bound, {"type": "UserAssigned", "userAssignedIdentities": {identity_id: {}}}),
+            (plain, {"type": "None"}),
+        ]
+        rejected = [
+            (plain, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id: {}}}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {
+                identity_id: {}, identity_id + "-extra": {}}}),
+            (bound, {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id + "-other": {}}}),
+        ]
+        for request, identity in accepted:
+            with self.subTest(identity=identity):
+                self.assertTrue(self.core.runner_identity_matches(request, identity))
+        for request, identity in rejected:
+            with self.subTest(identity=identity):
+                self.assertFalse(self.core.runner_identity_matches(request, identity))
+
     def test_no_flag_needs_no_unrelated_config_or_cloud(self):
         self.path.write_text('{"useSelfHostedBuildAgent":false}', encoding="utf-8")
         request = self.request()
@@ -1676,7 +1834,7 @@ class RunnerEnsureTests(unittest.TestCase):
         self.assertEqual(cloud.writes, first)
         self.assertEqual(self.core.plan(request, cloud)["actions"]["vm"], "reuse")
         vm = cloud.data[request["vm_id"]]
-        self.assertNotIn("identity", vm)
+        self.assert_defender_baseline(request, cloud, first)
         self.assertEqual(vm["properties"]["storageProfile"]["imageReference"], self.core.IMAGE)
         self.assertEqual(vm["properties"]["hardwareProfile"]["vmSize"], "Standard_D4s_v5")
         self.assertTrue(all(identifier.startswith(request["rg_id"] + "/providers/") for identifier in first))

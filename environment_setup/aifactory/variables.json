@@ -89,6 +89,8 @@
     "bastion_custom_name": "",
     "enableAdminVM": "false",
     "adminVMSize": "Standard_D2s_v5",
+    "enableEncryptionAtHost": "true",
+    "enableVmBackup": "false",
     "useSelfHostedBuildAgent": "false",
     "selfHostedRunnerLabel": "aifactory-admin-vm",
     "adminVMBuildAgentPool": "Default",

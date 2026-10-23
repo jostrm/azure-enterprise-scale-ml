@@ -70,6 +70,12 @@ param location string
 param enableAdminVM bool = false
 @description('Admin VM size. Override this when the default SKU is unavailable in the target region.')
 param adminVMSize string = 'Standard_D2s_v5'
+@description('true when the admin VM already exists (pipelines detect it with scripts/admin-vm-exists.sh). An existing VM is never PUT again: Gen1 DSVMs cannot switch image, Trusted Launch or encryption at host in place.')
+param adminVmExists bool = false
+@description('Defender for Cloud: encryption at host on new VMs. Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it).')
+param enableEncryptionAtHost bool = true
+@description('Opt-in Azure Backup for the admin VM: Recovery Services vault + daily Enhanced policy.')
+param enableVmBackup bool = false
 @description('true if Bastion Host should be created')
 param addBastionHost bool
 @description('Common default subnet')
@@ -973,6 +979,9 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
     tags: tags
     #disable-next-line BCP318
     keyvaultName: kvAdmin.outputs.keyvaultName
+    vmExists: adminVmExists
+    enableEncryptionAtHost: enableEncryptionAtHost
+    enableVmBackup: enableVmBackup
   }
 
   dependsOn: [

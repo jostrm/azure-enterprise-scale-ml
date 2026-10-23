@@ -443,6 +443,8 @@ jobs:
       acr_dedicated: ${{ vars.ACR_DEDICATED || 'false' }}
       acr_SKU: ${{ vars.ACR_SKU || 'Premium' }}
       enableProjectVM: ${{ vars.ENABLE_PROJECT_VM || 'false' }}
+      enableEncryptionAtHost: ${{ vars.ENABLE_ENCRYPTION_AT_HOST || 'true' }}
+      enableVmBackup: ${{ vars.ENABLE_VM_BACKUP || 'false' }}
       aca_a_registry_image: ${{ vars.ACA_W_REGISTRY_IMAGE || 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' }}
       aca_w_registry_image: ${{ vars.ACA_W_REGISTRY_IMAGE || 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' }}
 
@@ -457,6 +459,7 @@ jobs:
       dataFactoryExists: 'false'
       botServiceExists: 'false'
       aksExists: 'false'
+      vmExists: 'false'
       amlExists: 'false'
       openaiExists: 'false'
       aiSearchExists: 'false'
@@ -1378,6 +1381,7 @@ jobs:
             botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
             dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
             aksName="aks${projectNumber}-${locationSuffix}-${envName}"
+            vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
             amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
             openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
             safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
@@ -1493,6 +1497,8 @@ jobs:
             set_env "containerAppAExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
             set_env "containerAppWExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
             set_env "keyvaultExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")"
+            # An existing project VM is never PUT again: a Gen1 DSVM cannot switch image or Trusted Launch in place.
+            set_env "vmExists"               "$(resource_exists_fuzzy "$targetRG" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
             set_env "miACAExists"            "$(resource_exists_identity "$targetRG" "$miACAPrefix")"
             set_env "miPrjExists"            "$(resource_exists_identity "$targetRG" "$miPrjPrefix")"
             set_env "storageAccount1001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
@@ -2077,6 +2083,8 @@ jobs:
             echo "project_IP_whitelist: [${{ env.project_IP_whitelist }}]"
             
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+            bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableProjectVM }}" || exit 1
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-62-core-infrastructure" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2138,6 +2146,9 @@ jobs:
               --parameters skuStorageAccountDev="${{ env.skuStorageAccountDev }}" \
               --parameters skuStorageAccountStageProd="${{ env.skuStorageAccountStageProd }}" \
               --parameters enableProjectVM="${{ env.enableProjectVM }}" \
+              --parameters vmExists="${{ env.vmExists }}" \
+              --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
+              --parameters enableVmBackup="${{ env.enableVmBackup }}" \
               --parameters enableApplicationInsights="${{ env.enableApplicationInsights }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
@@ -2427,6 +2438,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+            bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAKS }}" || exit 1
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-65-compute-services" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2509,6 +2522,7 @@ jobs:
               --parameters disableAgentNetworkInjection="${{ env.disableAgentNetworkInjection }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters enableAKS="${{ env.enableAKS }}" \
+              --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
               --parameters aksExists="${{ env.aksExists }}" \
               --parameters aksEnablePrivateCluster="${{ env.aksEnablePrivateCluster }}" \
@@ -2648,6 +2662,8 @@ jobs:
                 --random-value="${{ env.deployment_random_value }}") || exit 1
               echo "Verified AML AKS attachment exists: $_aksComputeExists"
             fi
+            # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+            bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "$( [ "${{ env.enableAzureMachineLearning }}" = "true" ] && echo "${{ env.enableAksForAzureML }}" || echo false )" || exit 1
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-67-data-ml-platform" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2715,6 +2731,7 @@ jobs:
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters addAzureMachineLearning="${{ env.addAzureMachineLearning }}" \
               --parameters enableAksForAzureML="${{ env.enableAksForAzureML }}" \
+              --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
               --parameters aksOutboundType="${{ env.aksOutboundType }}" \
               --parameters aksPrivateDNSZone="${{ env.aksPrivateDNSZone }}" \
               --parameters cmk="${{ env.cmk }}" \

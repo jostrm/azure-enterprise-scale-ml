@@ -34,6 +34,8 @@ FEATURES = dict(
 ENABLE_AMPLS enableAMPLS
 ENABLE_ADMIN_VM enableAdminVM
 ENABLE_PROJECT_VM enableProjectVM
+ENABLE_ENCRYPTION_AT_HOST enableEncryptionAtHost
+ENABLE_VM_BACKUP enableVmBackup
 ENABLE_AI_FACTORY_HUB enableAIFactoryHub
 ENABLE_PUBLIC_GENAI_ACCESS enablePublicGenAIAccess
 ENABLE_PUBLIC_ACCESS_WITH_PERIMETER enablePublicAccessWithPerimeter
@@ -111,18 +113,18 @@ COMMON_FLAGS = {"ENABLE_ADMIN_VM", "ENABLE_DATAFACTORY_COMMON"}
 
 PUBLIC_FLAGS = "enablePublicGenAIAccess enablePublicAccessWithPerimeter"
 MODULE_FLAGS = {
-    "02-core-infrastructure.bicep": PUBLIC_FLAGS + " enableApplicationInsights enableLogicApps enableProjectVM",
+    "02-core-infrastructure.bicep": PUBLIC_FLAGS + " enableApplicationInsights enableLogicApps enableProjectVM enableEncryptionAtHost enableVmBackup",
     "03-cognitive-services.bicep": PUBLIC_FLAGS + " enableAIServices enableAISearch enableAzureOpenAI enableContentSafety enableAzureAIVision enableAzureSpeech enableAIDocIntelligence enableBingCustomSearch enableBing enableAFoundryCaphost enableAIFoundry enableAISearchSharedPrivateLink",
     "04-databases.bicep": PUBLIC_FLAGS + " enableCosmosDB enablePostgreSQL enableRedisCache enableSQLDatabase enableElasticsearch enableAFoundryCaphost enableAIFoundry",
-    "05-compute-services.bicep": PUBLIC_FLAGS + " enableContainerApps enableFunction enableWebApp enableBingSearch enableAzureOpenAI enableAISearch enableAIServices enableAppInsightsDashboard enableAIFoundry enableAKS",
+    "05-compute-services.bicep": PUBLIC_FLAGS + " enableContainerApps enableFunction enableWebApp enableBingSearch enableAzureOpenAI enableAISearch enableAIServices enableAppInsightsDashboard enableAIFoundry enableAKS enableEncryptionAtHost",
     "06-ai-platform.bicep": PUBLIC_FLAGS + " enableAIFoundryHub enableAISearch enableAIServices",
-    "07-ml-data-platform.bicep": "enablePublicAccessWithPerimeter enableDatafactory enableAzureMachineLearning enableDatabricks enableAksForAzureML",
+    "07-ml-data-platform.bicep": "enablePublicAccessWithPerimeter enableDatafactory enableAzureMachineLearning enableDatabricks enableAksForAzureML enableEncryptionAtHost",
     "11-integration.bicep": "enablePublicAccessWithPerimeter enableLogicApps enableEventHubs enableFunction enableWebApp enableBotService",
     "09-ai-foundry-2025-v4.bicep": PUBLIC_FLAGS + " enableAISearch enableCosmosDB enableAIFactoryCreatedDefaultProjectForAIFv2 enableCaphost enableAIFoundry enableDefenderforAISubLevel enableDefenderforAIResourceLevel",
 }
 COMMON_MODULE_FLAGS = {
     "11-rgCommon.bicep": "enableAdminVM enableDefenderforAISubLevel enableDefenderforAIResourceLevel",
-    "13-rgLevel.bicep": "enableAdminVM enablePublicAccessWithPerimeter enableDatafactoryCommon",
+    "13-rgLevel.bicep": "enableAdminVM enablePublicAccessWithPerimeter enableDatafactoryCommon enableEncryptionAtHost enableVmBackup",
 }
 PARAMETER_ALIASES = {"enableBingSearch": "enableBing", "enableCaphost": "enableAFoundryCaphost"}
 ISOLATED_RESOURCE_FLAGS = {

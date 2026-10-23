@@ -175,6 +175,8 @@ param enableWebApp bool = false
 
 @description('Enable standalone AKS deployment')
 param enableAKS bool = false
+@description('Defender for Cloud: encryption at host on the AKS node pools of a new cluster. Needs the subscription feature Microsoft.Compute/EncryptionAtHost.')
+param enableEncryptionAtHost bool = true
 
 param enableAzureOpenAI bool = false
 param enableAISearch bool = false
@@ -1110,6 +1112,8 @@ module aksDev '../modules/aksCluster.bicep' = if(env == 'dev' && !aksExists && !
     enablePrivateCluster: aksEnablePrivateCluster
     managedOutboundIPs: aksManagedOutboundIPs
     loadBalancerSku: aksLoadBalancerSku
+    enableEncryptionAtHost: enableEncryptionAtHost
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.id
   }
   dependsOn: [
     existingTargetRG
@@ -1158,6 +1162,8 @@ module aksTestProd '../modules/aksCluster.bicep' = if((env == 'test' || env == '
     enablePrivateCluster: aksEnablePrivateCluster
     managedOutboundIPs: aksManagedOutboundIPs
     loadBalancerSku: aksLoadBalancerSku
+    enableEncryptionAtHost: enableEncryptionAtHost
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.id
   }
   dependsOn: [
     existingTargetRG

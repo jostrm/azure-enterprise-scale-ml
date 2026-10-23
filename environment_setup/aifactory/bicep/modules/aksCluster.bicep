@@ -87,6 +87,31 @@ param diskEncryptionSetID string = ''
 @description('User-assigned managed identities to assign to the AKS cluster')
 param userAssignedIdentities object = {}
 
+// ============== Defender for Cloud baseline ==============
+// Contract: environment_setup/unit-tests/test-bicep/unit/test_defender_compute_baseline.py
+@description('Encryption at host on every node pool (temp disks and caches). Needs the subscription feature Microsoft.Compute/EncryptionAtHost. Applies to new clusters only.')
+param enableEncryptionAtHost bool = true
+
+@description('Log Analytics workspace for the Defender profile and the control-plane diagnostic logs. Empty: neither is configured.')
+param logAnalyticsWorkspaceResourceId string = ''
+
+@description('Defender for Containers sensor (securityProfile.defender), reporting to logAnalyticsWorkspaceResourceId.')
+param enableDefender bool = true
+
+@description('Azure Policy add-on for Kubernetes (Gatekeeper), required by the Defender for Cloud Kubernetes recommendations.')
+param enableAzurePolicy bool = true
+
+@description('Control-plane log categories sent to Log Analytics. kube-apiserver and kube-audit are left out on purpose (volume and cost); kube-audit-admin keeps every write.')
+param diagnosticLogCategories array = [
+  'kube-audit-admin'
+  'kube-controller-manager'
+  'kube-scheduler'
+  'cluster-autoscaler'
+  'guard'
+]
+
+var sendToLogAnalytics = !empty(logAnalyticsWorkspaceResourceId)
+
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if(!aksExists) {
   name: name
   tags: tags
@@ -106,9 +131,22 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     dnsPrefix: dnsPrefix
     disableLocalAccounts:disableLocalAccounts
     enableRBAC: enableRbac
-    agentPoolProfiles: agentPoolProfiles
+    agentPoolProfiles: map(agentPoolProfiles, pool => union(pool, { enableEncryptionAtHost: enableEncryptionAtHost }))
     nodeResourceGroup: nodeResourceGroup
     diskEncryptionSetID: cmk && !empty(diskEncryptionSetID) ? diskEncryptionSetID : null
+    addonProfiles: {
+      azurepolicy: {
+        enabled: enableAzurePolicy
+      }
+    }
+    securityProfile: enableDefender && sendToLogAnalytics ? {
+      defender: {
+        logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
+        securityMonitoring: {
+          enabled: true
+        }
+      }
+    } : null
     networkProfile: {
       networkPlugin: networkPlugin
       outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP
@@ -128,6 +166,19 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     }
   }
   
+}
+
+resource aksDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!aksExists && sendToLogAnalytics) {
+  name: 'aks-control-plane-to-log-analytics'
+  scope: aksCluster
+  properties: {
+    workspaceId: logAnalyticsWorkspaceResourceId
+    logAnalyticsDestinationType: 'Dedicated'
+    logs: map(diagnosticLogCategories, category => {
+      category: category
+      enabled: true
+    })
+  }
 }
 
 output aksId string = aksCluster.id

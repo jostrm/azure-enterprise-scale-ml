@@ -211,6 +211,10 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+     # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+     bash "scripts/ensure-encryption-at-host.sh" "$(enableEncryptionAtHost)" "$(dev_test_prod_sub_id)" "$(enableAdminVM)" || exit 1
+     # An existing admin VM is never PUT again (Gen1 DSVM, often this ADO agent): read-only detection.
+     adminVmExists="$(bash "scripts/admin-vm-exists.sh" "$(enableAdminVM)" "$(dev_test_prod_sub_id)" "$(commonResourceGroup_param)" "$(admin_aifactoryPrefixRG)" "$(vnetResourceGroupBase)" "$(admin_locationSuffix)" "$(dev_test_prod)" "$(admin_aifactorySuffixRG)" "$(admin_commonResourceSuffix)")" || exit 1
      az deployment sub create \
      --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-DeplRes" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -239,6 +243,9 @@ steps:
      --parameters databricksOID="$(databricksOID)" \
      --parameters enableAdminVM="$(enableAdminVM)" \
      --parameters adminVMSize="$(adminVMSize)" \
+     --parameters adminVmExists="$adminVmExists" \
+     --parameters enableEncryptionAtHost="$(enableEncryptionAtHost)" \
+     --parameters enableVmBackup="$(enableVmBackup)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
      --parameters vnetNameFull_param="$(vnetNameFull_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \

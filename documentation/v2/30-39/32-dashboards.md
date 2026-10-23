@@ -1057,6 +1057,35 @@ private DNS access. Preserve the configured private admin-access path rather
 than adding public SSH/RDP or applying extra inbound restrictions merely to
 clear a delayed assessment.
 
+#### Compute baseline: VMs, runner VMs and AKS
+
+Every new admin, project, AVD, tunnel and runner VM uses a Generation 2 image with
+Trusted Launch (Secure Boot, vTPM), encryption at host, a system-assigned identity,
+the Guest Attestation and Guest Configuration extensions, platform update assessment
+(`assessmentMode: AutomaticByPlatform`) and SSD disks. Windows VMs use
+`MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition`: the former Data
+Science VM images (`microsoft-dsvm:dsvm-win-2022:winserver-2022`, `dsvm-win-2019:server-2019`)
+are Generation 1 only, so their tools (Miniconda, Jupyter, VS Code, SQL Server Developer,
+Power BI Desktop, CUDA) are no longer preinstalled. New AKS clusters get encryption at host
+on the node pools, the Defender profile, the Azure Policy add-on and control-plane logs in
+Log Analytics.
+
+- `enableEncryptionAtHost` (default `true`) needs the subscription feature
+  `Microsoft.Compute/EncryptionAtHost`. The scale-set bootstrap registers it in Dev, and each pipeline
+  step that can create a VM or AKS cluster registers it when absent (`scripts/ensure-encryption-at-host.sh`).
+  When the deployment identity may not register features, ask an owner to run
+  `az feature register --namespace Microsoft.Compute --name EncryptionAtHost`, or set the flag to `false`.
+- Copy this release's pipeline templates together with the submodule: older common pipelines do not
+  detect an existing admin VM and would try to change it in place.
+- `enableVmBackup` (default `false`) protects the admin and project VM with a Recovery Services
+  vault `rsv-<vm-name>` and a daily Enhanced policy (30 days).
+- Existing VMs and AKS clusters are not changed by a redeploy: a Gen1 VM cannot switch image,
+  Trusted Launch or encryption at host in place, so recreate it to clear those findings.
+- Windows Defender Exploit Guard is not enforced; manage attack-surface-reduction rules with
+  Defender for Endpoint or Intune after testing them with the data-science tooling.
+
+Details: [Compute security baseline](../../architecture/infrastructure/Compute-Security-Baseline.md).
+
 Four older exported dashboard JSON files remain under
 [`environment_setup/aifactory/azure_dashboards`](../../../environment_setup/aifactory/azure_dashboards).
 Treat these as legacy portal artifacts, distinct from the current Bicep

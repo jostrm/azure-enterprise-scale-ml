@@ -97,6 +97,8 @@ jobs:
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
       adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
+      enableEncryptionAtHost: "${{ vars.ENABLE_ENCRYPTION_AT_HOST || 'true' }}"
+      enableVmBackup: "${{ vars.ENABLE_VM_BACKUP || 'false' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -343,6 +345,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
           az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -371,6 +377,9 @@ jobs:
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
             --parameters adminVMSize="${{ env.adminVMSize }}" \
+            --parameters adminVmExists="$adminVmExists" \
+            --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
+            --parameters enableVmBackup="${{ env.enableVmBackup }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
@@ -509,6 +518,8 @@ jobs:
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
       adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
+      enableEncryptionAtHost: "${{ vars.ENABLE_ENCRYPTION_AT_HOST || 'true' }}"
+      enableVmBackup: "${{ vars.ENABLE_VM_BACKUP || 'false' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -752,6 +763,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
           az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -780,6 +795,9 @@ jobs:
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
             --parameters adminVMSize="${{ env.adminVMSize }}" \
+            --parameters adminVmExists="$adminVmExists" \
+            --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
+            --parameters enableVmBackup="${{ env.enableVmBackup }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
@@ -920,6 +938,8 @@ jobs:
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
       adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
+      enableEncryptionAtHost: "${{ vars.ENABLE_ENCRYPTION_AT_HOST || 'true' }}"
+      enableVmBackup: "${{ vars.ENABLE_VM_BACKUP || 'false' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -1163,6 +1183,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
           az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -1191,6 +1215,9 @@ jobs:
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
             --parameters adminVMSize="${{ env.adminVMSize }}" \
+            --parameters adminVmExists="$adminVmExists" \
+            --parameters enableEncryptionAtHost="${{ env.enableEncryptionAtHost }}" \
+            --parameters enableVmBackup="${{ env.enableVmBackup }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \

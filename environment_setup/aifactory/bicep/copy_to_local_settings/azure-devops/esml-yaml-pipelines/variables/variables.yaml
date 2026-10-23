@@ -128,6 +128,8 @@ variables:
   bastion_custom_name: "" # <optional>Bastion name override for common RG RBAC<default>''<keep-as-is> Empty uses the standard Bastion naming convention.
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
   adminVMSize: "Standard_D2s_v5" # <optional>Admin VM size<default>Standard_D2s_v5<keep-as-is> Override when the regional SKU is unavailable.
+  enableEncryptionAtHost: "true" # <optional>Defender for Cloud encryption at host on new VMs and AKS node pools<default>true<keep-as-is> Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out.
+  enableVmBackup: "false" # <optional>Azure Backup for the admin and project VMs<default>false <otherwise> true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM.
   useSelfHostedBuildAgent: "false" # <optional>Use a self-hosted build agent/runner<default>false<keep-as-is> ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel.
   selfHostedRunnerLabel: "aifactory-admin-vm" # <optional>GitHub self-hosted runner label<default>aifactory-admin-vm<keep-as-is>
   adminVMBuildAgentPool: "Default" # <optional>Azure DevOps pool hosting the admin VM agent<default>Default<keep-as-is> Change only when the agent is registered in a custom pool.

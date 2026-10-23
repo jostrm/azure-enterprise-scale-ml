@@ -35,8 +35,23 @@ COMPUTE_API = "2024-03-01"
 DISK_API = "2024-03-02"
 NETWORK_API = "2023-11-01"
 TAGS_API = "2021-04-01"
+FEATURES_API = "2021-07-01"
 SIZE = "Standard_D4s_v5"
+# Generation 2 + Trusted Launch (az vm image show: hyperVGeneration V2, TrustedLaunchSupported).
 IMAGE = {"publisher": "Canonical", "offer": "ubuntu-24_04-lts", "sku": "server", "version": "latest"}
+# Defender for Cloud compute baseline for a new runner VM; the Bicep VM modules share the same rules
+# (environment_setup/aifactory/bicep/modules/common/vmSecurity.bicep). Encryption at host needs the
+# subscription feature Microsoft.Compute/EncryptionAtHost, which the scale-set bootstrap registers.
+SECURITY_PROFILE = {"encryptionAtHost": True, "securityType": "TrustedLaunch",
+                    "uefiSettings": {"secureBootEnabled": True, "vTpmEnabled": True}}
+# Installed in this order: parallel extension operations on one VM can conflict.
+EXTENSIONS = (
+    ("GuestAttestation", "Microsoft.Azure.Security.LinuxAttestation", "GuestAttestation", {"AttestationConfig": {
+        "MaaSettings": {"maaEndpoint": "", "maaTenantName": "GuestAttestation"},
+        "AscSettings": {"ascReportingEndpoint": "", "ascReportingFrequency": ""},
+        "useCustomToken": "false", "disableAlerts": "false"}}),
+    ("AzurePolicyforLinux", "Microsoft.GuestConfiguration", "ConfigurationForLinux", {}),
+)
 
 
 def scalar(text):
@@ -369,6 +384,8 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
     name = agent_name or pick(sources, "GHA_RUNNER_NAME" if provider == "gha" else "adminVMBuildAgentName",
                              *(() if provider == "gha" else ("ADO_AGENT_NAME",)), default=vm_name)
     label = (runner_label or pick(sources, "selfHostedRunnerLabel", "GHA_RUNNER_LABEL", default=f"{prefix}aifactory{suffix}")) if provider == "gha" else "unused"
+    encryption_at_host = pick(sources, "enableEncryptionAtHost", "ENABLE_ENCRYPTION_AT_HOST", default="true").lower()
+    require(encryption_at_host in ("true", "false"), "invalid-encryption-at-host-flag")
     for value in (pool, name, label):
         require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_. -]{0,99}", value), "invalid-runner-registration-name")
     if not prereqs_only:
@@ -381,7 +398,7 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
                    size=SIZE, legacy_windows=legacy_windows, repository=repository,
                    deployment_identity_id=deployment_identity_id,
                    ado_organization=organization, ado_tenant_id=guid(ado_tenant) if ado_tenant else None,
-                   pool=pool, agent_name=name, runner_label=label,
+                   pool=pool, agent_name=name, runner_label=label, encryption_at_host=encryption_at_host == "true",
                    tags={"aifactory-runner-owner": owner, "aifactory-runner-provider": provider})
     return request
 
@@ -402,6 +419,11 @@ def get(cloud, identifier, version):
     require(isinstance(value, dict) and str(value.get("id", "")).lower() == identifier.split("?")[0].lower(),
             "unexpected-resource-identity")
     return value
+
+
+def encryption_at_host_feature_id(request):
+    return ("/subscriptions/" + request["target"]["subscription_id"]
+            + "/providers/Microsoft.Features/providers/Microsoft.Compute/features/EncryptionAtHost")
 
 
 def tag_values(resource):
@@ -441,12 +463,14 @@ def validate_nic(request, nic, *, managed=True):
 
 
 def runner_identity_matches(request, identity):
+    """No identity, the baseline system-assigned identity, plus at most the exact deployment UAMI."""
     identity_type = (identity or {}).get("type", "None")
-    if identity_type == "None":
+    kinds = {kind.strip().casefold() for kind in identity_type.split(",")} - {"systemassigned"}
+    if kinds <= {"none", ""}:
         return True
     expected = request.get("deployment_identity_id")
     user_assigned = (identity or {}).get("userAssignedIdentities")
-    return (isinstance(expected, str) and identity_type.casefold() == "userassigned"
+    return (isinstance(expected, str) and kinds == {"userassigned"}
             and isinstance(user_assigned, dict) and len(user_assigned) == 1
             and {key.casefold() for key in user_assigned} == {expected.casefold()})
 
@@ -591,7 +615,7 @@ def plan(request, cloud=None, *, allow_pool_create=False):
     result.update(status="planned", agent_ready=False,
                   actions={"vm": "reuse" if state["vm"] else "create", "prerequisites": "verify-install-missing",
                            "agent": agent_action},
-                  no_public_ip=True, managed_identity="none-on-new-vm", os_disk_gb=128,
+                  no_public_ip=True, managed_identity="system-assigned-on-new-vm", os_disk_gb=128,
                   os_disk_sku="StandardSSD_LRS")
     if state["vm"] and request["vm_os"] == "windows":
         properties = state["vm"]["properties"]
@@ -669,6 +693,11 @@ def ensure_vm(request, *, yes=False, cloud=None, ssh_public_key=None):
     cloud.read_only, cloud.serialized_provisioning = False, True
     ids = resource_ids(request)
     if not state["vm"]:
+        if request["encryption_at_host"]:
+            # Read-only, before any write: ARM rejects encryptionAtHost until the feature is Registered.
+            feature = get(cloud, encryption_at_host_feature_id(request), FEATURES_API)
+            require((feature or {}).get("properties", {}).get("state") == "Registered",
+                    "encryption-at-host-feature-not-registered-register-or-set-enableEncryptionAtHost-false")
         body = {"location": request["location"], "tags": request["tags"]}
         key_directory = None
         try:
@@ -692,7 +721,7 @@ def ensure_vm(request, *, yes=False, cloud=None, ssh_public_key=None):
                     "networkSecurityGroup": {"id": ids["nsg"]}, "enableIPForwarding": False,
                     "ipConfigurations": [{"name": "private", "properties": {
                         "privateIPAllocationMethod": "Dynamic", "subnet": {"id": request["subnet"]}}}]}})
-            create_absent(cloud, request["vm_id"], COMPUTE_API, body | {"properties": {
+            create_absent(cloud, request["vm_id"], COMPUTE_API, body | {"identity": {"type": "SystemAssigned"}, "properties": {
                 "hardwareProfile": {"vmSize": SIZE},
                 "storageProfile": {"imageReference": IMAGE, "osDisk": {
                     "name": request["vm_name"] + "-os", "createOption": "FromImage", "diskSizeGB": 128,
@@ -708,8 +737,12 @@ def ensure_vm(request, *, yes=False, cloud=None, ssh_public_key=None):
                                                                        "automaticByPlatformSettings": {
                                                                            "bypassPlatformSafetyChecksOnUserSchedule": True}}}},
                 "networkProfile": {"networkInterfaces": [{"id": ids["nic"], "properties": {"deleteOption": "Detach"}}]},
-                "securityProfile": {"securityType": "TrustedLaunch",
-                                    "uefiSettings": {"secureBootEnabled": True, "vTpmEnabled": True}}}})
+                "securityProfile": SECURITY_PROFILE | {"encryptionAtHost": request["encryption_at_host"]}}})
+            # Only a VM created here gets extensions; an existing VM is reused unchanged.
+            for name, publisher, extension_type, settings in EXTENSIONS:
+                create_absent(cloud, request["vm_id"] + "/extensions/" + name, COMPUTE_API, body | {"properties": {
+                    "publisher": publisher, "type": extension_type, "typeHandlerVersion": "1.0",
+                    "autoUpgradeMinorVersion": True, "enableAutomaticUpgrade": True, "settings": settings}})
         finally:
             if key_directory:
                 shutil.rmtree(key_directory)

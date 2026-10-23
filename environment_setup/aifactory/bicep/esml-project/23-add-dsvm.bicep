@@ -71,7 +71,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = {
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: 'Standard_A4_v2' // 'Standard_DS3_v2'
+    vmSize: 'Standard_D4s_v5' // Gen2 + encryption at host capable (az vm list-skus, 2026-10-23)
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${dsvmSuffix}'
     subnetName: common_subnet_name

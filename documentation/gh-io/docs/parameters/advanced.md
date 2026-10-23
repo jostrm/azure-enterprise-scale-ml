@@ -406,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 401 |
-| `env` | 399 |
+| `yaml` | 403 |
+| `env` | 401 |
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 406 |
+| `json.dev` | 408 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 155, 424; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 156, 425; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 426, 450; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 157, 426; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 158, 427; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 428, 452; one reference row.
 
 ## YAML and variables.json reference
 
@@ -502,6 +502,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableDefenderforAISubLevel --><!-- parameter json.dev:enableDefenderforAISubLevel -->`enableDefenderforAISubLevel` | `ENABLE_DEFENDER_FOR_AI_SUB_LEVEL` | O | Y: `"false"`<br>J.dev: `"false"` | Defender for AI at subscription level otherwise: true, enable Microsoft Defender for AI at subscription level. |
 | <!-- parameter yaml:enableDeleteForDisabledResources --><!-- parameter json.dev:enableDeleteForDisabledResources -->`enableDeleteForDisabledResources` | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter yaml:enableElasticsearch --><!-- parameter json.dev:enableElasticsearch -->`enableElasticsearch` | `ENABLE_ELASTICSEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
+| <!-- parameter yaml:enableEncryptionAtHost --><!-- parameter json.dev:enableEncryptionAtHost -->`enableEncryptionAtHost` | `ENABLE_ENCRYPTION_AT_HOST` | O | Y: `"true"`<br>J.dev: `"true"` | Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
 | <!-- parameter yaml:enableEventHubs --><!-- parameter json.dev:enableEventHubs -->`enableEventHubs` | `ENABLE_EVENT_HUBS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Event Hubs |
 | <!-- parameter yaml:enableFactoryChatAgent --><!-- parameter json.dev:enableFactoryChatAgent -->`enableFactoryChatAgent` | `ENABLE_FACTORY_CHAT_AGENT` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter yaml:enableFunction --><!-- parameter json.dev:enableFunction -->`enableFunction` | `ENABLE_FUNCTION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Function App |
@@ -512,6 +513,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableRedisCache --><!-- parameter json.dev:enableRedisCache -->`enableRedisCache` | `ENABLE_REDIS_CACHE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Cache for Redis |
 | <!-- parameter yaml:enableRetries --><!-- parameter json.dev:enableRetries -->`enableRetries` | `ENABLE_RETRIES` | O | Y: `"false"`<br>J.dev: `"false"` | Enable automatic job retries otherwise: true, enable automatic retries on failure for GenAI services deployment. |
 | <!-- parameter yaml:enableSQLDatabase --><!-- parameter json.dev:enableSQLDatabase -->`enableSQLDatabase` | `ENABLE_SQL_DATABASE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure SQL Database |
+| <!-- parameter yaml:enableVmBackup --><!-- parameter json.dev:enableVmBackup -->`enableVmBackup` | `ENABLE_VM_BACKUP` | O | Y: `"false"`<br>J.dev: `"false"` | Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
 | <!-- parameter yaml:enableWebApp --><!-- parameter json.dev:enableWebApp -->`enableWebApp` | `ENABLE_WEBAPP`, `ENABLE_WEB_APP` (not in .env template) | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Web App |
 | <!-- parameter yaml:foundryApiManagementResourceId --><!-- parameter json.dev:foundryApiManagementResourceId -->`foundryApiManagementResourceId` | `FOUNDRY_API_MANAGEMENT_RESOURCE_ID` | O | Y: `""`<br>J.dev: `""` | APIM resource ID for Foundry integration otherwise: provide existing API Management resource ID to integrate with Microsoft Foundry. |
 | <!-- parameter yaml:foundryDeploymentType --><!-- parameter json.dev:foundryDeploymentType -->`foundryDeploymentType` | `FOUNDRY_DEPLOYMENT_TYPE` | O | Y: `"2"`<br>J.dev: `"2"` | &lt;deprecated&gt;Retained for configuration compatibility. AI Foundry now always uses the second-option account deployment. |
@@ -1048,6 +1050,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_DEFENDER_FOR_AI_SUB_LEVEL -->`ENABLE_DEFENDER_FOR_AI_SUB_LEVEL` | `enableDefenderforAISubLevel` | O | `"false"` | Defender for AI at subscription level keep-as-is: Subscription-level Microsoft Defender for AI protection. |
 | <!-- parameter env:ENABLE_DELETE_FOR_DISABLED_RESOURCES -->`ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `enableDeleteForDisabledResources` | O | `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter env:ENABLE_ELASTICSEARCH -->`ENABLE_ELASTICSEARCH` | `enableElasticsearch` | O | `"false"` | Enable Elasticsearch (Elastic Cloud) |
+| <!-- parameter env:ENABLE_ENCRYPTION_AT_HOST -->`ENABLE_ENCRYPTION_AT_HOST` | `enableEncryptionAtHost` | O | `"true"` | Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
 | <!-- parameter env:ENABLE_EVENT_HUBS -->`ENABLE_EVENT_HUBS` | `enableEventHubs` | O | `"false"` | Enable Azure Event Hubs |
 | <!-- parameter env:ENABLE_FACTORY_CHAT_AGENT -->`ENABLE_FACTORY_CHAT_AGENT` | `enableFactoryChatAgent` | O | `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter env:ENABLE_FOUNDRY_CAPHOST -->`ENABLE_FOUNDRY_CAPHOST` | `enableAFoundryCaphost` | C | `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
@@ -1060,6 +1063,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_REDIS_CACHE -->`ENABLE_REDIS_CACHE` | `enableRedisCache` | O | `"false"` | Enable Azure Cache for Redis |
 | <!-- parameter env:ENABLE_RETRIES -->`ENABLE_RETRIES` | `enableRetries` | O | `"false"` | Enable automatic job retries otherwise: true, enables retry logic for GenAI services deployment. |
 | <!-- parameter env:ENABLE_SQL_DATABASE -->`ENABLE_SQL_DATABASE` | `enableSQLDatabase` | O | `"false"` | Enable Azure SQL Database |
+| <!-- parameter env:ENABLE_VM_BACKUP -->`ENABLE_VM_BACKUP` | `enableVmBackup` | O | `"false"` | Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
 | <!-- parameter env:ENABLE_WEBAPP -->`ENABLE_WEBAPP` | `enableWebApp` | O | `"false"` | Enable Azure Web App |
 | <!-- parameter env:FOUNDRY_API_MANAGEMENT_RESOURCE_ID -->`FOUNDRY_API_MANAGEMENT_RESOURCE_ID` | `foundryApiManagementResourceId` | O | `""` | Existing APIM resource ID for AI Foundry integration keep-as-is: Leave empty for no APIM integration. otherwise: provide full resourceId of existing API Management instance. |
 | <!-- parameter env:FOUNDRY_DEPLOYMENT_TYPE -->`FOUNDRY_DEPLOYMENT_TYPE` | `foundryDeploymentType` | O | `"2"` | &lt;deprecated&gt;Retained for configuration compatibility. AI Foundry always uses the second-option account deployment. |

@@ -29,7 +29,6 @@ KNOWN_GAPS = {
     },
     "02-core-infrastructure.bicep": {
         "bingExists": ("ado", "declared but unused by 02"),
-        "vmExists": ("ado", "GHA does not detect the project VM yet; the module default false applies"),
     },
     "03-cognitive-services.bicep": {
         "disableLocalAuth": ("gha", "ADO defines disableLocalAuth but does not forward it to 03 yet"),

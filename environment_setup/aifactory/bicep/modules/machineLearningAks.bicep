@@ -54,6 +54,10 @@ param cmk bool = false
 @description('Name of the Customer Managed Key in Key Vault')
 param cmkKeyName string = ''
 param kvName string
+@description('Defender for Cloud: encryption at host on the AKS node pools of a new cluster.')
+param enableEncryptionAtHost bool = true
+@description('Log Analytics workspace for the AKS Defender profile and control-plane diagnostic logs.')
+param logAnalyticsWorkspaceResourceId string = ''
 
 var aksName = 'aks${projectNumber}-${locationSuffix}-${env}'
 var aksResourceId = '${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ContainerService/managedClusters/${aksName}'
@@ -153,6 +157,8 @@ module aksDev 'aksCluster.bicep' = if(env == 'dev' && !aksExists && !empty(aksSu
     enablePrivateCluster: aksEnablePrivateCluster
     managedOutboundIPs: aksManagedOutboundIPs
     loadBalancerSku: aksLoadBalancerSku
+    enableEncryptionAtHost: enableEncryptionAtHost
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
   }
   dependsOn: [
     ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
@@ -195,6 +201,8 @@ module aksTestProd 'aksCluster.bicep' = if((env == 'test' || env == 'prod') && !
     enablePrivateCluster: aksEnablePrivateCluster
     managedOutboundIPs: aksManagedOutboundIPs
     loadBalancerSku: aksLoadBalancerSku
+    enableEncryptionAtHost: enableEncryptionAtHost
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
   }
   dependsOn: [
     ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])

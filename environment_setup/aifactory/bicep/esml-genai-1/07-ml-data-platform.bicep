@@ -104,6 +104,8 @@ param technicalAdminsEmail string = ''
 param enableDatafactory bool = false
 param enableAzureMachineLearning bool = false
 param enableAksForAzureML bool = true
+@description('Defender for Cloud: encryption at host on the AKS node pools of a new cluster. Needs the subscription feature Microsoft.Compute/EncryptionAtHost.')
+param enableEncryptionAtHost bool = true
 param enableDatabricks bool = false
 
 @description('Bootstrap Azure Data Factory linked services (Key Vault, Storage 2001, Cosmos DB, Function) authenticated via the project UAMI.')
@@ -560,6 +562,8 @@ module amlv2Aks '../modules/machineLearningAks.bicep' = if(enableAzureMachineLea
     aksNodes_testProd: aks_test_prod_nodes_param
     kubernetesVersionAndOrchestrator: aksExists ? '' : aks_version_param
     kvName: keyvaultName
+    enableEncryptionAtHost: enableEncryptionAtHost
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceOpInsight.id
   }
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])

@@ -1,3 +1,5 @@
+import { trustedLaunch, windowsGen2Image, windowsPatchSettings } from '../../modules/common/vmSecurity.bicep'
+
 @secure()
 @description('Specifies a secure string used as password new local admin user')
 param adminPassword string
@@ -28,6 +30,12 @@ param keyvaultName string
 
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
+
+@description('Defender for Cloud: encryption at host. Needs the subscription feature Microsoft.Compute/EncryptionAtHost. Set false to opt out.')
+param enableEncryptionAtHost bool = true
+
+@description('Opt-in Azure Backup: Recovery Services vault + daily Enhanced policy, protecting this VM.')
+param enableVmBackup bool = false
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var pipNicName = '${vmName}-nic-${substring(uniqueString(vmName), 0, 5)}'
@@ -70,7 +78,7 @@ resource nInter 'Microsoft.Network/networkInterfaces@2020-06-01' = {
   }
 }
 
-resource vmAvd 'Microsoft.Compute/virtualMachines@2021-11-01' = {
+resource vmAvd 'Microsoft.Compute/virtualMachines@2024-07-01' = {
   name: vmName
   location: location
   tags: tags
@@ -89,19 +97,15 @@ resource vmAvd 'Microsoft.Compute/virtualMachines@2021-11-01' = {
       windowsConfiguration: {
         enableAutomaticUpdates: true
         provisionVMAgent: true
-        patchSettings: {
-          enableHotpatching: false
-          patchMode: 'AutomaticByOS'
-        }
+        patchSettings: windowsPatchSettings
       }
     }
+    securityProfile: union(trustedLaunch, {
+      encryptionAtHost: enableEncryptionAtHost
+    })
     storageProfile: {
-      imageReference: {
-        publisher: 'microsoft-dsvm'
-        offer: 'dsvm-win-2019'
-        sku: 'server-2019'
-        version: 'latest'
-      }
+      // Gen2 + Trusted Launch. The former microsoft-dsvm dsvm-win-2019:server-2019 image is Gen1 only.
+      imageReference: windowsGen2Image
       osDisk: {
         createOption: 'FromImage'
         managedDisk: {
@@ -111,6 +115,9 @@ resource vmAvd 'Microsoft.Compute/virtualMachines@2021-11-01' = {
       dataDisks: [
         {
           diskSizeGB: 1024
+          managedDisk: {
+            storageAccountType: 'StandardSSD_LRS'
+          }
           lun: 0
           createOption: 'Empty'
         }
@@ -181,6 +188,31 @@ resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2021-11-01' =
   ]
 }
 
+module securityExtensions '../../modules/vmSecurityExtensions.bicep' = {
+  name: take('vmSecExt-${vmName}', 64)
+  params: {
+    vmName: vmAvd.name
+    location: location
+    osType: 'Windows'
+    tags: tags
+  }
+  dependsOn: [
+    extDCforAADLogin
+    extAADLogin
+  ]
+}
+
+module backup '../../modules/vmBackup.bicep' = if (enableVmBackup) {
+  name: take('vmBackup-${vmName}', 64)
+  params: {
+    vmName: vmAvd.name
+    location: location
+    tags: tags
+  }
+  dependsOn: [
+    securityExtensions
+  ]
+}
 resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2021-07-12' = {
   name: hostPoolName
   location:location

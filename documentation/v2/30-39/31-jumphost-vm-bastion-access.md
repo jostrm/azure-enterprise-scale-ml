@@ -10,6 +10,9 @@
         - `dsvm-prj001-weu-dev-004` 
 - Each core team has its own VM, called `dsvm-prj001-weu-dev-001` or similar, in the common resource group, per environment
     - To login to that VM we use BASTION.
+- New VMs run Windows Server 2022 Datacenter Azure Edition (Generation 2, Trusted Launch, encryption at host).
+  The former Data Science VM image was Generation 1 only, so install Miniconda, VS Code and other tools yourself.
+  See [Compute security baseline](../../architecture/infrastructure/Compute-Security-Baseline.md).
     - To use BASTION, you need to first whitelist your IP adress. This README below
 
 ### GOAL: To START VM and login to BASTION, Create a local user

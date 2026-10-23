@@ -1106,6 +1106,7 @@ aif_register_resource_providers() {
     Microsoft.Logic Microsoft.Cache Microsoft.DBforPostgreSQL Microsoft.Sql
     Microsoft.ServiceBus
     Microsoft.AlertsManagement
+    Microsoft.RecoveryServices
   )
   local required=(
     Microsoft.Resources Microsoft.Network Microsoft.Storage Microsoft.KeyVault
@@ -1148,6 +1149,41 @@ aif_register_resource_providers() {
         --only-show-errors
     done
   fi
+}
+
+# Defender for Cloud: every AI Factory VM and AKS node pool enables encryption at host, which needs
+# the subscription feature Microsoft.Compute/EncryptionAtHost. Idempotent: registers only when absent.
+# Stage/prod subscriptions need the same one-time registration (az feature register ...).
+aif_register_encryption_at_host_feature() {
+  local subscription_id="$1" state="" attempt
+  if [[ "$AIF_DRY_RUN" == "true" ]]; then
+    aif_info "DRY-RUN: az feature register --namespace Microsoft.Compute --name EncryptionAtHost --subscription $subscription_id"
+    return 0
+  fi
+  state="$(az feature show --subscription "$subscription_id" --namespace Microsoft.Compute \
+    --name EncryptionAtHost --query properties.state --output tsv 2>/dev/null)" || state=""
+  state="${state//$'\r'/}"
+  [[ "$state" != "Registered" ]] || return 0
+  aif_info "Registering Microsoft.Compute/EncryptionAtHost in $subscription_id (encryption at host for VMs and AKS nodes)."
+  if ! az feature register --subscription "$subscription_id" --namespace Microsoft.Compute \
+    --name EncryptionAtHost --output none --only-show-errors; then
+    aif_warn "Could not register Microsoft.Compute/EncryptionAtHost; VM and AKS deployments fail until it is Registered, or set enableEncryptionAtHost to false."
+    return 0
+  fi
+  for ((attempt = 0; attempt < 60; attempt++)); do
+    state="$(az feature show --subscription "$subscription_id" --namespace Microsoft.Compute \
+      --name EncryptionAtHost --query properties.state --output tsv 2>/dev/null)" || state=""
+    state="${state//$'\r'/}"
+    [[ "$state" == "Registered" ]] && break
+    sleep 10
+  done
+  if [[ "$state" != "Registered" ]]; then
+    aif_warn "Microsoft.Compute/EncryptionAtHost is still '$state'; VM and AKS deployments fail until it is Registered."
+    return 0
+  fi
+  # A registered feature reaches the resource provider only after the provider is registered again.
+  az provider register --subscription "$subscription_id" --namespace Microsoft.Compute \
+    --output none --only-show-errors || aif_warn "Re-register Microsoft.Compute in $subscription_id to apply EncryptionAtHost."
 }
 
 aif_ensure_first_party_enterprise_apps() {
@@ -4316,6 +4352,7 @@ PY
   aif_validate_simple_new_scope
   aif_simple_stage identity
   aif_register_resource_providers "$AIF_DEV_SUBSCRIPTION_ID"
+  aif_register_encryption_at_host_feature "$AIF_DEV_SUBSCRIPTION_ID"
   aif_use_azure_tenant
   aif_ensure_first_party_enterprise_apps
   aif_prepare_external_access_hub

@@ -67,6 +67,10 @@ param miPrjExists bool = false
 
 @description('Enable private VM deployment')
 param enableProjectVM bool = false
+@description('Defender for Cloud: encryption at host on a new project VM. Needs the subscription feature Microsoft.Compute/EncryptionAtHost.')
+param enableEncryptionAtHost bool = true
+@description('Opt-in Azure Backup for the project VM: Recovery Services vault + daily Enhanced policy. Also protects an existing VM.')
+param enableVmBackup bool = false
 @description('Common resource abbreviation for short names. Default is "cmn"')
 param commonResourceShortName string = 'cmn'
 
@@ -715,7 +719,8 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExis
 
 // ============== VIRTUAL MACHINE ==============
 
-module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && enableProjectVM == true) {
+// An existing VM is never PUT again (vmExists); the module then only adds opt-in backup.
+module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableProjectVM == true && (!vmExists || enableVmBackup)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-privVM4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -729,6 +734,9 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && enab
     vnetId: vnet.id
     tags: tagsProject
     keyvaultName: keyvaultName
+    vmExists: vmExists
+    enableEncryptionAtHost: enableEncryptionAtHost
+    enableVmBackup: enableVmBackup
   }
   dependsOn: [
     existingTargetRG

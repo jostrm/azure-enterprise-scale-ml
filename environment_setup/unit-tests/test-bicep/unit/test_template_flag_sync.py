@@ -29,6 +29,9 @@ DEFAULTS = {
     # AI Search and AI Services send resource logs by default (Defender for Cloud); the others stay opt-in.
     "skipDiagAISearch": False,
     "skipDiagAIServices": False,
+    # Defender for Cloud compute baseline: encryption at host is on by default, Azure Backup is opt-in.
+    "enableEncryptionAtHost": True,
+    "enableVmBackup": False,
     **{key: True for key in (
         "skipDiagAOAI", "skipDiagContentSafety", "skipDiagDocIntelligence", "skipDiagSpeech", "skipDiagVision",
     )},
@@ -39,6 +42,7 @@ ENV_NAMES = {
     "enablePersonas": "ENABLE_PERSONAS", "aksSkuTier": "AKS_SKU_TIER",
     "enableProjectVM": "ENABLE_PROJECT_VM", "updateRbac": "UPDATE_RBAC",
     "adminVMSize": "ADMIN_VM_SIZE", "enableAzureMcpServer": "ENABLE_AZURE_MCP_SERVER",
+    "enableEncryptionAtHost": "ENABLE_ENCRYPTION_AT_HOST", "enableVmBackup": "ENABLE_VM_BACKUP",
     "skipDiagAISearch": "SKIP_DIAG_AI_SEARCH", "skipDiagAIServices": "SKIP_DIAG_AI_SERVICES",
     "skipDiagAOAI": "SKIP_DIAG_AOAI", "skipDiagContentSafety": "SKIP_DIAG_CONTENT_SAFETY",
     "skipDiagDocIntelligence": "SKIP_DIAG_DOC_INTELLIGENCE",
