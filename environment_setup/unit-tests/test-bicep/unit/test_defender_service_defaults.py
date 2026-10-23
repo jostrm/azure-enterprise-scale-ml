@@ -113,3 +113,23 @@ def test_search_key_switch_reaches_the_module_from_both_entrypoints():
         assert "param aiSearchDisableLocalAuth bool = true" in source, path.name
         orchestration = re.search(r"module\s+\w+\s+'[^']*aiSearchDeployment\.bicep'[^\n]*\n(.*?)\n\}", source, re.S)
         assert "aiSearchDisableLocalAuth: aiSearchDisableLocalAuth" in orchestration[1], path.name
+
+
+def created_search_services():
+    """Every non-debug Bicep resource that creates (not references) an AI Search service, with its body."""
+    for path in sorted(BICEP.rglob("*.bicep")):
+        if "debug" in path.relative_to(BICEP).parts:
+            continue
+        source = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"^resource\s+(\w+)\s+'Microsoft\.Search/searchServices@[^']+'\s*=(?!\s*existing)[^\n]*\{",
+                                 source, re.M):
+            yield path.relative_to(BICEP).as_posix(), match[1], source[match.end():source.index("\n}", match.end())]
+
+
+def test_every_created_search_service_disables_key_access_unless_a_switch_says_otherwise():
+    services = list(created_search_services())
+    assert services
+    for path, symbol, body in services:
+        setting = re.search(r"^\s+disableLocalAuth:\s*(\S+)", body, re.M)
+        assert setting, f"{path}:{symbol} does not set disableLocalAuth"
+        assert setting[1] != "false", f"{path}:{symbol} keeps AI Search API keys on"

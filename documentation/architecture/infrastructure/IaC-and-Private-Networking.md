@@ -315,8 +315,10 @@ Defender scan of a deployed factory):
   connections (`authType: 'AAD'`), indexers and ADF (managed identity `ResourceId=`), the ACL RAG demo,
   pipelines (control plane only) and the MCP (no Search calls). Unverified: the external azd notebook
   `create-azure-search.ipynb` that `bootstrap/20-genai-agentic-post-bicep.sh` runs is not in the
-  repository. The legacy `foundry-apim` v2 path (`standard-dependent-resources.bicep`) still hardcodes
-  `disableLocalAuth: false`; the pipelines deploy v4.
+  repository. The legacy `foundry-apim` v2 path (`standard-dependent-resources.bicep`, used by
+  `09-ai-foundry-2025-v2.bicep`) also creates its Search service Entra-only; its project connections are
+  `authType: 'AAD'`. `test_defender_service_defaults.py` fails if any non-debug Bicep file creates a
+  Search service without `disableLocalAuth` or with it set to `false`.
 - Storage network rules: the private project storage path already uses `defaultAction: 'Deny'`, VNet
   rules, private endpoints and `bypass: 'AzureServices'`, and the common lake is Deny. Only
   `enablePublicAccessWithPerimeter` (true in the shipped templates) opens storage with `Allow`, by design

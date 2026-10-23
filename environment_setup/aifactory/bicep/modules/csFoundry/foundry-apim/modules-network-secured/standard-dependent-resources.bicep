@@ -80,8 +80,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-06-01-preview' = if(!aiS
     type: 'SystemAssigned'
   }
   properties: {
-    disableLocalAuth: false
-    authOptions: { aadOrApiKey: { aadAuthFailureMode: 'http401WithBearerChallenge'}}
+    disableLocalAuth: true // Entra ID only: the project's Search connections use AAD (Defender: key access disabled)
     encryptionWithCmk: {
       enforcement: 'Unspecified'
     }
