@@ -33,7 +33,8 @@ graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:collect_resource_closure
   - bootstrap/lib/factory_lifecycle.py::class:ClosureReads
   - bootstrap/lib/factory_lifecycle.py::class:KeepAliveHTTPSHandler
-reviewed_source: '01f06fa1 + connectivity-retention port (main's factory-owned hub wins); observed 2026-10-21'
+  - bootstrap/lib/factory_lifecycle.py::class:ThrottledReadHandler
+reviewed_source: '01f06fa1 + connectivity-retention port (main's factory-owned hub wins); observed 2026-10-21; throttled reads 4130c8bf, 2026-10-23'
 ---
 # Lifecycle and recovery
 
@@ -50,6 +51,8 @@ Default coordination uses Blob leases and durable claims/receipts. Explicit sing
 `collect_resource_closure` builds every review, freeze and verification inventory: resource groups, provider schemas and operations, child collections, resource bodies and extension scopes. It consumes every read in its serial walk order, but `ClosureReads` (a Proxy over the cloud's read calls) starts the reads the walk already knows it will make (queued resource bodies, planned child and extension collections, provider schemas) on at most `RESOURCE_CLOSURE_READ_WORKERS` (8) threads. Each started read is consumed once, and its value or error surfaces where the serial walk makes that call. So the closure, its digests and insertion order, and the failure code (the first failing read in serial order) are those of a serial walk over the same responses. Any failure aborts the walk, and no read continues after it returns. A cloud object without `closure_read_workers` (the offline test fakes) reads serially.
 
 `Cloud`'s default opener adds `KeepAliveHTTPSHandler`: GET/HEAD borrow a pooled TLS connection to their host, one per concurrent reader, and a reused connection the server closed while idle is replaced once. Writes and proxy-tunnelled requests keep urllib's one connection per request with `Connection: close`. One lock makes token refreshes single-flight. An opener injected by a caller (pink's bundled helpers) is used as given, so it must be thread-safe, and the parallel speedup depends on it allowing concurrent requests. Why: on aif-119 (2026-10-20) a common-deployment review made 2,706 serial ARM reads (695 s of 728 s, about 190 s of it TCP and TLS setup) and overran the Factory API's evidence window.
+
+The default opener also adds `ThrottledReadHandler`, a urllib error handler for reads only: a GET or HEAD that ARM answers 429 (throttling) or 503 is sent again after `Retry-After` (seconds; otherwise 5 s, kept within 1 to 60 s), at most `THROTTLED_READ_ATTEMPTS` (8) answers and `READ_TRANSPORT_RETRY_WINDOW_SECONDS` (180 s) after the first throttled answer, each logged as a `remote-request-throttled` event without credentials. Writes and every other status pass through, so `Cloud.request` still sees each final status once and never treats a status as a transport retry. Why: on aif-124 (2026-10-23) the first COMMON run's worker stopped as `reconciliation-required` with `remote-request-failed-429` about 37 s into its pre-write reads, before any Azure write. Pink's dispatched reconciliation (v0.47.33) retires such an attempt.
 
 ## Deletion and recovery
 
