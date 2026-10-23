@@ -2940,11 +2940,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">401</td>
+<td style="text-align: right;">403</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">399</td>
+<td style="text-align: right;">401</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2960,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">406</td>
+<td style="text-align: right;">408</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 155, 424; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 156, 425; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 426, 450; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 157, 426; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 158, 427; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 428, 452; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3510,6 +3510,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Deploy Elasticsearch keep-as-is: Elastic Cloud managed service.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:enableEncryptionAtHost --><!-- parameter json.dev:enableEncryptionAtHost --><code>enableEncryptionAtHost</code></td>
+<td><code>ENABLE_ENCRYPTION_AT_HOST</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:enableEventHubs --><!-- parameter json.dev:enableEventHubs --><code>enableEventHubs</code></td>
 <td><code>ENABLE_EVENT_HUBS</code></td>
 <td>O</td>
@@ -3578,6 +3585,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Deploy Azure SQL Database</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enableVmBackup --><!-- parameter json.dev:enableVmBackup --><code>enableVmBackup</code></td>
+<td><code>ENABLE_VM_BACKUP</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableWebApp --><!-- parameter json.dev:enableWebApp --><code>enableWebApp</code></td>
@@ -7138,6 +7152,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Enable Elasticsearch (Elastic Cloud)</td>
 </tr>
 <tr>
+<td><!-- parameter env:ENABLE_ENCRYPTION_AT_HOST --><code>ENABLE_ENCRYPTION_AT_HOST</code></td>
+<td><code>enableEncryptionAtHost</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out.</td>
+</tr>
+<tr>
 <td><!-- parameter env:ENABLE_EVENT_HUBS --><code>ENABLE_EVENT_HUBS</code></td>
 <td><code>enableEventHubs</code></td>
 <td>O</td>
@@ -7220,6 +7241,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Enable Azure SQL Database</td>
+</tr>
+<tr>
+<td><!-- parameter env:ENABLE_VM_BACKUP --><code>ENABLE_VM_BACKUP</code></td>
+<td><code>enableVmBackup</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_WEBAPP --><code>ENABLE_WEBAPP</code></td>
