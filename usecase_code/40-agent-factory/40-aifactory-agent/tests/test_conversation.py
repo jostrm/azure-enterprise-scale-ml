@@ -277,6 +277,21 @@ def test_prepared_turn_reuses_grounding_tools_and_citations_without_external_inf
         prepared.execute("operation_execute", "call-2", "{}")
 
 
+def test_spoken_finish_attaches_retrieved_sources_but_never_accepts_invented_ids(settings):
+    # Speech models rarely say "[S1]" aloud, so a spoken answer may omit the markers; it may never invent one.
+    harness = injected(settings)
+    prepared = harness.conversation.prepare("Explain setup", "project", caller(settings), SCOPE)
+    result = prepared.finish("Setup is described in the platform guide.", "native-response", spoken=True)
+    assert result["citation_validation"] == "sources_attached"
+    assert result["citations"][0]["citation_id"] == "S1"
+    assert prepared.finish("Grounded [S1].", "native-response", spoken=True)["citation_validation"] == "passed"
+    with pytest.raises(RuntimeError, match="unsupported source citation"):
+        prepared.finish("Invented [S9].", "native-response", spoken=True)
+    with pytest.raises(RuntimeError, match="no answer"):
+        prepared.finish("", "native-response", spoken=True)
+    assert "citation_validation" not in prepared.finish("Grounded [S1].", "native-response")
+
+
 @pytest.mark.parametrize("arguments", ['{"query": 1}', '{"query": true}', '{"query": "x", "scope": "other"}'])
 def test_prepared_turn_rejects_invalid_native_tool_arguments(settings, arguments):
     harness = injected(settings)

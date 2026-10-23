@@ -575,12 +575,17 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
   and final citation validation as text. VAD automatic response creation remains
   off so evidence readiness is checked **before** native `response.create`.
 - Native audio and live transcripts are **provisional**. Only completed, citation-
-  checked responses populate the authoritative answer card. Invalid/omitted
-  citation IDs stop the turn and flush queued audio, but audio already heard
-  cannot be recalled. Citation checks do not prove semantic entailment. This
-  latency/verification trade-off is explicit, not equivalent to validating all
-  speech before playback. Tool failures and bounded-round exhaustion are shown;
-  the model can never approve or execute writes.
+  checked responses populate the authoritative answer card. An unsupported
+  (invented) citation ID stops the turn and flushes queued audio, but audio already
+  heard cannot be recalled. A speech model rarely says `[S1]` aloud, so a spoken
+  reply that omits the markers is published with the retrieved sources attached
+  and `citation_validation: "sources_attached"` (`"passed"` when it cites them).
+  Citation checks do not prove semantic entailment. This latency/verification
+  trade-off is explicit, not equivalent to validating all speech before playback.
+  As in typed chat, a failed read tool (`ok: false`) goes back to the model as
+  data and is logged as `voice_tool_failed` with its error code only; a denied
+  tool and bounded-round exhaustion stop the turn. The model can never approve or
+  execute writes.
 - The browser never receives Foundry credentials. It opens
   `WS /api/voice/ws` on the application; the backend connects to
   `wss://<foundry-account>.services.ai.azure.com/voice-live/realtime` with its

@@ -234,6 +234,20 @@ def test_native_completion_rechecks_current_scope_grants():
     assert not harness.gateway.sessions
 
 
+def test_native_completion_accepts_a_spoken_answer_without_bracket_citations():
+    from test_conversation import caller, injected
+
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini")
+    harness = injected(settings)
+    app = build(settings, harness.conversation, FakeGateway())
+    prepare, _ = voice_routes._native_handlers(app, caller(settings), "project001-dev", "project")
+    prepared = anyio.run(prepare, "Explain setup")
+    result = prepared.finish("Setup is described in the platform guide.", "spoken-response")
+    assert result["citation_validation"] == "sources_attached"
+    with pytest.raises(RuntimeError, match="unsupported source citation"):
+        prepared.finish("Invented [S9].", "spoken-response")
+
+
 @pytest.mark.parametrize("fallback", [False, True])
 def test_native_route_streams_grounded_audio_without_external_answer_inference_then_text_still_works(fallback):
     from test_conversation import FakeKnowledge, injected

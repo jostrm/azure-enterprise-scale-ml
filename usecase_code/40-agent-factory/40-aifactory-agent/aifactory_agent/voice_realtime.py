@@ -540,9 +540,10 @@ class RealtimeVoiceSession(VoiceSession):
             return
         if self._turn_timer is not None and self._turn_timer is not asyncio.current_task():
             self._turn_timer.cancel()
+        validation = result.pop("citation_validation", "passed")
         await self._publish(turn, self.channel.send_json({
             **result, "type": "answer", "spoken": text, "spoken_truncated": False,
-            "citation_validation": "passed", "audio_provisional": True}), grounded=True)
+            "citation_validation": validation, "audio_provisional": True}), grounded=True)
         if self._live_turn(turn):
             await self._set_state("listening")
             self._touch()
@@ -561,7 +562,11 @@ class RealtimeVoiceSession(VoiceSession):
                 if not self._live_turn(turn):
                     return
                 if output.get("ok") is False:
-                    raise VoiceAnswerError("tool_error", "The approved voice tool reported a failure.")
+                    # Like typed chat, a failed read tool is data for the model, not the end of the turn.
+                    error = output.get("error")
+                    LOGGER.warning("voice_tool_failed session=%s turn=%d tool=%s code=%s", self.session_id, turn,
+                                   _diagnostic_label(call.get("name")),
+                                   _diagnostic_label(error.get("code") if isinstance(error, dict) else None))
                 output_id = _client_item_id("out_")
                 await self._create_item(turn, {
                     "id": output_id, "type": "function_call_output", "call_id": identifier,

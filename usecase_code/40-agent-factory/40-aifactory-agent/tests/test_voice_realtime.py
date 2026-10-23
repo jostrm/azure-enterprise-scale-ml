@@ -97,6 +97,9 @@ class NativeHarness(Harness):
             await self.hold_tool.wait()
         if name == "forbidden":
             raise VoiceAnswerError("forbidden", "Tool denied.")
+        if name == "failing":
+            return {"ok": False, "error": {"code": "cost_service_unavailable", "message": "SECRET detail",
+                                           "status_code": 503}}
         return {"evidence": [{"citation_id": "S2"}]}
 
     def finish_answer(self, text, response_id, tokens):
@@ -893,6 +896,47 @@ def test_native_tool_success_continues_and_round_limit_stops_further_calls():
         await harness.until(lambda: harness.channel.of("error"))
         assert harness.channel.of("error")[-1]["code"] == "tool_limit"
         assert len(harness.executions) == 1 and len(harness.upstream.of("response.create")) == 2
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_tool_failure_is_returned_to_the_model_and_logged_by_code_only(caplog):
+    # Typed chat hands a failed read tool back to the model as data; voice must not end the turn instead.
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("What does the project cost?")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(output=[{"type": "function_call", "name": "failing",
+                                  "call_id": "c1", "arguments": "{}"}])
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        output = harness.upstream.of("conversation.item.create")[-1]["item"]
+        assert output["type"] == "function_call_output" and output["call_id"] == "c1"
+        assert json.loads(output["output"])["error"]["code"] == "cost_service_unavailable"
+        assert not harness.channel.of("error")
+        harness.upstream.push({"type": "response.created", "response": {"id": "r2"}})
+        harness.response(identifier="r2")
+        await harness.until(lambda: harness.channel.of("answer"))
+        await harness.finish()
+    with caplog.at_level(logging.WARNING):
+        run(scenario)
+    assert "voice_tool_failed" in caplog.text and "code=cost_service_unavailable" in caplog.text
+    assert "SECRET" not in caplog.text
+
+
+def test_native_answer_reports_the_server_citation_validation_outcome():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.context.finish = lambda text, response_id, tokens: {
+            "answer": text, "citations": [{"citation_id": "S1"}], "response_id": response_id,
+            "citation_validation": "sources_attached"}
+        harness.hear("Explain setup")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(text="Spoken without bracket codes.")
+        await harness.until(lambda: harness.channel.of("answer"))
+        assert harness.channel.of("answer")[0]["citation_validation"] == "sources_attached"
+        assert not harness.channel.of("error")
         await harness.finish()
     run(scenario)
 

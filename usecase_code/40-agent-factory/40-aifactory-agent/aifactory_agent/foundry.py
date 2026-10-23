@@ -389,7 +389,7 @@ class Conversation:
                 TOOL_FAILURES.add(1, {"tool": name, "scope": scope_key})
             return output
 
-        def finish(text: str, response_id: str, tokens: dict | None = None) -> dict:
+        def finish(text: str, response_id: str, tokens: dict | None = None, *, spoken: bool = False) -> dict:
             authorize(self.settings, principal, scope_key, "knowledge.read")
             if not text:
                 raise RuntimeError("The model returned no answer.")
@@ -397,7 +397,9 @@ class Conversation:
             references = set(re.findall(r"\[([SGA]\d+)\]", text))
             if not references <= set(seen.values()) | graph_ids:
                 raise RuntimeError("The model returned an unsupported source citation.")
-            if citations and not references:
+            # A speech transcript rarely carries "[S1]" aloud: a spoken answer may omit the markers and is then
+            # published with the retrieved sources attached, but it may never name an unsupported one (checked above).
+            if citations and not references and not spoken:
                 raise RuntimeError("The answer omitted available source citations.")
             tokens = tokens or {"input_tokens": 0, "output_tokens": 0}
             LOGGER.info("agent_answer correlation=%s scope=%s audience=%s latency_ms=%d input_tokens=%d output_tokens=%d",
@@ -407,13 +409,16 @@ class Conversation:
             ANSWER_LATENCY.record(time.monotonic()-started, {"scope": scope_key, "audience": audience})
             for kind, count in tokens.items():
                 MODEL_TOKENS.add(count, {"kind": kind, "scope": scope_key})
-            return {"answer": text, "citations": citations, "scope_key": scope_key,
-                    "audience": audience, "correlation_id": correlation,
-                    "response_id": response_id, "model_usage": tokens, "tool_activity": observed_tools,
-                    "knowledge_status": knowledge_status,
-                    "graph_context": {key: value for key, value in graph_context.items()
-                                      if key in {"status", "snapshot_id", "source", "freshness",
-                                                 "warnings", "truncated", "context_planes"}}}
+            result = {"answer": text, "citations": citations, "scope_key": scope_key,
+                      "audience": audience, "correlation_id": correlation,
+                      "response_id": response_id, "model_usage": tokens, "tool_activity": observed_tools,
+                      "knowledge_status": knowledge_status,
+                      "graph_context": {key: value for key, value in graph_context.items()
+                                        if key in {"status", "snapshot_id", "source", "freshness",
+                                                   "warnings", "truncated", "context_planes"}}}
+            if spoken:
+                result["citation_validation"] = "sources_attached" if citations and not references else "passed"
+            return result
 
         return PreparedTurn(messages, list(allowed_tools.values()), execute, finish)
 

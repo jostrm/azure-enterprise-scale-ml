@@ -166,7 +166,7 @@ def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audienc
 
         def finish(text, response_id, tokens=None):
             authorize(_services(app).settings, principal, scope_key, "knowledge.read")
-            return prepared.finish(text, response_id, tokens)
+            return prepared.finish(text, response_id, tokens, spoken=True)
 
         return replace(prepared, finish=finish)
 
