@@ -173,3 +173,41 @@ def test_native_profiles_are_not_limited_to_english_and_swedish():
 def test_malformed_server_profile_locale_is_rejected(code):
     with pytest.raises(ValidationError):
         VoiceSettings(language_profiles={code: {"voice_name": "voice"}}, default_language=code)
+
+
+def test_native_multilingual_is_opt_in_and_accepts_several_or_auto_detected_languages():
+    single = VoiceSettings(mode="realtime", model="gpt-realtime-mini")
+    assert single.multilingual is False and single.for_language(None).turn_detection == "server_vad"
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", multilingual=True,
+                          input_languages=["sv-SE", "en-US", "fi-FI"])
+    selected = voice.for_language(None)
+    assert selected.multilingual and selected.turn_detection == "azure_semantic_vad_multilingual"
+    assert selected.input_languages == ["sv-SE", "en-US", "fi-FI"]
+    assert voice.for_language("en-US").input_languages == ["en-US", "sv-SE", "fi-FI"]
+    with pytest.raises(ValueError):
+        voice.for_language("de-DE")
+    detected = VoiceSettings(mode="realtime", model="gpt-realtime-mini", multilingual=True)
+    assert detected.for_language(None).turn_detection == "azure_semantic_vad_multilingual"
+
+
+def test_native_multilingual_keeps_server_vad_as_the_operator_fallback():
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", multilingual=True, turn_detection="server_vad")
+    assert voice.for_language(None).turn_detection == "server_vad"
+
+
+def test_native_multilingual_profiles_choose_voice_and_greeting_but_not_a_single_input_language():
+    profiles = {"en-US": {"voice_type": "openai", "voice_name": "coral"},
+                "sv-SE": {"voice_type": "openai", "voice_name": "marin", "greeting": "Hej!"}}
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", multilingual=True,
+                          language_profiles=profiles, default_language="en-US")
+    selected = voice.for_language("sv-SE")
+    assert selected.multilingual and selected.voice_name == "marin" and selected.greeting == "Hej!"
+    assert selected.input_languages[0] == "sv-SE"
+    assert selected.turn_detection == "azure_semantic_vad_multilingual"
+    with pytest.raises(ValueError):
+        voice.for_language("fr-FR")
+
+
+def test_multilingual_is_a_native_realtime_option_only():
+    with pytest.raises(ValidationError):
+        VoiceSettings(multilingual=True)

@@ -214,7 +214,9 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 1. Open the app's private address in **Edge, Chrome, Safari or Firefox** (the page needs HTTPS and a microphone)
    and sign in with Microsoft. Choose the factory/project/environment you are authorized for.
 2. Choose a language from the operator-configured profiles (for example English, Swedish, French or Japanese). Changing language
-   restarts voice only; your Chat sign-in and typed-chat form remain usable. Select **Start talking**
+   restarts voice only; your Chat sign-in and typed-chat form remain usable. When the operator has
+   turned on multilingual voice, the card says so: you can then speak any supported language without
+   choosing it first, and the agent replies in the language you use. Select **Start talking**
    and allow the microphone for the site. The orb shows what the agent is doing:
 
    | State | Meaning |
@@ -230,7 +232,8 @@ The deployment adds one **revision** of the same app. With voice enabled it also
    only a completed, source-checked answer appears in the answer card. A failed source check is
    shown explicitly; already heard audio cannot be recalled. In compatibility shell mode the full
    answer appears first and a shorter rendition is spoken.
-4. **Interrupt any time** by speaking over the agent or selecting *Stop speaking*. *Mute microphone* keeps the
+4. **Interrupt any time** by speaking over the agent or selecting *Stop speaking*. Speaking also stops
+   an answer that has finished generating but is still playing. *Mute microphone* keeps the
    session but sends no audio. *Stop talking* ends the session.
 5. If voice fails, select **Use typed chat**. It releases the microphone and focuses the existing
    text form; it never submits automatically or changes your sign-in. **Check voice again** and
@@ -271,8 +274,8 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | Limits (defaults) | 15 minutes per session, idle end after 2 minutes, 4 concurrent sessions per app replica, one session per user (a newer one replaces the older). |
 | Spoken length | Shell: `voice.max_spoken_characters` defaults to `1200`. Native: brief responses capped at 1024 output tokens; long code/operations belong in typed chat. |
 | Cost | Shell uses a Voice Live model tier plus external answer inference. Native uses `gpt-realtime-mini`/`gpt-realtime` directly, removing that external answer request; Search/embedding/tool costs remain. Check your agreement's current rates. |
-| Languages | Operator-configured locale profiles, not an English/Swedish-only list. Add languages supported by the selected model and voice. OpenAI voices give model-native audio; `sv-SE-SofieNeural` with `voice_type: azure-standard` gives Azure synthesis inside Voice Live. Switching safely restarts voice only. |
-| Latency | Measure warmed English/Swedish end-of-speech to first audible reply after approved deployment. Server `aifactory.voice.first_audio.duration` measures first relayed frame, not speaker playback; readiness/Search/network/tool latency remains. Offline tests cannot promise sub-second replies. |
+| Languages | Operator-configured locale profiles, not an English/Swedish-only list. Add languages supported by the selected model and voice. OpenAI voices give model-native audio; `sv-SE-SofieNeural` with `voice_type: azure-standard` gives Azure synthesis inside Voice Live. Switching safely restarts voice only. Native mode listens in one language per session unless the operator sets `voice.multilingual: true`. Then the language is detected per utterance, the reply follows it, `input_languages` become hints (the first is the fallback), and turn detection is `azure_semantic_vad_multilingual` unless `turn_detection` is `server_vad`. Use voices that speak every expected language (for example `coral`). |
+| Latency | Measure warmed English/Swedish end-of-speech to first audible reply after approved deployment. Server `aifactory.voice.first_audio.duration` measures first relayed frame, not speaker playback; readiness/Search/network/tool latency remains. Grounding before native speech is measured as `aifactory.voice.grounding.duration`. Native tool calls start while the model is still streaming and run in parallel. Offline tests cannot promise sub-second replies. |
 | Knowledge | Refresh stages a complete isolated generation before atomic promotion. Each text/native turn pins a complete committed snapshot; failed, blocked or stale refreshes can use the last success with a dated freshness warning. No unverified or partially written fallback is served. |
 | Turn voice off | Set `voice.enabled` to `false` (operator flow) or the flag to `false`; the app keeps running as a text chat. Nothing is deleted. |
 | Roll back | Retain earlier revisions and serving state. A revision using a legacy manifest/index contract may be incompatible with a newly promoted generation; review code, configuration and saved state together rather than blindly switching traffic or overwriting the manifest. |

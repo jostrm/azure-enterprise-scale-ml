@@ -1140,3 +1140,280 @@ def test_native_service_rejection_ends_only_voice_without_alternate_generation_o
         assert harness.upstream.closed
         assert await harness.finish() == "voice_unavailable"
     run(scenario)
+
+
+class Clock:
+    """Wall clock for the relay's playback estimate; tests move it explicitly."""
+
+    def __init__(self, now=1000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+SECOND = b"\x01\x00" * 24000  # one second of 24 kHz mono PCM16
+
+
+async def _spoken_answer(harness, seconds):
+    harness.hear("First")
+    await harness.until(lambda: harness.upstream.of("response.create"))
+    harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+    harness.upstream.push({"type": "response.output_item.added", "response_id": "r1",
+                           "item": {"id": "r1-output-0", "type": "message", "role": "assistant"}})
+    for _ in range(seconds):
+        harness.upstream.push({"type": "response.audio.delta", "response_id": "r1",
+                               "delta": base64.b64encode(SECOND).decode()})
+    harness.response()
+    await harness.until(lambda: harness.channel.of("answer"))
+    await harness.until(lambda: harness.channel.states()[-1] == "listening")
+    assert len(harness.channel.audio) == seconds and not harness.channel.of("interrupted")
+
+
+def test_native_speech_after_response_done_flushes_audio_the_browser_is_still_playing():
+    # gpt-realtime-mini finishes generating long before the browser finishes playing; the user must still be able to
+    # cut the agent off while the queued audio plays.
+    async def scenario():
+        clock = Clock()
+        harness = await NativeHarness(audio_clock=clock).start()
+        await _spoken_answer(harness, seconds=4)
+        clock.now += 1.5
+        harness.upstream.push({"type": "input_audio_buffer.speech_started", "item_id": "item2"})
+        await harness.until(lambda: harness.channel.of("interrupted"))
+        assert harness.channel.states()[-1] == "listening"
+        assert not harness.upstream.of("response.cancel"), "a finished response is not cancelled again"
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_speech_after_playback_has_finished_does_not_send_a_spurious_interrupt():
+    async def scenario():
+        clock = Clock()
+        harness = await NativeHarness(audio_clock=clock).start()
+        await _spoken_answer(harness, seconds=2)
+        clock.now += 10
+        harness.upstream.push({"type": "input_audio_buffer.speech_started", "item_id": "item2"})
+        await harness.until(lambda: "item2" in harness.session._input_turn)
+        assert not harness.channel.of("interrupted")
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_playback_estimate_counts_audio_from_back_to_back_deltas_not_wall_clock_alone():
+    # Audio that arrives faster than real time queues behind the earlier chunks in the browser.
+    async def scenario():
+        clock = Clock()
+        harness = await NativeHarness(audio_clock=clock).start()
+        await _spoken_answer(harness, seconds=3)
+        clock.now += 2.5
+        harness.upstream.push({"type": "input_audio_buffer.speech_started", "item_id": "item2"})
+        await harness.until(lambda: harness.channel.of("interrupted"))
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_interrupted_answer_never_reaches_the_next_model_turn():
+    # Voice Live is never asked to remember what the user did not hear: the interrupted assistant item is deleted,
+    # and the deletion acknowledged, before the next grounded response is created.
+    async def scenario():
+        clock = Clock()
+        harness = await NativeHarness(audio_clock=clock).start()
+        await _spoken_answer(harness, seconds=4)
+        clock.now += 1
+        harness.hear("Second", item="item2")
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        assert harness.channel.of("interrupted")
+        kinds = [(event["type"], event.get("item_id")) for event in harness.upstream.sent]
+        deleted = kinds.index(("conversation.item.delete", "r1-output-0"))
+        second = [index for index, (kind, _) in enumerate(kinds) if kind == "response.create"][1]
+        assert deleted < second
+        assert not harness.upstream.of("conversation.item.truncate")
+        await harness.finish()
+    run(scenario)
+
+
+def _function_call(call_id, name="knowledge_search", arguments='{"query":"more"}', identifier=None):
+    return {"id": identifier or "fc-" + call_id, "type": "function_call", "status": "completed",
+            "call_id": call_id, "name": name, "arguments": arguments}
+
+
+def test_native_tool_call_starts_as_soon_as_its_arguments_are_complete():
+    # The model may keep talking after it has asked for a tool; the read must not wait for the whole response.
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.upstream.push({"type": "response.function_call_arguments.done", "response_id": "r1",
+                               "item_id": "fc-c1", "call_id": "c1", "arguments": '{"query":"more"}'})
+        harness.upstream.push({"type": "response.output_item.done", "response_id": "r1",
+                               "item": _function_call("c1")})
+        await harness.until(lambda: harness.executions)
+        assert harness.executions == [("knowledge_search", "c1", '{"query":"more"}')]
+        assert not any(event["item"].get("type") == "function_call_output"
+                       for event in harness.upstream.of("conversation.item.create")), \
+            "outputs wait for response.done so the response inventory stays authoritative"
+        harness.response(output=[_function_call("c1")])
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        assert len(harness.executions) == 1, "the early call is executed exactly once"
+        outputs = [event["item"] for event in harness.upstream.of("conversation.item.create")
+                   if event["item"].get("type") == "function_call_output"]
+        assert [output["call_id"] for output in outputs] == ["c1"] and "S2" in outputs[0]["output"]
+        harness.upstream.push({"type": "response.created", "response": {"id": "r2"}})
+        harness.response(identifier="r2")
+        await harness.until(lambda: harness.channel.of("answer"))
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_independent_tool_calls_run_concurrently_and_return_in_call_order():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(output=[_function_call("c1", name="hold", arguments="{}"),
+                                 _function_call("c2", name="hold", arguments="{}"),
+                                 _function_call("c3")])
+        await harness.until(lambda: len(harness.executions) == 3)
+        assert len(harness.upstream.of("response.create")) == 1
+        harness.hold_tool.set()
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        outputs = [event["item"]["call_id"] for event in harness.upstream.of("conversation.item.create")
+                   if event["item"].get("type") == "function_call_output"]
+        assert outputs == ["c1", "c2", "c3"]
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_early_tool_call_is_cancelled_by_barge_in_and_never_continues():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.upstream.push({"type": "response.output_item.done", "response_id": "r1",
+                               "item": _function_call("c1", name="hold", arguments="{}")})
+        await harness.until(lambda: harness.executions)
+        harness.upstream.push({"type": "input_audio_buffer.speech_started", "item_id": "item2"})
+        await harness.until(lambda: harness.channel.of("interrupted"))
+        harness.hold_tool.set()
+        harness.response(output=[_function_call("c1", name="hold", arguments="{}")])
+        await asyncio.sleep(0.05)
+        assert not any(event["item"].get("type") == "function_call_output"
+                       for event in harness.upstream.of("conversation.item.create"))
+        assert len(harness.upstream.of("response.create")) == 1 and len(harness.executions) == 1
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_early_tool_call_respects_the_round_limit():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(output=[_function_call("c1")])
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        harness.upstream.push({"type": "response.created", "response": {"id": "r2"}})
+        harness.upstream.push({"type": "response.output_item.done", "response_id": "r2",
+                               "item": _function_call("c2")})
+        await asyncio.sleep(0.05)
+        assert len(harness.executions) == 1, "a call the round limit will reject is never executed early"
+        harness.response(identifier="r2", output=[_function_call("c2")])
+        await harness.until(lambda: harness.channel.of("error"))
+        assert harness.channel.of("error")[-1]["code"] == "tool_limit" and len(harness.executions) == 1
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_early_tool_call_that_changes_before_response_done_is_rejected():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.upstream.push({"type": "response.output_item.done", "response_id": "r1",
+                               "item": _function_call("c1", arguments='{"query":"one"}')})
+        await harness.until(lambda: harness.executions)
+        harness.response(output=[_function_call("c1", arguments='{"query":"two"}')])
+        await harness.until(lambda: harness.channel.of("error"))
+        assert harness.channel.of("error")[-1]["code"] == "tool_error"
+        assert len(harness.executions) == 1 and len(harness.upstream.of("response.create")) == 1
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_concurrent_tool_failure_is_still_returned_to_the_model_as_data():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(output=[_function_call("c1", name="failing", arguments="{}"), _function_call("c2")])
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        outputs = {event["item"]["call_id"]: json.loads(event["item"]["output"])
+                   for event in harness.upstream.of("conversation.item.create")
+                   if event["item"].get("type") == "function_call_output"}
+        assert outputs["c1"]["error"]["code"] == "cost_service_unavailable" and "S2" in str(outputs["c2"])
+        assert not harness.channel.of("error")
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_grounding_latency_is_logged_before_the_first_response(caplog):
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        await harness.finish()
+    with caplog.at_level(logging.INFO, logger="aifactory_agent.voice"):
+        run(scenario)
+    assert "voice_grounding_ready session=s-1 turn=2 latency_ms=" in caplog.text
+
+
+def test_native_multilingual_session_detects_language_and_replies_in_kind():
+    async def scenario():
+        voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", greeting=None, voice_type="openai",
+                              voice_name="coral", multilingual=True, input_languages=["sv-SE", "en-US"])
+        harness = NativeHarness()
+        harness.voice = voice.for_language(None)
+        harness.session = RealtimeVoiceSession(harness.voice, harness.upstream, harness.channel, harness.prepare,
+                                               harness.execute, max_tool_rounds=2, session_id="s-1")
+        await harness.start()
+        session = harness.upstream.of("session.update")[0]["session"]
+        assert session["turn_detection"]["type"] == "azure_semantic_vad_multilingual"
+        assert session["turn_detection"]["create_response"] is False
+        assert session["turn_detection"]["interrupt_response"] is False
+        assert session["input_audio_transcription"] == {"model": "gpt-4o-mini-transcribe"}
+        assert "language the user" in session["instructions"] and "BCP-47" not in session["instructions"]
+        assert "sv-SE" in session["instructions"] and "en-US" in session["instructions"]
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_multilingual_falls_back_to_server_vad_when_configured():
+    async def scenario():
+        voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", greeting=None, voice_type="openai",
+                              voice_name="coral", multilingual=True, turn_detection="server_vad")
+        harness = NativeHarness()
+        harness.voice = voice.for_language(None)
+        harness.session = RealtimeVoiceSession(harness.voice, harness.upstream, harness.channel, harness.prepare,
+                                               harness.execute, max_tool_rounds=2, session_id="s-1")
+        await harness.start()
+        session = harness.upstream.of("session.update")[0]["session"]
+        assert session["turn_detection"]["type"] == "server_vad"
+        assert "language" not in session["input_audio_transcription"]
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_single_language_session_is_unchanged_without_the_opt_in():
+    async def scenario():
+        harness = await NativeHarness().start()
+        session = harness.upstream.of("session.update")[0]["session"]
+        assert session["turn_detection"]["type"] == "server_vad"
+        assert session["input_audio_transcription"] == {"model": "gpt-4o-mini-transcribe", "language": "en"}
+        assert "Respond in the language of BCP-47 locale en-US." in session["instructions"]
+        await harness.finish()
+    run(scenario)

@@ -635,3 +635,26 @@ def test_losing_the_voice_service_is_fatal_and_visible():
         assert harness.channel.of("error")[-1]["fatal"] is True
         assert harness.channel.of("closed")[-1]["reason"] == "upstream_closed"
     run(scenario)
+
+
+def test_speech_after_the_reply_finished_generating_still_flushes_queued_playback():
+    # Text to speech outruns real time: response.done arrives while the browser still has seconds of audio queued.
+    now = [500.0]
+    second = b"\x01\x00" * 24000
+
+    async def scenario():
+        harness = await Harness(audio_clock=lambda: now[0]).start()
+        harness.hear("Question one")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "resp_1"}})
+        for _ in range(3):
+            harness.upstream.push({"type": "response.audio.delta", "response_id": "resp_1",
+                                   "delta": base64.b64encode(second).decode()})
+        harness.upstream.push({"type": "response.done", "response": {"id": "resp_1", "status": "completed"}})
+        await harness.until(lambda: harness.channel.states()[-1] == "listening")
+        assert not harness.channel.of("interrupted")
+        now[0] += 1.0
+        harness.upstream.push({"type": "input_audio_buffer.speech_started", "item_id": "item_2"})
+        await harness.until(lambda: harness.channel.of("interrupted"))
+        await harness.finish()
+    run(scenario)

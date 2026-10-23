@@ -885,3 +885,18 @@ def test_levels_follow_the_microphone_while_listening_and_the_speakers_while_spe
   assert.ok(Math.abs(rig.log.levels.at(-1) - voice.levelFromRms(0.05)) < 1e-6, "speaking shows the speaker level");
 })().catch((error) => { console.error(error); process.exit(1); });
 """, STATIC / "voice.js")
+
+
+@pytest.mark.parametrize("multilingual", [False, True])
+def test_native_page_says_when_any_spoken_language_is_understood(multilingual):
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const multilingual = process.argv[3] === "true";
+  const rig = page({...capabilities, voice: {...capabilities.voice, multilingual}});
+  rig.grant(true);
+  await tick();
+  const help = rig.element("voice-help").textContent;
+  assert.match(help, /provisional/);
+  assert.equal(/any language/i.test(help), multilingual, help);
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js", "true" if multilingual else "false")

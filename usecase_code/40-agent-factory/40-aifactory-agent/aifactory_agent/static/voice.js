@@ -475,7 +475,8 @@
           await client.setLanguage(profiles ? language.value : null);
         }
         if (status.mode === "realtime" && help) help.textContent =
-          "Native voice streams a reply. Live audio and transcript are provisional until the final sources are checked. Typing remains available.";
+          "Native voice streams a reply. Live audio and transcript are provisional until the final sources are checked. Typing remains available."
+          + (status.voice && status.voice.multilingual === true ? " Speak in any language; the agent replies in the language you use." : "");
         if (!status.ready && help) help.textContent = "Live voice is enabled but not ready on this deployment; ask the operator to check the voice dependencies.";
       } catch {
         if (generation !== probeGeneration) return;

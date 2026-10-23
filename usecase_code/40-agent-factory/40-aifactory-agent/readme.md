@@ -602,7 +602,11 @@ the verification trade-off described below.
   As in typed chat, a failed read tool (`ok: false`) goes back to the model as
   data and is logged as `voice_tool_failed` with its error code only; a denied
   tool and bounded-round exhaustion stop the turn. The model can never approve or
-  execute writes.
+  execute writes. A native tool call starts as soon as its arguments are complete
+  (`response.output_item.done`), while the model may still be speaking, and
+  independent calls in one response run concurrently. Each call is still authorized
+  and audited, runs exactly once and stays inside the round limit. Its output reaches
+  the model only after `response.done` has listed the whole response.
 - The browser never receives Foundry credentials. It opens
   `WS /api/voice/ws` on the application; the backend connects to
   `wss://<foundry-account>.services.ai.azure.com/voice-live/realtime` with its
@@ -614,7 +618,15 @@ the verification trade-off described below.
   the token that opened them) and replaces a user's older session with the newer one. The browser cannot choose the model, voice,
   instructions or tools. It can select only an operator-configured language profile.
 - Speaking while the agent answers (barge-in) cancels the pending answer and the
-  speech. Tokens and transcripts are never logged; errors shown to the browser
+  speech. Speech is generated faster than real time, so the browser can still be
+  playing an answer that has finished generating. The relay estimates playback from
+  the audio it relayed (PCM16 bytes / 48,000 per second, plus a 0.5 s margin) and
+  flushes the browser's queue whenever the user starts speaking before that
+  estimate runs out. The server never interrupts or answers on its own
+  (`interrupt_response` and `create_response` stay off). The next grounded turn
+  deletes the interrupted answer from the Voice Live conversation before it creates
+  a new response, so the model never builds on speech the user did not hear.
+  Tokens and transcripts are never logged; errors shown to the browser
   carry no internal detail.
 - Voice failures (including a status 401 or voice-only authentication error) never
   clear or renew the text token. **Use typed chat** focuses the existing form,
@@ -647,7 +659,8 @@ reuse the current text session rather than acquiring a separate token.
 | `model` | `gpt-4.1-nano` | Shell billing tier; native mode requires `gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`. Approve regional availability and processing scope separately. |
 | `voice_name` | `en-US-Ava:DragonHDLatestNeural` | Fixed for the whole session. |
 | `voice_type` | `azure-standard` | `openai` with an approved native voice (for example `coral`) produces model-native audio. `azure-standard` selects Azure synthesis within Voice Live instead. |
-| `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). |
+| `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). Realtime mode allows exactly one unless `multilingual` is on; then they are hints and the first one is the fallback. |
+| `multilingual` | `false` | Realtime only. Understands any spoken language and replies in the user's language (see below). |
 | `turn_detection` | `azure_semantic_vad` | Also `azure_semantic_vad_multilingual`, `server_vad`; `silence_duration_ms` 500. |
 | `max_session_seconds` / `idle_timeout_seconds` | `900` / `120` | Session bounds. |
 | `max_concurrent_sessions` | `4` | Per application replica. |
@@ -719,6 +732,28 @@ VAD is not used for Swedish). The reply language is server-selected instructions
 the browser cannot send arbitrary instructions or a voice name. Voice is fixed
 after the first speech, so the selector starts a fresh voice session.
 
+**Multilingual realtime (opt-in).** By default a realtime session listens and
+replies in one language. Set `"multilingual": true` to let users speak any language
+the native model supports without picking one first:
+
+- Transcription omits the language, so `gpt-4o-mini-transcribe` detects it per
+  utterance (it is still only the retrieval query).
+- The model is told to reply in the language of the user's latest utterance.
+  `input_languages` (several allowed, for example `["sv-SE", "en-US"]`) are listed
+  as expected languages, and the first one is used when the language is unclear.
+- Turn detection is `azure_semantic_vad_multilingual`, which Voice Live supports
+  with all models, including `gpt-realtime` and `gpt-realtime-mini`. Set
+  `"turn_detection": "server_vad"` to keep the volume-based fallback.
+- With `language_profiles`, the selected profile still chooses the voice and
+  greeting and is the fallback language, but it no longer limits what the user
+  may speak. `GET /api/voice/status` reports `voice.multilingual`, and the voice
+  card says that any language works.
+- Use a voice that can speak every language you expect: the native `openai`
+  voices (for example `coral`) or Azure Multilingual/HD voices.
+
+Without `multilingual`, behaviour is unchanged: one language per session,
+`server_vad`, and transcription pinned to that language.
+
 If you prefer a specifically Swedish Azure synthesis voice, configure the Swedish
 profile as `{"voice_type":"azure-standard","voice_name":"sv-SE-SofieNeural"}`.
 This is Azure TTS **within Voice Live**, not native model audio; there is still no
@@ -737,11 +772,14 @@ retrieval/embedding costs. HD voices are regional. Sessions are bounded by
 Native turns isolate conversation history because their citation identifiers are
 question-local. Each prepared turn pins retrieval and knowledge-status tools to
 the same complete committed snapshot, including explicitly warned last-successful
-fallback. No browser playback-clock acknowledgement is available. Canceled read-only worker calls
+fallback. No browser playback-clock acknowledgement is available; barge-in uses the
+relay's playback estimate described above. Canceled read-only worker calls
 may finish in their thread, but their results cannot resume a canceled turn.
 The native first-audio histogram `aifactory.voice.first_audio.duration` and safe
 `voice_first_audio` log measure end-of-speech to the first relayed audio frame;
-they do not measure browser speaker playback. Compare warmed English/Swedish
+they do not measure browser speaker playback. Grounding runs before any native
+speech, by design. Its cost is logged as `voice_grounding_ready ... latency_ms=` and
+recorded in `aifactory.voice.grounding.duration`. Compare warmed English/Swedish
 median/p95 and interrupted turns on the approved private network after deployment.
 Initial transcription, readiness, Search, optional embeddings/graph queries, tools,
 network and cold-start latency remain; no sub-second claim is made from fake tests.
