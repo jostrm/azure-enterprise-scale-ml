@@ -1181,10 +1181,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#identity-access-and-encryption" class="md-nav__link">
+  <a href="#models-and-deployments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Identity, access and encryption
+        Models and deployments
       
     </span>
   </a>
@@ -1192,10 +1192,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#models-and-deployments" class="md-nav__link">
+  <a href="#identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Models and deployments
+        Identity, access and encryption
       
     </span>
   </a>
@@ -1264,6 +1264,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gha-models-and-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GHA: Models and deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gha-identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1279,17 +1290,6 @@
     <span class="md-ellipsis">
       
         GHA: Operations, diagnostics and lifecycle
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gha-models-and-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GHA: Models and deployments
       
     </span>
   </a>
@@ -2259,10 +2259,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#identity-access-and-encryption" class="md-nav__link">
+  <a href="#models-and-deployments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Identity, access and encryption
+        Models and deployments
       
     </span>
   </a>
@@ -2270,10 +2270,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#models-and-deployments" class="md-nav__link">
+  <a href="#identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Models and deployments
+        Identity, access and encryption
       
     </span>
   </a>
@@ -2342,6 +2342,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gha-models-and-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GHA: Models and deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gha-identity-access-and-encryption" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2357,17 +2368,6 @@
     <span class="md-ellipsis">
       
         GHA: Operations, diagnostics and lifecycle
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gha-models-and-deployments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GHA: Models and deployments
       
     </span>
   </a>
@@ -2940,11 +2940,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">398</td>
+<td style="text-align: right;">400</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">396</td>
+<td style="text-align: right;">398</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2960,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">403</td>
+<td style="text-align: right;">405</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 154, 421; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 155, 422; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 423, 447; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 154, 423; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 155, 424; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 425, 449; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3839,6 +3839,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:aifactoryAgentConfigFile --><!-- parameter json.dev:aifactoryAgentConfigFile --><code>aifactoryAgentConfigFile</code></td>
+<td><code>AIFACTORY_AGENT_CONFIG_FILE</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when enableAIFactoryAgentLiveVoice:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:aifactoryAgentContainerAppsEnvironment --><!-- parameter json.dev:aifactoryAgentContainerAppsEnvironment --><code>aifactoryAgentContainerAppsEnvironment</code></td>
 <td><code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code></td>
 <td>O</td>
@@ -3857,7 +3864,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>
 <td>C</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages --><code>aifactoryAgentVoiceLanguages</code></td>
@@ -5513,6 +5520,132 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="models-and-deployments">Models and deployments<a class="headerlink" href="#models-and-deployments" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>YAML / JSON key</th>
+<th>GHA binding(s)</th>
+<th>M/C/O</th>
+<th>Source defaults</th>
+<th>Description / conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentModelDeployment --><!-- parameter json.dev:aifactoryAgentModelDeployment --><code>aifactoryAgentModelDeployment</code></td>
+<td><code>AIFACTORY_AGENT_MODEL_DEPLOYMENT</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity --><code>default_embedding_capacity</code></td>
+<td><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>25</code><br>J.dev: <code>25</code></td>
+<td>Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version --><code>default_gpt_4o_version</code></td>
+<td><code>DEFAULT_GPT_4O_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2024-11-20"</code><br>J.dev: <code>"2024-11-20"</code></td>
+<td>gpt-4o version otherwise: "2024-08-06".</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version --><code>default_gpt_54_mini_version</code></td>
+<td><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
+<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity --><code>default_gpt_capacity</code></td>
+<td><code>DEFAULT_GPT_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>40</code><br>J.dev: <code>40</code></td>
+<td>GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku --><code>default_model_sku</code></td>
+<td><code>DEFAULT_MODEL_SKU</code></td>
+<td>O</td>
+<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
+<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o --><code>deployModel_gpt_4o</code></td>
+<td><code>DEPLOY_MODEL_GPT_4O</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini --><code>deployModel_gpt_54_mini</code></td>
+<td><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X --><code>deployModel_gpt_X</code></td>
+<td><code>DEPLOY_MODEL_GPT_X</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large --><code>deployModel_text_embedding_3_large</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Deploy text-embedding-3-large recommended: for production RAG scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small --><code>deployModel_text_embedding_3_small</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy text-embedding-3-small recommended: for cost-optimized scenarios.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 --><code>deployModel_text_embedding_ada_002</code></td>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Deploy text-embedding-ada-002</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity --><code>modelGPTXCapacity</code></td>
+<td><code>MODEL_GPTX_CAPACITY</code></td>
+<td>O</td>
+<td>Y: <code>30</code><br>J.dev: <code>30</code></td>
+<td>GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName --><code>modelGPTXName</code></td>
+<td><code>MODEL_GPTX_NAME</code></td>
+<td>O</td>
+<td>Y: <code>"gpt-5.4-mini"</code><br>J.dev: <code>"gpt-5.4-mini"</code></td>
+<td>GPT-X model name ensure: model is available in your Azure region with sufficient quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku --><code>modelGPTXSku</code></td>
+<td><code>MODEL_GPTX_SKU</code></td>
+<td>O</td>
+<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
+<td>GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion --><code>modelGPTXVersion</code></td>
+<td><code>MODEL_GPTX_VERSION</code></td>
+<td>O</td>
+<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
+<td>GPT-X model version ensure: update the version when selecting a different model.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="identity-access-and-encryption">Identity, access and encryption<a class="headerlink" href="#identity-access-and-encryption" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -5779,125 +5912,6 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="models-and-deployments">Models and deployments<a class="headerlink" href="#models-and-deployments" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>YAML / JSON key</th>
-<th>GHA binding(s)</th>
-<th>M/C/O</th>
-<th>Source defaults</th>
-<th>Description / conditions</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><!-- parameter yaml:default_embedding_capacity --><!-- parameter json.dev:default_embedding_capacity --><code>default_embedding_capacity</code></td>
-<td><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>25</code><br>J.dev: <code>25</code></td>
-<td>Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_4o_version --><!-- parameter json.dev:default_gpt_4o_version --><code>default_gpt_4o_version</code></td>
-<td><code>DEFAULT_GPT_4O_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2024-11-20"</code><br>J.dev: <code>"2024-11-20"</code></td>
-<td>gpt-4o version otherwise: "2024-08-06".</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_54_mini_version --><!-- parameter json.dev:default_gpt_54_mini_version --><code>default_gpt_54_mini_version</code></td>
-<td><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
-<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_gpt_capacity --><!-- parameter json.dev:default_gpt_capacity --><code>default_gpt_capacity</code></td>
-<td><code>DEFAULT_GPT_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>40</code><br>J.dev: <code>40</code></td>
-<td>GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:default_model_sku --><!-- parameter json.dev:default_model_sku --><code>default_model_sku</code></td>
-<td><code>DEFAULT_MODEL_SKU</code></td>
-<td>O</td>
-<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
-<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_4o --><!-- parameter json.dev:deployModel_gpt_4o --><code>deployModel_gpt_4o</code></td>
-<td><code>DEPLOY_MODEL_GPT_4O</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_54_mini --><!-- parameter json.dev:deployModel_gpt_54_mini --><code>deployModel_gpt_54_mini</code></td>
-<td><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_gpt_X --><!-- parameter json.dev:deployModel_gpt_X --><code>deployModel_gpt_X</code></td>
-<td><code>DEPLOY_MODEL_GPT_X</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_3_large --><!-- parameter json.dev:deployModel_text_embedding_3_large --><code>deployModel_text_embedding_3_large</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Deploy text-embedding-3-large recommended: for production RAG scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_3_small --><!-- parameter json.dev:deployModel_text_embedding_3_small --><code>deployModel_text_embedding_3_small</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy text-embedding-3-small recommended: for cost-optimized scenarios.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:deployModel_text_embedding_ada_002 --><!-- parameter json.dev:deployModel_text_embedding_ada_002 --><code>deployModel_text_embedding_ada_002</code></td>
-<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Deploy text-embedding-ada-002</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXCapacity --><!-- parameter json.dev:modelGPTXCapacity --><code>modelGPTXCapacity</code></td>
-<td><code>MODEL_GPTX_CAPACITY</code></td>
-<td>O</td>
-<td>Y: <code>30</code><br>J.dev: <code>30</code></td>
-<td>GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXName --><!-- parameter json.dev:modelGPTXName --><code>modelGPTXName</code></td>
-<td><code>MODEL_GPTX_NAME</code></td>
-<td>O</td>
-<td>Y: <code>"gpt-5.4-mini"</code><br>J.dev: <code>"gpt-5.4-mini"</code></td>
-<td>GPT-X model name ensure: model is available in your Azure region with sufficient quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXSku --><!-- parameter json.dev:modelGPTXSku --><code>modelGPTXSku</code></td>
-<td><code>MODEL_GPTX_SKU</code></td>
-<td>O</td>
-<td>Y: <code>"DataZoneStandard"</code><br>J.dev: <code>"DataZoneStandard"</code></td>
-<td>GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:modelGPTXVersion --><!-- parameter json.dev:modelGPTXVersion --><code>modelGPTXVersion</code></td>
-<td><code>MODEL_GPTX_VERSION</code></td>
-<td>O</td>
-<td>Y: <code>"2026-03-17"</code><br>J.dev: <code>"2026-03-17"</code></td>
-<td>GPT-X model version ensure: update the version when selecting a different model.</td>
-</tr>
-</tbody>
-</table>
 <h2 id="github-actions-env-reference">GitHub Actions .env reference<a class="headerlink" href="#github-actions-env-reference" title="Permanent link">&para;</a></h2>
 <p>Every unique assignment is included, including orchestrator-only and compatibility names. Values are decoded literals, not expansions; these are template values, not necessarily the workflow's effective fallback. <strong>No verified counterpart</strong> means no mapping was found in the inspected shared bindings, not proof that a setting is unused.</p>
 <h3 id="gha-factory-project-naming-and-orchestration">GHA: Factory, project, naming and orchestration<a class="headerlink" href="#gha-factory-project-naming-and-orchestration" title="Permanent link">&para;</a></h3>
@@ -5983,6 +5997,13 @@ reported, not silently represented as multiple settings.</p>
 <td>VM admin username</td>
 </tr>
 <tr>
+<td><!-- parameter env:AIFACTORY_AGENT_CONFIG_FILE --><code>AIFACTORY_AGENT_CONFIG_FILE</code></td>
+<td><code>aifactoryAgentConfigFile</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>aifactoryAgentConfigFile: your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter env:AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT --><code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code></td>
 <td><code>aifactoryAgentContainerAppsEnvironment</code></td>
 <td>O</td>
@@ -6001,7 +6022,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>aifactoryAgentReaderObjectIds</code></td>
 <td>C</td>
 <td><code>""</code></td>
-<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
 </tr>
 <tr>
 <td><!-- parameter env:AIFACTORY_AGENT_VOICE_LANGUAGES --><code>AIFACTORY_AGENT_VOICE_LANGUAGES</code></td>
@@ -8245,6 +8266,132 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="gha-models-and-deployments">GHA: Models and deployments<a class="headerlink" href="#gha-models-and-deployments" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Exact environment key</th>
+<th>YAML / JSON counterpart(s)</th>
+<th>M/C/O</th>
+<th>Template value</th>
+<th>Description / conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_MODEL_DEPLOYMENT --><code>AIFACTORY_AGENT_MODEL_DEPLOYMENT</code></td>
+<td><code>aifactoryAgentModelDeployment</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>aifactoryAgentModelDeployment: Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses MODEL_GPTX_NAME. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when ENABLE_FACTORY_CHAT_AGENT:'true' or ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEFAULT_EMBEDDING_CAPACITY --><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
+<td><code>default_embedding_capacity</code></td>
+<td>O</td>
+<td><code>"25"</code></td>
+<td>Embedding model capacity (TPM in K)</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEFAULT_GPT_4O_VERSION --><code>DEFAULT_GPT_4O_VERSION</code></td>
+<td><code>default_gpt_4o_version</code></td>
+<td>O</td>
+<td><code>"2024-11-20"</code></td>
+<td>GPT-4o version</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEFAULT_GPT_54_MINI_VERSION --><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
+<td><code>default_gpt_54_mini_version</code></td>
+<td>O</td>
+<td><code>"2026-03-17"</code></td>
+<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEFAULT_GPT_CAPACITY --><code>DEFAULT_GPT_CAPACITY</code></td>
+<td><code>default_gpt_capacity</code></td>
+<td>O</td>
+<td><code>"40"</code></td>
+<td>GPT model capacity (TPM in K) keep-as-is: 40 = 40K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEFAULT_MODEL_SKU --><code>DEFAULT_MODEL_SKU</code></td>
+<td><code>default_model_sku</code></td>
+<td>O</td>
+<td><code>"DataZoneStandard"</code></td>
+<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_GPT_4O --><code>DEPLOY_MODEL_GPT_4O</code></td>
+<td><code>deployModel_gpt_4o</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Deploy GPT-4o model</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_GPT_54_MINI --><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
+<td><code>deployModel_gpt_54_mini</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Enable the separately named GPT-5.4-mini deployment toggle.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_GPT_X --><code>DEPLOY_MODEL_GPT_X</code></td>
+<td><code>deployModel_gpt_X</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Deploy custom GPT-X model otherwise: true, deploys the model defined in MODEL_GPTX_NAME.</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE --><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
+<td><code>deployModel_text_embedding_3_large</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Deploy text-embedding-3-large</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL --><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
+<td><code>deployModel_text_embedding_3_small</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Deploy text-embedding-3-small</td>
+</tr>
+<tr>
+<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 --><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
+<td><code>deployModel_text_embedding_ada_002</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Deploy text-embedding-ada-002</td>
+</tr>
+<tr>
+<td><!-- parameter env:MODEL_GPTX_CAPACITY --><code>MODEL_GPTX_CAPACITY</code></td>
+<td><code>modelGPTXCapacity</code></td>
+<td>O</td>
+<td><code>"30"</code></td>
+<td>Custom GPT-X model capacity (TPM in K) keep-as-is: 30 = 30K tokens per minute.</td>
+</tr>
+<tr>
+<td><!-- parameter env:MODEL_GPTX_NAME --><code>MODEL_GPTX_NAME</code></td>
+<td><code>modelGPTXName</code></td>
+<td>O</td>
+<td><code>"gpt-5.4-mini"</code></td>
+<td>Custom GPT-X model name</td>
+</tr>
+<tr>
+<td><!-- parameter env:MODEL_GPTX_SKU --><code>MODEL_GPTX_SKU</code></td>
+<td><code>modelGPTXSku</code></td>
+<td>O</td>
+<td><code>"DataZoneStandard"</code></td>
+<td>Custom GPT-X model SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
+</tr>
+<tr>
+<td><!-- parameter env:MODEL_GPTX_VERSION --><code>MODEL_GPTX_VERSION</code></td>
+<td><code>modelGPTXVersion</code></td>
+<td>O</td>
+<td><code>"2026-03-17"</code></td>
+<td>Custom GPT-X model version keep-as-is: Update the version when selecting a different model.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="gha-identity-access-and-encryption">GHA: Identity, access and encryption<a class="headerlink" href="#gha-identity-access-and-encryption" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -8648,125 +8795,6 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"aifactory-admin-vm"</code></td>
 <td>Custom label assigned to the GitHub self-hosted runner</td>
-</tr>
-</tbody>
-</table>
-<h3 id="gha-models-and-deployments">GHA: Models and deployments<a class="headerlink" href="#gha-models-and-deployments" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Exact environment key</th>
-<th>YAML / JSON counterpart(s)</th>
-<th>M/C/O</th>
-<th>Template value</th>
-<th>Description / conditions</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><!-- parameter env:DEFAULT_EMBEDDING_CAPACITY --><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
-<td><code>default_embedding_capacity</code></td>
-<td>O</td>
-<td><code>"25"</code></td>
-<td>Embedding model capacity (TPM in K)</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEFAULT_GPT_4O_VERSION --><code>DEFAULT_GPT_4O_VERSION</code></td>
-<td><code>default_gpt_4o_version</code></td>
-<td>O</td>
-<td><code>"2024-11-20"</code></td>
-<td>GPT-4o version</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEFAULT_GPT_54_MINI_VERSION --><code>DEFAULT_GPT_54_MINI_VERSION</code></td>
-<td><code>default_gpt_54_mini_version</code></td>
-<td>O</td>
-<td><code>"2026-03-17"</code></td>
-<td>Version for the separately named GPT-5.4-mini deployment toggle.</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEFAULT_GPT_CAPACITY --><code>DEFAULT_GPT_CAPACITY</code></td>
-<td><code>default_gpt_capacity</code></td>
-<td>O</td>
-<td><code>"40"</code></td>
-<td>GPT model capacity (TPM in K) keep-as-is: 40 = 40K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEFAULT_MODEL_SKU --><code>DEFAULT_MODEL_SKU</code></td>
-<td><code>default_model_sku</code></td>
-<td>O</td>
-<td><code>"DataZoneStandard"</code></td>
-<td>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_GPT_4O --><code>DEPLOY_MODEL_GPT_4O</code></td>
-<td><code>deployModel_gpt_4o</code></td>
-<td>O</td>
-<td><code>"false"</code></td>
-<td>Deploy GPT-4o model</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_GPT_54_MINI --><code>DEPLOY_MODEL_GPT_54_MINI</code></td>
-<td><code>deployModel_gpt_54_mini</code></td>
-<td>O</td>
-<td><code>"false"</code></td>
-<td>Enable the separately named GPT-5.4-mini deployment toggle.</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_GPT_X --><code>DEPLOY_MODEL_GPT_X</code></td>
-<td><code>deployModel_gpt_X</code></td>
-<td>O</td>
-<td><code>"true"</code></td>
-<td>Deploy custom GPT-X model otherwise: true, deploys the model defined in MODEL_GPTX_NAME.</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE --><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
-<td><code>deployModel_text_embedding_3_large</code></td>
-<td>O</td>
-<td><code>"true"</code></td>
-<td>Deploy text-embedding-3-large</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL --><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
-<td><code>deployModel_text_embedding_3_small</code></td>
-<td>O</td>
-<td><code>"false"</code></td>
-<td>Deploy text-embedding-3-small</td>
-</tr>
-<tr>
-<td><!-- parameter env:DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 --><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
-<td><code>deployModel_text_embedding_ada_002</code></td>
-<td>O</td>
-<td><code>"false"</code></td>
-<td>Deploy text-embedding-ada-002</td>
-</tr>
-<tr>
-<td><!-- parameter env:MODEL_GPTX_CAPACITY --><code>MODEL_GPTX_CAPACITY</code></td>
-<td><code>modelGPTXCapacity</code></td>
-<td>O</td>
-<td><code>"30"</code></td>
-<td>Custom GPT-X model capacity (TPM in K) keep-as-is: 30 = 30K tokens per minute.</td>
-</tr>
-<tr>
-<td><!-- parameter env:MODEL_GPTX_NAME --><code>MODEL_GPTX_NAME</code></td>
-<td><code>modelGPTXName</code></td>
-<td>O</td>
-<td><code>"gpt-5.4-mini"</code></td>
-<td>Custom GPT-X model name</td>
-</tr>
-<tr>
-<td><!-- parameter env:MODEL_GPTX_SKU --><code>MODEL_GPTX_SKU</code></td>
-<td><code>modelGPTXSku</code></td>
-<td>O</td>
-<td><code>"DataZoneStandard"</code></td>
-<td>Custom GPT-X model SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota.</td>
-</tr>
-<tr>
-<td><!-- parameter env:MODEL_GPTX_VERSION --><code>MODEL_GPTX_VERSION</code></td>
-<td><code>modelGPTXVersion</code></td>
-<td>O</td>
-<td><code>"2026-03-17"</code></td>
-<td>Custom GPT-X model version keep-as-is: Update the version when selecting a different model.</td>
 </tr>
 </tbody>
 </table>
