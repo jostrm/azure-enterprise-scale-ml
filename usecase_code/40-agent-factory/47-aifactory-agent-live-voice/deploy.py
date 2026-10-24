@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agent_factory.agent_live_voice import (  # noqa: E402
     LiveVoiceIntegration, LiveVoiceRequest, decide, subprocess_runner)
 from agent_factory.azure import AzureSession  # noqa: E402
+from agent_factory.deployer_access import DeployerAccess  # noqa: E402
 
 INPUTS = (
     "enableFactoryChatAgent", "enableAIFactoryAgentLiveVoice",
@@ -66,7 +67,8 @@ def load_customer_configuration(relative: str, root: Path) -> dict:
     return document
 
 
-def run(args, environ=os.environ, session_factory=AzureSession, runner=subprocess_runner) -> dict:
+def run(args, environ=os.environ, session_factory=AzureSession, runner=subprocess_runner, *,
+        access_factory=DeployerAccess.for_session) -> dict:
     request = LiveVoiceRequest.from_values({name: environ.get(name) for name in INPUTS})
     if request.enable_live_voice and request.config_file:
         request = replace(request, config_overlay=load_customer_configuration(request.config_file, consumer_root(environ)))
@@ -78,7 +80,8 @@ def run(args, environ=os.environ, session_factory=AzureSession, runner=subproces
     if args.command == "validate":
         return {"mode": "validated", "reason": decision.reason, "voice": decision.voice, "mutations": False}
     session = session_factory(request.subscription_id, request.tenant_id)
-    engine = LiveVoiceIntegration(session, runner, work_dir=work_directory(environ), repository_root=REPOSITORY_ROOT)
+    engine = LiveVoiceIntegration(session, runner, work_dir=work_directory(environ), repository_root=REPOSITORY_ROOT,
+                                  access=access_factory(session))
     return engine.run(request, apply=args.command == "apply")
 
 

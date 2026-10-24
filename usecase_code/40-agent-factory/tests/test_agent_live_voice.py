@@ -533,9 +533,13 @@ def test_disabled_validate_and_invalid_runs_never_reach_azure():
 def test_plan_reads_azure_only_and_apply_runs_the_engine_in_a_work_directory_outside_the_checkout(tmp_path):
     module, arm, runner = launcher(), FakeArm(), FakeRunner()
     environ = values(RUNNER_TEMP=str(tmp_path))
-    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner)
+    recorder = RecordingAccess(arm)
+    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner,
+                      access_factory=lambda session: recorder)
     assert plan["mode"] == "plan" and plan["mutations"] is False and runner.calls == []
-    applied = module.run(arguments(), environ, lambda subscription, tenant: arm, runner)
+    applied = module.run(arguments(), environ, lambda subscription, tenant: arm, runner,
+                         access_factory=lambda session: recorder)
+    assert [apply for _, apply, _ in recorder.seen] == [False, True], "the launcher wires the deployer access"
     assert applied["mode"] == "apply" and runner.names()[-1] == "deploy.py" and applied["outputs"]["voice"] is True
     assert (tmp_path / "aifactory-agent-live-voice" / "config.json").is_file()
     assert module.work_directory({"AGENT_TEMPDIRECTORY": str(tmp_path)}) == tmp_path / "aifactory-agent-live-voice"
@@ -548,7 +552,8 @@ def test_the_launcher_loads_the_customers_agent_configuration_from_the_consumer_
     (tmp_path / "aifactory" / "agent" / "project001-dev.json").write_text(json.dumps(OVERLAY), encoding="utf-8")
     environ = values(RUNNER_TEMP=str(tmp_path / "temp"), BUILD_SOURCESDIRECTORY=str(tmp_path),
                      aifactoryAgentConfigFile="aifactory/agent/project001-dev.json")
-    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner)
+    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner,
+                      access_factory=lambda session: RecordingAccess(session))
     assert plan["mode"] == "plan" and plan["outputs"]["customer_configuration"] == "aifactory/agent/project001-dev.json"
     written = json.loads((tmp_path / "temp" / "aifactory-agent-live-voice" / "config.json").read_text("utf-8"))
     assert written["voice"]["mode"] == "realtime" and written["max_tool_rounds"] == 6
@@ -589,3 +594,52 @@ def test_the_command_line_reports_configuration_and_command_errors_in_one_line(m
     assert "requires enableFactoryChatAgent" in error and "Traceback" not in error
     monkeypatch.setattr(module, "run", lambda args: (_ for _ in ()).throw(live.CommandError("ingest failed (exit 1)")))
     assert module.main() == 1 and "ingest failed (exit 1)" in capsys.readouterr().err
+
+
+class RecordingAccess:
+    def __init__(self, arm):
+        self.arm, self.seen = arm, []
+
+    def ensure(self, needs, *, apply):
+        self.seen.append(({need.scope: need.role for need in needs}, apply, len(self.arm.calls)))
+        return [{"status": "created", "scope": need.scope} for need in needs]
+
+
+def test_the_step_grants_its_own_foundry_blob_and_search_data_access_before_any_data_plane_call(tmp_path):
+    from agent_factory import deployer_access
+
+    arm = FakeArm()
+    recorder = RecordingAccess(arm)
+    engine = live.LiveVoiceIntegration(arm, FakeRunner(), work_dir=tmp_path, repository_root=Path("/work/checkout"),
+                                       access=recorder)
+    report = engine.run(request(), apply=True)
+    needs, apply, calls_before = recorder.seen[0]
+    assert apply is True and needs == {
+        ACCOUNT_ID: deployer_access.FOUNDRY_USER,
+        f"{GROUP_ID}/providers/Microsoft.Storage/storageAccounts/saprj0012001/blobServices/default/containers/aifactory-agent":
+            deployer_access.STORAGE_BLOB_DATA_CONTRIBUTOR,
+        f"{GROUP_ID}/providers/Microsoft.Search/searchServices/srch001": deployer_access.SEARCH_INDEX_DATA_CONTRIBUTOR,
+    }
+    first_agent_call = next(i for i, call in enumerate(arm.calls) if call[0] == "GET" and str(call[1]).startswith(ENDPOINT))
+    assert calls_before <= first_agent_call
+    assert [row["status"] for row in report["deployer_access"]] == ["created"] * 3
+
+
+def test_plan_reports_the_access_it_would_grant(tmp_path):
+    arm = FakeArm()
+    recorder = RecordingAccess(arm)
+    live.LiveVoiceIntegration(arm, FakeRunner(), work_dir=tmp_path, repository_root=Path("/work/checkout"),
+                              access=recorder).run(request(), apply=False)
+    assert recorder.seen[0][1] is False
+
+
+def test_the_launchers_build_the_real_deployer_access_from_their_session():
+    import importlib.util as util
+
+    from agent_factory import deployer_access
+
+    for folder in ("46-factory-chat-agent", "47-aifactory-agent-live-voice"):
+        spec = util.spec_from_file_location(f"launcher_{folder[:2]}", ROOT / folder / "deploy.py")
+        module = util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.run.__kwdefaults__["access_factory"].__func__ is deployer_access.DeployerAccess.for_session.__func__, folder

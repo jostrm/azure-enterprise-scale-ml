@@ -29,6 +29,7 @@ from typing import Callable, Mapping, Protocol
 from urllib.parse import quote, urlencode
 
 from .azure import ARM, AzureError
+from .deployer_access import blob_container_contributor, foundry_user, search_index_contributor
 from .factory_chat_agent import AGENT_NAME, AI_AUDIENCE, MODEL_NAME, OWNER
 from .factory_chat_agent import API_VERSION as AGENT_API_VERSION
 from .mcp_gateway import GUID, KNOWLEDGE_EXCLUDES, KNOWLEDGE_INCLUDES, flag
@@ -51,6 +52,8 @@ COGNITIVE_API = "2025-06-01"
 APPS_API = "2025-01-01"
 VOICE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
 LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+
+STORAGE_CONTAINER = "aifactory-agent"  # the agent's own container (knowledge state, deployment bundles)
 
 
 class CommandError(RuntimeError):
@@ -294,8 +297,10 @@ def check_existing_app(session: ArmPort, group_id: str, request: LiveVoiceReques
                          "or remove the app and let this step create it.")
 
 
-def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
-    """Resolve the project's actual Foundry, data and Container Apps resources (GET only)."""
+def discover(session: ArmPort, request: LiveVoiceRequest,
+             before_data_plane: Callable[[list], None] | None = None) -> Target:
+    """Resolve the project's actual Foundry, data and Container Apps resources (GET only). before_data_plane receives
+    the data-plane access needs (deployer_access) once the resources are known and before the first data-plane call."""
     group_id = f"/subscriptions/{request.subscription_id}/resourceGroups/{request.resource_group}"
     check_existing_app(session, group_id, request)
     resources = session.pages(f"{ARM}{group_id}/resources?api-version={RESOURCES_API}")
@@ -342,6 +347,9 @@ def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
     environment = session.arm("GET", environment["id"], api_version="2024-03-01")
     if not ((environment.get("properties") or {}).get("vnetConfiguration") or {}).get("internal"):
         raise ValueError("The agent stays private: the selected Container Apps environment must be internal (VNet-integrated).")
+    if before_data_plane is not None:
+        before_data_plane([foundry_user(account["id"]), blob_container_contributor(data[0]["id"], STORAGE_CONTAINER),
+                           search_index_contributor(search["id"])])
     agent_version = verify_agent(session, endpoint.rstrip("/"))
     insights = of_type("Microsoft.Insights/components")
     model = chat["properties"]["model"]
@@ -372,7 +380,7 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
         "model_version": target.model["version"], "model_sku": target.model["sku"],
         "model_capacity": target.model["capacity"], "embedding_deployment": target.embedding,
         "search_endpoint": f"https://{target.search_name}.search.windows.net", "search_index": "enterprise-scale-ai-factory-v1",
-        "storage_endpoint": f"https://{target.storage_name}.blob.core.windows.net", "storage_container": "aifactory-agent",
+        "storage_endpoint": f"https://{target.storage_name}.blob.core.windows.net", "storage_container": STORAGE_CONTAINER,
         "credential": "cli",
     }
     if target.insights_name:
@@ -431,21 +439,25 @@ class Report:
     actions: list[dict] = field(default_factory=list)
     outputs: dict = field(default_factory=dict)
     prerequisites: list[str] = field(default_factory=list)
+    deployer_access: list[dict] = field(default_factory=list)
 
     def add(self, resource: str, action: str, detail: str = "") -> None:
         self.actions.append({"resource": resource, "action": action, **({"detail": detail} if detail else {})})
 
     def to_dict(self) -> dict:
         return {"mode": self.mode, "actions": self.actions, "outputs": self.outputs,
-                "prerequisites": self.prerequisites, "mutations": self.mode == "apply"}
+                "prerequisites": self.prerequisites, "deployer_access": self.deployer_access,
+                "mutations": self.mode == "apply"}
 
 
 class LiveVoiceIntegration:
     """Dependency-injected orchestration: plan (Azure GET only) or apply (the agent's own owned writes)."""
 
     def __init__(self, session: ArmPort, runner: Runner, *, work_dir: Path, repository_root: Path,
-                 agent_dir: Path | None = None):
-        self.session, self.runner = session, runner
+                 agent_dir: Path | None = None, access=None):
+        # access (deployer_access.DeployerAccess) grants the deploying principal its Foundry, blob and Search data
+        # roles before the first data-plane call; None skips it (the caller already holds them).
+        self.session, self.runner, self.access = session, runner, access
         self.work_dir, self.repository_root = Path(work_dir), Path(repository_root)
         self.agent_dir = agent_dir or Path(__file__).resolve().parents[1] / "40-aifactory-agent"
 
@@ -480,7 +492,8 @@ class LiveVoiceIntegration:
             report.add("ai-factory-agent-live-voice", "skipped", decision.reason)
             report.mode = "skipped"
             return report.to_dict()
-        target = discover(self.session, request)
+        grant = (lambda needs: report.deployer_access.extend(self.access.ensure(needs, apply=apply))) if self.access else None
+        target = discover(self.session, request, before_data_plane=grant)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         config = self.work_dir / "config.json"
         config.write_text(json.dumps(render_config(request, target, repository_root=self.repository_root), indent=2),

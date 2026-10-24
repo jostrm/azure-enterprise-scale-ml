@@ -74,6 +74,23 @@ template (`40-aifactory-agent/infra/voice-roles.bicep`), only when voice is enab
 They are broader than the project-scoped runtime role in `identity.bicep`, which stays untouched. Check in a
 test environment whether a narrower scope is enough before using voice in production.
 
+## Data roles of the deploying identity
+
+Contributor and User Access Administrator carry no data actions, so the pipeline identity could deploy the
+resources and still get 403 reading the agent, the index or a blob. Before their first data-plane call, steps
+70 (`46-factory-chat-agent`) and 72 (this step) grant the deploying **service principal** these roles, once
+(deterministic assignment names), and then wait about two minutes for RBAC to take effect:
+
+| Role | Scope | Used by |
+|---|---|---|
+| Foundry User | project Foundry account | step 70 (agent versions), step 72 (agent check, embeddings) |
+| Storage Blob Data Contributor | container `aifactory-agent` of the project data storage | step 72 (index state, deployment bundle) |
+| Search Index Data Contributor | the project AI Search service | step 72 (knowledge index documents) |
+
+An existing assignment at that scope or above (or an equivalent data role) counts, so nothing is written twice.
+`plan` lists the roles it would grant. A signed-in user (the terminal launcher) is never granted roles: the
+report names the role to request. The roles are never removed. The code is `agent_factory/deployer_access.py`.
+
 ## Prerequisites (one-time, outside the pipeline)
 
 1. An Entra admin creates the agent's dedicated registration with

@@ -14,6 +14,7 @@ from typing import Mapping, Protocol
 from urllib.parse import quote, urlencode, urlsplit
 
 from .azure import ARM, AzureError
+from .deployer_access import foundry_user
 from .catalog import EVIDENCE_SCOPE_INSTRUCTIONS
 
 AI_AUDIENCE = "https://ai.azure.com"
@@ -304,6 +305,7 @@ def decide(request: FactoryChatAgentRequest) -> Decision:
 @dataclass(frozen=True)
 class ProjectTarget:
     account_name: str
+    account_id: str
     project_name: str
     project_endpoint: str
     model_deployment: str
@@ -382,6 +384,7 @@ def discover(session: AzurePort, request: FactoryChatAgentRequest) -> ProjectTar
     _one(model_matches, f"succeeded model deployment '{request.model_deployment}'")
     return ProjectTarget(
         account_name=account["name"].split("/")[-1],
+        account_id=account["id"],
         project_name=project["name"].split("/")[-1],
         project_endpoint=endpoint,
         model_deployment=request.model_deployment,
@@ -396,8 +399,10 @@ def _latest(agent: dict) -> dict:
 
 
 class FactoryChatAgentIntegration:
-    def __init__(self, session: AzurePort):
-        self.session = session
+    def __init__(self, session: AzurePort, access=None):
+        # access (deployer_access.DeployerAccess) grants the deploying principal Foundry data access first;
+        # None skips it (the caller already holds the role).
+        self.session, self.access = session, access
 
     def run(self, request: FactoryChatAgentRequest, *, apply: bool) -> dict:
         decision = decide(request)
@@ -408,6 +413,7 @@ class FactoryChatAgentIntegration:
                 "mutations": False,
             }
         target = discover(self.session, request)
+        access = self.access.ensure([foundry_user(target.account_id)], apply=apply) if self.access else []
         definition = agent_definition(target.model_deployment)
         digest = definition_hash(definition)
         agent_url = (
@@ -443,6 +449,7 @@ class FactoryChatAgentIntegration:
                         "model": target.model_deployment,
                     },
                     "actions": [],
+                    "deployer_access": access,
                     "mutations": False,
                 }
             status = "updated"
@@ -464,6 +471,7 @@ class FactoryChatAgentIntegration:
                     "definition_hash": digest,
                 },
             ],
+            "deployer_access": access,
             "mutations": apply,
         }
         if not apply:

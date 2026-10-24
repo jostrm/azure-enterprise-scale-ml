@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_factory.azure import AzureSession  # noqa: E402
+from agent_factory.deployer_access import DeployerAccess  # noqa: E402
 from agent_factory.factory_chat_agent import (  # noqa: E402
     FactoryChatAgentIntegration, FactoryChatAgentRequest, decide,
 )
@@ -23,7 +24,8 @@ INPUTS = (
 )
 
 
-def run(args, environ=os.environ, session_factory=AzureSession) -> dict:
+def run(args, environ=os.environ, session_factory=AzureSession, *,
+        access_factory=DeployerAccess.for_session) -> dict:
     request = FactoryChatAgentRequest.from_values(
         {name: environ.get(name) for name in INPUTS}
     )
@@ -43,7 +45,7 @@ def run(args, environ=os.environ, session_factory=AzureSession) -> dict:
             "mutations": False,
         }
     session = session_factory(request.subscription_id, request.tenant_id)
-    return FactoryChatAgentIntegration(session).run(
+    return FactoryChatAgentIntegration(session, access=access_factory(session)).run(
         request, apply=args.command == "apply"
     )
 
