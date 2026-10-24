@@ -5,7 +5,7 @@
   "endHoldSeconds": 1,
   "nominalFramesPerSecond": 20,
   "width": 1400,
-  "animationHeight": 1806,
+  "animationHeight": 1850,
   "steps": [
     "onion",
     "consumer",
@@ -35,7 +35,7 @@
       820
     ]
   },
-  "textLinesCheckedWithOpenSans": 911,
+  "textLinesCheckedWithOpenSans": 931,
   "renderer": {
     "svg": "make_onion_svg.py (standard library), SMIL animation",
     "raster": "@resvg/resvg-js 2.6.2 (CPU, no browser capture)",
@@ -43,20 +43,20 @@
   },
   "files": {
     "10-factory-onion-architecture.svg": {
-      "bytes": 20343,
-      "sha256": "61d127b3538bf30149f880c361fdbeb54fbf8844ab63d100532e17c4c59744a8"
+      "bytes": 21268,
+      "sha256": "8ecaad8c0a9eaadf22600bc124bae9baae090f815a94a15eeb681901688533bf"
     },
     "10-factory-onion-architecture.png": {
-      "bytes": 347362,
-      "sha256": "4a347a5ef4c7d538e09708afc6fc93c75b2b874bb33dc791bd9cdf3f5f67fb23"
+      "bytes": 358945,
+      "sha256": "314e41fc43427947eacac77ba704179258734f46d2af31d1b9b3a40b6551d9d4"
     },
     "10-factory-onion-architecture-animated.svg": {
-      "bytes": 147831,
-      "sha256": "6da46839806a4bf18d47dd008d535e8676635737bdc9ede6792fd81fa37f46ab"
+      "bytes": 155129,
+      "sha256": "452f2189299ab1b88fd11f2b062f1906edd12be0917f35cc7b41ae0d0bfe3e01"
     },
     "10-factory-onion-architecture.gif": {
-      "bytes": 1545830,
-      "sha256": "12963dda84e6f03759c375f0821236af7d3f85864a495b005ab976e54f606123"
+      "bytes": 1545771,
+      "sha256": "40dbcfe4cc2f51bec13a0bf8a0e2cfaf66ddc441d87f19c7ed6fab4f208e0cb2"
     }
   },
   "limitations": [

@@ -138,7 +138,7 @@ def main() -> None:
     parser.add_argument("--font-dir", type=Path, help="folder with OpenSans-Regular.ttf and OpenSans-Semibold.ttf")
     args = parser.parse_args()
     subprocess.run([sys.executable, str(HERE / "make_onion_svg.py"), "--frames", str(ART)], check=True)
-    data = json.loads((HERE / "onion-layers.json").read_text(encoding="utf-8"))
+    data = onion.load()
     out = {key: (HERE / value).resolve() for key, value in data["outputs"].items()}
     plan = json.loads((ART / "timeline.json").read_text(encoding="utf-8"))
     jobs = plan["jobs"] + [{"svg": str(out["poster_svg"]), "png": str(out["poster_png"])}]

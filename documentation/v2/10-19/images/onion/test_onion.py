@@ -1,7 +1,9 @@
 """Checks for the onion generator (standard library only): python -m unittest test_onion.py"""
 from __future__ import annotations
 
+import colorsys
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -16,7 +18,7 @@ SVG = "{http://www.w3.org/2000/svg}"
 
 class OnionData(unittest.TestCase):
     def setUp(self):
-        self.data = json.loads(onion.DATA.read_text(encoding="utf-8"))
+        self.data = onion.load()
 
     def test_every_scenario_has_a_time_for_every_layer_with_a_known_kind(self):
         ids = ["consumer"] + [layer["id"] for layer in self.data["layers"]]
@@ -46,9 +48,47 @@ class OnionData(unittest.TestCase):
         self.assertEqual([frame["start"] for frame in frames[1:]], [f["start"] + f["delay"] for f in frames[:-1]])
 
 
+class OnionColors(unittest.TestCase):
+    """Colors carry meaning: green fastest, red slowest, blue neutral, no purple in the onion."""
+
+    def setUp(self):
+        self.raw = json.loads(onion.DATA.read_text(encoding="utf-8"))
+        self.data = onion.load()
+        self.scale = {band["name"]: band["hex"] for band in self.raw["colors"]["time_scale"]}
+
+    def test_no_layer_color_is_hard_coded_in_the_data(self):
+        for item in [self.raw["consumer"]] + self.raw["layers"]:
+            self.assertNotIn("color", item, item["id"])
+
+    def test_the_slowest_layer_is_red_and_the_fastest_green(self):
+        average = {layer["id"]: onion.average_minutes(self.data, layer["id"]) for layer in self.data["layers"]}
+        colors = {layer["id"]: layer["color"] for layer in self.data["layers"]}
+        self.assertEqual(colors[max(average, key=average.get)], self.scale["red"])
+        self.assertEqual(colors[min(average, key=average.get)], self.scale["green"])
+        self.assertEqual(colors["l5"], self.scale["red"], "the core (ARM) takes the most time today")
+
+    def test_a_slower_layer_never_gets_a_better_color(self):
+        order = list(self.scale.values())
+        layers = sorted(self.data["layers"], key=lambda layer: onion.average_minutes(self.data, layer["id"]))
+        ranks = [order.index(layer["color"]) for layer in layers]
+        self.assertEqual(ranks, sorted(ranks))
+
+    def test_the_consumer_is_neutral_blue(self):
+        self.assertEqual(self.data["consumer"]["color"], self.raw["colors"]["neutral"])
+
+    def test_no_purple_anywhere_in_the_pictures(self):
+        for key in ("poster_svg", "animated_svg"):
+            content = (HERE / self.raw["outputs"][key]).resolve().read_text(encoding="utf-8")
+            for color in set(re.findall(r"#[0-9A-Fa-f]{6}\b", content)):
+                r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+                hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+                purple = 250 <= hue * 360 <= 300 and saturation > .25 and .08 < lightness < .95
+                self.assertFalse(purple, f"{color} in {key} reads as purple")
+
+
 class OnionOutputs(unittest.TestCase):
     def setUp(self):
-        self.data = json.loads(onion.DATA.read_text(encoding="utf-8"))
+        self.data = onion.load()
         self.out = {key: (HERE / value).resolve() for key, value in self.data["outputs"].items()}
 
     def test_svgs_are_vector_only_and_self_contained(self):

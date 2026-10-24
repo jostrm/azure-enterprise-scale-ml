@@ -23,7 +23,10 @@ DATA = HERE / "onion-layers.json"
 
 # VisualLearner palette (AsomRecordsAB.Base/VisualLearner/VisualLearnerScene.cs).
 W, M = 1400, 48
-BG, SURFACE, GRID, MUTED, WHITE, ACCENT, KEY = "#080E1B", "#14243A", "#304565", "#A0B5D0", "#ECF6FF", "#79DCED", "#FFD48A"
+# Colors carry meaning: layer colors come from onion-layers.json "colors" (green fastest .. red slowest,
+# blue neutral) and are assigned by load(); the base UI colors below stay neutral. No purple in the onion.
+BG, SURFACE, GRID, MUTED, WHITE, ACCENT = "#080E1B", "#14243A", "#304565", "#A0B5D0", "#ECF6FF", "#79DCED"
+RING_BASE = "#0B0D12"  # near-neutral dark: tinting toward the navy BG would turn pink rings purple
 FONT = '"Open Sans","Segoe UI","Helvetica Neue",Arial,sans-serif'
 
 # Diagram geometry, in diagram coordinates (width W - 2M).
@@ -90,11 +93,11 @@ class Scene:
                 (f' opacity="{num(opacity)}"' if opacity is not None else "")
         self.add(f'<rect x="{num(x)}" y="{num(y)}" width="{num(w)}" height="{num(h)}" rx="{radius}" fill="{fill}"{extra}/>')
 
-    def text(self, text, x, y, width, size=20, color=WHITE, bold=False, leading=None, anchor="start") -> float:
+    def text(self, text, x, y, width, size=20, color=WHITE, bold=False, leading=None, anchor="start", opacity=None) -> float:
         leading = leading or math.ceil(size * 1.38)
         lines = wrap(text, width, size, bold)
         weight = ' font-weight="600"' if bold else ""
-        align = f' text-anchor="{anchor}"' if anchor != "start" else ""
+        align = (f' text-anchor="{anchor}"' if anchor != "start" else "") + (f' fill-opacity="{opacity}"' if opacity else "")
         for index, line in enumerate(lines):
             top = y + index * leading
             TEXT_CHECKS.append({"scene": self.name, "text": line, "size": size, "bold": bold, "allowed": width})
@@ -110,6 +113,38 @@ def document(body: str, height: int, title: str, description: str) -> str:
             f'<title>{esc(title)}</title><desc>{esc(description)}</desc>'
             f'<style>text{{font-family:{FONT};font-kerning:normal}}</style>'
             f'<rect width="{W}" height="{height}" fill="{BG}"/>{body}</svg>\n')
+
+
+# ---------------------------------------------------------------- data and colors
+
+def load(path: Path = DATA) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assign_colors(data)
+    return data
+
+
+def average_minutes(data, node_id: str) -> float:
+    """Middle of each scenario's range for this layer, averaged over the scenarios."""
+    times = [scenario["times"][node_id] for scenario in data["scenarios"]]
+    return sum((t["min"] + t["max"]) / 2 for t in times) / len(times)
+
+
+def assign_colors(data) -> None:
+    """Green for the fastest layers .. red for the slowest, by share of the slowest layer; consumer neutral."""
+    colors = data["colors"]
+    slowest = max(average_minutes(data, layer["id"]) for layer in data["layers"]) or 1
+    for layer in data["layers"]:
+        share = average_minutes(data, layer["id"]) / slowest
+        band = next(b for b in colors["time_scale"] if b["below_share"] is None or share < b["below_share"])
+        layer["color"], layer["color_name"] = band["hex"], band["name"]
+    data["consumer"]["color"], data["consumer"]["color_name"] = colors["neutral"], "blue"
+
+
+def color_legend(data) -> str:
+    bands = data["colors"]["time_scale"]
+    parts = [f'{b["name"]} under {round(b["below_share"] * 100)}%' for b in bands if b["below_share"] is not None]
+    return ("Colour = average time in the layer per scenario, relative to the slowest layer: " + ", ".join(parts)
+            + f', {bands[-1]["name"]} the slowest. Blue = neutral (the consumer, outside the AI Factory).')
 
 
 # ---------------------------------------------------------------- diagram
@@ -212,7 +247,7 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
     for index, layer in enumerate(data["layers"]):
         on = lit(layer["id"])
         color = layer["color"]
-        fill = mix(color, BG, .16 if on else .05)
+        fill = mix(color, RING_BASE, .2 if on else .07)
         stroke = color if on else GRID
         scene.add(f'<circle cx="{num(cx)}" cy="{num(cy)}" r="{RADII[index]}" fill="{fill}" stroke="{stroke}" '
                   f'stroke-width="{2.4 if on and focus is not None else 1.6}"/>')
@@ -224,9 +259,10 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         defs.append(f'<path id="{top}" d="M{num(cx - r_top)},{num(cy)} A{num(r_top)},{num(r_top)} 0 0 1 {num(cx + r_top)},{num(cy)}"/>')
         defs.append(f'<path id="{bottom}" d="M{num(cx - r_bottom)},{num(cy)} A{num(r_bottom)},{num(r_bottom)} 0 0 0 {num(cx + r_bottom)},{num(cy)}"/>')
         for path_id, label, size, color in ((top, layer["ring_top"], 14, layer["color"] if on else MUTED),
-                                            (bottom, layer["ring_bottom"], 11, mix(layer["color"], MUTED, .55) if on else GRID)):
+                                            (bottom, layer["ring_bottom"], 11, layer["color"] if on else GRID)):
             TEXT_CHECKS.append({"scene": name, "text": label, "size": size, "bold": True, "allowed": math.pi * mid * .62})
-            scene.add(f'<text font-size="{size}" font-weight="600" letter-spacing="1" fill="{color}">'
+            faded = ' fill-opacity=".8"' if path_id == bottom else ""
+            scene.add(f'<text font-size="{size}" font-weight="600" letter-spacing="1" fill="{color}"{faded}>'
                       f'<textPath href="#{path_id}" startOffset="50%" text-anchor="middle">{esc(label)}</textPath></text>')
     core = data["layers"][4]
     on = lit(core["id"])
@@ -249,7 +285,7 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
     by_id = nodes(data)
     for path in data["paths"]:
         points = path_points(data, center, path["id"])
-        color = KEY if path["dashed"] else WHITE
+        color = MUTED if path["dashed"] else WHITE
         if focus is None:
             sequence = [points["consumer"], points["consumer-join"]] if path["via"][0] == "consumer" else []
             sequence += [points[node_id] for node_id in path["via"] if node_id != "consumer"]
@@ -265,7 +301,7 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
             if not skipped:
                 scene.add(f'<circle cx="{num(px)}" cy="{num(py)}" r="3" fill="{ring if lit(node_id) else GRID}"/>')
             else:
-                scene.text(f'skips {by_id[node_id]["label"]}', px + 12, py + 2, 70, 11, KEY if lit(path["via"][0]) else GRID, True)
+                scene.text(f'skips {by_id[node_id]["label"]}', px + 12, py + 2, 70, 11, MUTED if lit(path["via"][0]) else GRID, True)
     routes = []
     for index, link in enumerate(links):
         points = route(data, center, link)
@@ -291,7 +327,7 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         y = scene.text(title, CARD_X + 16, top + 31, inner, 16, WHITE if on else MUTED, True, 22)
         y = scene.text(item["where"], CARD_X + 16, y + 4, inner, 11.5, MUTED, leading=16)
         y = scene.text(item["what"], CARD_X + 16, y + 4, inner, 13, WHITE if on else MUTED, leading=18)
-        scene.text("e.g. " + item["example"], CARD_X + 16, y + 4, inner, 11.5, mix(color, MUTED, .7) if on else GRID, True, 16)
+        scene.text("e.g. " + item["example"], CARD_X + 16, y + 4, inner, 11.5, color if on else GRID, True, 16, opacity=.8 if on else None)
 
     if chart:
         time_chart(scene, data, (0, center[1] + RADII[0] + 44, CARD_X - 40, height))
@@ -299,10 +335,14 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
     # Path legend under the diagram.
     y = height + 18
     for path in data["paths"]:
-        color = KEY if path["dashed"] else WHITE
+        color = MUTED if path["dashed"] else WHITE
         scene.add(f'<path d="M0,{num(y + 10)} H44" stroke="{color}" stroke-width="2.4"{dash(path["dashed"])}/>')
         scene.text(f'{path["label"]}: {path["text"]}', 56, y, DW - 56, 14, color if path["dashed"] else WHITE, True, 20)
         y += 24
+    bands = data["colors"]["time_scale"]
+    for index, band in enumerate(bands):
+        scene.rect(index * 11, y + 6, 10, 10, band["hex"], radius=2)
+    y = scene.text(color_legend(data), 56, y, DW - 56, 14, WHITE, True, 20) + 4
     return scene, y, routes
 
 
@@ -445,7 +485,7 @@ def animation(data, frames_dir: Path | None):
         y += 16
         key_height = len(wrap(step["key"], DW - 36, 17, True)) * 24 + 32
         scene.rect(M, y, DW, key_height, SURFACE, GRID)
-        scene.text(step["key"], M + 18, y + 14, DW - 36, 17, KEY, True, 24)
+        scene.text(step["key"], M + 18, y + 14, DW - 36, 17, WHITE, True, 24)
         text_bottoms.append(y + key_height + 18)
         prepared.append(scene)
     fixed_y = max(text_bottoms)  # stable diagram position across steps
@@ -547,6 +587,7 @@ def tables(data) -> dict[str, str]:
     loops = data["prevention"]["loops_minutes"]
     out["loops"] = " + ".join(f"{v} {k}" for k, v in loops.items()) + f" = **{sum(loops.values())} min**"
     out["fifth-bug"] = data["prevention"]["fifth_bug"]
+    out["colors"] = color_legend(data) + " " + data["colors"]["note"]
     out["evidence"] = "\n".join(f"- **{key}**: {text}" for key, text in data["evidence"].items())
     return out
 
@@ -567,7 +608,7 @@ def main() -> None:
     parser.add_argument("--update-doc", action="store_true", help="rewrite the generated tables in the markdown page")
     parser.add_argument("--frames", type=Path, help="write per-step scenes and timeline.json for make_onion_raster.py")
     args = parser.parse_args()
-    data = json.loads(args.data.read_text(encoding="utf-8"))
+    data = load(args.data)
     out = {key: (args.data.parent / value).resolve() for key, value in data["outputs"].items()}
     svg, height = poster(data)
     out["poster_svg"].write_text(svg, encoding="utf-8")
