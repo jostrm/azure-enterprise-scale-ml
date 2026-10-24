@@ -7,6 +7,9 @@ task `70-factory-chat-agent`) and the AI Factory MCP step, as the last task of t
 reports are published), and only when `enableAIFactoryAgentLiveVoice` is
 `true` and no delete-all flag is set. It deploys the code in [40-aifactory-agent](../40-aifactory-agent/readme.md)
 with Azure Voice Live: a voice card with a pulsing orb that listens, thinks and speaks.
+Which voice technology it uses (always the Voice Live API; `speech_shell` with an Azure neural voice, or `realtime`
+with a GPT realtime model such as `gpt-realtime-mini`) is explained in
+[40-aifactory-agent, Live voice](../40-aifactory-agent/readme.md#live-voice-optional).
 
 | Flags | Result |
 |---|---|

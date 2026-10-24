@@ -555,6 +555,23 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
 (the operator flow). The user guide is
 [chapter 21](../../../documentation/v2/10-19/21-agent-factory-chat.md).
 
+**Which voice technology does it use?**
+
+Both modes use the **Azure Voice Live API** (`wss://<foundry-account>.services.ai.azure.com/voice-live/realtime`,
+`api-version` `2026-04-10`) on the project Foundry account. No separate Azure Speech resource or Speech SDK
+pipeline (speech to text, then chat, then text to speech) is used. The mode decides who writes the answer and
+whose voice speaks it:
+
+| `voice.mode` | Speech in | Who writes the answer | Voice out |
+|---|---|---|---|
+| `speech_shell` (default; the pipeline baseline) | Voice Live transcription and turn detection | The same `Conversation.answer()` as typed chat (grounded, cited) | An Azure neural voice through Voice Live (`voice_type: "azure-standard"`, default `en-US-Ava:DragonHDLatestNeural`) |
+| `realtime` (opt-in, e.g. Spider project001 Dev) | The GPT realtime model hears the audio itself (`gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`) | The realtime model, with the evidence, read tools and citation checks from `Conversation.prepare` | The realtime model's own voice (`voice_type: "openai"`, for example `coral`) |
+
+Choose the mode in your configuration (or in the customer overlay named by `aifactoryAgentConfigFile`), for
+example `"voice": {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "coral"}`.
+`speech_shell` keeps typed and spoken answers identical; `realtime` answers faster and sounds more natural, with
+the verification trade-off described below.
+
 **How it works**
 
 - The compatibility default, `voice.mode: "speech_shell"`, uses Azure **Voice Live**
