@@ -4499,6 +4499,29 @@ jobs:
             --expected-subscription "$MCP_SUBSCRIPTION" --expected-project "$MCP_PROJECT" \
             --expected-environment "$MCP_ENVIRONMENT" --variables-file "$MCP_VARIABLES" --apply
 
+      - name: Report final pipeline job result (offline)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-deploy-project-${{ inputs.phase }}-${{ inputs.environment }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Deploy Factory Chat Agent in Foundry
         if: success() && inputs.phase == 'foundry' && env.enableFactoryChatAgent == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
         shell: bash
@@ -4525,29 +4548,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 "$AIFACTORY_AGENT_REPOSITORY/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py" apply --apply
-
-      - name: Report final pipeline job result (offline)
-        if: always()
-        continue-on-error: true
-        shell: bash
-        env:
-          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
-          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
-        run: |
-          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
-          if [ -f "$helper" ]; then bash "$helper"; else
-            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
-          fi
-
-      - name: Publish AI Factory region reports
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: aifactory-region-reports-deploy-project-${{ inputs.phase }}-${{ inputs.environment }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}/*.json
-          if-no-files-found: warn
-          retention-days: 14
 
       - name: Remove run-specific reviewed configuration
         if: ${{ always() && inputs.deployment_id != '' }}

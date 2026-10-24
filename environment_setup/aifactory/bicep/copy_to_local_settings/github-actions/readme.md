@@ -61,6 +61,12 @@ runs to include these hooks. Existing yellow repositories/copies and historical
 runs are not modified. The existing Azure DevOps bootstrap copy includes the shared
 `esml-infra-common/jobs/region-report-steps.yaml` template.
 
+In the project job the region reports come before the AI Factory Agent steps: the chat agent
+(`70-factory-chat-agent`), the AI Factory MCP and AI Gateway (`71-aifactory-mcp-ai-gateway`) and live voice
+(`72-aifactory-agent-live-voice`) run last, in that order (GitHub Actions only removes the run-specific reviewed
+configuration after them). The reports therefore describe the infrastructure result; an agent step failure shows
+in the run itself, not in the report.
+
 Each JSON file uses schema version 1 with `region`, `subscription_id`, `tenant_id`,
 `environment` (`dev`, `stage`, `prod`, or empty), `source: pipeline_artifact`,
 `run_id`, `run_url`, an actual UTC `observed_at`, and `observations`. Each observation

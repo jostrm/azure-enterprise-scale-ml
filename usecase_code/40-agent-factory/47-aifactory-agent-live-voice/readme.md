@@ -3,7 +3,8 @@
 A late, opt-in step of the normal project pipeline (ADO `jobs/job-aifactory-agent-live-voice.yaml`,
 task `72-aifactory-agent-live-voice`; GitHub Actions step "Deploy AI Factory Agent live voice (any project, Dev)").
 It runs in the `foundry` phase after the Factory Chat Agent step ([46-factory-chat-agent](../46-factory-chat-agent/deploy.py),
-task `70-factory-chat-agent`) and the AI Factory MCP step, and only when `enableAIFactoryAgentLiveVoice` is
+task `70-factory-chat-agent`) and the AI Factory MCP step, as the last task of the project job (after the region
+reports are published), and only when `enableAIFactoryAgentLiveVoice` is
 `true` and no delete-all flag is set. It deploys the code in [40-aifactory-agent](../40-aifactory-agent/readme.md)
 with Azure Voice Live: a voice card with a pulsing orb that listens, thinks and speaks.
 

@@ -65,7 +65,7 @@ def test_ado_template_is_included_after_the_mcp_gateway_and_maps_every_input():
     services = ADO_SERVICES.read_text(encoding="utf-8")
     assert services.index("- template: job-factory-chat-agent.yaml") < services.index("- template: job-aifactory-agent-live-voice.yaml")
     assert services.index("- template: job-aifactory-mcp-ai-gateway.yaml") < services.index("- template: job-aifactory-agent-live-voice.yaml")
-    assert services.index("- template: job-aifactory-agent-live-voice.yaml") < services.index("region-report-steps.yaml")
+    assert services.index("region-report-steps.yaml") < services.index("- template: job-aifactory-agent-live-voice.yaml")
     step = load_pipeline(JOB)["steps"][0]
     assert step["task"] == "AzureCLI@2" and step["displayName"] == "72-aifactory-agent-live-voice"
     assert step["inputs"]["azureSubscription"] == "${{ parameters.serviceConnection }}"

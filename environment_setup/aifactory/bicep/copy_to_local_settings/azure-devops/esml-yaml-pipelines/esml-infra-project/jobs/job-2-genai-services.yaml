@@ -6095,6 +6095,8 @@ steps:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}
 
+- template: ../../esml-infra-common/jobs/region-report-steps.yaml
+
 - template: job-factory-chat-agent.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
@@ -6109,5 +6111,3 @@ steps:
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}
-
-- template: ../../esml-infra-common/jobs/region-report-steps.yaml
