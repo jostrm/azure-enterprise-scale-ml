@@ -44,13 +44,17 @@ if [[ "${1:-}" == "--no-delete" ]]; then
         aif_error "Python 3 is required for --no-delete."
         exit 1
     fi
+    # Registered roots: keep the API's catalog lock and operations database out of Git.
+    ignore_option=""
+    [[ "$registered" != "true" ]] || ignore_option="--ignore-api-metadata"
     PYTHONDONTWRITEBYTECODE=1 "${python_command[@]}" "$bundle/lib/bootstrap_no_delete.py" \
-        bundle --source "$bundle" --root "$SCRIPT_DIR/.."
+        bundle --source "$bundle" --root "$SCRIPT_DIR/.." ${ignore_option:+"$ignore_option"}
     aif_complete "Installed both ADO and GHA bootstrap helpers without deleting files or dispatching workflows."
-    aif_info "Existing .gitignore is preserved; review tracking rules before staging the installed bundle."
     if [[ "$registered" == "true" ]]; then
+        aif_info "Existing .gitignore lines are preserved; .azurefactory/ is appended when missing. Review other tracking rules before staging the installed bundle."
         aif_info "Registered layout: use ADO/GHA-azurefactory.sh with a reviewed manifest. Template copy remains blocked."
     else
+        aif_info "Existing .gitignore is preserved; review tracking rules before staging the installed bundle."
         aif_info "From your repository root: bash ./01-aif-copy-aifactory-templates.sh --no-delete"
         aif_info "Then, only to initialize register storage: bash ./01-aif-copy-aifactory-templates.sh --init-azurefactory"
         aif_info "Do not run legacy 02/03 bootstrap helpers for this register-only setup."

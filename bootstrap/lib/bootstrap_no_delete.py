@@ -12,6 +12,30 @@ from uuid import uuid4
 import initialize_azurefactory as starter
 
 
+# The API writes azurefactory/.azurefactory/ (catalog lock, operations database) after the first catalog operation.
+API_METADATA_RULE = ".azurefactory/"
+API_METADATA_COMMENT = "# AI Factory API catalog lock and operations database; never commit."
+
+
+def ensure_api_metadata_ignored(root):
+    """Append the API metadata rule once; existing .gitignore bytes are never rewritten."""
+    path = starter.ordinary(root / ".gitignore")
+    existing = path.read_bytes() if path.exists() else b""
+    rules = {API_METADATA_RULE, API_METADATA_RULE.rstrip("/")}
+    rules |= {"**/" + rule for rule in rules}
+    lines = existing.decode("utf-8", errors="replace").lstrip("\ufeff").splitlines()
+    if any(line.rstrip() in rules for line in lines):
+        print(f"{path} already ignores {API_METADATA_RULE}")
+        return
+    newline = b"\r\n" if b"\r\n" in existing else b"\n"
+    block = newline.join((API_METADATA_COMMENT.encode(), API_METADATA_RULE.encode(), b""))
+    if existing and not existing.endswith(b"\n"):
+        block = newline + block
+    with path.open("ab") as stream:
+        stream.write(block)
+    print(f"Added {API_METADATA_RULE} to {path}: keeps the API catalog lock and operations database out of Git.")
+
+
 class Merge:
     def __init__(self, root):
         self.root = starter.ordinary(root)
@@ -184,6 +208,8 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--layout-mode", choices=("auto", "legacy-templates"), default="auto")
     parser.add_argument("--api-assets", nargs="+", default=[])
+    parser.add_argument("--ignore-api-metadata", action="store_true",
+                        help="Registered layout: append .azurefactory/ to .gitignore when it is missing.")
     args = parser.parse_args()
     try:
         merge = Merge(Path(os.path.abspath(args.root)))
@@ -196,6 +222,8 @@ def main():
                 raise ValueError("Explicit relative CLI/API assets are required.")
             templates(merge, source, args.layout_mode, args.api_assets)
         merge.execute()
+        if args.ignore_api_metadata:
+            ensure_api_metadata_ignored(merge.root)
     except (OSError, ValueError) as exc:
         print(f"ERROR: Non-deleting bootstrap stopped: {exc}", file=sys.stderr)
         return 2

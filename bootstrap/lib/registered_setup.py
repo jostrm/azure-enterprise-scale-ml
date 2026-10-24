@@ -7,31 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from bootstrap_no_delete import Merge
+from bootstrap_no_delete import Merge, ensure_api_metadata_ignored
 import initialize_azurefactory as starter
-
-# The API writes azurefactory/.azurefactory/ (catalog lock, operations database) after the first catalog operation.
-API_METADATA_RULE = ".azurefactory/"
-API_METADATA_COMMENT = "# AI Factory API catalog lock and operations database; never commit."
-
-
-def ensure_api_metadata_ignored(root):
-    """Append the API metadata rule once; existing .gitignore bytes are never rewritten."""
-    path = starter.ordinary(root / ".gitignore")
-    existing = path.read_bytes() if path.exists() else b""
-    rules = {API_METADATA_RULE, API_METADATA_RULE.rstrip("/")}
-    rules |= {"**/" + rule for rule in rules}
-    lines = existing.decode("utf-8", errors="replace").lstrip("\ufeff").splitlines()
-    if any(line.rstrip() in rules for line in lines):
-        print(f"{path} already ignores {API_METADATA_RULE}")
-        return
-    newline = b"\r\n" if b"\r\n" in existing else b"\n"
-    block = newline.join((API_METADATA_COMMENT.encode(), API_METADATA_RULE.encode(), b""))
-    if existing and not existing.endswith(b"\n"):
-        block = newline + block
-    with path.open("ab") as stream:
-        stream.write(block)
-    print(f"Added {API_METADATA_RULE} to {path}: keeps the API catalog lock and operations database out of Git.")
 
 
 def git(source, *args):

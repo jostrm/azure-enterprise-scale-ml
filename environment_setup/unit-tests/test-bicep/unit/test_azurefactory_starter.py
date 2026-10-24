@@ -67,6 +67,15 @@ class StarterWorkspace(unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         return path
 
+    def ignored(self, *relative):
+        # Callers git-init the workspace so the shared repository's rules do not apply.
+        result = subprocess.run(
+            ["git", "-C", str(self.workspace), "check-ignore", "--no-index", "--", *relative],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        return set(result.stdout.split())
+
 
 class TestAzureFactoryStarter(StarterWorkspace):
     def test_template_exactly_matches_empty_v2_contract(self):
@@ -397,6 +406,24 @@ class TestStarterBootstrapRouting(StarterWorkspace):
         for relative in ("azurefactory/register.json", "aifactory-templates/keep.txt",
                          "aifactory-usecase-code/keep.txt"):
             self.assertEqual(self.snapshot()[str(Path(relative))], before[str(Path(relative))])
+
+    def test_no_delete_start_at_registered_root_appends_api_metadata_rule_once(self):
+        subprocess.run(["git", "init", "--quiet", str(self.workspace)], check=True, capture_output=True)
+        script = self.prepare_start_bundle()
+        self.write_register(json.dumps(populated_document(), indent=4))
+        gitignore = self.workspace / ".gitignore"
+        gitignore.write_bytes(b"private-config.json\n")
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("FORBIDDEN_", result.stdout + result.stderr)
+        self.assertIn("Added .azurefactory/ to", result.stdout)
+        expected = b"private-config.json\n" + API_METADATA_RULE
+        self.assertEqual(gitignore.read_bytes(), expected)
+        self.assertEqual(self.ignored(*API_METADATA, "azurefactory/register.json"), set(API_METADATA))
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("already ignores .azurefactory/", result.stdout)
+        self.assertEqual(gitignore.read_bytes(), expected)
 
     def test_no_delete_refresh_preserves_sentinels_and_versions_for_all_modes(self):
         self.prepare_template_sources()
@@ -736,14 +763,6 @@ class TestRegisteredShellSetup(StarterWorkspace):
             [str(BASH), str(ROOT / "01-start-v125-and-above.sh"), *args],
             cwd=self.workspace, env=self.env, capture_output=True, text=True, timeout=60,
         )
-
-    def ignored(self, *relative):
-        result = subprocess.run(
-            ["git", "-C", str(self.workspace), "check-ignore", "--no-index", "--", *relative],
-            capture_output=True, text=True, check=False,
-        )
-        self.assertIn(result.returncode, (0, 1), result.stderr)
-        return set(result.stdout.split())
 
     def test_clean_consumer_installs_both_providers_and_real_cli_offline(self):
         result = self.start()

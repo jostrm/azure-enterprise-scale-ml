@@ -20,7 +20,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_bootstrap_scoped_creation_guard.py
 graph_symbols:
   - bootstrap/lib/registered_creation.py::function:prepare
-reviewed_source: '4a2e0973 + Graph read-back in registered_prerequisites; observed 2026-10-22; governance-compliant runner patch settings 2026-10-23; .azurefactory/ ignore rule in registered_setup 2026-10-24; concurrent private DNS writes in registered_prerequisites 2026-10-24'
+reviewed_source: '4a2e0973 + Graph read-back in registered_prerequisites; observed 2026-10-22; governance-compliant runner patch settings 2026-10-23; .azurefactory/ ignore rule in registered_setup and 00-start --no-delete (registered roots) 2026-10-24; concurrent private DNS writes in registered_prerequisites 2026-10-24'
 ---
 # Bootstrap and layouts
 
@@ -35,15 +35,19 @@ files and credentials remain ignored.
 
 `01-start-v125-and-above.sh` delegates to `registered_setup.py`: registered-layout onboarding, not a download, source-version change or cloud deployment. `registered_creation.py` maps Simple/Full launcher inputs into the API-owned prepare/review/confirm workflow and does not write factory records or execute cloud bootstrap itself.
 
-Onboarding (including `--refresh-only`) keeps the API's pending catalog metadata
-out of Git: `ensure_api_metadata_ignored` appends `.azurefactory/` with a comment
-to the consumer root `.gitignore` when no `.azurefactory`, `.azurefactory/` or
-`**/` form of the rule exists, in the file's line-ending style, and never
-rewrites existing lines. The rule covers `azurefactory/.azurefactory/`
-(`.catalog.lock`, `catalog-operations.sqlite` and its journal files; the set
-`registered_creation.consumer_root` accepts) and a root `.azurefactory/`. The
-legacy `--init-azurefactory` copier route and `initialize_azurefactory.py` do
-not edit `.gitignore`.
+Registered onboarding keeps the API's pending catalog metadata out of Git.
+`bootstrap_no_delete.ensure_api_metadata_ignored` appends `.azurefactory/` with a
+comment to the consumer root `.gitignore` when no `.azurefactory`,
+`.azurefactory/` or `**/` form of the rule exists, in the file's line-ending
+style, and never rewrites existing lines. Two callers use it:
+`registered_setup.py` (`01-start-v125-and-above.sh`, every run including
+`--refresh-only`) and `00-start.sh --no-delete`, which passes
+`bundle --ignore-api-metadata` only when `aif_registered_layout_root` found a
+register. The rule covers `azurefactory/.azurefactory/` (`.catalog.lock`,
+`catalog-operations.sqlite` and its journal files; the set
+`registered_creation.consumer_root` accepts) and a root `.azurefactory/`. Legacy
+`--no-delete` refreshes, the `--init-azurefactory` copier route and
+`initialize_azurefactory.py` do not edit `.gitignore`.
 
 | Layout | Meaning |
 |---|---|
