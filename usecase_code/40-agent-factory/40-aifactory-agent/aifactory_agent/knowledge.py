@@ -660,11 +660,12 @@ class Knowledge:
             raise _IndexVisibilityPending("Committed Search index is out of sync with its manifest.")
         if type(count) is not int or count != len(manifest["entries"]):
             raise IndexingError("Committed Search index is out of sync with its manifest.")
+        # Keys are unique in a Search index, but an unsorted "*" query pages without a stable order: a page can repeat
+        # one document and skip another. Every row is verified; a repeat is de-duplicated by key and a skipped document
+        # is "not visible yet", so the scan is repeated until every manifest document is searchable or time runs out.
         seen = set()
         for row in client.search(search_text="*", select=self._selected_fields(manifest)):
             self._verify_row(row, manifest)
-            if row["id"] in seen:
-                raise IndexingError("Committed Search index returned duplicate documents.")
             seen.add(row["id"])
         if seen != set(manifest["entries"]):
             raise _IndexVisibilityPending("Committed Search index did not return every manifest document.")

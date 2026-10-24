@@ -176,6 +176,12 @@ class FakeSearch:
     def get_document_count(self):
         return len(self.docs)
 
+    def get_document(self, key, selected_fields=None):
+        if key not in self.docs:
+            raise ResourceNotFoundError()
+        document = copy.deepcopy(self.docs[key])
+        return {field: document.get(field) for field in selected_fields} if selected_fields else document
+
 
 class FakeEmbeddings:
     def __init__(self, dimensions):
@@ -272,6 +278,36 @@ def test_snapshot_pins_generation_across_promotion_and_in_progress_read(knowledg
     knowledge.embedding_client.create = original_create
     pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
     assert "Old committed" in pinned.search("question", "project001-dev")[0]["content"]
+
+
+def test_unstable_wildcard_paging_is_not_mistaken_for_duplicate_documents(knowledge, settings, monkeypatch):
+    # Azure AI Search keys are unique, but an unsorted "*" query pages without a stable order: a page can repeat one
+    # document and skip another. The repeat is de-duplicated and the skipped document is waited for (a fresh scan).
+    from aifactory_agent import knowledge as module
+
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    write(settings, "guide.md", "# Original\nOld committed text.\n")
+    write(settings, "other.md", "# Other\nMore committed text.\n")
+    knowledge.refresh()
+    original_factory = knowledge._search_client_factory
+
+    def factory(name):
+        client = original_factory(name)
+        search, unstable_once = client.search, [True]
+
+        def unstable(**options):
+            rows = search(**options)
+            if options.get("search_text") == "*" and len(rows) > 1 and unstable_once.pop() if unstable_once else False:
+                return [rows[0], *rows[:-1]]
+            return rows
+
+        client.search = unstable
+        return client
+
+    knowledge._search_client_factory = factory
+    write(settings, "guide.md", "# Replacement\nNew committed text.\n")
+    assert knowledge.refresh()["status"] == "ready"
+    assert knowledge.status()["availability"] == "current"
 
 
 @pytest.mark.parametrize("delay", ["count", "rows", "timeout", "corruption"])
