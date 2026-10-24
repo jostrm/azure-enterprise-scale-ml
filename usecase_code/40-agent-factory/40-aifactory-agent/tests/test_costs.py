@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from aifactory_agent.costs import (
     ARM, RETAIL, COST_SKILLS, COST_TOOL_TO_SKILL, DEFAULT_VARIABLES_RELATIVE_PATH,
-    DEFAULT_VARIABLES_SHA256, CostSettings, CostSkills, NoArguments, RGArguments,
+    CostSettings, CostSkills, NoArguments, RGArguments,
     argument_model, cost_descriptors, template_components,
 )
 from aifactory_agent.security import Principal
@@ -224,12 +224,14 @@ def test_cost_settings_closed_and_bounded(options):
         CostSettings(**options)
 
 
-def test_canonical_default_is_integrity_pinned_and_live_settings_not_used(settings, principal):
+def test_canonical_default_is_read_from_this_checkout_and_live_settings_not_used(settings, principal):
+    # The canonical template ships in the same commit as this code: its bytes are hashed, not compared to a constant
+    # that every template change (or a CRLF checkout) would break. Explicit pins stay enforced (tests below).
     raw = (REPO / DEFAULT_VARIABLES_RELATIVE_PATH).read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == DEFAULT_VARIABLES_SHA256
     fake = FakeAzure()
     data, cred = run(settings, principal, fake)
     assert data["inventory_source"]["source_type"] == "canonical_default_variables"
+    assert data["inventory_source"]["sha256"] == hashlib.sha256(raw).hexdigest()
     assert not data["inventory_source"]["uses_applied_live_settings"]
     baseline = data["idle_baseline"]
     search = next(item for item in baseline["components"] if item["service"] == "ai-search")
@@ -250,10 +252,21 @@ def test_template_changed_or_unpinned_is_explicit_blocker(settings, principal, m
     with pytest.raises(ToolError) as error:
         run(configure(settings, default_variables_path=Path("applied.json")), principal, FakeAzure())
     assert error.value.code == "cost_template_unpinned"
+    pinned = configure(settings, default_variables_sha256=hashlib.sha256((REPO / DEFAULT_VARIABLES_RELATIVE_PATH).read_bytes()).hexdigest())
     monkeypatch.setattr(Path, "read_bytes", lambda _: b'{"dev":{}}')
     with pytest.raises(ToolError) as error:
-        run(settings, principal, FakeAzure())
+        run(pinned, principal, FakeAzure())
     assert error.value.code == "cost_template_integrity"
+
+
+def test_a_crlf_checkout_of_the_canonical_template_is_still_priced(settings, principal, tmp_path):
+    template = tmp_path / DEFAULT_VARIABLES_RELATIVE_PATH
+    template.parent.mkdir(parents=True)
+    raw = (REPO / DEFAULT_VARIABLES_RELATIVE_PATH).read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    template.write_bytes(raw)
+    checkout = settings.model_copy(update={"knowledge": settings.knowledge.model_copy(update={"repository_root": tmp_path})})
+    data, _ = run(checkout, principal, FakeAzure())
+    assert data["inventory_source"]["sha256"] == hashlib.sha256(raw).hexdigest()
 
 
 def test_packaged_template_path_requires_trusted_hash(settings, principal, monkeypatch):

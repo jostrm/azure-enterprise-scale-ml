@@ -100,10 +100,12 @@ def package(settings, client_id: str, destination: Path) -> dict:
     if template.is_symlink() or template.stat().st_size > 2_000_000:
         raise RuntimeError("The approved cost template must be a bounded regular file.")
     with template.open("rb") as stream:
-        if hashlib.file_digest(stream, "sha256").hexdigest() != template_hash.lower():
-            raise RuntimeError("The default cost template changed from its trusted SHA-256 pin.")
+        actual = hashlib.file_digest(stream, "sha256").hexdigest()
+    if template_hash is not None and actual != template_hash.lower():
+        raise RuntimeError("The default cost template changed from its trusted SHA-256 pin.")
+    # The bundle pins the bytes it ships, so the running application verifies exactly this template.
     cloud["costs"]["default_variables_path"] = DEFAULT_VARIABLES_RELATIVE_PATH.as_posix()
-    cloud["costs"]["default_variables_sha256"] = template_hash.lower()
+    cloud["costs"]["default_variables_sha256"] = actual
     if settings.azure.application_insights_name:
         scope = next(iter(settings.scopes.values()))
         monitoring = az("resource", "show", "--subscription", str(scope.subscription_id),

@@ -19,7 +19,6 @@ RETAIL = "https://prices.azure.com/api/retail/prices"
 API_VERSION = "2025-03-01"
 HOURS = Decimal(730)
 DEFAULT_VARIABLES_RELATIVE_PATH = Path("environment_setup") / "aifactory" / "variables.json"
-DEFAULT_VARIABLES_SHA256 = "c753b65634f80e9dc4f55323fb917448e3f57c11311e73bad6f09b748e4f3ec6"
 COST_SKILLS = (
     "/get-default-project-estimated-azure-idle-running-cost",
     "/get-aifactory-common-estimated-azure-idle-running-cost",
@@ -89,10 +88,12 @@ class RGArguments(NoArguments):
     resource_group: str = Field(pattern=_RG)
 
 
-def default_template_source(repository_root: Path, options: CostSettings) -> tuple[Path, str]:
+def default_template_source(repository_root: Path, options: CostSettings) -> tuple[Path, str | None]:
+    """The template and its trusted pin. The canonical template ships in the same commit as this code, so without an
+    explicit pin its own bytes are trusted (None); a configured template must always carry its pin."""
     path = options.default_variables_path
     if path is None:
-        return repository_root / DEFAULT_VARIABLES_RELATIVE_PATH, options.default_variables_sha256 or DEFAULT_VARIABLES_SHA256
+        return repository_root / DEFAULT_VARIABLES_RELATIVE_PATH, options.default_variables_sha256
     if not options.default_variables_sha256:
         _fail("cost_template_unpinned", "A configured default template requires its trusted SHA-256 pin.", 503)
     return (path if path.is_absolute() else repository_root / path), options.default_variables_sha256
@@ -686,12 +687,13 @@ class CostSkills:
             if path.stat().st_size > _MAX_BYTES:
                 raise ValueError
             raw = path.read_bytes()
-            if hashlib.sha256(raw).hexdigest() != digest.lower():
+            actual = hashlib.sha256(raw).hexdigest()
+            if digest is not None and actual != digest.lower():
                 _fail("cost_template_integrity", "The canonical default variables template differs from its trusted pin.", 503)
             document = json.loads(raw.decode("utf-8-sig"))
         except (OSError, ValueError, UnicodeError):
             _fail("cost_template_unavailable", "The integrity-pinned canonical default variables template is unavailable.", 503)
-        return document, {"source_type": "canonical_default_variables", "sha256": digest.lower(),
+        return document, {"source_type": "canonical_default_variables", "sha256": actual,
                           "template": DEFAULT_VARIABLES_RELATIVE_PATH.as_posix(),
                           "uses_applied_live_settings": False}
 

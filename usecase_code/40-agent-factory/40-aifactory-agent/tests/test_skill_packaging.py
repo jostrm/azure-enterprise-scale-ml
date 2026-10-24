@@ -39,6 +39,18 @@ def package_inputs(tmp_path, monkeypatch):
     return settings, tmp_path / "bundle.tar.gz", template
 
 
+def test_unpinned_canonical_template_is_bundled_with_the_checkouts_own_hash(package_inputs):
+    settings, destination, template = package_inputs
+    template.write_bytes(template.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    settings = settings.model_copy(update={"costs": settings.costs.model_copy(update={"default_variables_sha256": None})})
+    deploy.package(settings, "11111111-1111-4111-8111-111111111111", destination)
+    with tarfile.open(destination) as archive:
+        raw = archive.extractfile("repository/" + DEFAULT_VARIABLES_RELATIVE_PATH.as_posix()).read()
+        config = json.load(archive.extractfile("config.json"))
+    assert raw == template.read_bytes()
+    assert config["costs"]["default_variables_sha256"] == hashlib.sha256(raw).hexdigest()
+
+
 def test_pinned_default_cost_template_is_in_cloud_bundle(package_inputs):
     settings, destination, _ = package_inputs
     result = deploy.package(settings, "11111111-1111-4111-8111-111111111111", destination)
