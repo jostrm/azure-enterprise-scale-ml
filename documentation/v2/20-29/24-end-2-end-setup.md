@@ -413,6 +413,12 @@ team group or adds its member, Graph can answer 404 for the new group and leave
 the group or member out of filter and member-list reads for a while. `execute`
 therefore reads back for up to about 100 seconds before it reports the group,
 membership or final state as not verified; it never repeats the write.
+Azure takes about 32 seconds to create each private DNS zone and each VNet link,
+so `execute` writes up to eight zones at a time (`PRIVATE_DNS_WRITE_WORKERS`);
+each zone's links still follow it, and every other effect keeps its plan order.
+Each write is still recorded as pending before its PUT and as completed only after
+its read-back. After a failure no new write starts, and the receipt lists every
+write that remains uncertain in `pending_effects`.
 `verify_source_snapshot(...)` verifies an explicitly pinned five-file local
 helper bundle and its loaded dependencies; missing helpers or changed bytes fail
 before cloud discovery. Local verification records `published_ref_verified=false`.

@@ -9,8 +9,10 @@ remain compatible without migration. This after-common stage never invents stora
 
 prepare(...) performs discovery only. execute(...) consumes its exact plan once,
 under physical-resource leases or explicit manual single-writer governance, and
-persists results before returning. An interruption retains any infinite leases
-and an uncertain receipt: automatic retry is deliberately unsupported.
+persists results before returning. Effects run in plan order, except that a run of
+private DNS zone creates is written up to PRIVATE_DNS_WRITE_WORKERS zones at a time.
+An interruption retains any infinite leases and an uncertain receipt: automatic
+retry is deliberately unsupported.
 Newly generated Entra IDs require downstream review.
 Existing gateway route additions require explicit manual single-writer governance:
 GET/ETag comparison is not atomic, and no provider-enforced If-Match is claimed.
@@ -20,6 +22,7 @@ Blob-coordinated route updates remain blocked without that provider guarantee.
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import copy
 from datetime import datetime
 import hashlib
@@ -28,6 +31,7 @@ import json
 import os
 from pathlib import Path
 import re
+import threading
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -46,6 +50,10 @@ NETWORK_API = "2024-05-01"
 DNS_API = "2022-07-01"
 # First private DNS link API with resolutionPolicy (NXDOMAIN fallback to public DNS).
 PRIVATE_DNS_LINK_API = "2024-06-01"
+# ARM takes about 32 s to create each private DNS zone and each VNet link (observed 2026-10-24: 59 zones and their
+# links written one at a time took 72 minutes). Zones are independent, so this many are written at once; each zone's
+# links still follow it.
+PRIVATE_DNS_WRITE_WORKERS = 8
 POLICY_API = "2022-06-01"
 POLICY_DEFINITION_API = "2023-04-01"
 EXEMPTION_API = "2022-07-01-preview"
@@ -244,6 +252,12 @@ class Cloud(enrollment.Cloud):
 
     def __init__(self, target, coordinates, command_runner=None, opener=None):
         super().__init__({"target": target, "coordinates": coordinates}, command_runner, opener)
+        self._token_lock = threading.Lock()
+
+    def token(self, audience, tenant=None):
+        # Concurrent private DNS writers share one cached token: one CLI refresh at a time, never one per writer.
+        with self._token_lock:
+            return super().token(audience, tenant)
 
     def graph(self, method, path, body=None, allowed=(200,)):
         require(method in ("GET", "POST") and (not self.read_only or method == "GET"),
@@ -1709,6 +1723,76 @@ def _wait(runtime, identifier, api, assert_held, sleep):
     raise PrerequisiteError("resource-provisioning-uncertain:" + identifier)
 
 
+def _private_dns_zone(effect):
+    """The private DNS zone that a zone or VNet-link create belongs to; None for every other effect."""
+    identifier = str(effect.get("id", "")).lower()
+    if effect.get("kind") != "arm-create" or "/providers/microsoft.network/privatednszones/" not in identifier:
+        return None
+    return identifier.split("/virtualnetworklinks/", 1)[0]
+
+
+def _execution_steps(effects):
+    """Plan-order steps: an effect index, or a run of private DNS creates over several zones as per-zone index chains."""
+    steps = []
+    for index, effect in enumerate(effects):
+        zone = _private_dns_zone(effect)
+        if zone is None:
+            steps.append(index)
+        elif steps and isinstance(steps[-1], dict):
+            steps[-1].setdefault(zone, []).append(index)
+        else:
+            steps.append({zone: [index]})
+    result = []
+    for step in steps:
+        if isinstance(step, dict) and len(step) == 1:
+            result.extend(*step.values())
+        else:
+            result.append(list(step.values()) if isinstance(step, dict) else step)
+    return result
+
+
+def _write_private_dns_concurrently(chains, effects, receipt, persist, checked, apply):
+    """Write independent private DNS zones at once; each zone's own creates stay in plan order.
+
+    Every write keeps the sequential contract: re-checked inputs, a durable pending record before its PUT,
+    read-back verification and a durable completion. After any failure no further write starts; writes already
+    in flight finish, so the receipt lists exactly the completed effects and the uncertain ones as pending_effects.
+    """
+    lock, stop, failures = threading.Lock(), threading.Event(), {}
+
+    def run(chain):
+        for index in chain:
+            if stop.is_set():
+                return
+            try:
+                checked()
+                with lock:
+                    receipt["pending_effects"] = sorted({*receipt.get("pending_effects", []), index})
+                    receipt["changed"] = True
+                    persist()
+                apply(effects[index])
+                with lock:
+                    receipt["effects_completed"] = sorted({*receipt["effects_completed"], index})
+                    receipt["pending_effects"].remove(index)
+                    if not receipt["pending_effects"]:
+                        del receipt["pending_effects"]
+                    persist()
+            except BaseException as exc:  # the caller re-raises it after every in-flight write has finished
+                stop.set()
+                with lock:
+                    failures[index] = exc
+                return
+
+    with ThreadPoolExecutor(max_workers=min(PRIVATE_DNS_WRITE_WORKERS, len(chains))) as pool:
+        try:
+            for future in [pool.submit(run, chain) for chain in chains]:
+                future.result()
+        finally:
+            stop.set()
+    if failures:
+        raise failures[min(failures)]
+
+
 def read_result(*, state_dir, plan_id):
     """Read durable recovery evidence only; never renew, release, or break a lease."""
     path = ordinary(ordinary(state_dir) / (_guid(plan_id) + ".json"))
@@ -1812,8 +1896,9 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         receipt["outputs"] = copy.deepcopy(receipt["bindings"])
         receipt["stage_results"] = [{"stage": "privileged-prerequisites", "status": receipt["status"],
                                      "effects_completed": list(receipt["effects_completed"])}]
-        if "pending_effect" in receipt:
-            receipt["stage_results"][0]["pending_effect"] = receipt["pending_effect"]
+        for key in ("pending_effect", "pending_effects"):
+            if key in receipt:
+                receipt["stage_results"][0][key] = copy.deepcopy(receipt[key])
         _persist(receipt_path, receipt)
         if claimed:
             runtime.blob("PUT", remote, data=receipt,
@@ -1854,14 +1939,14 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         runtime.read_only = False
         receipt["status"] = "running"
         persist()
-        for index, effect in enumerate(plan["effects"]):
+
+        def checked():
             assert_held()
             require(source_fingerprint(plan["source"]["root"]) == plan["source"], "privileged-source-changed")
             require(_read_target(ordinary(plan["consumer_root"]), plan["scope"])[1] == plan["consumer_hash"],
                     "consumer-register-changed")
-            receipt["pending_effect"] = index
-            receipt["changed"] = True
-            persist()
+
+        def apply(effect):
             kind = effect["kind"]
             if kind == "provider-register":
                 _, _, current = runtime.arm("GET", effect["id"], effect["api"])
@@ -1943,7 +2028,17 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                         "vnet-dns-write-not-verified")
             else:
                 raise PrerequisiteError("unrecognized-reviewed-effect")
-            receipt["effects_completed"].append(index)
+
+        for step in _execution_steps(plan["effects"]):
+            if isinstance(step, list):
+                _write_private_dns_concurrently(step, plan["effects"], receipt, persist, checked, apply)
+                continue
+            checked()
+            receipt["pending_effect"] = step
+            receipt["changed"] = True
+            persist()
+            apply(plan["effects"][step])
+            receipt["effects_completed"].append(step)
             receipt.pop("pending_effect", None)
             persist()
         runtime.read_only = True
@@ -1991,7 +2086,8 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         receipt["outputs"] = copy.deepcopy(receipt["bindings"])
         receipt["stage_results"] = [{"stage": "privileged-prerequisites", "status": "uncertain",
                                      "effects_completed": list(receipt["effects_completed"]),
-                                     **({"pending_effect": receipt["pending_effect"]} if "pending_effect" in receipt else {})}]
+                                     **{key: copy.deepcopy(receipt[key]) for key in ("pending_effect", "pending_effects")
+                                        if key in receipt}}]
         _persist(receipt_path, receipt)
         if claimed:
             try:

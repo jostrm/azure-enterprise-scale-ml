@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import threading
 from urllib.error import HTTPError
 from urllib.parse import unquote, urlsplit, parse_qs
 from types import SimpleNamespace
@@ -2977,3 +2978,135 @@ def test_foundation_rehashed_plan_cannot_hide_pending_private_transition(workspa
     with pytest.raises(foundation.FoundationError, match="live-state-or-plan-changed:private_transition_required"):
         foundation_execute(plan, workspace, runtime)
     assert not runtime.writes and not runtime.blobs
+
+
+def private_dns_chains(plan):
+    """Effect indexes of each private DNS zone's creates (the zone, then its VNet links), in plan order."""
+    chains = {}
+    for index, effect in enumerate(plan["effects"]):
+        identifier = effect.get("id", "").lower()
+        if "/privatednszones/" in identifier:
+            chains.setdefault(identifier.split("/virtualnetworklinks/")[0], []).append(index)
+    return list(chains.values())
+
+
+class HeldDnsWrites(Runtime):
+    """Counts private DNS PUTs in flight; the first `hold` of them wait until all `hold` are in flight together."""
+
+    def __init__(self, hold):
+        super().__init__()
+        self.lock, self.barrier = threading.Lock(), threading.Barrier(hold, timeout=30)
+        self.hold, self.started, self.inside, self.most = hold, 0, 0, 0
+        self.on_dns_put = None
+
+    def arm(self, method, identifier, api, data=None, headers=None, allowed=(200,)):
+        if method != "PUT" or "/privatednszones/" not in identifier.lower():
+            return super().arm(method, identifier, api, data, headers, allowed)
+        with self.lock:
+            self.started += 1
+            self.inside += 1
+            self.most = max(self.most, self.inside)
+            held = self.started <= self.hold
+        try:
+            if held:
+                self.barrier.wait()
+            if self.on_dns_put:
+                self.on_dns_put(identifier.lower())
+            return super().arm(method, identifier, api, data, headers, allowed)
+        finally:
+            with self.lock:
+                self.inside -= 1
+
+
+def test_private_dns_zones_are_written_concurrently_within_the_worker_bound(workspace):
+    workers = core.PRIVATE_DNS_WRITE_WORKERS
+    runtime = HeldDnsWrites(workers)
+    plan = core.prepare(**external_arguments(workspace, setup=False), runtime=runtime)
+    chains = private_dns_chains(plan)
+    assert workers == 8 and len(chains) == 59 and all(len(chain) == 3 for chain in chains)
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result
+    assert runtime.most == workers
+    assert result["effects_completed"] == list(range(len(plan["effects"])))
+    assert "pending_effect" not in result and "pending_effects" not in result
+    ids = [effect["id"].lower() for effect in plan["effects"]]
+    written = [write[2] for write in runtime.writes if write[0] == "arm"]
+    assert sorted(written) == sorted(ids)
+    order = {identifier: position for position, identifier in enumerate(written)}
+    for chain in chains:
+        assert [order[ids[index]] for index in chain] == sorted(order[ids[index]] for index in chain)
+    dns = sorted(index for chain in chains for index in chain)
+    assert dns == list(range(dns[0], dns[-1] + 1)) and 0 < dns[0] and dns[-1] < len(ids) - 1
+    assert max(order[ids[index]] for index in range(dns[0])) < min(order[ids[index]] for index in dns)
+    assert max(order[ids[index]] for index in dns) < min(order[ids[index]] for index in range(dns[-1] + 1, len(ids)))
+
+
+def test_each_concurrent_private_dns_write_is_durably_pending_before_its_put(workspace):
+    runtime = HeldDnsWrites(core.PRIVATE_DNS_WRITE_WORKERS)
+    plan = core.prepare(**external_arguments(workspace, setup=False), runtime=runtime)
+    ids = [effect["id"].lower() for effect in plan["effects"]]
+    remote, seen = "bootstrap/runs/" + plan["plan_id"] + ".json", []
+
+    def durable(identifier):
+        receipt, index = runtime.blobs[remote], ids.index(identifier)
+        seen.append(index)
+        assert index in receipt["pending_effects"] and index not in receipt["effects_completed"]
+        assert receipt["stage_results"][0]["pending_effects"] == receipt["pending_effects"]
+        assert "pending_effect" not in receipt
+
+    runtime.on_dns_put = durable
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result
+    assert sorted(seen) == sorted(index for chain in private_dns_chains(plan) for index in chain)
+
+
+def test_a_failed_private_dns_write_stops_new_writes_and_leaves_only_it_pending(workspace, monkeypatch):
+    monkeypatch.setattr(core, "PRIVATE_DNS_WRITE_WORKERS", 2)
+    runtime = HeldDnsWrites(2)
+    plan = core.prepare(**external_arguments(workspace, setup=False), runtime=runtime)
+    ids = [effect["id"].lower() for effect in plan["effects"]]
+    chains = private_dns_chains(plan)
+    failing, finishing = chains[0][0], chains[1][0]
+    failed = threading.Event()
+
+    def lose_one_response(identifier):
+        if identifier == ids[failing]:
+            failed.set()
+        else:
+            failed.wait(10)
+            threading.Event().wait(0.2)  # the failing worker stops new writes before this one completes
+
+    runtime.on_dns_put = lose_one_response
+    runtime.fail_write = lambda identifier: identifier == ids[failing]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "uncertain" and result["error"] == "remote-request-uncertain"
+    assert result["pending_effects"] == [failing] and "pending_effect" not in result
+    assert result["effects_completed"] == [*range(failing), finishing]
+    assert result["stage_results"] == [{"stage": "privileged-prerequisites", "status": "uncertain",
+                                        "effects_completed": [*range(failing), finishing],
+                                        "pending_effects": [failing]}]
+    written = {write[2] for write in runtime.writes if write[0] == "arm"}
+    assert written == {ids[index] for index in [*range(failing), finishing, failing]}
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+
+
+def test_concurrent_writers_share_one_cli_token_refresh(graph_transport):
+    state, active, most = graph_transport, [], []
+    original = state.cloud.command_runner
+
+    def slow_cli(argv, **kwargs):
+        active.append(argv)
+        most.append(len(active))
+        threading.Event().wait(0.05)
+        try:
+            return original(argv, **kwargs)
+        finally:
+            active.remove(argv)
+
+    state.cloud.command_runner = slow_cli
+    threads = [threading.Thread(target=state.cloud.token, args=(core.enrollment.ARM + "/",)) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert max(most) == 1 and len(state.commands) == 1
