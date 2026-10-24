@@ -23,7 +23,7 @@ API_VERSION = "2023-11-01"
 ENTRYPOINT = "environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep"
 HELPER = "bootstrap/lib/common_network_preservation.py"
 ROOT = Path(__file__).resolve().parents[2]
-_LOADED_HELPER_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+_LOADED_HELPER_SHA256 = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 class PreservationError(ValueError):
@@ -84,7 +84,8 @@ def _source_files(source_root):
         relative = path.relative_to(root).as_posix()
         if relative in files:
             continue
-        files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+        # One commit is one source: a CRLF checkout (Windows core.autocrlf) and an LF one hash the same.
+        files[relative] = hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
         if path.suffix == ".bicep":
             for reference in re.findall(r"(?m)^\s*module\s+\w+\s+'([^']+)'", path.read_text(encoding="utf-8")):
                 require(not reference.startswith(("br:", "ts:")), "unreviewed-network-registry-module")

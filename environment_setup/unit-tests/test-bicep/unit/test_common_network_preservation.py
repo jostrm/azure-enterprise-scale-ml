@@ -270,6 +270,27 @@ def test_selected_source_compiles_and_fingerprint_is_enforced(compiled):
         net.assert_preservation_capability(ROOT, expected_payload_sha256="0" * 64)
 
 
+def _copy_network_source(target, line_ending):
+    for relative in net._source_files(ROOT):
+        destination = target / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        data = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
+        destination.write_bytes(data.replace(b"\n", line_ending))
+    return target
+
+
+def test_source_fingerprint_is_the_same_for_crlf_and_lf_checkouts_of_one_commit(tmp_path):
+    # aif-125 (2026-10-24): the API host checked out 12-networkCommon.bicep with CRLF (core.autocrlf=true), the Linux
+    # runner with LF; the same commit must give the same reviewed payload, while a content change still differs.
+    lf = _copy_network_source(tmp_path / "lf", b"\n")
+    crlf = _copy_network_source(tmp_path / "crlf", b"\r\n")
+    assert (crlf / net.ENTRYPOINT).read_bytes() != (lf / net.ENTRYPOINT).read_bytes()
+    assert net._source_files(crlf) == net._source_files(lf) == net._source_files(ROOT)
+    entry = crlf / net.ENTRYPOINT
+    entry.write_bytes(entry.read_bytes() + b"// changed\r\n")
+    assert net._source_files(crlf) != net._source_files(lf)
+
+
 @pytest.mark.parametrize("kind,error", [
     ("vnet", "live-vnet-address-overlap"), ("reserved", "reserved-routing-address-overlap"),
     ("subnet", "live-subnet-address-overlap"), ("parent", "parent-address-space-change"),
