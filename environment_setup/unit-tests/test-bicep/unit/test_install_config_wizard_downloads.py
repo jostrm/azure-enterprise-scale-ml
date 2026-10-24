@@ -42,10 +42,13 @@ class InstallConfigWizardDownloadTests(unittest.TestCase):
         cls.manifest = json.loads((WIZARD / "release-manifest.json").read_text(encoding="utf-8"))
         cls.artifacts = {artifact["archive"]: artifact for artifact in cls.manifest["artifacts"]}
 
-    def test_download_heading_matches_the_manifest(self):
-        heading = re.search(r"^## Download - Version `([^`]+)`$", self.readme, re.M)
-        self.assertIsNotNone(heading)
-        self.assertEqual(f"v{heading.group(1)}", self.manifest["version"])
+    def test_each_download_row_names_its_archive_version(self):
+        # Regular pink releases build Windows only (AIF_RELEASE_PLATFORMS=windows), so platforms may differ in version.
+        self.assertIsNotNone(re.search(r"^## Download$", self.readme, re.M))
+        for archive, folder in FOLDERS.items():
+            rows = [line for line in self.readme.splitlines() if line.startswith("|") and f"{folder}/{archive})" in line]
+            self.assertEqual(1, len(rows), archive)
+            self.assertIn(f"| {self.artifacts[archive]['version']},", rows[0], archive)
 
     def test_readme_downloads_every_archive_from_its_folder_on_main(self):
         self.assertEqual(set(FOLDERS), set(self.artifacts))
@@ -62,11 +65,13 @@ class InstallConfigWizardDownloadTests(unittest.TestCase):
             self.assertEqual(self.artifacts[archive]["bytes"], path.stat().st_size, archive)
             self.assertEqual(self.artifacts[archive]["sha256"], sha256(path), archive)
 
-    def test_manifest_artifacts_come_from_one_build(self):
-        for field in ("version", "source_commit"):
-            self.assertEqual({artifact[field] for artifact in self.manifest["artifacts"]}, {self.manifest[field]})
-        for field in ("accelerator_commit", "run_id"):
-            self.assertEqual(len({artifact[field] for artifact in self.manifest["artifacts"]}), 1, field)
+    def test_each_artifact_carries_its_own_build_provenance(self):
+        self.assertEqual(set(self.manifest), {"artifacts"})
+        for artifact in self.manifest["artifacts"]:
+            self.assertRegex(artifact["version"], r"^v\d+\.\d+\.\d+$")
+            for field in ("source_commit", "accelerator_commit"):
+                self.assertRegex(artifact[field], r"^[0-9a-f]{40}$")
+            self.assertRegex(artifact["run_id"], r"^\d+$")
 
     def test_checksums_match_the_manifest(self):
         self.assertEqual({archive: artifact["sha256"] for archive, artifact in self.artifacts.items()},

@@ -1,3 +1,3 @@
-bf756aa27287b9a0912066728985f9ae91f96833f4b0376eff7c2f9c3eec738a  aifactory-config-windows.zip
+918123807d200eb2aa4665a2c60cdb0f380863f2770c7321ef3a5e7c5fffa22d  aifactory-config-windows.zip
 45a909158f2aa7d8e9e8ea4b169632a9b88426fc4d58527a2ab938dbbf7af749  aifactory-config-linux.tar.gz
 677150d3d3c18d8e2a18cde8e6923dcbfb6aabcee3de5685966d183d7a42bf52  aifactory-config-macos.tar.gz
