@@ -3370,6 +3370,13 @@ the intended operation explicitly. The API key is never printed or persisted.</p
 <p>Check the readback's exact IDs and changes. Read settings/parameters again
 when changed. A transport error may occur after a write took effect; do not
 catch it by automatically running this program again.</p>
+<p>When you commit the confirmed configuration under <code>azurefactory</code>, leave out
+<code>azurefactory/.azurefactory/</code>. After the first catalog operation the API keeps
+its <code>.catalog.lock</code> and <code>catalog-operations.sqlite</code> (plus SQLite journal files)
+there: local API state, not configuration. <code>01-start-v125-and-above.sh</code> adds
+<code>.azurefactory/</code> to the consumer <code>.gitignore</code> when it is missing; before
+<code>git add azurefactory</code>, check that
+<code>git check-ignore azurefactory/.azurefactory/catalog-operations.sqlite</code> prints the path.</p>
 <h2 id="separate-runtime-deployment-and-observation">Separate runtime deployment and observation<a class="headerlink" href="#separate-runtime-deployment-and-observation" title="Permanent link">&para;</a></h2>
 <p>Save as <strong><code>prepare_runtime.py</code></strong>. Project deployment requires an existing
 placement. Common-only deliberately omits <code>project_id</code>; it does not mean all
