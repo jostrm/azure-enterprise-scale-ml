@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -128,7 +129,7 @@ class FakeRunner:
         self.calls, self.fail_on, self.configs = [], fail_on, []
 
     def __call__(self, args, *, cwd, env=None):
-        self.calls.append({"args": list(args), "cwd": Path(cwd)})
+        self.calls.append({"args": list(args), "cwd": Path(cwd), "env": dict(env or {})})
         text = " ".join(map(str, args))
         if "--config" in args:
             self.configs.append(json.loads(Path(args[args.index("--config") + 1]).read_text("utf-8")))
@@ -450,6 +451,16 @@ def test_apply_runs_the_documented_operator_sequence_in_order_with_the_generated
     assert report["outputs"]["app"] == {"fqdn": "agent.internal.example", "deployment_state": "Succeeded"}
     assert report["outputs"]["voice"] is True and runner.configs[0]["voice"]["enabled"] is True
     assert "secret" not in json.dumps(report).lower()
+
+
+def test_agent_commands_import_the_azurefactory_sdk_from_the_checkout_like_the_container(tmp_path):
+    # The agent imports azurefactory at module load; the container gets it from PYTHONPATH (infra/bootstrap.sh).
+    engine, runner = integration(tmp_path)
+    engine.run(request(), apply=True)
+    sdk = str(Path("/work/checkout") / "environment_setup" / "azurefactory-cli" / "src")
+    agent_calls = [call for call in runner.calls if runner.step_name(call["args"]) in ("ingest", "deploy.py")]
+    assert len(agent_calls) == 2
+    assert all(sdk in call["env"].get("PYTHONPATH", "").split(os.pathsep) for call in agent_calls)
 
 
 def test_the_step_never_creates_the_foundry_agent(tmp_path):

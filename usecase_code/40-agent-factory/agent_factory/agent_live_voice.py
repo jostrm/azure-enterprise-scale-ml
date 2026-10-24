@@ -449,6 +449,12 @@ class LiveVoiceIntegration:
         self.work_dir, self.repository_root = Path(work_dir), Path(repository_root)
         self.agent_dir = agent_dir or Path(__file__).resolve().parents[1] / "40-aifactory-agent"
 
+    def _command_env(self) -> dict:
+        """The agent imports the azurefactory SDK at module load; like the container (infra/bootstrap.sh), the operator
+        commands find it in this checkout through PYTHONPATH instead of an installed package."""
+        sdk = str(self.repository_root / "environment_setup" / "azurefactory-cli" / "src")
+        return {"PYTHONPATH": os.pathsep.join(item for item in (sdk, os.environ.get("PYTHONPATH", "")) if item)}
+
     def _steps(self, request: LiveVoiceRequest, target: Target, config: Path) -> list[tuple[str, str, list]]:
         env_dir = self.work_dir / "agent-env"
         python = str(env_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
@@ -509,7 +515,7 @@ class LiveVoiceIntegration:
             result = ""
             for command in commands:
                 try:
-                    result = self.runner(command, cwd=self.agent_dir)
+                    result = self.runner(command, cwd=self.agent_dir, env=self._command_env())
                 except CommandError as error:
                     raise CommandError(f"{resource} failed ({error})") from None
             report.add(resource, "ran", details.get(marker, ""))
