@@ -22,6 +22,7 @@ Quick Setup
 * [26) EXTEND AIFactory project type: With new Services, Your BICEP](../v2/20-29/27-extend-AIF-pipelines.md)
 * [21) Agent Factory chat & live voice: talk to your AI Factory (10-19 series, CoreTeam + ProjectTeam)](./10-19/21-agent-factory-chat.md)
 * [22) AI Factory lifecycle Azure Function: six lifecycle scenarios over REST or the SDK, followed through GitHub events (10-19 series, CoreTeam)](./10-19/22-lifecycle-azure-function.md)
+* [10) AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, time per layer for the six lifecycle scenarios and per code change (10-19 series, CoreTeam)](./10-19/10-factory-onion-architecture.md)
 * **From Bicep to agents** (CoreTeam): Bicep -> ADO/GHA -> [Factory API, CLI & Python SDK](./10-19/17-cli-and-api-and-usage.md) -> [29) AI Factory MCP](./20-29/29-factory-MCP.md) -> [29) ESAIF Chat Agent](./20-29/29-ESAIF-Chat-Agent.md)
     * [29) AI Gateways: native AI Gateway SKU, classic APIM with AI policies, Kong](./20-29/29-factory-AI-Gateways.md)
     * [29) Dual knowledge graphs: structural graph + architecture vault](./20-29/29-dual-knowledge-graphs.md)

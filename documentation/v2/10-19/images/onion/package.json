@@ -1,0 +1,9 @@
+{
+  "name": "aifactory-onion-raster",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned, offline CPU SVG rasterization for the onion PNG and GIF (same rasterizer as the VisualLearner concept exports)",
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}

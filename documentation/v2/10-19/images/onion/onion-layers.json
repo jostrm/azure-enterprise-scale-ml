@@ -1,0 +1,858 @@
+{
+  "schema": 1,
+  "updated": "2026-10-24",
+  "title": "AI Factory onion architecture",
+  "summary": "A lifecycle request travels from the outside in, and each layer calls only the layer inside it. Only the core, Azure Resource Manager, changes Azure.",
+  "outputs": {
+    "poster_svg": "../10-factory-onion-architecture.svg",
+    "poster_png": "../10-factory-onion-architecture.png",
+    "animated_svg": "../10-factory-onion-architecture-animated.svg",
+    "animated_gif": "../10-factory-onion-architecture.gif",
+    "doc": "../../10-factory-onion-architecture.md"
+  },
+  "evidence": {
+    "M1": "Measured 2026-10-24: aif-ops and aif-event-relay runs of the lifecycle Function in jostrm/azure-enterprise-scale-byor-121 take 12-30 s each; scenario 1 for aif-126 went from the first prepare (13:22 UTC) to the repository-initialization commit (13:26 UTC) in 4 min.",
+    "M2": "Measured from commit times in the jostrm/azure-enterprise-scale-byor-12x factory repositories, from 'Initialize reviewed AI Factory source pin' to 'Configure generated deployment connection': aif-124 103 min (2026-10-23), aif-125 131 min (2026-10-24), aif-123 236 min (2026-10-22, the day the Lifecycle-Function contract records an ARM 403 stop and a recovery).",
+    "M3": "Measured 2026-10-24, aif-125 (aif-lifecycle-phase4-5-log.md): Function intake about 1 min, repository-initialization about 1 min, a 26 min gap before minimum-foundation, minimum-foundation to publication 02:33-04:25 CEST (network-foundation with VPN gateway done 04:12, runner 04:17), each COMMON review (prepare-next) about 12 min, COMMON start to GitHub run 17-19 min.",
+    "M4": "Measured 2026-10-24: factory-lifecycle COMMON runs 40064071277 (4.0 min) and 40075915367 (3.3 min) in jostrm/azure-enterprise-scale-byor-125; both stopped before any Azure write, so COMMON and PROJECT deployment times are not measured yet.",
+    "M5": "Measured 2026-10-22 on the real Factory API (Lifecycle-Function contract): a runtime review took 13 min and its confirmation held the catalog lock for 18 min.",
+    "M6": "Measured 2026-10-24: one fix iteration, composite of pink v0.47.38 and v0.47.39 (aif-125).",
+    "E": "Estimated from the code path and earlier factories; replace with measured values after real runs. Scenarios 4-6 ran simulated only (AIF_DELETES=simulate): the Factory API never saw a delete."
+  },
+  "consumer": {
+    "id": "consumer",
+    "label": "Consumer",
+    "name": "External consumer: lifecycle Azure Function",
+    "tag": "PURPLE TEMPLATE",
+    "color": "#DCE6F2",
+    "where": "usecase_code/10-azure-function/12_func_aifactory_lifecycle, copied to the consumer repository",
+    "what": "Private Function on Flex Consumption that offers the 6 scenarios as reviewed REST operations and follows the GitHub runs.",
+    "example": "POST /api/v1/lifecycle/add-scaleset/prepare, then /operations/{id}/confirm",
+    "called_by": "A portal, agent, pipeline or person with an Entra app role (function keys only for mock passes).",
+    "calls": "L1: dispatches aif-ops.yml to the management runner, which calls the SDK (AzureFactoryClient) or REST next to the API.",
+    "change": {
+      "min": 15,
+      "max": 30,
+      "kind": "estimated",
+      "note": "Edit, run the Function tests (tests/, 13 files), redeploy with deploy.ps1 (remote build on Flex Consumption)."
+    }
+  },
+  "layers": [
+    {
+      "id": "l1",
+      "n": 1,
+      "label": "L1",
+      "name": "Clients",
+      "ring_top": "L1 · CLIENTS · CLI · SDK · WIZARDS",
+      "ring_bottom": "PURPLE · PINK · MAUI",
+      "tag": "PURPLE · PINK · MAUI",
+      "color": "#79DCED",
+      "where": "azurefactory CLI and Python SDK AzureFactoryClient (purple environment_setup/azurefactory-cli) · Tkinter wizard (pink) · MAUI ESAIF.ConfigWizard (jostrm/maui-apps)",
+      "what": "Thin clients: they build requests, show reviews, confirm and poll. No deployment logic lives here.",
+      "example": "factory_create_prepare · scaleset_add_prepare · project_deployment_start",
+      "called_by": "The external consumer, or a person at the CLI or a wizard.",
+      "calls": "L2 over HTTP on loopback (127.0.0.1:8765) with the API key in X-API-Key; plaintext HTTP is allowed only on loopback.",
+      "change": {
+        "min": 15,
+        "max": 60,
+        "kind": "estimated",
+        "note": "SDK/CLI: stdlib-only, edit + tests + push, 15-25 min. MAUI: Windows build and installer, 30-60 min. The Tkinter wizard ships with the pink release (see L2)."
+      }
+    },
+    {
+      "id": "l2",
+      "n": 2,
+      "label": "L2",
+      "name": "Factory REST API",
+      "ring_top": "L2 · FACTORY REST API",
+      "ring_bottom": "PINK",
+      "tag": "PINK",
+      "color": "#FF7185",
+      "where": "jostrm/azure-aifactory-config: FastAPI routes src/*_api.py and the service layer in src/ · runs as SYSTEM on 127.0.0.1:8765 on the admin VM",
+      "what": "Owns every decision: catalog, reviews, whole-workflow consent, recoveries and reconciliation, frozen deployment planner, cost preview, DPAPI-sealed SQLite state.",
+      "example": "creation_workflow_api.py · catalog_runtime.py · project_deployments.py · creation_cost_preview.py",
+      "called_by": "L1 clients on the same host (catalog and deployment routes accept loopback clients only).",
+      "calls": "L3: runs purple Bash/PowerShell launchers and helpers, and dispatches the factory-lifecycle pipeline. Pins a purple commit.",
+      "change": {
+        "min": 135,
+        "max": 135,
+        "kind": "measured",
+        "evidence": "M6",
+        "note": "One fix iteration now: run, diagnose, fix, tests, release, install, recovery, fresh review (see Code change - options). Estimated 70 min with the future options."
+      }
+    },
+    {
+      "id": "l3",
+      "n": 3,
+      "label": "L3",
+      "name": "Pipelines + API-called scripts",
+      "ring_top": "L3 · PIPELINES + API SCRIPTS",
+      "ring_bottom": "PURPLE · RUNS IN CONSUMER REPO",
+      "tag": "PURPLE · VENDORED IN PINK",
+      "color": "#FFD48A",
+      "where": "purple bootstrap/ (launchers, lib/ helpers) and bootstrap/templates/factory-lifecycle-*.yml · pink vendors byte-exact copies in template-files/creation-workflow/bootstrap/lib",
+      "what": "What the API starts: Bash and PowerShell launchers on the API host, and GitHub Actions or ADO pipelines on the factory's self-hosted runner.",
+      "example": "GHA-update-aifactory-and-run-project.sh · create-new-aifactory-scaleset.sh · runner-registration.ps1 · runner-prerequisites.ps1",
+      "called_by": "L2. Pink's publication stage first commits the generated catalog, enrollment and settings to the consumer repository.",
+      "calls": "L4: the pipeline worker bootstrap/lib/factory_lifecycle.py compiles and deploys purple Bicep. Bootstrap helpers call ARM directly (L5).",
+      "scripts": [
+        {
+          "name": "bootstrap/GHA-update-aifactory-and-run-project.sh",
+          "lang": "bash",
+          "by": "pink src/project_deployments.py",
+          "does": "Add or update a project: refresh templates (patch) or run project-only, then start the project pipeline."
+        },
+        {
+          "name": "bootstrap/ADO-update-aifactory-and-run-project.sh",
+          "lang": "bash",
+          "by": "pink src/project_deployments.py",
+          "does": "Same for Azure DevOps."
+        },
+        {
+          "name": "bootstrap/GHA-create-new-aifactory-scaleset.sh -> bootstrap/lib/create-new-aifactory-scaleset.sh",
+          "lang": "bash",
+          "by": "pink src/creation.py, src/simple_mode.py",
+          "does": "Create a factory or scale set repository and start its workflow (gh workflow run)."
+        },
+        {
+          "name": "bootstrap/lib/runner-registration.ps1 / .sh",
+          "lang": "powershell / bash",
+          "by": "pink bootstrap runner stage (vendored copy, sha256-pinned)",
+          "does": "Register the factory's self-hosted runner."
+        },
+        {
+          "name": "bootstrap/lib/runner-prerequisites.ps1 / .sh",
+          "lang": "powershell / bash",
+          "by": "pink bootstrap runner stage (vendored copy, sha256-pinned)",
+          "does": "Install the runner's tools (az, bicep, gh, git, Python)."
+        },
+        {
+          "name": "bootstrap/lib/release_version.sh",
+          "lang": "bash",
+          "by": "pink src/project_deployments.py, src/project_update.py",
+          "does": "Version-aware launcher contract."
+        },
+        {
+          "name": "bootstrap/lib/factory_lifecycle.py",
+          "lang": "python",
+          "by": "pink src/catalog_runtime.py (plan) and the factory-lifecycle pipeline (worker)",
+          "does": "Freezes the plan, dispatches .github/workflows/factory-lifecycle.yml or aifactory/pipelines/factory-lifecycle.yml, runs the worker on the runner."
+        }
+      ],
+      "change": {
+        "min": 150,
+        "max": 240,
+        "kind": "estimated",
+        "note": "Change purple, re-vendor byte-exact into pink and update the sha256 pins (src/creation_workflow_source.py), then the full pink release loop (L2), plus source handoff and re-audit when a factory is running. The most expensive loop: keep such changes for the next factory."
+      }
+    },
+    {
+      "id": "l4",
+      "n": 4,
+      "label": "L4",
+      "name": "Bicep + pipeline-called scripts",
+      "ring_top": "L4 · BICEP + SCRIPTS",
+      "ring_bottom": "PURPLE",
+      "tag": "PURPLE",
+      "color": "#C49BFF",
+      "where": "purple environment_setup/aifactory/bicep (esml-common/main, esml-genai-1, modules) and bicep/scripts · executed at the pinned purple commit",
+      "what": "Infrastructure as code the pipeline compiles and deploys, plus the PowerShell and Bash scripts the pipelines run around it.",
+      "example": "11-rgCommon · 12-networkCommon · 13-rgLevel · 31-network … 11-integration · preflight.sh · subnetCalc_v2.ps1",
+      "called_by": "L3 pipelines on the self-hosted runner.",
+      "calls": "L5: resource-group and subscription-scope ARM deployments, az CLI calls.",
+      "scripts": [
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/preflight.sh",
+          "lang": "bash",
+          "by": "infra-common.yml",
+          "does": "Pre-deployment checks."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh",
+          "lang": "bash",
+          "by": "infra-common.yml",
+          "does": "Register EncryptionAtHost when it is enabled."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh",
+          "lang": "bash",
+          "by": "infra-common.yml",
+          "does": "Detect an existing admin VM before COMMON."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1",
+          "lang": "powershell",
+          "by": "infra-project-phase.yml, ADO job-1-genai-networking.yaml",
+          "does": "Calculate the project subnets."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1, getProjectSubnetState.ps1",
+          "lang": "powershell",
+          "by": "project networking jobs",
+          "does": "Generate network parameters, read existing subnets."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/prepareSeedingKeyVaultPrivateDns.ps1",
+          "lang": "powershell",
+          "by": "COMMON / project pipelines",
+          "does": "Prepare private DNS for the seeding Key Vault."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh, delete-subnets-for-projects.sh, delete-caphost-and-foundry-and-its-subnet.sh",
+          "lang": "bash",
+          "by": "project pipelines and deletes",
+          "does": "Remove disabled services, project subnets, Foundry capability hosts."
+        },
+        {
+          "name": "environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh",
+          "lang": "bash",
+          "by": "infra-common.yml, infra-project.yml",
+          "does": "Write the region report."
+        }
+      ],
+      "change": {
+        "min": 60,
+        "max": 240,
+        "kind": "estimated",
+        "note": "Next run: purple change + bicep build and unit tests + pin bump + fresh review (prepare-next, 12 min measured) + rerun, 60-120 min. During a running factory with a frozen plan add source handoff and freeze, up to 240 min."
+      }
+    },
+    {
+      "id": "l5",
+      "n": 5,
+      "label": "L5",
+      "name": "Azure Resource Manager",
+      "ring_top": "L5 · AZURE RESOURCE MANAGER",
+      "ring_bottom": "AZURE",
+      "tag": "AZURE · CORE",
+      "color": "#61F3B1",
+      "where": "management.azure.com: deployments, resource groups, resources, role assignments, locks",
+      "what": "The only layer that changes Azure. Most wall-clock time is spent here: networks, VPN gateway, private endpoints and DNS zones.",
+      "example": "group and subscription deployments · resource-group deletes · provider registration",
+      "called_by": "L4 deployments from the runner; L3 bootstrap helpers from the API host (az, with the VM's managed identity).",
+      "calls": "Nothing in AI Factory: Azure resource providers.",
+      "change": {
+        "min": null,
+        "max": null,
+        "kind": "n/a",
+        "note": "No AI Factory code. Platform conditions (quota, policy, provider registration, RBAC propagation) are fixed by configuration or with Azure support; the code change then lands in L4 (Bicep) or L2 (a pre-check)."
+      }
+    }
+  ],
+  "paths": [
+    {
+      "id": "lifecycle",
+      "label": "Lifecycle path",
+      "angle": -150,
+      "dashed": false,
+      "via": [
+        "consumer",
+        "l1",
+        "l2",
+        "l3",
+        "l4",
+        "l5"
+      ],
+      "text": "Consumer > L1 > L2 > L3 pipeline > L4 Bicep > L5 (COMMON, PROJECT, scale sets, deletes)"
+    },
+    {
+      "id": "bootstrap",
+      "label": "Bootstrap path",
+      "angle": -30,
+      "dashed": true,
+      "via": [
+        "l2",
+        "l3",
+        "l5"
+      ],
+      "skips": [
+        "l4"
+      ],
+      "text": "L2 > L3 API-called helpers > L5, skipping L4 (repository-initialization … publication)"
+    }
+  ],
+  "scenarios": [
+    {
+      "n": 1,
+      "id": "init-factory",
+      "name": "Init AI Factory",
+      "sdk": "factory_create_prepare / bootstrap_*",
+      "outcome": "Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones.",
+      "path": "Bootstrap path, then the lifecycle path for COMMON",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 4,
+          "kind": "measured",
+          "evidence": "M1 M3",
+          "note": "intake 1 min (aif-125), prepare to repository commit 4 min (aif-126)"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 55,
+          "max": 57,
+          "kind": "measured",
+          "evidence": "M3",
+          "note": "26 min before minimum-foundation + COMMON review 12 + COMMON start to run 17-19"
+        },
+        "l3": {
+          "min": 28,
+          "max": 29,
+          "kind": "mixed",
+          "evidence": "M3 M4 E",
+          "note": "bootstrap helpers ~25 (est., share of 112 measured) + COMMON pipeline start 3-4 (measured)"
+        },
+        "l4": {
+          "min": 5,
+          "max": 10,
+          "kind": "estimated",
+          "note": "COMMON Bicep build, preflight, what-if"
+        },
+        "l5": {
+          "min": 107,
+          "max": 127,
+          "kind": "mixed",
+          "evidence": "M3 E",
+          "note": "bootstrap ARM ~87 incl. VPN gateway (est., share of 112 measured) + COMMON deployment 20-40 (est., not measured yet)"
+        }
+      }
+    },
+    {
+      "n": 2,
+      "id": "add-scaleset",
+      "name": "Add scale set",
+      "sdk": "scaleset_add_prepare",
+      "outcome": "Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group.",
+      "path": "Lifecycle path (COMMON + PROJECT)",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 2,
+          "kind": "estimated",
+          "evidence": "M1",
+          "note": "4-6 hand-offs of 12-30 s"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 32,
+          "max": 33,
+          "kind": "mixed",
+          "evidence": "M5 E",
+          "note": "catalog prepare/confirm 1-2 (est.) + runtime review 13 + confirmation 18 (measured)"
+        },
+        "l3": {
+          "min": 6,
+          "max": 8,
+          "kind": "estimated",
+          "evidence": "M4",
+          "note": "two pipeline starts (COMMON, PROJECT) of 3-4 min"
+        },
+        "l4": {
+          "min": 10,
+          "max": 15,
+          "kind": "estimated",
+          "note": "3 COMMON + 13 project templates, preflight, subnet scripts"
+        },
+        "l5": {
+          "min": 55,
+          "max": 95,
+          "kind": "estimated",
+          "note": "resource providers 5-10, COMMON 20-40, PROJECT 30-45"
+        }
+      }
+    },
+    {
+      "n": 3,
+      "id": "add-or-update-project",
+      "name": "Add or update project",
+      "sdk": "project_add_prepare + project_deployment_*",
+      "outcome": "Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists.",
+      "path": "Lifecycle path (PROJECT)",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 2,
+          "kind": "estimated",
+          "evidence": "M1",
+          "note": "4-6 hand-offs of 12-30 s"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 32,
+          "max": 33,
+          "kind": "mixed",
+          "evidence": "M5 E",
+          "note": "catalog prepare/confirm 1-2 (est.) + runtime review 13 + confirmation 18 (measured)"
+        },
+        "l3": {
+          "min": 3,
+          "max": 4,
+          "kind": "estimated",
+          "evidence": "M4",
+          "note": "one pipeline start"
+        },
+        "l4": {
+          "min": 8,
+          "max": 12,
+          "kind": "estimated",
+          "note": "13 project templates, subnetCalc_v2.ps1, getProjectSubnetState.ps1, delete-services-if-disabled.sh"
+        },
+        "l5": {
+          "min": 5,
+          "max": 45,
+          "kind": "estimated",
+          "note": "settings update 5-20, new project 30-45"
+        }
+      }
+    },
+    {
+      "n": 4,
+      "id": "delete-project",
+      "name": "Delete project",
+      "sdk": "project_delete_prepare",
+      "outcome": "The project resource group is deleted.",
+      "path": "Lifecycle path (simulated only)",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 2,
+          "kind": "estimated",
+          "evidence": "M1"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 3,
+          "max": 13,
+          "kind": "estimated",
+          "note": "named deletion review with retention evidence, confirmation phrase"
+        },
+        "l3": {
+          "min": 3,
+          "max": 4,
+          "kind": "estimated",
+          "evidence": "M4",
+          "note": "one pipeline start"
+        },
+        "l4": {
+          "min": 3,
+          "max": 5,
+          "kind": "estimated",
+          "note": "project-deletion.py, delete-subnets-for-projects.sh, delete-caphost-and-foundry-and-its-subnet.sh"
+        },
+        "l5": {
+          "min": 10,
+          "max": 30,
+          "kind": "estimated",
+          "note": "resource-group delete: private endpoints, Foundry capability host, subnets"
+        }
+      }
+    },
+    {
+      "n": 5,
+      "id": "delete-scaleset",
+      "name": "Delete scale set",
+      "sdk": "scaleset_delete_prepare",
+      "outcome": "The project and common resource groups are deleted, leaving an empty Azure subscription.",
+      "path": "Lifecycle path (simulated only)",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 2,
+          "kind": "estimated",
+          "evidence": "M1"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 5,
+          "max": 15,
+          "kind": "estimated",
+          "note": "deletion review over every project of the scale set"
+        },
+        "l3": {
+          "min": 6,
+          "max": 8,
+          "kind": "estimated",
+          "evidence": "M4",
+          "note": "project pipelines, then COMMON"
+        },
+        "l4": {
+          "min": 5,
+          "max": 10,
+          "kind": "estimated"
+        },
+        "l5": {
+          "min": 25,
+          "max": 60,
+          "kind": "estimated",
+          "note": "project and common resource groups: VNet, private endpoints, DNS zones, Key Vault"
+        }
+      }
+    },
+    {
+      "n": 6,
+      "id": "delete-factory",
+      "name": "Delete AI Factory",
+      "sdk": "delete_aifactory_prepare / _confirm",
+      "outcome": "All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept.",
+      "path": "Lifecycle path (simulated only; the Function supports single-environment factories)",
+      "times": {
+        "consumer": {
+          "min": 1,
+          "max": 2,
+          "kind": "estimated",
+          "evidence": "M1"
+        },
+        "l1": {
+          "min": 0,
+          "max": 0,
+          "kind": "estimated",
+          "note": "seconds"
+        },
+        "l2": {
+          "min": 10,
+          "max": 20,
+          "kind": "estimated",
+          "note": "ordered-project-pipelines-v1 plan, retention policy, local configuration removal"
+        },
+        "l3": {
+          "min": 6,
+          "max": 12,
+          "kind": "estimated",
+          "evidence": "M4",
+          "note": "ordered project pipelines, then COMMON, per scale set"
+        },
+        "l4": {
+          "min": 5,
+          "max": 15,
+          "kind": "estimated"
+        },
+        "l5": {
+          "min": 30,
+          "max": 90,
+          "kind": "estimated",
+          "note": "every project and common resource group, including a factory-owned access hub"
+        }
+      }
+    }
+  ],
+  "fix_iteration": {
+    "evidence": "M6",
+    "steps": [
+      {
+        "n": 1,
+        "step": "Real stage runs until it fails (COMMON: ~17 min before the GitHub run starts + 4 min)",
+        "now": 22,
+        "future": 22,
+        "how": "Unchanged; the host doctor prevents most of these runs"
+      },
+      {
+        "n": 2,
+        "step": "Diagnose (VM run commands 1-3 min each, logs, reading pink code)",
+        "now": 20,
+        "future": 5,
+        "how": "Explainer route + host doctor"
+      },
+      {
+        "n": 3,
+        "step": "Fix with failing tests first",
+        "now": 8,
+        "future": 8,
+        "how": "Unchanged"
+      },
+      {
+        "n": 4,
+        "step": "Related test files on the laptop (13 files)",
+        "now": 32,
+        "future": 3,
+        "how": "Only the changed file locally; the whole suite in CI on every push (sharded, parallel)"
+      },
+      {
+        "n": 5,
+        "step": "Commit, architecture index, push, tag",
+        "now": 3,
+        "future": 3,
+        "how": "Unchanged"
+      },
+      {
+        "n": 6,
+        "step": "Release CI (Windows only; ~4 min of it is the gate tests)",
+        "now": 9,
+        "future": 3,
+        "how": "Dev-mode deploy of the pushed commit to the test-factory API host replaces steps 6-7; one release at the end"
+      },
+      {
+        "n": 7,
+        "step": "Install on the admin VM",
+        "now": 4,
+        "future": 0,
+        "how": "Included in the dev-mode deploy"
+      },
+      {
+        "n": 8,
+        "step": "Recovery ceremony for the failed stage (evidence, prepare, confirm)",
+        "now": 20,
+        "future": 14,
+        "how": "One guarded recovery script"
+      },
+      {
+        "n": 9,
+        "step": "Fresh review (prepare-next: live inventory, Bicep compile, cost)",
+        "now": 12,
+        "future": 12,
+        "how": "Unchanged: it is the safety check"
+      },
+      {
+        "n": 10,
+        "step": "Hand-offs between steps",
+        "now": 4,
+        "future": 0,
+        "how": "Chained by the deploy and recovery scripts"
+      }
+    ]
+  },
+  "prevention": {
+    "loops_minutes": {
+      "az logout": 29,
+      "keyVaultSecretExpiry": 48,
+      "Bicep mismatch": 93,
+      "consent bug": 88
+    },
+    "fifth_bug": "2026-10-24 ~10:00, COMMON attempt 2 (run 40075915367): the worker refused with runtime-network-preservation-source-changed before any Azure write. The admin VM's Git for Windows has core.autocrlf=true (system), so the purple submodule and every catalog-run copy hold 12-networkCommon.bicep with CRLF (11,057 bytes, 255 CR) while git stores it LF (10,802 bytes, 0 CR) and the Linux runner checks out LF. The network-preservation proof hashes raw bytes, and its CRLF digest is frozen in the verified network-foundation profile."
+  },
+  "animation": {
+    "speed": 3,
+    "end_hold_seconds": 1,
+    "steps": [
+      {
+        "id": "onion",
+        "chapter": "01 / THE ONION",
+        "title": "Five layers, one direction.",
+        "explanation": "A lifecycle request travels from the outside in. Each layer calls only the layer inside it, and only the core, Azure Resource Manager, changes Azure. The outer layers are thin and quick to change; the inner layers do the slow work.",
+        "key": "Outer layers are fast to change. Inner layers are slow to run.",
+        "active": [
+          "consumer",
+          "l1",
+          "l2",
+          "l3",
+          "l4",
+          "l5"
+        ],
+        "links": [],
+        "seconds": 13
+      },
+      {
+        "id": "consumer",
+        "chapter": "02 / EXTERNAL CONSUMER",
+        "title": "An Azure Function enters through the SDK.",
+        "explanation": "The lifecycle Function offers the six scenarios as reviewed REST operations. It never calls the Factory API over the network: it dispatches aif-ops.yml to a management runner, which calls AzureFactoryClient next to the API.",
+        "key": "Each hand-off takes 12-30 seconds (measured 2026-10-24).",
+        "active": [
+          "consumer",
+          "l1"
+        ],
+        "links": [
+          {
+            "from": "consumer",
+            "to": "l1",
+            "label": "aif-ops.yml hand-off to the SDK",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "clients",
+        "chapter": "03 / LAYER 1 · CLIENTS",
+        "title": "CLI, SDK and wizards are thin clients.",
+        "explanation": "The azurefactory CLI and Python SDK (purple), the Tkinter wizard (pink) and the MAUI ESAIF.ConfigWizard send the same review, confirm and status calls. They hold no deployment logic, so they spend seconds, not minutes.",
+        "key": "Clients review, confirm and poll. Deciding happens in layer 2.",
+        "active": [
+          "l1",
+          "l2"
+        ],
+        "links": [
+          {
+            "from": "l1",
+            "to": "l2",
+            "label": "REST on 127.0.0.1:8765 with X-API-Key",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "api",
+        "chapter": "04 / LAYER 2 · FACTORY REST API",
+        "title": "Pink owns the decisions.",
+        "explanation": "The FastAPI routes and the service layer behind them build the catalog, reviews, whole-workflow consent, frozen deployment plans, cost previews and recoveries. State is DPAPI-sealed SQLite on the admin VM, where the identity, VPN and runner are.",
+        "key": "A runtime review took 13 min and its confirmation 18 min (measured).",
+        "active": [
+          "l2",
+          "l3"
+        ],
+        "links": [
+          {
+            "from": "l2",
+            "to": "l3",
+            "label": "runs launchers, dispatches factory-lifecycle",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 14
+      },
+      {
+        "id": "pipelines",
+        "chapter": "05 / LAYER 3 · PIPELINES + API SCRIPTS",
+        "title": "The API starts scripts and pipelines.",
+        "explanation": "The API runs purple Bash and PowerShell such as GHA-update-aifactory-and-run-project.sh, create-new-aifactory-scaleset.sh and runner-registration.ps1, and dispatches factory-lifecycle.yml or the ADO pipeline on the factory's self-hosted runner.",
+        "key": "A COMMON run reached the worker after 3-4 min (measured, aif-125).",
+        "active": [
+          "l3",
+          "l4"
+        ],
+        "links": [
+          {
+            "from": "l3",
+            "to": "l4",
+            "label": "worker bootstrap/lib/factory_lifecycle.py",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 14
+      },
+      {
+        "id": "bicep",
+        "chapter": "06 / LAYER 4 · BICEP + PIPELINE SCRIPTS",
+        "title": "Purple describes the infrastructure.",
+        "explanation": "The worker compiles and deploys purple Bicep: 11-rgCommon, 12-networkCommon and 13-rgLevel for COMMON, 31-network to 11-integration for a project. The pipelines also run scripts such as preflight.sh, subnetCalc_v2.ps1 and delete-services-if-disabled.sh.",
+        "key": "Build, preflight and what-if take minutes, not hours (estimated).",
+        "active": [
+          "l4",
+          "l5"
+        ],
+        "links": [
+          {
+            "from": "l4",
+            "to": "l5",
+            "label": "resource-group and subscription deployments",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 14
+      },
+      {
+        "id": "arm",
+        "chapter": "07 / LAYER 5 · AZURE RESOURCE MANAGER",
+        "title": "Only the core changes Azure.",
+        "explanation": "ARM creates, updates and deletes resource groups and resources. Networking dominates: a VPN gateway alone takes tens of minutes, and private endpoints and private DNS zones add more.",
+        "key": "Most wall-clock time is spent in the core.",
+        "active": [
+          "l5"
+        ],
+        "links": [],
+        "seconds": 12
+      },
+      {
+        "id": "bootstrap",
+        "chapter": "08 / BOOTSTRAP SHORTCUT",
+        "title": "Bootstrap skips layer 4.",
+        "explanation": "Scenario 1's bootstrap stages, repository-initialization to publication, run on the API host: pink plus vendored purple helpers call az, gh and git straight to ARM. Only COMMON, PROJECT and later operations go through the pipelines and Bicep.",
+        "key": "Bootstrap took 103-131 min on two factories (measured, aif-124 and aif-125).",
+        "active": [
+          "l2",
+          "l3",
+          "l5"
+        ],
+        "links": [
+          {
+            "from": "l2",
+            "to": "l3",
+            "label": "bootstrap stage helpers",
+            "path": "bootstrap"
+          },
+          {
+            "from": "l3",
+            "to": "l5",
+            "label": "az, gh, git with the VM's identity",
+            "path": "bootstrap"
+          }
+        ],
+        "seconds": 15
+      },
+      {
+        "id": "time",
+        "chapter": "09 / WHERE THE TIME GOES",
+        "title": "Six scenarios, one path.",
+        "explanation": "{totals}. Deletes ran simulated only.",
+        "key": "Inner layers cost the most time to change: prevent their bugs instead of looping faster.",
+        "active": [
+          "consumer",
+          "l1",
+          "l2",
+          "l3",
+          "l4",
+          "l5"
+        ],
+        "links": [
+          {
+            "from": "consumer",
+            "to": "l1",
+            "label": "lifecycle",
+            "path": "lifecycle"
+          },
+          {
+            "from": "l1",
+            "to": "l2",
+            "label": "review + confirm",
+            "path": "lifecycle"
+          },
+          {
+            "from": "l2",
+            "to": "l3",
+            "label": "dispatch",
+            "path": "lifecycle"
+          },
+          {
+            "from": "l3",
+            "to": "l4",
+            "label": "worker",
+            "path": "lifecycle"
+          },
+          {
+            "from": "l4",
+            "to": "l5",
+            "label": "deploy",
+            "path": "lifecycle"
+          }
+        ],
+        "seconds": 15,
+        "chart": true
+      }
+    ]
+  }
+}
