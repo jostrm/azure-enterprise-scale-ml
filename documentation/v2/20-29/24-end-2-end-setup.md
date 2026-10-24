@@ -558,6 +558,14 @@ not another folder level. Friendly names are optional metadata. Projects do not
 inherit a new factory-wide settings layer. Keep credentials in protected storage,
 never in these files.
 
+After the first catalog operation the API also keeps a hidden
+`azurefactory\.azurefactory\` folder: its `.catalog.lock` and
+`catalog-operations.sqlite` operations database (plus SQLite journal files).
+That is local API state, not configuration: **never commit it**.
+`01-start-v125-and-above.sh` appends `.azurefactory/` to the consumer
+`.gitignore` when no rule for it exists, so `git add azurefactory` stages
+`register.json` and its projections only.
+
 Factory type is explicit. AI deployment is supported; robot/web/app factory types
 are extension points, not additional deployment engines.
 
@@ -578,6 +586,9 @@ unsupported envelopes, linked paths, mixed layouts and nonempty unregistered
 destinations fail without overwriting user files. No readable projection or
 `variables.json` is generated. Add or import your metadata through the catalog
 before expecting the illustrated factory, scale-set and project files.
+This helper does not edit `.gitignore`. Before your first catalog operation, add
+`.azurefactory/` to the consumer `.gitignore` yourself, or run
+`01-start-v125-and-above.sh`, which adds it when it is missing.
 
 An existing sibling `aifactory\variables.json`, including a legacy Dev-only
 configuration and a placeholder config-wizard README, is legitimate legacy input.
@@ -644,9 +655,13 @@ their supporting libraries and the same Python SDK/CLI locally, then initializes
 only the empty register. Use `--provider ado` or `--provider gha` to install one
 wrapper; opposing-provider files are never deleted. Rerunning is an idempotent
 helper refresh: changed helper files are backed up under `.aifactory-backups`,
-while register configuration, projections, saved versions, workflows, `.env`
-and an existing `.gitignore` remain untouched. `--refresh-only` skips register
-initialization. Review ignore rules yourself and keep backups/receipts private.
+while register configuration, projections, saved versions, workflows and `.env`
+remain untouched. Existing `.gitignore` lines are never rewritten: setup only
+appends `.azurefactory/` (with a comment, in the file's line-ending style) when
+no rule for it exists, so the API's catalog lock and operations database are
+never committed. It does so on every run, including `--refresh-only`, which
+skips register initialization. Review your other ignore rules yourself and keep
+backups/receipts private.
 It does not run the legacy template copier or overwrite a legacy `aifactory`
 destination. Use explicit migration for an existing legacy repository.
 

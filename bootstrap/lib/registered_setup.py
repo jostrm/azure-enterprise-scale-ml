@@ -10,6 +10,29 @@ import sys
 from bootstrap_no_delete import Merge
 import initialize_azurefactory as starter
 
+# The API writes azurefactory/.azurefactory/ (catalog lock, operations database) after the first catalog operation.
+API_METADATA_RULE = ".azurefactory/"
+API_METADATA_COMMENT = "# AI Factory API catalog lock and operations database; never commit."
+
+
+def ensure_api_metadata_ignored(root):
+    """Append the API metadata rule once; existing .gitignore bytes are never rewritten."""
+    path = starter.ordinary(root / ".gitignore")
+    existing = path.read_bytes() if path.exists() else b""
+    rules = {API_METADATA_RULE, API_METADATA_RULE.rstrip("/")}
+    rules |= {"**/" + rule for rule in rules}
+    lines = existing.decode("utf-8", errors="replace").lstrip("\ufeff").splitlines()
+    if any(line.rstrip() in rules for line in lines):
+        print(f"{path} already ignores {API_METADATA_RULE}")
+        return
+    newline = b"\r\n" if b"\r\n" in existing else b"\n"
+    block = newline.join((API_METADATA_COMMENT.encode(), API_METADATA_RULE.encode(), b""))
+    if existing and not existing.endswith(b"\n"):
+        block = newline + block
+    with path.open("ab") as stream:
+        stream.write(block)
+    print(f"Added {API_METADATA_RULE} to {path}: keeps the API catalog lock and operations database out of Git.")
+
 
 def git(source, *args):
     result = subprocess.run(
@@ -90,17 +113,18 @@ def install(source, root, provider="both", refresh_only=False):
         digest.update(origin.read_bytes() if isinstance(origin, Path) else origin)
     print(f"Selected helper payload SHA256: {digest.hexdigest()}", flush=True)
     merge.execute()
+    ensure_api_metadata_ignored(root)
     if not refresh_only:
         path, created = starter.initialize(target)
         print(f"{'Initialized empty' if created else 'Preserved existing'} register: {path}")
-    print("No factory/project was created, migrated or deployed. Saved configuration/version and .gitignore are preserved.")
+    print("No factory/project was created, migrated or deployed. Saved configuration/version and existing .gitignore lines are preserved.")
     print("A current authenticated local API is required for configuration; no desktop app is required.")
     print("Next: bash ./azurefactory.sh api instructions")
     print("Then: bash ./azurefactory.sh doctor")
     print("Configure: bash ./azurefactory.sh factory create --help")
     print("Review the preview, then separately approve: bash ./azurefactory.sh catalog confirm --receipt <file> --yes")
     print("Creation configures a factory plus its initial project (default project001); deployment is a separate review.")
-    print("Keep receipts and .aifactory-backups private; existing ignore rules are not changed.")
+    print("Keep receipts and .aifactory-backups private; .gitignore only gains .azurefactory/ when it is missing.")
 
 
 def main():

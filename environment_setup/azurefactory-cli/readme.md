@@ -298,7 +298,10 @@ bash ./azurefactory.sh api instructions
 The source entrypoint installs the same CLI plus registered ADO/GHA root helpers
 without running legacy template copy/cleanup. `--provider ado|gha` selects just
 one wrapper without deleting the other. Reruns back up changed helpers and
-preserve register configuration, explicit saved versions and `.gitignore`;
+preserve register configuration, explicit saved versions and existing
+`.gitignore` lines. Every run (also `--refresh-only`) appends `.azurefactory/`
+to `.gitignore` when it is missing, so the API's catalog lock and operations
+database under `azurefactory/.azurefactory/` are never committed;
 `--refresh-only` installs helpers without initializing storage. The printed
 source commit/dirty state and payload digest describe the files actually used.
 They do not certify a published release or the running API binary.

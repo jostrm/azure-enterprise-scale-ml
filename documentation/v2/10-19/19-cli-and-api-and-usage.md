@@ -995,6 +995,14 @@ Check the readback's exact IDs and changes. Read settings/parameters again
 when changed. A transport error may occur after a write took effect; do not
 catch it by automatically running this program again.
 
+When you commit the confirmed configuration under `azurefactory`, leave out
+`azurefactory/.azurefactory/`. After the first catalog operation the API keeps
+its `.catalog.lock` and `catalog-operations.sqlite` (plus SQLite journal files)
+there: local API state, not configuration. `01-start-v125-and-above.sh` adds
+`.azurefactory/` to the consumer `.gitignore` when it is missing; before
+`git add azurefactory`, check that
+`git check-ignore azurefactory/.azurefactory/catalog-operations.sqlite` prints the path.
+
 ## Separate runtime deployment and observation
 
 Save as **`prepare_runtime.py`**. Project deployment requires an existing

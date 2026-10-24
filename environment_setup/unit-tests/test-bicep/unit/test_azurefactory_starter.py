@@ -22,6 +22,9 @@ SPEC.loader.exec_module(STARTER)
 BASH = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
 if not BASH.is_file():
     BASH = None if os.name == "nt" else shutil.which("bash")
+# After the first catalog operation the API writes its lock and operations database here.
+API_METADATA = ("azurefactory/.azurefactory/.catalog.lock", "azurefactory/.azurefactory/catalog-operations.sqlite")
+API_METADATA_RULE = b"# AI Factory API catalog lock and operations database; never commit.\n.azurefactory/\n"
 
 
 def bash_environment():
@@ -734,12 +737,23 @@ class TestRegisteredShellSetup(StarterWorkspace):
             cwd=self.workspace, env=self.env, capture_output=True, text=True, timeout=60,
         )
 
+    def ignored(self, *relative):
+        result = subprocess.run(
+            ["git", "-C", str(self.workspace), "check-ignore", "--no-index", "--", *relative],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        return set(result.stdout.split())
+
     def test_clean_consumer_installs_both_providers_and_real_cli_offline(self):
         result = self.start()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Source commit:", result.stdout)
         self.assertIn("payload SHA256:", result.stdout)
         self.assertEqual(STARTER.read_document(self.target / "register.json"), STARTER.EMPTY_DOCUMENT)
+        # The template's checkout line endings decide the appended rule's line endings.
+        self.assertTrue((self.workspace / ".gitignore").read_bytes().replace(b"\r\n", b"\n").endswith(API_METADATA_RULE))
+        self.assertEqual(self.ignored(*API_METADATA, "azurefactory/register.json"), set(API_METADATA))
         for name in ("ADO-azurefactory.sh", "GHA-azurefactory.sh", "azurefactory.sh", "AIFactory-lifecycle.sh"):
             self.assertTrue((self.workspace / name).is_file(), name)
         for name in ("aifactory", "aifactory-templates", "01-aif-copy-aifactory-templates.sh"):
@@ -761,8 +775,8 @@ class TestRegisteredShellSetup(StarterWorkspace):
         factory_id = document["factories"][0]["id"]
         document["configurations"][factory_id]["factory"]["aifactory_version"] = "main"
         self.write_register(json.dumps(document, indent=4))
+        (self.workspace / ".gitignore").write_bytes(b"my-private-configuration.json\n")
         preserved = {
-            ".gitignore": b"my-private-configuration.json\n",
             ".env": b"USER_SETTING=keep\n",
             ".github/workflows/custom.yml": b"name: user workflow\n",
             "GHA-azurefactory.sh": b"user opposing-provider launcher\n",
@@ -779,10 +793,46 @@ class TestRegisteredShellSetup(StarterWorkspace):
         self.assertEqual(result.returncode, 0, result.stderr)
         for relative, data in preserved.items():
             self.assertEqual((self.workspace / relative).read_bytes(), data)
+        self.assertEqual((self.workspace / ".gitignore").read_bytes(),
+                         b"my-private-configuration.json\n" + API_METADATA_RULE)
         self.assertEqual((self.target / "register.json").read_bytes(), register_before)
         backups = list((self.workspace / ".aifactory-backups").iterdir())
         self.assertEqual(len(backups), 1)
         self.assertEqual((backups[0] / "ADO-azurefactory.sh").read_bytes(), b"user ADO launcher\n")
+
+    def test_existing_ignore_rules_are_kept_and_api_metadata_rule_is_appended_once(self):
+        gitignore = self.workspace / ".gitignore"
+        gitignore.write_bytes(b"# my rules\nkeep-private.json")
+        result = self.start()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("existing ignore rules are not changed", result.stdout)
+        self.assertIn("Added .azurefactory/ to", result.stdout)
+        expected = b"# my rules\nkeep-private.json\n" + API_METADATA_RULE
+        self.assertEqual(gitignore.read_bytes(), expected)
+        self.assertEqual(self.ignored(*API_METADATA, "azurefactory/register.json"), set(API_METADATA))
+        result = self.start()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("already ignores .azurefactory/", result.stdout)
+        self.assertEqual(gitignore.read_bytes(), expected)
+
+    def test_refresh_only_appends_rule_in_existing_line_ending_style(self):
+        gitignore = self.workspace / ".gitignore"
+        gitignore.write_bytes(b"keep-private.json\r\n")
+        result = self.start("--refresh-only")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.target.exists())
+        self.assertEqual(gitignore.read_bytes(),
+                         b"keep-private.json\r\n" + API_METADATA_RULE.replace(b"\n", b"\r\n"))
+
+    def test_existing_api_metadata_rule_leaves_gitignore_unchanged(self):
+        gitignore = self.workspace / ".gitignore"
+        for existing in (b"build/\n.azurefactory  \n", b"\xef\xbb\xbf**/.azurefactory/\r\n"):
+            with self.subTest(existing=existing):
+                gitignore.write_bytes(existing)
+                result = self.start("--refresh-only")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("already ignores .azurefactory/", result.stdout)
+                self.assertEqual(gitignore.read_bytes(), existing)
 
     def test_installed_cli_prepares_initial_project_via_api_without_confirm(self):
         installed = self.start()
