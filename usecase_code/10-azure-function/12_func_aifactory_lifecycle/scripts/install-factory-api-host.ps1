@@ -9,8 +9,10 @@
     - gh is logged in for SYSTEM with a GitHub token read from Key Vault by the VM's managed identity (never printed),
       with gh as git's credential helper, a git identity and long paths (the API publishes to the factory repo).
       A classic PAT needs the scopes repo, workflow and read:org; the script checks them before it changes anything;
-    - az for SYSTEM must already be logged in with `az login --identity` (the managed identity needs the factory
-      subscription's Owner role, plus Microsoft Graph Group.ReadWrite.All and User.Read.All for the team group);
+    - az runs with the API's own profile in <InstallRoot>\azure-cli (AZURE_CONFIG_DIR), signed in with
+      `az login --identity` at every start (the managed identity needs the factory subscription's Owner role, plus
+      Microsoft Graph Group.ReadWrite.All and User.Read.All for the team group). Other SYSTEM jobs on the VM cannot log
+      the API out: an Azure DevOps agent running as SYSTEM clears SYSTEM's shared az profile after its Azure CLI tasks;
     - the pinned release asset is downloaded with gh and checked against the release's SHA256SUMS.txt;
     - start-api.ps1 reads the API key from Key Vault at every start and runs `aifactory-config.exe --api-host`, with
       its output in <InstallRoot>\logs (the previous run's logs are kept as *.prev);
@@ -34,11 +36,15 @@ param(
     [string]$CatalogOwner = 'aif-lifecycle-mgmt',
     [string]$GitUserName = 'AI Factory lifecycle',
     [string]$GitUserEmail = 'aif-lifecycle@users.noreply.github.com',
-    [string]$TaskName = 'AIFactoryApi'
+    [string]$TaskName = 'AIFactoryApi',
+    [string]$SubscriptionId = '',
+    [string]$AzureConfigDir = ''
 )
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 if ($KeyVaultName -notmatch '^[A-Za-z0-9-]{3,24}$') { throw 'KeyVaultName is not a vault name.' }
+if ($SubscriptionId -and $SubscriptionId -notmatch '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$') { throw 'SubscriptionId is not a subscription ID.' }
+if (-not $AzureConfigDir) { $AzureConfigDir = Join-Path $InstallRoot 'azure-cli' }
 
 function Invoke-Native([string]$File, [string[]]$Arguments) {
     & $File @Arguments
@@ -50,6 +56,22 @@ function Get-VaultSecret([string]$Name) {
     $token = (Invoke-RestMethod -Headers @{ Metadata = 'true' } -Uri $imds -TimeoutSec 15).access_token
     $uri = "https://$KeyVaultName.vault.azure.net/secrets/$Name`?api-version=7.4"
     return (Invoke-RestMethod -Headers @{ Authorization = "Bearer $token" } -Uri $uri -TimeoutSec 15).value
+}
+
+function Initialize-ApiAzureCli([string]$ConfigDir, [string]$SubscriptionId) {
+    # The API's own az profile, signed in with the VM's managed identity; start-api.ps1 runs this before every start.
+    New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
+    $env:AZURE_CONFIG_DIR = $ConfigDir
+    $current = & { $ErrorActionPreference = 'Continue'; az account show --query id -o tsv 2>$null }
+    if ($LASTEXITCODE -ne 0 -or -not $current) {
+        az login --identity --allow-no-subscriptions --output none
+        if ($LASTEXITCODE -ne 0) { throw 'az login --identity failed for the Factory API''s az profile.' }
+        $current = ''
+    }
+    if ($SubscriptionId -and $current -ne $SubscriptionId) {
+        az account set --subscription $SubscriptionId
+        if ($LASTEXITCODE -ne 0) { throw "az account set --subscription $SubscriptionId failed." }
+    }
 }
 
 function Get-MissingGitHubScope([string]$Granted) {
@@ -123,6 +145,8 @@ $start = @"
 `$token = (Invoke-RestMethod -Headers @{ Metadata = 'true' } -Uri `$imds -TimeoutSec 15).access_token
 `$env:AIFACTORY_API_KEY = (Invoke-RestMethod -Headers @{ Authorization = "Bearer `$token" } -Uri 'https://$KeyVaultName.vault.azure.net/secrets/$ApiKeySecretName`?api-version=7.4' -TimeoutSec 15).value
 `$env:AIFACTORY_CATALOG_OWNER = '$CatalogOwner'
+function Initialize-ApiAzureCli {$((Get-Command Initialize-ApiAzureCli).Definition)}
+Initialize-ApiAzureCli '$AzureConfigDir' '$SubscriptionId'
 `$logs = '$InstallRoot\logs'
 New-Item -ItemType Directory -Force -Path `$logs | Out-Null
 foreach (`$name in 'api.out.log', 'api.err.log') {

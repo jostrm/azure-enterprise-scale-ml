@@ -78,7 +78,8 @@ For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `s
    own `az` and `gh` logins, keep a clone of the factory repo outside the runner's work folder, and install the runner
    entry point with `scripts\install-lifecycle-runner.ps1` (the API URL, the factory repo's `azurefactory` folder and
    the Key Vault names go into `runner.json`). `scripts\install-factory-api-host.ps1` installs the API with SYSTEM as
-   that user. Before you run it: `az login --identity` for SYSTEM; the VM's managed identity needs Owner on the factory
+   that user. It signs the API's own `az` profile in with the VM's managed identity at every start, so other SYSTEM jobs (such as
+   an Azure DevOps agent) cannot log it out. Before you run it: the VM's managed identity needs Owner on the factory
    subscription plus the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All`, and Reader on every
    network in another subscription that is peered with a network in the factory subscription (for example a
    connectivity hub's: the bootstrap's network-foundation stage reads it); Key Vault needs

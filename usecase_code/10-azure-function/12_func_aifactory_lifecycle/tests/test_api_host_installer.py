@@ -59,3 +59,60 @@ def test_a_reinstall_stops_the_running_api_before_the_task_starts_it_again():
     text = SCRIPT.read_text(encoding="utf-8")
     stop = text.index("Get-Process -Name aifactory-config")
     assert text.index("Stop-ScheduledTask") < stop < text.index("Start-ScheduledTask")
+
+
+FAKE_AZ = r"""
+$global:calls = @()
+function az {
+    $global:calls += "$env:AZURE_CONFIG_DIR|$($args -join ' ')"
+    $marker = Join-Path $env:AZURE_CONFIG_DIR 'signed-in'
+    if ($args[0] -eq 'login') { Set-Content $marker '' }
+    if ($args[0] -eq 'account' -and $args[1] -eq 'show') {
+        if (Test-Path $marker) { $global:LASTEXITCODE = 0; return 'sub-current' }
+        Write-Error 'Please run az login to setup account.'; $global:LASTEXITCODE = 1; return
+    }
+    $global:LASTEXITCODE = 0
+}
+"""
+
+
+def run_initialize(tmp_path, signed_in, subscription):
+    assert SHELL, "this test runs the installer's function in Windows PowerShell or pwsh"
+    folder = tmp_path / "azure-cli"
+    if signed_in:
+        folder.mkdir()
+        (folder / "signed-in").write_text("")
+    script = ("$ErrorActionPreference = 'Stop'\n" + FAKE_AZ + function_text("Initialize-ApiAzureCli")
+              + f"\nInitialize-ApiAzureCli '{folder}' '{subscription}'\n$global:calls -join [char]10")
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode()
+    result = subprocess.run([SHELL, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    return [line.split("|", 1) for line in result.stdout.strip().splitlines()], str(folder)
+
+
+def test_the_api_signs_in_its_own_az_profile_with_the_managed_identity(tmp_path):
+    """SYSTEM's shared az profile was emptied three times on 2026-10-23/24 while an Azure DevOps agent (running as
+    SYSTEM on the same VM) ran Azure CLI tasks; the Factory API's next token request failed and stopped a factory
+    creation (stage-execution-interrupted). The API's own AZURE_CONFIG_DIR keeps its login apart from other jobs."""
+    calls, folder = run_initialize(tmp_path, signed_in=False, subscription="sub-factory")
+    assert all(directory == folder for directory, _ in calls)
+    commands = [command for _, command in calls]
+    assert commands[0].startswith("account show")
+    assert "login --identity --allow-no-subscriptions --output none" in commands
+    assert commands[-1] == "account set --subscription sub-factory"
+
+
+def test_an_api_profile_that_is_signed_in_is_kept(tmp_path):
+    calls, _ = run_initialize(tmp_path, signed_in=True, subscription="")
+    assert [command for _, command in calls] == ["account show --query id -o tsv"]
+
+
+def test_every_api_start_uses_and_signs_in_its_own_az_profile_before_the_api_runs():
+    text = SCRIPT.read_text(encoding="utf-8")
+    begin = text.index('$start = @"')
+    start = text[begin:text.index('"@', begin)]
+    assert "function Initialize-ApiAzureCli {$((Get-Command Initialize-ApiAzureCli).Definition)}" in start
+    call = start.index("Initialize-ApiAzureCli '$AzureConfigDir' '$SubscriptionId'")
+    assert call < start.index("Start-Process @arguments")
+    assert "Join-Path $InstallRoot 'azure-cli'" in text  # inside the SYSTEM/Administrators-only install root

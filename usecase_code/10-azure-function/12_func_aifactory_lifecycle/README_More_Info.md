@@ -98,7 +98,7 @@ can read the ops repository can see. They hold reviews and catalog IDs only, sig
 |---|---|---|---|
 | The Function's managed identity | Storage Blob Data Owner, Storage Table Data Contributor, Storage Queue Data Contributor | The project storage account | Identity-based `AzureWebJobsStorage`, the operation table, the event queue (`infra/roles.bicep`) |
 | The Function's managed identity | Key Vault Secrets User | The project Key Vault | The event secret and the GitHub token |
-| The management VM's managed identity (SYSTEM's `az login --identity`, the Factory API's identity) | Owner | The factory subscription | The bootstrap creates resource groups, identities, roles and networks |
+| The management VM's managed identity (the Factory API's own `az` profile, signed in with `az login --identity`) | Owner | The factory subscription | The bootstrap creates resource groups, identities, roles and networks |
 | The same identity | Microsoft Graph app roles `Group.ReadWrite.All`, `User.Read.All` | Tenant (granted by a Privileged Role Administrator) | The bootstrap creates the team group and adds its members |
 | The same identity | Key Vault Secrets User | The project Key Vault | `aif-factory-api-key`, `aif-factory-api-gh-token` |
 | The same identity | Reader | Every virtual network in another subscription that is peered with a virtual network in the factory subscription, for example `vnet-contoso-access-hub-sdc-001` | The bootstrap's network-foundation stage reads every network in the factory subscription and follows their peerings to check address overlaps. Without it the stage is blocked by an ARM 403 (see Troubleshooting) |
@@ -128,12 +128,14 @@ network: it dispatches `aif-ops.yml` to the management runner, which calls the A
 signed result back. Keep the VM outside every factory the Function can create or delete, and protect its scale set
 with `AIF_PROTECTED_IDS`.
 
-1. **SYSTEM's Azure CLI login**, once, through a run command: `az login --identity`.
+1. **No manual Azure CLI login**: the installer gives the Factory API its own `az` profile (`C:\aif-api\azure-cli`)
+   and signs it in with the VM's managed identity at every start, so an Azure DevOps agent or another job running as
+   SYSTEM, which clears SYSTEM's shared `az` profile after its Azure CLI tasks, cannot log the API out.
 2. **The Factory API**, a pinned AI Factory Config Wizard release in API-only mode, as SYSTEM:
 
    ```powershell
    az vm run-command invoke -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
-      --scripts '@scripts/install-factory-api-host.ps1' --parameters KeyVaultName=kv-p001-sdc-dev-abcde01 Release=v0.47.32
+      --scripts '@scripts/install-factory-api-host.ps1' --parameters KeyVaultName=kv-p001-sdc-dev-abcde01 Release=v0.47.32 SubscriptionId=<factory subscription ID>
    ```
 
    Pass `Release` explicitly: v0.47.32 or later federates the OIDC subject GitHub signs for repositories created after

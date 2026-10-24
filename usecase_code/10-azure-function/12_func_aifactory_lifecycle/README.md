@@ -252,8 +252,9 @@ Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Au
   `az vm run-command invoke --command-id RunPowerShellScript --scripts @install-factory-api-host.ps1 --parameters
   KeyVaultName=<vault>`): a pinned release checked against its `SHA256SUMS.txt`, a startup task, `gh` logged in from Key
   Vault. It needs, before it runs:
-  - SYSTEM's `az` logged in with `az login --identity`; the VM's managed identity has Owner on the factory
-    subscription and the Microsoft Graph app roles `Group.ReadWrite.All` and `User.Read.All` (a Privileged Role
+  - the VM's managed identity (the installer signs the API's own `az` profile, `C:\aif-api\azure-cli`, in with it at
+    every start, so other SYSTEM jobs cannot log the API out) has Owner on the factory subscription and the Microsoft
+    Graph app roles `Group.ReadWrite.All` and `User.Read.All` (a Privileged Role
     Administrator grants them; the bootstrap creates the team group);
   - Reader for the same identity on every virtual network in another subscription that is peered with a network in
     the factory subscription, for example a connectivity hub's: the bootstrap's network-foundation stage follows those
