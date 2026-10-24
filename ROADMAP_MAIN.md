@@ -135,7 +135,7 @@ Subscription vending is an integration discussion, not a completed customer-spec
 
 **Published main versus this local checkout:** at the 30 September snapshot, local `main` is `168bb3fa`, one commit ahead and two behind published `main`. Its local-only commit concerns isolated project lake access and AML image-build compute. Published `bbb70a2d` and `7b8605c2` are not ancestors of that local HEAD. Neither local subjects nor dirty files are evidence of additional published features; do not reset or overwrite this work to adopt the published repairs.
 
-The working tree has extensive existing modifications. They are excluded from these notes. The separate branch `release/v.1.25` is also excluded. No branch checkout, merge, reset or publication is part of this documentation task.
+The working tree has extensive existing modifications. They are excluded from these notes. The `release/v1.25` branch is also excluded. No branch checkout, merge, reset or publication is part of this documentation task.
 
 To reproduce the exact published comparison:
 

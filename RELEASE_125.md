@@ -301,7 +301,7 @@ Report dispatch can start reporting runbooks, and throttle alerts can use Action
 
 ## Upgrade checklist and compatibility caveats
 
-1. **Choose an explicit approved version/commit.** The reviewed implementation maps `--aifactory-version 125` to `release/v1.25`. Do not confuse it with the separate `release/v.1.25` branch.
+1. **Choose an explicit approved version/commit.** The reviewed implementation maps `--aifactory-version 125` to `release/v1.25`, the only v1.25 release branch. It was recreated from `main` on 24 October 2026; the audited tip `1bd9020e` remains in `main` history.
 2. **Do not assume the defaults became 1.25.** At this snapshot `bootstrap/lib/release_version.py` still has `DEFAULT_VERSION = "124"`; canonical JSON, ADO variables and the GHA environment template still contain minor version `24`. Some Bicep fallback minors are older. Review generated/effective configuration rather than copying an invented version-25 default block.
 3. **Preserve version and layout intent.** Legacy create defaults to 124; an existing update normally inherits the saved version and blocks if it cannot resolve it. Registered operations freeze their reviewed branch/commit. Version selection and directory migration are separate operations.
 4. **Update matching components together.** Keep launcher, helpers, provider templates, CLI/API and application contracts compatible. A marker-file update alone is insufficient. Replace removed `useAdminVMBuildAgent` with `useSelfHostedBuildAgent`.
@@ -320,7 +320,7 @@ All **2,662 reachable commit messages**, including their bodies, were reviewed f
 
 The baseline-note commit was authored on 6 July but committed on 9 September 2026. Ancestry, not an author-date cutoff, defines the review. Generic `update` commits were inspected through changed paths and relevant diffs; feature claims were checked against committed documentation/code rather than inferred solely from subjects.
 
-The current `release/v1.24` branch includes later backports, so subtracting that branch would misclassify changes. Novelty here is relative to the supplied document, including its patch section. Differently named `release/v.1.25`, local-only `main` commits and uncommitted work are excluded.
+The current `release/v1.24` branch includes later backports, so subtracting that branch would misclassify changes. Novelty here is relative to the supplied document, including its patch section. Other branches, local-only `main` commits and uncommitted work are excluded.
 
 Reproduce the history scope without changing branches:
 

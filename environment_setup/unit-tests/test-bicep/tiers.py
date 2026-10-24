@@ -55,6 +55,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_project_deployment_contract.py",
         "unit/test_project_only_launchers.py",
         "unit/test_release_branch_checkout.py",
+        "unit/test_release_branch_names.py",
         "unit/test_release_version.py",
         "unit/test_shared_acr_update.py",
         "unit/test_workflow_run_monitor.py",

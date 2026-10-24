@@ -20,7 +20,7 @@ common scenarios. Each SDK call below is a client of the same Config Wizard API.
 | 5. Delete scaleset | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. |
 | 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. |
 
-**Note:** It uses the new registered Azure Factory approach (v.1.25 and higher).
+**Note:** It uses the new registered Azure Factory approach (v1.25 and higher).
 You need the prepared API and accelerator source folders from your platform team.
 
 ## Choose your tool

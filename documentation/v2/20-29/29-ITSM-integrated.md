@@ -289,7 +289,7 @@ to GitHub. `AzureFactoryClient()` only reads the client's connection settings.
 ### 1. Install the Python SDK and CLI
 
 Use **Python 3.10 or newer** and an updated checkout of this repository containing
-`environment_setup\azurefactory-cli`, from `main` or `release/v.1.25`.
+`environment_setup\azurefactory-cli`, from `main` or `release/v1.25`.
 The commands below use **PowerShell 7 or newer**; replace the checkout path with
 your own:
 
@@ -685,7 +685,7 @@ integration logic.
 This repository contains the shared monitor in
 `bootstrap/lib/workflow_run_monitor.py`, CLI/SDK support under
 `environment_setup/azurefactory-cli`, tests, and this document on both `main`
-and `release/v.1.25`.
+and `release/v1.25`.
 
 The backend Python API used by the AI Factory Configuration Wizard is maintained
 separately from this SDK. Install compatible API and desktop app versions when
