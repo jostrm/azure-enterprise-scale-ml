@@ -143,6 +143,13 @@ def test_short_project_numbers_are_normalized_to_three_digits(tmp_path):
     assert result == 0 and voice.calls[0]["environ"]["project_number_000"] == "012"
 
 
+def test_the_documented_short_form_to_project_option_is_accepted(tmp_path):
+    # "-addAIFactoryAgentChat -toProject 001" is the form the operators were given; it must mean --to-project.
+    root = registered(tmp_path)
+    result, _, voice = run(entry(), ["-toProject", "012", "--consumer-root", str(root)])
+    assert result == 0 and voice.calls[0]["environ"]["project_number_000"] == "012"
+
+
 # ---- entry: configuration resolution ---------------------------------------------------------------------------
 
 def test_a_registered_root_uses_the_projects_own_variables_file(tmp_path, capsys):

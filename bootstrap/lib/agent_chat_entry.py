@@ -32,8 +32,9 @@ class UsageError(ValueError):
 def parse(arguments: list[str]) -> dict:
     options = {"environment": "dev", "consumer_root": os.getcwd(), "config": "", "agent_config": None,
                "voice": True, "apply": False, "project": ""}
-    values = {"--to-project": "project", "--environment": "environment", "--consumer-root": "consumer_root",
-              "--config": "config", "--agent-config": "agent_config"}
+    # -toProject is the short form that matches the -addAIFactoryAgentChat action alias.
+    values = {"--to-project": "project", "-toProject": "project", "--environment": "environment",
+              "--consumer-root": "consumer_root", "--config": "config", "--agent-config": "agent_config"}
     index = 0
     while index < len(arguments):
         argument = arguments[index]
