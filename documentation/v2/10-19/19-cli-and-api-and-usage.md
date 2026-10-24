@@ -603,6 +603,7 @@ from azurefactory.catalog_requests import (
     project_add_request, project_add_placements_request,
 )
 from azurefactory.review import load_receipt, parse_expires_at, validate_preview, write_receipt
+from azurefactory.errors import BlockedError
 
 def require(condition, message):
     if not condition:
@@ -1021,12 +1022,21 @@ body = {"contract_version": 1, "folder": folder, "action": "deploy", "factory_id
         "scale_set_id": s["id"], "expected_revision": current["revision"], "version_ref": version}
 if p:
     body["project_id"] = p["id"]
-save_review(c, body, c.review_catalog_prepare(body), "runtime-deploy")
+try:
+    preview = c.review_catalog_prepare(body)
+except BlockedError:
+    # Show why: prepare again only to read the reasons. A blocked preview cannot be confirmed.
+    blocked = c.catalog_prepare(body)
+    show(c, {"can_execute": blocked.get("can_execute"), "blockers": blocked.get("blockers")})
+    raise SystemExit("STOP. The API refused this deployment; resolve the blockers above. "
+                     "Nothing was saved or started.")
+save_review(c, body, preview, "runtime-deploy")
 ```
 
 **STOP**. Deployment approval is distinct from configuration approval. Only
 afterward run `confirm_review.py` with `runtime`. Do not bypass blockers with
-legacy/bootstrap calls.
+legacy/bootstrap calls. When the API refuses, the program prints its blockers,
+for example a missing pipeline binding before Full bootstrap has run.
 
 Save **`observe_runtime.py`** to inspect the returned job. This bounded loop
 only reads; it does not retry deployment.

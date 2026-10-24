@@ -110,6 +110,54 @@ def test_guides_have_one_complete_native_tool_selector(number):
     assert "```python" not in rest and not re.search(r"^\s*@'\s*$", rest, re.M)
 
 
+def python_program(number, name):
+    """The Python SDK tab's code block saved as `name` in guide `number`."""
+    python = guide_tabs((DOCS / f"{number}-cli-and-api-and-usage.md").read_text(encoding="utf-8"))["Python SDK"]
+    after = python.split(f"**`{name}`**", 1)[1]
+    return re.search(r"(?ms)^```python\n(.*?)^```", after).group(1)
+
+
+def test_guide19_prepare_runtime_prints_the_blockers_when_the_api_refuses(monkeypatch, capsys):
+    import sys
+    import types
+    from azurefactory.errors import BlockedError
+
+    blockers = ["Configure the factory's pipeline binding gha.json before deployment."]
+    saved = []
+
+    class Client:
+        api_key = "private-test-key"
+
+        def review_catalog_prepare(self, body):
+            raise BlockedError("Preview cannot execute; resolve blockers before confirming.")
+
+        def catalog_prepare(self, body):
+            return {"can_execute": False, "blockers": blockers, "confirmation_id": "c-1"}
+
+    helper = types.ModuleType("aif_review")
+    helper.connect = lambda: (Client(), "C:/host/azurefactory")
+    helper.choice = lambda prompt, allowed: "common"
+    helper.select = lambda *args, **kwargs: (
+        {"revision": "r1"}, {"id": "f-1"}, {"id": "s-1"}, None)
+    helper.require = lambda condition, message: None
+    helper.show = lambda client, value: print(json.dumps(value))
+    helper.save_review = lambda *args: saved.append(args)
+    helper.BlockedError = BlockedError
+    helper.__all__ = ["connect", "choice", "select", "require", "show", "save_review", "BlockedError"]
+    # The real helper must provide BlockedError to `from aif_review import *` as well.
+    assert "from azurefactory.errors import BlockedError" in python_program(19, "aif_review.py")
+    monkeypatch.setitem(sys.modules, "aif_review", helper)
+    monkeypatch.setattr("builtins.input", lambda _: "main")
+
+    with pytest.raises(SystemExit) as stopped:
+        exec(compile(python_program(19, "prepare_runtime.py"), "prepare_runtime.py", "exec"), {})
+
+    output = capsys.readouterr().out
+    assert blockers[0] in output and '"can_execute": false' in output
+    assert "Nothing was saved or started" in str(stopped.value)
+    assert not saved and "private-test-key" not in output
+
+
 def test_site_hook_rewrites_only_document_links(tmp_path):
     pytest.importorskip("mkdocs")
     spec = importlib.util.spec_from_file_location("factory_guide_hook",
