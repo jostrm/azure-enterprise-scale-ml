@@ -71,8 +71,12 @@ THROTTLED_READ_MAX_DELAY_SECONDS = 60
 REMOTE_SOCKET_TIMEOUT_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
 RESOURCE_CLOSURE_READ_WORKERS = 8
+# The peer cut the TLS session (EOF without close_notify, or close_notify): a transport drop like a reset,
+# unlike a certificate or protocol failure, which stays permanent.
+TLS_SESSION_CUT_ERRORS = (ssl.SSLEOFError, ssl.SSLZeroReturnError)
 # How a pooled connection the server already closed while idle fails on its next request.
-STALE_CONNECTION_ERRORS = (RemoteDisconnected, ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+STALE_CONNECTION_ERRORS = (RemoteDisconnected, ConnectionResetError, ConnectionAbortedError,
+                           BrokenPipeError) + TLS_SESSION_CUT_ERRORS
 ARM = "https://management.azure.com"
 SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
@@ -1117,7 +1121,9 @@ class Cloud:
                 break
             except (URLError, OSError, IncompleteRead) as error:
                 reason = error.reason if isinstance(error, URLError) else error
-                if isinstance(reason, (ssl.SSLError, PermissionError)):
+                if isinstance(reason, TLS_SESSION_CUT_ERRORS):
+                    transient = True
+                elif isinstance(reason, (ssl.SSLError, PermissionError)):
                     transient = False
                 elif isinstance(reason, socket.gaierror):
                     transient = reason.errno in (socket.EAI_AGAIN, WSANO_DATA)

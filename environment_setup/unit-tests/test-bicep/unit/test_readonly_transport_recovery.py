@@ -116,6 +116,10 @@ def test_read_retries_proven_errno101_after_60_seconds(clock, capsys, method):
     # Windows reports a resolver hiccup for an always-resolvable ARM host as WSANO_DATA.
     URLError(socket.gaierror(11004, "getaddrinfo failed")),
     OSError(errno.EHOSTUNREACH, "host unreachable"), OSError(errno.ENETDOWN, "network down"),
+    # The peer dropped the TLS session mid-request (aif-126 COMMON read-back, 2026-10-24): a transport cut, not TLS.
+    URLError(ssl.SSLEOFError(8, "EOF occurred in violation of protocol")),
+    ssl.SSLEOFError(8, "EOF occurred in violation of protocol"),
+    URLError(ssl.SSLZeroReturnError(6, "TLS/SSL connection has been closed (EOF)")),
 ])
 def test_specific_transient_read_errors_retry(clock, failure):
     response = Response()
@@ -161,6 +165,14 @@ def test_mutations_including_what_if_post_remain_single_attempt(clock, method, d
     assert opener.open.call_count == 1 and not clock.sleeps
     if during_body:
         assert first.closed
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_mutation_tls_eof_remains_single_attempt(clock, method):
+    cloud, opener = cloud_with(URLError(ssl.SSLEOFError(8, "EOF occurred in violation of protocol")), Response())
+    with pytest.raises(fl.Blocked, match="^remote-request-unverified$"):
+        cloud.request(method, ARM_URL, fl.ARM, data={"private": "payload"})
+    assert opener.open.call_count == 1 and not clock.sleeps
 
 
 @pytest.mark.parametrize("failure", [

@@ -5,6 +5,7 @@ Every connection here is a fake; nothing opens a socket.
 
 import http.client
 import importlib.util
+import ssl
 import threading
 import time
 from pathlib import Path
@@ -149,7 +150,10 @@ def test_requests_through_a_proxy_tunnel_use_the_stdlib_path():
 
 
 @pytest.mark.parametrize("failure", [http.client.RemoteDisconnected("idle close"), ConnectionResetError(104, "reset"),
-                                     BrokenPipeError(32, "broken pipe"), ConnectionAbortedError(103, "aborted")])
+                                     BrokenPipeError(32, "broken pipe"), ConnectionAbortedError(103, "aborted"),
+                                     # A TLS peer that closed an idle session answers the next request with EOF.
+                                     ssl.SSLEOFError(8, "EOF occurred in violation of protocol"),
+                                     ssl.SSLZeroReturnError(6, "TLS/SSL connection has been closed (EOF)")])
 def test_a_stale_reused_connection_is_replaced_once(failure):
     def answer(connection, method, selector, headers):
         if connection is server.connections[0] and len(connection.requests) == 2:
