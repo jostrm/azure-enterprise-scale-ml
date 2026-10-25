@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "15460409693422565932"
+      "templateHash": "1225914422441165485"
     }
   },
   "functions": [
@@ -4626,8 +4626,11 @@
         "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-seeding-endpoint'], variables('tokens')), createObject('keyVaultId', createObject('value', reference('seedingVault').outputs.keyVaultId.value)))]"
       },
       "dependsOn": [
+        "appGatewayNetwork",
+        "hubAccess",
         "privateDns",
-        "seedingVault"
+        "seedingVault",
+        "vpnGateway"
       ]
     },
     "projectNetwork": {
