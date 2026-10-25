@@ -412,6 +412,42 @@ def test_unreadable_provider_schema_children_are_metadata_not_a_closure_stop(chi
     assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
 
 
+def test_kind_filter_required_children_are_audited_from_live_evidence():
+    # aif-130 (2026-10-25, read-only az rest): GET workspaces/{ws}/dataSources?api-version=2020-08-01
+    # answers 400 KindNotSpecified "Must specify a valid kind filter": the list has no unfiltered form.
+    assert fl.FILTER_REQUIRED_CHILDREN == {"microsoft.operationalinsights/workspaces/datasources": "KindNotSpecified"}
+
+
+def test_a_kind_filter_required_child_is_recorded_not_listed(monkeypatch):
+    monkeypatch.setattr(fl, "FILTER_REQUIRED_CHILDREN", {
+        **fl.FILTER_REQUIRED_CHILDREN, "microsoft.network/networksecuritygroups/datasources": "KindNotSpecified"})
+
+    class FilteredChildCloud(MetadataCloud):
+        listed = []
+
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": "networkSecurityGroups/dataSources",
+                                            "apiVersions": ["2024-05-01"]})
+            return result
+
+        def provider_operations(self, namespace):
+            return super().provider_operations(namespace) + [
+                namespace.lower() + "/networksecuritygroups/datasources/" + action
+                for action in ("read", "write", "delete")]
+
+        def collection(self, path, api_version, extension=False):
+            self.listed.append(path.lower())
+            return super().collection(path, api_version, extension=extension)
+
+    cloud = FilteredChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    path = NSG.lower() + "/datasources"
+    assert closure["collections"][path] == {"non_resource_metadata": "microsoft.network/networksecuritygroups/datasources"}
+    assert path not in cloud.listed
+    assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
+
+
 def test_an_actual_reference_to_an_unreadable_kind_still_fails_closed():
     class UnreadableChildCloud(MetadataCloud):
         def provider_schema(self, namespace):

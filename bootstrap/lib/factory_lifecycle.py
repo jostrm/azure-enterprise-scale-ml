@@ -138,6 +138,10 @@ UNSUPPORTED_COLLECTION_CODES = {
     "DiagnosticSettingsNotSupported", "ResourceTypeNotSupported", "UnsupportedResourceType",
     "ResourceTypeNotSupportedForDiagnosticSettings", "ScopeNotSupported",
 }
+# Schema children whose ARM list has no unfiltered form, by the error code the unfiltered list answers.
+# Audited from live evidence only: aif-130 (2026-10-25) GET workspaces/{ws}/dataSources answered
+# 400 KindNotSpecified. They live and die with their parent and are recorded, never listed.
+FILTER_REQUIRED_CHILDREN = {"microsoft.operationalinsights/workspaces/datasources": "KindNotSpecified"}
 MANAGED_GROUP_PARENT_TYPES = {
     "microsoft.containerservice/managedclusters", "microsoft.databricks/workspaces",
     "microsoft.synapse/workspaces", "microsoft.solutions/applications",
@@ -152,7 +156,35 @@ ADO_FILES = {
 }
 
 
+CHILD_INVENTORY_TYPE = re.compile(
+    r"[a-z0-9.]{1,64}(?:/[a-z0-9]{1,80}){1,6}(?:/providers/[a-z0-9.]{1,64}(?:/[a-z0-9]{1,80}){1,6})?")
+ARM_ERROR_CODE = re.compile(r"[A-Za-z][A-Za-z0-9_.]{0,127}")
+
+
+def collection_resource_type(path):
+    """The provider/type path of an ARM child collection, without subscription, group or resource names."""
+    chunks = path.lower().split("/providers/")[1:]
+    # Every scope before the last provider segment ends with a name; the collection itself does not.
+    return "/providers/".join(resource_type_from_id(chunk + ("/entry" if index == len(chunks) - 1 else ""))
+                              for index, chunk in enumerate(chunks))
+
+
+def child_inventory_diagnostic(value):
+    if type(value) is not dict or set(value) != {"resource_type", "api_version", "status", "error_code"}:
+        return None
+    kind, api, status, error_code = (value[key] for key in ("resource_type", "api_version", "status", "error_code"))
+    if (type(kind) is not str or not CHILD_INVENTORY_TYPE.fullmatch(kind)
+            or type(api) is not str or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", api)
+            or type(status) is not int or status not in (400, 404, 405)
+            or error_code is not None and (type(error_code) is not str
+                                           or not ARM_ERROR_CODE.fullmatch(error_code))):
+        return None
+    return {"resource_type": kind, "api_version": api, "status": status, "error_code": error_code}
+
+
 def safe_instance_diagnostic(code, value):
+    if code == "unsupported-child-inventory-endpoint":
+        return child_inventory_diagnostic(value)
     if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
             or type(value) is not dict
             or set(value) != {"resource_id", "failed_comparisons"}):
@@ -1304,8 +1336,12 @@ class Cloud:
                         and path.lower().endswith("/providers/microsoft.insights/diagnosticsettings")):
                     error = body
                 code = error.get("code") if isinstance(error, dict) else None
-                require(extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
-                        and not ("error" in body and "code" in body), "unsupported-child-inventory-endpoint")
+                if not (extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
+                        and not ("error" in body and "code" in body)):
+                    raise Blocked("unsupported-child-inventory-endpoint", error_diagnostic={
+                        "resource_type": collection_resource_type(path), "api_version": api_version,
+                        "status": status, "error_code": code if isinstance(code, str)
+                        and ARM_ERROR_CODE.fullmatch(code) else None})
                 return [], code
             # This Key Vault ARM collection returns a JSON-encoded array,
             # rather than the normal ARM ListResult envelope.
@@ -1514,6 +1550,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 continue
             if full_type in inline:
                 yield "inline", key + "/" + tail, None, None
+            elif full_type in FILTER_REQUIRED_CHILDREN:
+                # No unfiltered list exists (see FILTER_REQUIRED_CHILDREN): record it, never list it.
+                yield "metadata", key + "/" + tail, full_type, None
             elif (full_type + "/read" not in operations[namespace]
                   and "supportstags" not in resource_capabilities.get(full_type, set())):
                 # A schema child without a read operation (none at all, or write-only) is a provider endpoint,
