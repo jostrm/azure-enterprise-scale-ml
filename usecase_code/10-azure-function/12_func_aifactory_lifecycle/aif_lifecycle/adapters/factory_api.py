@@ -15,7 +15,7 @@ from typing import Any
 
 from ..domain.errors import DeletesDisabled, UnknownId, UpstreamError, ValidationFailed
 from ..domain.operation import Preview, StepKind
-from ..domain.scenarios import Scenario
+from ..domain.scenarios import Scenario, adds_project
 from ..ports import Catalog, ConfirmResult, StepRequest
 
 RUNTIME_STEPS = {"deploy-common", "deploy-project001", "deploy-project", "delete-project", "delete-scaleset"}
@@ -179,12 +179,14 @@ class FactoryApiBackend(ABC):
                                                "folder": self._repository_root(), "orchestrator": "gha",
                                                "config": self._bootstrap_config(request),
                                                "region_short_name": r["region_code"]})
-            if request.scenario is Scenario.ADD_SCALESET:
-                return self._add_scaleset(r["factory_id"], [scale_set_body(request, r["suffix"])], revision)
-            if r.get("mode") == "add":
+            if adds_project(request.scenario, name, r):
+                # Scenario 3's settings belong to its new project; scenario 2's project001 starts from defaults.
+                settings = request.settings if request.scenario is Scenario.ADD_OR_UPDATE_PROJECT else None
                 return self._add_project(r["factory_id"], r["project_number"], f"Project {r['project_number']}",
                                          [{"environment": r["environment"], "scale_set_id": r["scale_set_id"]}],
-                                         request.settings or None, revision)
+                                         settings or None, revision)
+            if request.scenario is Scenario.ADD_SCALESET:
+                return self._add_scaleset(r["factory_id"], [scale_set_body(request, r["suffix"])], revision)
             return self._configure_settings(r["factory_id"], request.settings, r["scale_set_id"], r["project_id"], revision)
         if request.kind is StepKind.BOOTSTRAP:
             if name != "bootstrap":
@@ -194,6 +196,9 @@ class FactoryApiBackend(ABC):
         if name == "deploy-common":
             return self._deploy(deploy_request(self.folder, r["factory_id"], r["scale_set_id"], None, revision))
         if name in ("deploy-project001", "deploy-project"):
+            if not r.get("project_id"):
+                raise ValidationFailed(f"{request.target} has no catalog project {r.get('project_number', '001')} placed on "
+                                       "the selected scale set, so there is no project to deploy; add the project first.")
             return self._deploy(deploy_request(self.folder, r["factory_id"], r["scale_set_id"], r["project_id"], revision))
         if name == "delete-project":
             return self._delete_project(r["factory_id"], r["project_id"], [r["environment"]], r["include_project_subnets"],

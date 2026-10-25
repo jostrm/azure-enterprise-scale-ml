@@ -40,6 +40,19 @@ class Scenario(str, Enum):
         return self in (Scenario.DELETE_PROJECT, Scenario.DELETE_SCALESET, Scenario.DELETE_FACTORY)
 
 
+ADD_PROJECT001_STEP = "add-project001"
+"""Scenario 2's configuration step that puts project001 on the new scale set. The Factory API's `create-scale-set`
+adds no project, and a project has one placement per environment, so this is a new logical project (`add-project`
+placed on the new scale set), not a second placement of the factory's existing project001."""
+
+
+def adds_project(scenario: Scenario, step_name: str, resolved: dict) -> bool:
+    """Whether this configuration step creates a new logical project placed on `resolved['scale_set_id']`."""
+    if scenario is Scenario.ADD_SCALESET:
+        return step_name == ADD_PROJECT001_STEP
+    return scenario is Scenario.ADD_OR_UPDATE_PROJECT and resolved.get("mode") == "add"
+
+
 _TARGET_KIND = {
     Scenario.INIT_FACTORY: "factory",
     Scenario.ADD_SCALESET: "scaleset",

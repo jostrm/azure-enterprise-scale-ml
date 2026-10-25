@@ -45,6 +45,9 @@ SCENARIOS = {
              {"factory_id": FACTORY_ID, "environment": "dev", "suffix": "002", "project_number": "001"},
              options={"scaleSet": SCALE_SET}),
         step(Scenario.ADD_SCALESET, "deploy-common", StepKind.DEPLOY, "aif-121-sdc-dev-002", IDS),
+        step(Scenario.ADD_SCALESET, "add-project001", StepKind.CONFIGURE, "aif-121-sdc-dev-002",
+             {**IDS, "project_number": "001"}),
+        # project_id is what add-project001's confirm resolves; test_add_scaleset_factory_api.py proves that flow.
         step(Scenario.ADD_SCALESET, "deploy-project001", StepKind.DEPLOY, "aif-121-sdc-dev-002",
              {**IDS, "project_id": PROJECT_ID}),
     ],
@@ -79,7 +82,7 @@ EXPECTED_ROUTES = {
                        "GET /api/v1/factory-catalog", "POST /api/v1/creation/workflows/prepare",
                        "POST /api/v1/creation/workflows/start"],
     "2-add-scaleset": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
-                       "POST /api/v1/factory-catalog/confirm"] * 3,
+                       "POST /api/v1/factory-catalog/confirm"] * 4,
     "3-add-project": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
                       "POST /api/v1/factory-catalog/confirm"] * 2,
     "3-update-project": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",

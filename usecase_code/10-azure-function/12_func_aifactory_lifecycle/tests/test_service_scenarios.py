@@ -48,8 +48,16 @@ def test_add_then_409_then_delete_then_404_behaves_sensibly(service):
         service.prepare("init-factory", {"factoryId": FACTORY})
 
     added = run_to_completion(service, service.prepare("add-scaleset", {"scalesetId": SCALESET_2}))
-    assert step_names(added) == ["configure", "deploy-common", "deploy-project001"]
+    assert step_names(added) == ["configure", "deploy-common", "add-project001", "deploy-project001"]
     assert added.status is Status.SUCCEEDED
+    assert [step.preview.backend_ref["action"] for step in added.steps] == [
+        "create-scale-set", "deploy", "add-project", "deploy"]
+    # Like the Factory API: the new scale set gets its own logical project001 (one placement per environment).
+    factory = service._backend.catalog().factories[0]
+    projects = [p for p in factory.projects if p.number == "001"]
+    assert len(projects) == 2 and all(len(p.placements) == 1 for p in projects)
+    assert added.resolved["project_id"] == projects[1].id
+    assert added.steps[3].runs[0].target == "aif-121-esml-project001-sdc-dev-002-rg"
     with pytest.raises(errors.AlreadyExists):
         service.prepare("add-scaleset", {"scalesetId": SCALESET_2})
 

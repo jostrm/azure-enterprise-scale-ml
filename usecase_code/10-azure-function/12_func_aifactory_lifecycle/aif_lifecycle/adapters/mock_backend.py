@@ -16,7 +16,7 @@ from ..application import resolver
 from ..domain.errors import Conflict, RevisionMismatch, UnknownId, UpstreamTimeout
 from ..domain.ids import FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Preview, StepKind
-from ..domain.scenarios import Scenario
+from ..domain.scenarios import Scenario, adds_project
 from ..ports import Catalog, ConfirmResult, StateStore, StepRequest, StoreConflict
 
 PARTITION, KEY = "mockcatalog", "catalog"
@@ -117,8 +117,10 @@ class MockFactoryBackend:
 
     def _action(self, request: StepRequest) -> str:
         if request.kind is StepKind.CONFIGURE:
+            if adds_project(request.scenario, request.step_name, request.resolved):
+                return "add-project"
             return {Scenario.INIT_FACTORY: "create-factory", Scenario.ADD_SCALESET: "create-scale-set"}.get(
-                request.scenario, "add-project" if request.resolved.get("mode") == "add" else "configure-settings")
+                request.scenario, "configure-settings")
         return request.step_name if request.kind is StepKind.DELETE else "deploy"
 
     def _plan(self, request: StepRequest, action: str, groups: list[str]) -> list[str]:
@@ -178,30 +180,30 @@ class MockFactoryBackend:
             })
             return {"factory_id": factory_id, "factory_key": key, "scale_set_id": scaleset_id, "project_id": project_id}
         factory = self._factory(data, resolved["factory_id"])
-        if request.scenario is Scenario.ADD_SCALESET:
+        if adds_project(request.scenario, request.step_name, resolved):
+            project_settings = settings if request.scenario is Scenario.ADD_OR_UPDATE_PROJECT else {}
+            project_id = self._add_project(factory, resolved["project_number"], resolved["environment"],
+                                           resolved["scale_set_id"], project_settings)
+            return {"project_id": project_id}
+        if request.scenario is Scenario.ADD_SCALESET:  # like the Factory API, a new scale set has no project yet
             scaleset_id = self._ids()
             factory["scale_sets"].append({"id": scaleset_id, "environment": resolved["environment"],
                                           "suffix": resolved["suffix"], "status": "configured"})
-            project_id = self._place(factory, "001", resolved["environment"], scaleset_id, {})
-            return {"scale_set_id": scaleset_id, "project_id": project_id}
-        if resolved.get("mode") == "add":
-            project_id = self._place(factory, resolved["project_number"], resolved["environment"],
-                                     resolved["scale_set_id"], settings)
-            return {"project_id": project_id}
+            return {"scale_set_id": scaleset_id}
         for project in factory["projects"]:
             if project["id"] == resolved["project_id"]:
                 project.setdefault("settings", {}).update(settings)
         return {}
 
-    def _place(self, factory: dict[str, Any], number: str, environment: str, scaleset_id: str,
-               settings: dict[str, Any]) -> str:
-        for project in factory["projects"]:
-            if project["number"] == number:
-                project["placements"].append({"environment": environment, "scale_set_id": scaleset_id})
-                project.setdefault("settings", {}).update(settings)
-                return project["id"]
+    def _add_project(self, factory: dict[str, Any], number: str, environment: str, scaleset_id: str,
+                     settings: dict[str, Any]) -> str:
+        """The API's `add-project`: always a new logical project with one placement and a unique readable key (a
+        project has one placement per environment, so the same number on another scale set is another project)."""
+        keys = {project["key"] for project in factory["projects"]}
+        key = next(candidate for counter in range(1, 10000)
+                   if (candidate := f"project-{number}-{counter:03}") not in keys)
         project_id = self._ids()
-        factory["projects"].append({"id": project_id, "key": f"project-{number}-001", "number": number,
+        factory["projects"].append({"id": project_id, "key": key, "number": number,
                                     "display_name": f"Project {number}", "settings": dict(settings),
                                     "placements": [{"environment": environment, "scale_set_id": scaleset_id}]})
         return project_id

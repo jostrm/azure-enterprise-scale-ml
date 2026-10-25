@@ -7,7 +7,7 @@ from typing import Any
 from ..domain.errors import AlreadyExists, ScopeNotSupported, UnknownId
 from ..domain.ids import AnyId, FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Step, StepKind
-from ..domain.scenarios import Scenario
+from ..domain.scenarios import ADD_PROJECT001_STEP, Scenario
 from ..ports import Catalog
 from . import resolver
 
@@ -48,7 +48,10 @@ def _add_scaleset(target: ScalesetId, catalog: Catalog, options):
         raise AlreadyExists(f"Scale set {target} is already in the catalog.")
     resolved = {"factory_id": factory.id, "factory_key": factory.key, "environment": target.factory.catalog_env,
                 "suffix": target.suffix, "project_number": DEFAULT_PROJECT_NUMBER}
-    steps = [_configure(), Step.new("deploy-common", StepKind.DEPLOY), Step.new("deploy-project001", StepKind.DEPLOY)]
+    # The new scale set gets no project when it is created: deploy its common part, then add project001 to it
+    # (configuration only, like scenario 3's configure) and deploy that project.
+    steps = [_configure(), Step.new("deploy-common", StepKind.DEPLOY),
+             Step.new(ADD_PROJECT001_STEP, StepKind.CONFIGURE), Step.new("deploy-project001", StepKind.DEPLOY)]
     return steps, resolved
 
 
