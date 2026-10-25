@@ -197,8 +197,11 @@ def test_form_outputs_map_one_to_one_to_main_parameters(form, main_template):
     assert form["view"]["kind"] == "Form"
     context = form["view"]["outputs"]
     assert context["kind"] == "Subscription"
-    assert context["subscriptionId"] == "[steps('basics').subscription.subscriptionId]"
-    assert context["location"] == "[steps('basics').location.name]"
+    # Subscription scope: the portal reads scope and location from a ResourceScope element (as in Microsoft's AVD
+    # landing zone accelerator form); subscriptionId is the subscription's resource ID.
+    assert form["view"]["properties"]["steps"][0]["elements"][0]["type"] == "Microsoft.Common.ResourceScope"
+    assert context["subscriptionId"] == "[steps('basics').resourceScope.subscription.id]"
+    assert context["location"] == "[steps('basics').resourceScope.location.name]"
     outputs = form_outputs(form)
     assert set(outputs) == set(main_template["parameters"])
     names = {element["name"] for element in form_elements(form)}
@@ -250,10 +253,9 @@ def test_region_allow_list_is_sourced(form, main_template):
     expected = GENERATOR.allowed_regions(ROOT)
     assert expected, "at least one region must remain after the intersections"
     assert main_template["parameters"]["location"]["allowedValues"] == expected
-    location = next(element for element in form_elements(form) if element["name"] == "location")
-    assert location["type"] == "Microsoft.Common.LocationSelector"
-    assert location["allowedValues"] == expected
-    assert form_outputs(form)["location"] == "[steps('basics').location.name]"
+    scope = next(element for element in form_elements(form) if element["name"] == "resourceScope")
+    assert scope["location"]["allowedValues"] == expected
+    assert form_outputs(form)["location"] == "[steps('basics').resourceScope.location.name]"
     cli = GENERATOR.cli_regions(ROOT)
     assert set(expected) <= set(cli)
     assert set(expected) <= set(GENERATOR.bastion_developer_regions(ROOT))
