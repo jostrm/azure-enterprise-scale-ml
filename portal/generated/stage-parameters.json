@@ -99,6 +99,179 @@
     "uksouth": "uks",
     "westeurope": "weu"
   },
+  "choices": {
+    "resources": [
+      {
+        "id": "foundry",
+        "members": [
+          "foundry",
+          "foundry-capability-host"
+        ],
+        "parameter": "enableFoundry",
+        "label": "Microsoft Foundry S0",
+        "description": "Optional private Foundry account and default project; requires capability host, Search and Cosmos DB. No model deployments.",
+        "default": true,
+        "requires": [
+          "ai-search",
+          "cosmos-db"
+        ]
+      },
+      {
+        "id": "ai-search",
+        "members": [
+          "ai-search"
+        ],
+        "parameter": "enableAISearch",
+        "label": "AI Search",
+        "description": "Basic-tier private search, independently selectable or required with Foundry.",
+        "default": true,
+        "requires": []
+      },
+      {
+        "id": "cosmos-db",
+        "members": [
+          "cosmos-db"
+        ],
+        "parameter": "enableCosmosDB",
+        "label": "Azure Cosmos DB",
+        "description": "Private database, independently selectable or required for Foundry agent history.",
+        "default": true,
+        "requires": []
+      },
+      {
+        "id": "application-insights",
+        "members": [
+          "application-insights"
+        ],
+        "parameter": "enableApplicationInsights",
+        "label": "Application Insights",
+        "description": "Optional workspace-based project telemetry; not private-only without AMPLS.",
+        "default": true,
+        "requires": []
+      },
+      {
+        "id": "azure-machine-learning",
+        "members": [
+          "azure-machine-learning"
+        ],
+        "parameter": "enableAzureMachineLearning",
+        "label": "Azure Machine Learning",
+        "description": "Private Basic workspace using canonical compute defaults; requires its linked Application Insights.",
+        "default": false,
+        "requires": [
+          "application-insights"
+        ]
+      },
+      {
+        "id": "aks-for-azure-ml",
+        "members": [
+          "aks-for-azure-ml"
+        ],
+        "parameter": "enableAksForAzureML",
+        "label": "AKS for Azure ML",
+        "description": "AKS compute for the selected Azure Machine Learning workspace.",
+        "default": false,
+        "requires": [
+          "azure-machine-learning"
+        ]
+      },
+      {
+        "id": "aks",
+        "members": [
+          "aks"
+        ],
+        "parameter": "enableAKS",
+        "label": "Standalone AKS",
+        "description": "Independent private AKS cluster; does not require Azure Machine Learning.",
+        "default": false,
+        "requires": []
+      },
+      {
+        "id": "databricks",
+        "members": [
+          "databricks"
+        ],
+        "parameter": "enableDatabricks",
+        "label": "Azure Databricks",
+        "description": "Private Premium workspace using the canonical project data platform.",
+        "default": false,
+        "requires": []
+      },
+      {
+        "id": "datafactory",
+        "members": [
+          "datafactory"
+        ],
+        "parameter": "enableDatafactory",
+        "label": "Azure Data Factory",
+        "description": "Project data pipelines with managed private endpoints.",
+        "default": false,
+        "requires": []
+      },
+      {
+        "id": "event-hubs",
+        "members": [
+          "event-hubs"
+        ],
+        "parameter": "enableEventHubs",
+        "label": "Azure Event Hubs",
+        "description": "Private event ingestion using Standard tier (required for Private Link).",
+        "default": false,
+        "requires": []
+      },
+      {
+        "id": "postgresql",
+        "members": [
+          "postgresql"
+        ],
+        "parameter": "enablePostgreSQL",
+        "label": "Azure Database for PostgreSQL",
+        "description": "Private flexible server, Burstable Standard_B1ms.",
+        "default": false,
+        "requires": []
+      },
+      {
+        "id": "container-apps",
+        "members": [
+          "container-apps"
+        ],
+        "parameter": "enableContainerApps",
+        "label": "Azure Container Apps",
+        "description": "Private Container Apps environment using canonical project defaults and linked Application Insights.",
+        "default": false,
+        "requires": [
+          "application-insights"
+        ]
+      }
+    ],
+    "skus": {
+      "aiSearchSku": {
+        "keys": [
+          "skuAISearchDev",
+          "admin_aiSearchTier"
+        ],
+        "values": [
+          "basic",
+          "standard",
+          "standard2"
+        ],
+        "label": "AI Search tier (Dev)",
+        "default": "basic"
+      },
+      "storageSku": {
+        "keys": [
+          "skuStorageAccountDev"
+        ],
+        "values": [
+          "Standard_LRS",
+          "Standard_ZRS"
+        ],
+        "label": "Storage redundancy (Dev)",
+        "default": "Standard_LRS"
+      }
+    },
+    "maxRequiresDepth": 2
+  },
   "stages": {
     "bootstrap-seeding-vault": {
       "template": "stages/portal-bootstrap.json",
@@ -120,7 +293,10 @@
         "costCenter": "string",
         "keyVaultName": "string",
         "location": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "common-11-rgCommon": {
       "template": "stages/11-rgCommon.json",
@@ -199,7 +375,10 @@
         "technicalAdminsEmail": "string",
         "technicalAdminsObjectID": "string",
         "useAdGroups": "bool"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "common-12-networkCommon": {
       "template": "stages/12-networkCommon.json",
@@ -328,7 +507,10 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "common-13-rgLevel": {
       "template": "stages/13-rgLevel.json",
@@ -534,7 +716,10 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-private-dns": {
       "template": "stages/createPrivateDnsZones.json",
@@ -769,7 +954,10 @@
         "azureWebPrivateDnsZoneId": {
           "value": "/subscriptions/__P_subscriptionId__/resourceGroups/__P_commonResourceGroup__/providers/Microsoft.Network/privateDnsZones/privatelink.webpubsub.azure.com"
         }
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-private-dns-initiative": {
       "template": "stages/28-Initiatives.json",
@@ -790,7 +978,10 @@
       "types": {
         "includeCostOptimization": "bool",
         "location": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-private-dns-policy": {
       "template": "stages/portal-private-dns-policy.json",
@@ -811,7 +1002,10 @@
       "types": {
         "assignmentParameters": "object",
         "location": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-access": {
       "template": "stages/portal-hub-access.json",
@@ -846,7 +1040,10 @@
         "scalesetNumber": "string",
         "vnetCidr": "string",
         "vnetName": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-vpn-gateway": {
       "template": "stages/portal-vpn-gateway.json",
@@ -878,7 +1075,10 @@
         "scalesetNumber": "string",
         "vnetCidr": "string",
         "vnetName": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-app-gateway-network": {
       "template": "stages/simple-app-gateway-network.json",
@@ -907,7 +1107,10 @@
         "location": "string",
         "vaultDnsZoneId": "string",
         "vnetName": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-app-gateway-certificate-rbac": {
       "template": "stages/portal-app-gateway-certificate-rbac.json",
@@ -924,7 +1127,10 @@
       ],
       "omitted": [],
       "sources": {},
-      "types": {}
+      "types": {},
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-seeding-endpoint": {
       "template": "stages/portal-seeding-endpoint.json",
@@ -946,7 +1152,10 @@
       "types": {
         "location": "string",
         "vnetName": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "project-31-network": {
       "template": "stages/31-network.json",
@@ -1095,7 +1304,10 @@
         "vnetNameFull_param": "string",
         "vnetResourceGroup": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     },
     "project-01-foundation": {
       "template": "stages/01-foundation.json",
@@ -1127,18 +1339,13 @@
         "DEBUG_disableContributorAccessForUsers": false,
         "DEBUG_enableAIDocIntelligence": false,
         "DEBUG_enableAIFoundryHub": false,
-        "DEBUG_enableAISearch": true,
         "DEBUG_enableAIServices": false,
         "DEBUG_enableAppInsightsDashboard": false,
         "DEBUG_enableAzureAIVision": false,
-        "DEBUG_enableAzureMachineLearning": false,
         "DEBUG_enableAzureOpenAI": false,
         "DEBUG_enableAzureSpeech": false,
         "DEBUG_enableBingSearch": false,
-        "DEBUG_enableContainerApps": false,
-        "DEBUG_enableCosmosDB": true,
         "DEBUG_enableFunction": false,
-        "DEBUG_enablePostgreSQL": false,
         "DEBUG_enablePublicAccessWithPerimeter": false,
         "DEBUG_enablePublicGenAIAccess": false,
         "DEBUG_enableRedisCache": false,
@@ -1449,7 +1656,31 @@
         "zoneRedisExists": "bool",
         "zoneServicesAiExists": "bool",
         "zoneSqlExists": "bool"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "DEBUG_enableAISearch": {
+          "choice": "ai-search",
+          "negate": false
+        },
+        "DEBUG_enableAzureMachineLearning": {
+          "choice": "azure-machine-learning",
+          "negate": false
+        },
+        "DEBUG_enableContainerApps": {
+          "choice": "container-apps",
+          "negate": false
+        },
+        "DEBUG_enableCosmosDB": {
+          "choice": "cosmos-db",
+          "negate": false
+        },
+        "DEBUG_enablePostgreSQL": {
+          "choice": "postgresql",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-02-core-infrastructure": {
       "template": "stages/02-core-infrastructure.json",
@@ -1492,7 +1723,6 @@
         "projectServicePrincipleSecret_SeedingKeyvaultName": "",
         "projectSuffix": "-rg",
         "resourceSuffix": "-001",
-        "skuStorageAccountDev": "Standard_LRS",
         "skuStorageAccountStageProd": "Standard_LRS",
         "storageAccount1001Exists": false,
         "storageAccount2001Exists": false,
@@ -1531,7 +1761,6 @@
         "aksSubnetId",
         "dbxPrivSubnetName",
         "dbxPubSubnetName",
-        "enableApplicationInsights",
         "genaiSubnetId",
         "webappSubnetId"
       ],
@@ -1660,6 +1889,16 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
+      },
+      "condition": "always",
+      "toggled": {
+        "enableApplicationInsights": {
+          "choice": "application-insights",
+          "negate": false
+        }
+      },
+      "chosen": {
+        "skuStorageAccountDev": "storageSku"
       }
     },
     "project-03-cognitive-services": {
@@ -1690,11 +1929,7 @@
         "deployModel_text_embedding_ada_002": false,
         "diagnosticSettingLevel": "gold",
         "disableLocalAuth": true,
-        "enableAFoundryCaphost": true,
         "enableAIDocIntelligence": false,
-        "enableAIFoundry": true,
-        "enableAISearch": true,
-        "enableAISearchSharedPrivateLink": true,
         "enableAIServices": false,
         "enableAzureAIVision": false,
         "enableAzureOpenAI": false,
@@ -1728,7 +1963,6 @@
         "skipDiagDocIntelligence": true,
         "skipDiagSpeech": true,
         "skipDiagVision": true,
-        "skuAISearchDev": "basic",
         "skuAISearchStageProd": "standard",
         "skuAIServicesDev": "S0",
         "skuAIServicesStageProd": "S0",
@@ -1746,7 +1980,6 @@
         "skuVisionStageProd": "S1",
         "storageAccount1001Exists": false,
         "storageAccount2001Exists": false,
-        "storageAccountSkuName": "Standard_LRS",
         "vnetNameBase": "vnt-esmlcmn"
       },
       "templated": {
@@ -1973,6 +2206,29 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
+      },
+      "condition": "always",
+      "toggled": {
+        "enableAFoundryCaphost": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableAIFoundry": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableAISearch": {
+          "choice": "ai-search",
+          "negate": false
+        },
+        "enableAISearchSharedPrivateLink": {
+          "choice": "ai-search",
+          "negate": false
+        }
+      },
+      "chosen": {
+        "skuAISearchDev": "aiSearchSku",
+        "storageAccountSkuName": "storageSku"
       }
     },
     "project-03b-ai-search": {
@@ -1996,7 +2252,6 @@
         "commonResourceName": "esml-common",
         "commonResourceSuffix": "-001",
         "diagnosticSettingLevel": "gold",
-        "enableAIFoundry": true,
         "enableAISearch": true,
         "enableAISearchSharedPrivateLink": true,
         "enableAIServices": false,
@@ -2010,7 +2265,6 @@
         "resourceSuffix": "-001",
         "semanticSearchTier": "free",
         "skipDiagAISearch": false,
-        "skuAISearchDev": "basic",
         "skuAISearchStageProd": "standard",
         "vnetNameBase": "vnt-esmlcmn"
       },
@@ -2087,6 +2341,16 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
+      },
+      "condition": "ai-search",
+      "toggled": {
+        "enableAIFoundry": {
+          "choice": "foundry",
+          "negate": false
+        }
+      },
+      "chosen": {
+        "skuAISearchDev": "aiSearchSku"
       }
     },
     "project-04-databases": {
@@ -2114,9 +2378,6 @@
         "elasticFirstName": "AI",
         "elasticLastName": "Factory",
         "elasticType": "ElasticCloud",
-        "enableAFoundryCaphost": true,
-        "enableAIFoundry": true,
-        "enableCosmosDB": true,
         "enableElasticsearch": false,
         "enablePostgreSQL": false,
         "enablePublicAccessWithPerimeter": false,
@@ -2324,7 +2585,136 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "enableAFoundryCaphost": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableAIFoundry": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableCosmosDB": {
+          "choice": "cosmos-db",
+          "negate": false
+        }
+      },
+      "chosen": {}
+    },
+    "project-04b-postgresql": {
+      "template": "stages/04b-postgresql.json",
+      "step": "64b-postgresql-attempt-1",
+      "phase": "infra",
+      "scope": "subscription",
+      "resourceGroup": "",
+      "constants": {
+        "aifactorySalt10char": "",
+        "centralDnsZoneByPolicyInHub": false,
+        "cmk": false,
+        "cmkKeyName": "<todo>_aifactory-cmk-key",
+        "commonResourceGroup_param": "",
+        "commonResourceName": "esml-common",
+        "commonResourceSuffix": "-001",
+        "diagnosticSettingLevel": "gold",
+        "enablePostgreSQL": true,
+        "enablePublicAccessWithPerimeter": false,
+        "env": "dev",
+        "network_env": "dev",
+        "postGresAdminEmails": "email_adress_only",
+        "postgreSQLExists": false,
+        "projectNumber": "001",
+        "projectPrefix": "esml-",
+        "projectServicePrincipleOID_SeedingKeyvaultName": "",
+        "projectSuffix": "-rg",
+        "resourceSuffix": "-001",
+        "skuPostgreSQLDev": "Standard_B1ms",
+        "skuPostgreSQLStageProd": "Standard_B1ms",
+        "skuTierPostgreSQLDev": "Burstable",
+        "skuTierPostgreSQLStageProd": "Burstable",
+        "useAdGroups": true,
+        "vnetNameBase": "vnt-esmlcmn"
+      },
+      "templated": {
+        "admin_bicep_input_keyvault_subscription": "__P_subscriptionId__",
+        "admin_bicep_kv_fw": "__P_seedingKeyVaultName__",
+        "admin_bicep_kv_fw_rg": "__P_bootstrapResourceGroup__",
+        "aifactorySuffixRG": "-__P_scalesetNumber__",
+        "commonRGNamePrefix": "__P_prefix__",
+        "inputKeyvault": "__P_seedingKeyVaultName__",
+        "inputKeyvaultResourcegroup": "__P_bootstrapResourceGroup__",
+        "inputKeyvaultSubscription": "__P_subscriptionId__",
+        "location": "__P_location__",
+        "locationSuffix": "__P_locationShort__",
+        "privDnsResourceGroup_param": "__P_commonResourceGroup__",
+        "privDnsSubscription_param": "__P_subscriptionId__",
+        "randomValue": "__P_deploymentRandom__",
+        "technicalAdminsEmail": "__P_teamMemberEmail__",
+        "technicalAdminsObjectID": "__P_teamGroupObjectId__",
+        "vnetNameFull_param": "vnt-esmlcmn-__P_locationShort__-dev-001",
+        "vnetResourceGroup_param": "__P_prefix__esml-common-__P_locationShort__-dev-__P_scalesetNumber__"
+      },
+      "templatedJson": {
+        "tagsProject": "{\"CostCenter\": \"__P_costCenter__\", \"AIF-Scaleset\": \"-__P_scalesetNumber__\", \"AIF-Environment\": \"dev\", \"AIF-Project Owners\": \"__P_teamMemberEmail__\", \"AIFactory project\": \"001\"}"
+      },
+      "wired": [
+        "aca2SubnetId",
+        "acaSubnetId",
+        "aks2SubnetId",
+        "aksSubnetId",
+        "genaiSubnetId"
+      ],
+      "omitted": [],
+      "sources": {},
+      "types": {
+        "admin_bicep_input_keyvault_subscription": "string",
+        "admin_bicep_kv_fw": "string",
+        "admin_bicep_kv_fw_rg": "string",
+        "aifactorySalt10char": "string",
+        "aifactorySuffixRG": "string",
+        "centralDnsZoneByPolicyInHub": "bool",
+        "cmk": "bool",
+        "cmkKeyName": "string",
+        "commonRGNamePrefix": "string",
+        "commonResourceGroup_param": "string",
+        "commonResourceName": "string",
+        "commonResourceSuffix": "string",
+        "diagnosticSettingLevel": "string",
+        "enablePostgreSQL": "bool",
+        "enablePublicAccessWithPerimeter": "bool",
+        "env": "string",
+        "inputKeyvault": "string",
+        "inputKeyvaultResourcegroup": "string",
+        "inputKeyvaultSubscription": "string",
+        "location": "string",
+        "locationSuffix": "string",
+        "network_env": "string",
+        "postGresAdminEmails": "string",
+        "postgreSQLExists": "bool",
+        "privDnsResourceGroup_param": "string",
+        "privDnsSubscription_param": "string",
+        "projectNumber": "string",
+        "projectPrefix": "string",
+        "projectServicePrincipleOID_SeedingKeyvaultName": "string",
+        "projectSuffix": "string",
+        "randomValue": "string",
+        "resourceSuffix": "string",
+        "skuPostgreSQLDev": "string",
+        "skuPostgreSQLStageProd": "string",
+        "skuTierPostgreSQLDev": "string",
+        "skuTierPostgreSQLStageProd": "string",
+        "tagsProject": "object",
+        "technicalAdminsEmail": "string",
+        "technicalAdminsObjectID": "string",
+        "useAdGroups": "bool",
+        "vnetNameBase": "string",
+        "vnetNameFull_param": "string",
+        "vnetResourceGroup_param": "string"
+      },
+      "condition": "postgresql",
+      "toggled": {},
+      "chosen": {}
     },
     "project-05-compute-services": {
       "template": "stages/05-compute-services.json",
@@ -2360,11 +2750,7 @@
         "containerAppWExists": false,
         "containerAppsEnvExists": false,
         "diagnosticSettingLevel": "gold",
-        "disableAgentNetworkInjection": false,
-        "enableAIFoundry": true,
-        "enableAISearch": true,
         "enableAIServices": false,
-        "enableAKS": false,
         "enableAppInsightsDashboard": false,
         "enableAzureOpenAI": false,
         "enableBingSearch": false,
@@ -2597,7 +2983,134 @@
         "webAppRuntime": "string",
         "webAppRuntimeVersion": "string",
         "webAppServicePlanExists": "bool"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "disableAgentNetworkInjection": {
+          "choice": "foundry",
+          "negate": true
+        },
+        "enableAIFoundry": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableAISearch": {
+          "choice": "ai-search",
+          "negate": false
+        },
+        "enableAKS": {
+          "choice": "aks",
+          "negate": false
+        }
+      },
+      "chosen": {}
+    },
+    "project-05b-container-apps": {
+      "template": "stages/05b-container-apps.json",
+      "step": "65b-container-apps-attempt-1",
+      "phase": "infra",
+      "scope": "subscription",
+      "resourceGroup": "",
+      "constants": {
+        "IPwhiteList": "",
+        "aca_a_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "addAISearch": false,
+        "aifactorySalt10char": "",
+        "centralDnsZoneByPolicyInHub": false,
+        "commonResourceGroup_param": "",
+        "commonResourceName": "esml-common",
+        "commonResourceSuffix": "-001",
+        "containerAppAExists": false,
+        "containerAppWExists": false,
+        "containerAppsEnvExists": false,
+        "diagnosticSettingLevel": "gold",
+        "enableAISearch": true,
+        "enableAIServices": false,
+        "enableBingSearch": false,
+        "enableContainerApps": true,
+        "enablePublicAccessWithPerimeter": false,
+        "enablePublicGenAIAccess": false,
+        "env": "dev",
+        "network_env": "dev",
+        "projectNumber": "001",
+        "projectPrefix": "esml-",
+        "projectSuffix": "-rg",
+        "resourceSuffix": "-001",
+        "skuContainerAppsDev": "Consumption",
+        "skuContainerAppsStageProd": "Consumption",
+        "useCommonACR": true,
+        "vnetNameBase": "vnt-esmlcmn"
+      },
+      "templated": {
+        "aifactorySuffixRG": "-__P_scalesetNumber__",
+        "commonRGNamePrefix": "__P_prefix__",
+        "location": "__P_location__",
+        "locationSuffix": "__P_locationShort__",
+        "privDnsResourceGroup_param": "__P_commonResourceGroup__",
+        "privDnsSubscription_param": "__P_subscriptionId__",
+        "randomValue": "__P_deploymentRandom__",
+        "subscriptionIdDevTestProd": "__P_subscriptionId__",
+        "vnetNameFull_param": "vnt-esmlcmn-__P_locationShort__-dev-001",
+        "vnetResourceGroup_param": "__P_prefix__esml-common-__P_locationShort__-dev-__P_scalesetNumber__"
+      },
+      "templatedJson": {
+        "tagsProject": "{\"CostCenter\": \"__P_costCenter__\", \"AIF-Scaleset\": \"-__P_scalesetNumber__\", \"AIF-Environment\": \"dev\", \"AIF-Project Owners\": \"__P_teamMemberEmail__\", \"AIFactory project\": \"001\"}"
+      },
+      "wired": [
+        "aca2SubnetId",
+        "acaSubnetId",
+        "aks2SubnetId",
+        "aksSubnetId",
+        "genaiSubnetId"
+      ],
+      "omitted": [],
+      "sources": {},
+      "types": {
+        "IPwhiteList": "string",
+        "aca_a_registry_image": "string",
+        "aca_w_registry_image": "string",
+        "addAISearch": "bool",
+        "aifactorySalt10char": "string",
+        "aifactorySuffixRG": "string",
+        "centralDnsZoneByPolicyInHub": "bool",
+        "commonRGNamePrefix": "string",
+        "commonResourceGroup_param": "string",
+        "commonResourceName": "string",
+        "commonResourceSuffix": "string",
+        "containerAppAExists": "bool",
+        "containerAppWExists": "bool",
+        "containerAppsEnvExists": "bool",
+        "diagnosticSettingLevel": "string",
+        "enableAISearch": "bool",
+        "enableAIServices": "bool",
+        "enableBingSearch": "bool",
+        "enableContainerApps": "bool",
+        "enablePublicAccessWithPerimeter": "bool",
+        "enablePublicGenAIAccess": "bool",
+        "env": "string",
+        "location": "string",
+        "locationSuffix": "string",
+        "network_env": "string",
+        "privDnsResourceGroup_param": "string",
+        "privDnsSubscription_param": "string",
+        "projectNumber": "string",
+        "projectPrefix": "string",
+        "projectSuffix": "string",
+        "randomValue": "string",
+        "resourceSuffix": "string",
+        "skuContainerAppsDev": "string",
+        "skuContainerAppsStageProd": "string",
+        "subscriptionIdDevTestProd": "string",
+        "tagsProject": "object",
+        "useCommonACR": "bool",
+        "vnetNameBase": "string",
+        "vnetNameFull_param": "string",
+        "vnetResourceGroup_param": "string"
+      },
+      "condition": "container-apps",
+      "toggled": {},
+      "chosen": {}
     },
     "project-06-ai-platform": {
       "template": "stages/06-ai-platform.json",
@@ -2631,7 +3144,6 @@
         "deployModel_text_embedding_ada_002": false,
         "diagnosticSettingLevel": "gold",
         "enableAIFoundryHub": false,
-        "enableAISearch": true,
         "enableAIServices": false,
         "enablePublicAccessWithPerimeter": false,
         "enablePublicGenAIAccess": false,
@@ -2814,7 +3326,15 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "enableAISearch": {
+          "choice": "ai-search",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-07-ml-data-platform": {
       "template": "stages/07-ml-data-platform.json",
@@ -2825,7 +3345,6 @@
       "constants": {
         "AMLStudioUIPrivate": true,
         "IPwhiteList": "",
-        "addAzureMachineLearning": false,
         "aifactorySalt10char": "",
         "aksComputeExists": false,
         "aksExists": false,
@@ -2850,10 +3369,6 @@
         "dataFactoryExists": false,
         "databricksExists": false,
         "diagnosticSettingLevel": "gold",
-        "enableAksForAzureML": false,
-        "enableAzureMachineLearning": false,
-        "enableDatabricks": false,
-        "enableDatafactory": false,
         "enableEncryptionAtHost": true,
         "enablePublicAccessWithPerimeter": false,
         "env": "dev",
@@ -3039,7 +3554,31 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "addAzureMachineLearning": {
+          "choice": "azure-machine-learning",
+          "negate": false
+        },
+        "enableAksForAzureML": {
+          "choice": "aks-for-azure-ml",
+          "negate": false
+        },
+        "enableAzureMachineLearning": {
+          "choice": "azure-machine-learning",
+          "negate": false
+        },
+        "enableDatabricks": {
+          "choice": "databricks",
+          "negate": false
+        },
+        "enableDatafactory": {
+          "choice": "datafactory",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-11-integration": {
       "template": "stages/11-integration.json",
@@ -3060,7 +3599,6 @@
         "commonResourceSuffix": "-001",
         "diagnosticSettingLevel": "gold",
         "enableBotService": false,
-        "enableEventHubs": false,
         "enableFunction": false,
         "enableLogicApps": false,
         "enablePublicAccessWithPerimeter": false,
@@ -3226,7 +3764,15 @@
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string",
         "webAppExists": "bool"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "enableEventHubs": {
+          "choice": "event-hubs",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-08-rbac-security": {
       "template": "stages/08-rbac-security.json",
@@ -3254,20 +3800,15 @@
         "disableContributorAccessForUsers": false,
         "disableRBACAdminOnRGForUsers": true,
         "enableAIDocIntelligence": false,
-        "enableAIFoundry": true,
         "enableAIFoundryHub": false,
-        "enableAISearch": true,
         "enableAIServices": false,
         "enableAppInsightsDashboard": false,
         "enableAzureAIVision": false,
         "enableAzureMachineLearning": false,
         "enableAzureOpenAI": false,
         "enableAzureSpeech": false,
-        "enableContainerApps": false,
-        "enableCosmosDB": true,
         "enableFunction": false,
         "enableLogicApps": false,
-        "enablePostgreSQL": false,
         "enableRedisCache": false,
         "enableSQLDatabase": false,
         "enableWebApp": false,
@@ -3450,7 +3991,31 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "enableAIFoundry": {
+          "choice": "foundry",
+          "negate": false
+        },
+        "enableAISearch": {
+          "choice": "ai-search",
+          "negate": false
+        },
+        "enableContainerApps": {
+          "choice": "container-apps",
+          "negate": false
+        },
+        "enableCosmosDB": {
+          "choice": "cosmos-db",
+          "negate": false
+        },
+        "enablePostgreSQL": {
+          "choice": "postgresql",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-08b-rbac-common-rg": {
       "template": "stages/08b-rbac-common-rg.json",
@@ -3460,7 +4025,6 @@
       "resourceGroup": "",
       "constants": {
         "addAIFoundryHub": false,
-        "addAzureMachineLearning": false,
         "addBastionHost": false,
         "aiHubExists": false,
         "aifactorySalt10char": "",
@@ -3602,7 +4166,15 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {
+        "addAzureMachineLearning": {
+          "choice": "azure-machine-learning",
+          "negate": false
+        }
+      },
+      "chosen": {}
     },
     "project-09-ai-foundry-2025-v4": {
       "template": "stages/09-ai-foundry-2025-v4.json",
@@ -3850,7 +4422,10 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "foundry",
+      "toggled": {},
+      "chosen": {}
     },
     "foundry-injection-rbac": {
       "template": "stages/portal-foundry-injection-rbac.json",
@@ -3871,7 +4446,10 @@
       "sources": {},
       "types": {
         "vnetName": "string"
-      }
+      },
+      "condition": "foundry",
+      "toggled": {},
+      "chosen": {}
     },
     "project-09-ai-foundry-2025-v4-pass2": {
       "template": "stages/09-ai-foundry-2025-v4.json",
@@ -4119,7 +4697,10 @@
         "vnetNameBase": "string",
         "vnetNameFull_param": "string",
         "vnetResourceGroup_param": "string"
-      }
+      },
+      "condition": "foundry",
+      "toggled": {},
+      "chosen": {}
     },
     "foundry-cosmos-rbac": {
       "template": "stages/portal-cosmos-foundry-rbac.json",
@@ -4169,7 +4750,10 @@
         "randomValue": "string",
         "resourceSuffix": "string",
         "subscriptionIdDevTestProd": "string"
-      }
+      },
+      "condition": "foundry",
+      "toggled": {},
+      "chosen": {}
     },
     "hub-app-gateway": {
       "template": "stages/simple-app-gateway.json",
@@ -4197,10 +4781,12 @@
         "gatewayName": "string",
         "location": "string",
         "vnetName": "string"
-      }
+      },
+      "condition": "always",
+      "toggled": {},
+      "chosen": {}
     }
   },
-  "searchSku": "basic",
   "privateDnsZones": [
     "privatelink.__P_locationShort__.backup.windowsazure.com",
     "privatelink.__P_location__.azmk8s.io",

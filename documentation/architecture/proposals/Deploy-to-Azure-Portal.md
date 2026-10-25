@@ -29,7 +29,7 @@ reviewed_source: 'release/v1.25 956a8f6e + portal-125 working tree; observed 202
 
 Status: **proposed**. The package is tested offline and in CI only. It stays a proposal until a user confirms one successful deployment. Live Azure behaviour has not been observed.
 
-The button deploys the default selection of the Simple Mode preset (`private-ai-foundation-v2`) as compiled ARM linked templates, opened through the portal's CustomDeploymentBlade with a Form view (uiFormDefinition 2021-09-09). The v1.24 package is on branch `portal-124`; the v1.25 package is on `portal-125`. Both have the same layout: `portal/generate_portal.py`, `portal/main.bicep`, `portal/stages/*.json`, `portal/form.json` and the offline tests in `test_portal_deploy_to_azure.py`.
+The button deploys the Simple Mode preset (`private-ai-foundation-v2`) as compiled ARM linked templates, opened through the portal's CustomDeploymentBlade with a Form view (uiFormDefinition 2021-09-09). The v1.24 package is on branch `portal-124`; the v1.25 package is on `portal-125`. Both have the same layout: `portal/generate_portal.py`, `portal/main.bicep`, `portal/stages/*.json`, `portal/form.json` and the offline tests in `test_portal_deploy_to_azure.py`.
 
 ## How the parameters are derived
 
@@ -50,6 +50,12 @@ Evidence (repository source; the canonical API implementation is external and wa
 - The portal uses a deterministic `deploymentRandom` and an empty salt, whereas registered creation resolves names and salts itself. Adopting a portal factory would need an API-reviewed migration, which does not exist.
 
 Revisit this decision if the external API gains a reviewed "adopt existing factory" route.
+
+## Form choices (portal-125 only)
+
+Every optional `SIMPLE_MODE_RESOURCE_CATALOG` project item is a Yes/No choice. Foundry and its capability host require each other, so they form one choice. There are also Dev SKU choices for AI Search (basic, standard or standard2) and Storage (LRS or ZRS). portal-124 keeps the strict v1.24 preset, where only Application Insights is optional.
+
+The generator builds a plan for the default selection, for each choice flipped (respecting catalog requirements), for all-on and all-off, and for each SKU value. Every value that varies must be explained by exactly one choice or its negation, and every stage that comes and goes must likewise depend on exactly one choice. The stages are `03b` (AI Search), `04b` (PostgreSQL), `05b` (Container Apps) and the two Foundry passes with their role modules. Anything else fails generation. `main.bicep` resolves requirement chains (depth at most 2) and passes each value from the choice.
 
 ## Replacements (v1.25 differences from portal-124)
 

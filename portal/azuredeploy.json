@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "13264535491881558312"
+      "templateHash": "5937395986940254010"
     }
   },
   "functions": [
@@ -38,11 +38,19 @@
             {
               "type": "object",
               "name": "t"
+            },
+            {
+              "type": "object",
+              "name": "choices"
+            },
+            {
+              "type": "object",
+              "name": "skus"
             }
           ],
           "output": {
             "type": "object",
-            "value": "[union(toObject(items(parameters('stage').constants), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', lambdaVariables('item').value))), toObject(items(parameters('stage').templated), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', __bicep.fill(lambdaVariables('item').value, parameters('t'))))), toObject(items(parameters('stage').templatedJson), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', json(__bicep.fill(lambdaVariables('item').value, parameters('t')))))))]"
+            "value": "[union(toObject(items(parameters('stage').constants), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', lambdaVariables('item').value))), toObject(items(parameters('stage').templated), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', __bicep.fill(lambdaVariables('item').value, parameters('t'))))), toObject(items(parameters('stage').templatedJson), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', json(__bicep.fill(lambdaVariables('item').value, parameters('t')))))), toObject(items(parameters('stage').toggled), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', if(lambdaVariables('item').value.negate, not(parameters('choices')[lambdaVariables('item').value.choice]), parameters('choices')[lambdaVariables('item').value.choice])))), toObject(items(parameters('stage').chosen), lambda('item', lambdaVariables('item').key), lambda('item', createObject('value', parameters('skus')[lambdaVariables('item').value]))))]"
           }
         },
         "subnetCidr": {
@@ -128,11 +136,111 @@
         "description": "AI Search region. Empty or same-as-factory-region means the AI Factory region. No automatic capacity retry."
       }
     },
+    "enableFoundry": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Microsoft Foundry account, default project and capability host (requires AI Search and Cosmos DB)."
+      }
+    },
+    "enableAISearch": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Private AI Search."
+      }
+    },
+    "enableCosmosDB": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Private Azure Cosmos DB."
+      }
+    },
     "enableApplicationInsights": {
       "type": "bool",
       "defaultValue": true,
       "metadata": {
-        "description": "Optional workspace-based project Application Insights."
+        "description": "Workspace-based project Application Insights (not private-only without AMPLS)."
+      }
+    },
+    "enableAzureMachineLearning": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Machine Learning workspace (requires Application Insights)."
+      }
+    },
+    "enableAksForAzureML": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "AKS compute for Azure Machine Learning (requires Azure Machine Learning)."
+      }
+    },
+    "enableAKS": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Standalone private AKS cluster."
+      }
+    },
+    "enableDatabricks": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Databricks Premium workspace."
+      }
+    },
+    "enableDatafactory": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Data Factory with managed private endpoints."
+      }
+    },
+    "enableEventHubs": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Event Hubs Standard (required for Private Link)."
+      }
+    },
+    "enablePostgreSQL": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Database for PostgreSQL flexible server."
+      }
+    },
+    "enableContainerApps": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Azure Container Apps environment (requires Application Insights)."
+      }
+    },
+    "aiSearchSku": {
+      "type": "string",
+      "defaultValue": "basic",
+      "allowedValues": [
+        "basic",
+        "standard",
+        "standard2"
+      ],
+      "metadata": {
+        "description": "AI Search tier for Dev. Free has no private endpoints."
+      }
+    },
+    "storageSku": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS"
+      ],
+      "metadata": {
+        "description": "Storage account redundancy for Dev."
       }
     },
     "enableBastion": {
@@ -301,6 +409,179 @@
         "uksouth": "uks",
         "westeurope": "weu"
       },
+      "choices": {
+        "resources": [
+          {
+            "id": "foundry",
+            "members": [
+              "foundry",
+              "foundry-capability-host"
+            ],
+            "parameter": "enableFoundry",
+            "label": "Microsoft Foundry S0",
+            "description": "Optional private Foundry account and default project; requires capability host, Search and Cosmos DB. No model deployments.",
+            "default": true,
+            "requires": [
+              "ai-search",
+              "cosmos-db"
+            ]
+          },
+          {
+            "id": "ai-search",
+            "members": [
+              "ai-search"
+            ],
+            "parameter": "enableAISearch",
+            "label": "AI Search",
+            "description": "Basic-tier private search, independently selectable or required with Foundry.",
+            "default": true,
+            "requires": []
+          },
+          {
+            "id": "cosmos-db",
+            "members": [
+              "cosmos-db"
+            ],
+            "parameter": "enableCosmosDB",
+            "label": "Azure Cosmos DB",
+            "description": "Private database, independently selectable or required for Foundry agent history.",
+            "default": true,
+            "requires": []
+          },
+          {
+            "id": "application-insights",
+            "members": [
+              "application-insights"
+            ],
+            "parameter": "enableApplicationInsights",
+            "label": "Application Insights",
+            "description": "Optional workspace-based project telemetry; not private-only without AMPLS.",
+            "default": true,
+            "requires": []
+          },
+          {
+            "id": "azure-machine-learning",
+            "members": [
+              "azure-machine-learning"
+            ],
+            "parameter": "enableAzureMachineLearning",
+            "label": "Azure Machine Learning",
+            "description": "Private Basic workspace using canonical compute defaults; requires its linked Application Insights.",
+            "default": false,
+            "requires": [
+              "application-insights"
+            ]
+          },
+          {
+            "id": "aks-for-azure-ml",
+            "members": [
+              "aks-for-azure-ml"
+            ],
+            "parameter": "enableAksForAzureML",
+            "label": "AKS for Azure ML",
+            "description": "AKS compute for the selected Azure Machine Learning workspace.",
+            "default": false,
+            "requires": [
+              "azure-machine-learning"
+            ]
+          },
+          {
+            "id": "aks",
+            "members": [
+              "aks"
+            ],
+            "parameter": "enableAKS",
+            "label": "Standalone AKS",
+            "description": "Independent private AKS cluster; does not require Azure Machine Learning.",
+            "default": false,
+            "requires": []
+          },
+          {
+            "id": "databricks",
+            "members": [
+              "databricks"
+            ],
+            "parameter": "enableDatabricks",
+            "label": "Azure Databricks",
+            "description": "Private Premium workspace using the canonical project data platform.",
+            "default": false,
+            "requires": []
+          },
+          {
+            "id": "datafactory",
+            "members": [
+              "datafactory"
+            ],
+            "parameter": "enableDatafactory",
+            "label": "Azure Data Factory",
+            "description": "Project data pipelines with managed private endpoints.",
+            "default": false,
+            "requires": []
+          },
+          {
+            "id": "event-hubs",
+            "members": [
+              "event-hubs"
+            ],
+            "parameter": "enableEventHubs",
+            "label": "Azure Event Hubs",
+            "description": "Private event ingestion using Standard tier (required for Private Link).",
+            "default": false,
+            "requires": []
+          },
+          {
+            "id": "postgresql",
+            "members": [
+              "postgresql"
+            ],
+            "parameter": "enablePostgreSQL",
+            "label": "Azure Database for PostgreSQL",
+            "description": "Private flexible server, Burstable Standard_B1ms.",
+            "default": false,
+            "requires": []
+          },
+          {
+            "id": "container-apps",
+            "members": [
+              "container-apps"
+            ],
+            "parameter": "enableContainerApps",
+            "label": "Azure Container Apps",
+            "description": "Private Container Apps environment using canonical project defaults and linked Application Insights.",
+            "default": false,
+            "requires": [
+              "application-insights"
+            ]
+          }
+        ],
+        "skus": {
+          "aiSearchSku": {
+            "keys": [
+              "skuAISearchDev",
+              "admin_aiSearchTier"
+            ],
+            "values": [
+              "basic",
+              "standard",
+              "standard2"
+            ],
+            "label": "AI Search tier (Dev)",
+            "default": "basic"
+          },
+          "storageSku": {
+            "keys": [
+              "skuStorageAccountDev"
+            ],
+            "values": [
+              "Standard_LRS",
+              "Standard_ZRS"
+            ],
+            "label": "Storage redundancy (Dev)",
+            "default": "Standard_LRS"
+          }
+        },
+        "maxRequiresDepth": 2
+      },
       "stages": {
         "bootstrap-seeding-vault": {
           "template": "stages/portal-bootstrap.json",
@@ -322,7 +603,10 @@
             "costCenter": "string",
             "keyVaultName": "string",
             "location": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "common-11-rgCommon": {
           "template": "stages/11-rgCommon.json",
@@ -401,7 +685,10 @@
             "technicalAdminsEmail": "string",
             "technicalAdminsObjectID": "string",
             "useAdGroups": "bool"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "common-12-networkCommon": {
           "template": "stages/12-networkCommon.json",
@@ -530,7 +817,10 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "common-13-rgLevel": {
           "template": "stages/13-rgLevel.json",
@@ -736,7 +1026,10 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-private-dns": {
           "template": "stages/createPrivateDnsZones.json",
@@ -971,7 +1264,10 @@
             "azureWebPrivateDnsZoneId": {
               "value": "/subscriptions/__P_subscriptionId__/resourceGroups/__P_commonResourceGroup__/providers/Microsoft.Network/privateDnsZones/privatelink.webpubsub.azure.com"
             }
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-private-dns-initiative": {
           "template": "stages/28-Initiatives.json",
@@ -992,7 +1288,10 @@
           "types": {
             "includeCostOptimization": "bool",
             "location": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-private-dns-policy": {
           "template": "stages/portal-private-dns-policy.json",
@@ -1013,7 +1312,10 @@
           "types": {
             "assignmentParameters": "object",
             "location": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-access": {
           "template": "stages/portal-hub-access.json",
@@ -1048,7 +1350,10 @@
             "scalesetNumber": "string",
             "vnetCidr": "string",
             "vnetName": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-vpn-gateway": {
           "template": "stages/portal-vpn-gateway.json",
@@ -1080,7 +1385,10 @@
             "scalesetNumber": "string",
             "vnetCidr": "string",
             "vnetName": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-app-gateway-network": {
           "template": "stages/simple-app-gateway-network.json",
@@ -1109,7 +1417,10 @@
             "location": "string",
             "vaultDnsZoneId": "string",
             "vnetName": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-app-gateway-certificate-rbac": {
           "template": "stages/portal-app-gateway-certificate-rbac.json",
@@ -1126,7 +1437,10 @@
           ],
           "omitted": [],
           "sources": {},
-          "types": {}
+          "types": {},
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-seeding-endpoint": {
           "template": "stages/portal-seeding-endpoint.json",
@@ -1148,7 +1462,10 @@
           "types": {
             "location": "string",
             "vnetName": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "project-31-network": {
           "template": "stages/31-network.json",
@@ -1297,7 +1614,10 @@
             "vnetNameFull_param": "string",
             "vnetResourceGroup": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         },
         "project-01-foundation": {
           "template": "stages/01-foundation.json",
@@ -1329,18 +1649,13 @@
             "DEBUG_disableContributorAccessForUsers": false,
             "DEBUG_enableAIDocIntelligence": false,
             "DEBUG_enableAIFoundryHub": false,
-            "DEBUG_enableAISearch": true,
             "DEBUG_enableAIServices": false,
             "DEBUG_enableAppInsightsDashboard": false,
             "DEBUG_enableAzureAIVision": false,
-            "DEBUG_enableAzureMachineLearning": false,
             "DEBUG_enableAzureOpenAI": false,
             "DEBUG_enableAzureSpeech": false,
             "DEBUG_enableBingSearch": false,
-            "DEBUG_enableContainerApps": false,
-            "DEBUG_enableCosmosDB": true,
             "DEBUG_enableFunction": false,
-            "DEBUG_enablePostgreSQL": false,
             "DEBUG_enablePublicAccessWithPerimeter": false,
             "DEBUG_enablePublicGenAIAccess": false,
             "DEBUG_enableRedisCache": false,
@@ -1651,7 +1966,31 @@
             "zoneRedisExists": "bool",
             "zoneServicesAiExists": "bool",
             "zoneSqlExists": "bool"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "DEBUG_enableAISearch": {
+              "choice": "ai-search",
+              "negate": false
+            },
+            "DEBUG_enableAzureMachineLearning": {
+              "choice": "azure-machine-learning",
+              "negate": false
+            },
+            "DEBUG_enableContainerApps": {
+              "choice": "container-apps",
+              "negate": false
+            },
+            "DEBUG_enableCosmosDB": {
+              "choice": "cosmos-db",
+              "negate": false
+            },
+            "DEBUG_enablePostgreSQL": {
+              "choice": "postgresql",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-02-core-infrastructure": {
           "template": "stages/02-core-infrastructure.json",
@@ -1694,7 +2033,6 @@
             "projectServicePrincipleSecret_SeedingKeyvaultName": "",
             "projectSuffix": "-rg",
             "resourceSuffix": "-001",
-            "skuStorageAccountDev": "Standard_LRS",
             "skuStorageAccountStageProd": "Standard_LRS",
             "storageAccount1001Exists": false,
             "storageAccount2001Exists": false,
@@ -1733,7 +2071,6 @@
             "aksSubnetId",
             "dbxPrivSubnetName",
             "dbxPubSubnetName",
-            "enableApplicationInsights",
             "genaiSubnetId",
             "webappSubnetId"
           ],
@@ -1862,6 +2199,16 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
+          },
+          "condition": "always",
+          "toggled": {
+            "enableApplicationInsights": {
+              "choice": "application-insights",
+              "negate": false
+            }
+          },
+          "chosen": {
+            "skuStorageAccountDev": "storageSku"
           }
         },
         "project-03-cognitive-services": {
@@ -1892,11 +2239,7 @@
             "deployModel_text_embedding_ada_002": false,
             "diagnosticSettingLevel": "gold",
             "disableLocalAuth": true,
-            "enableAFoundryCaphost": true,
             "enableAIDocIntelligence": false,
-            "enableAIFoundry": true,
-            "enableAISearch": true,
-            "enableAISearchSharedPrivateLink": true,
             "enableAIServices": false,
             "enableAzureAIVision": false,
             "enableAzureOpenAI": false,
@@ -1930,7 +2273,6 @@
             "skipDiagDocIntelligence": true,
             "skipDiagSpeech": true,
             "skipDiagVision": true,
-            "skuAISearchDev": "basic",
             "skuAISearchStageProd": "standard",
             "skuAIServicesDev": "S0",
             "skuAIServicesStageProd": "S0",
@@ -1948,7 +2290,6 @@
             "skuVisionStageProd": "S1",
             "storageAccount1001Exists": false,
             "storageAccount2001Exists": false,
-            "storageAccountSkuName": "Standard_LRS",
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
@@ -2175,6 +2516,29 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
+          },
+          "condition": "always",
+          "toggled": {
+            "enableAFoundryCaphost": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableAIFoundry": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableAISearch": {
+              "choice": "ai-search",
+              "negate": false
+            },
+            "enableAISearchSharedPrivateLink": {
+              "choice": "ai-search",
+              "negate": false
+            }
+          },
+          "chosen": {
+            "skuAISearchDev": "aiSearchSku",
+            "storageAccountSkuName": "storageSku"
           }
         },
         "project-03b-ai-search": {
@@ -2198,7 +2562,6 @@
             "commonResourceName": "esml-common",
             "commonResourceSuffix": "-001",
             "diagnosticSettingLevel": "gold",
-            "enableAIFoundry": true,
             "enableAISearch": true,
             "enableAISearchSharedPrivateLink": true,
             "enableAIServices": false,
@@ -2212,7 +2575,6 @@
             "resourceSuffix": "-001",
             "semanticSearchTier": "free",
             "skipDiagAISearch": false,
-            "skuAISearchDev": "basic",
             "skuAISearchStageProd": "standard",
             "vnetNameBase": "vnt-esmlcmn"
           },
@@ -2289,6 +2651,16 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
+          },
+          "condition": "ai-search",
+          "toggled": {
+            "enableAIFoundry": {
+              "choice": "foundry",
+              "negate": false
+            }
+          },
+          "chosen": {
+            "skuAISearchDev": "aiSearchSku"
           }
         },
         "project-04-databases": {
@@ -2316,9 +2688,6 @@
             "elasticFirstName": "AI",
             "elasticLastName": "Factory",
             "elasticType": "ElasticCloud",
-            "enableAFoundryCaphost": true,
-            "enableAIFoundry": true,
-            "enableCosmosDB": true,
             "enableElasticsearch": false,
             "enablePostgreSQL": false,
             "enablePublicAccessWithPerimeter": false,
@@ -2526,7 +2895,136 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "enableAFoundryCaphost": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableAIFoundry": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableCosmosDB": {
+              "choice": "cosmos-db",
+              "negate": false
+            }
+          },
+          "chosen": {}
+        },
+        "project-04b-postgresql": {
+          "template": "stages/04b-postgresql.json",
+          "step": "64b-postgresql-attempt-1",
+          "phase": "infra",
+          "scope": "subscription",
+          "resourceGroup": "",
+          "constants": {
+            "aifactorySalt10char": "",
+            "centralDnsZoneByPolicyInHub": false,
+            "cmk": false,
+            "cmkKeyName": "<todo>_aifactory-cmk-key",
+            "commonResourceGroup_param": "",
+            "commonResourceName": "esml-common",
+            "commonResourceSuffix": "-001",
+            "diagnosticSettingLevel": "gold",
+            "enablePostgreSQL": true,
+            "enablePublicAccessWithPerimeter": false,
+            "env": "dev",
+            "network_env": "dev",
+            "postGresAdminEmails": "email_adress_only",
+            "postgreSQLExists": false,
+            "projectNumber": "001",
+            "projectPrefix": "esml-",
+            "projectServicePrincipleOID_SeedingKeyvaultName": "",
+            "projectSuffix": "-rg",
+            "resourceSuffix": "-001",
+            "skuPostgreSQLDev": "Standard_B1ms",
+            "skuPostgreSQLStageProd": "Standard_B1ms",
+            "skuTierPostgreSQLDev": "Burstable",
+            "skuTierPostgreSQLStageProd": "Burstable",
+            "useAdGroups": true,
+            "vnetNameBase": "vnt-esmlcmn"
+          },
+          "templated": {
+            "admin_bicep_input_keyvault_subscription": "__P_subscriptionId__",
+            "admin_bicep_kv_fw": "__P_seedingKeyVaultName__",
+            "admin_bicep_kv_fw_rg": "__P_bootstrapResourceGroup__",
+            "aifactorySuffixRG": "-__P_scalesetNumber__",
+            "commonRGNamePrefix": "__P_prefix__",
+            "inputKeyvault": "__P_seedingKeyVaultName__",
+            "inputKeyvaultResourcegroup": "__P_bootstrapResourceGroup__",
+            "inputKeyvaultSubscription": "__P_subscriptionId__",
+            "location": "__P_location__",
+            "locationSuffix": "__P_locationShort__",
+            "privDnsResourceGroup_param": "__P_commonResourceGroup__",
+            "privDnsSubscription_param": "__P_subscriptionId__",
+            "randomValue": "__P_deploymentRandom__",
+            "technicalAdminsEmail": "__P_teamMemberEmail__",
+            "technicalAdminsObjectID": "__P_teamGroupObjectId__",
+            "vnetNameFull_param": "vnt-esmlcmn-__P_locationShort__-dev-001",
+            "vnetResourceGroup_param": "__P_prefix__esml-common-__P_locationShort__-dev-__P_scalesetNumber__"
+          },
+          "templatedJson": {
+            "tagsProject": "{\"CostCenter\": \"__P_costCenter__\", \"AIF-Scaleset\": \"-__P_scalesetNumber__\", \"AIF-Environment\": \"dev\", \"AIF-Project Owners\": \"__P_teamMemberEmail__\", \"AIFactory project\": \"001\"}"
+          },
+          "wired": [
+            "aca2SubnetId",
+            "acaSubnetId",
+            "aks2SubnetId",
+            "aksSubnetId",
+            "genaiSubnetId"
+          ],
+          "omitted": [],
+          "sources": {},
+          "types": {
+            "admin_bicep_input_keyvault_subscription": "string",
+            "admin_bicep_kv_fw": "string",
+            "admin_bicep_kv_fw_rg": "string",
+            "aifactorySalt10char": "string",
+            "aifactorySuffixRG": "string",
+            "centralDnsZoneByPolicyInHub": "bool",
+            "cmk": "bool",
+            "cmkKeyName": "string",
+            "commonRGNamePrefix": "string",
+            "commonResourceGroup_param": "string",
+            "commonResourceName": "string",
+            "commonResourceSuffix": "string",
+            "diagnosticSettingLevel": "string",
+            "enablePostgreSQL": "bool",
+            "enablePublicAccessWithPerimeter": "bool",
+            "env": "string",
+            "inputKeyvault": "string",
+            "inputKeyvaultResourcegroup": "string",
+            "inputKeyvaultSubscription": "string",
+            "location": "string",
+            "locationSuffix": "string",
+            "network_env": "string",
+            "postGresAdminEmails": "string",
+            "postgreSQLExists": "bool",
+            "privDnsResourceGroup_param": "string",
+            "privDnsSubscription_param": "string",
+            "projectNumber": "string",
+            "projectPrefix": "string",
+            "projectServicePrincipleOID_SeedingKeyvaultName": "string",
+            "projectSuffix": "string",
+            "randomValue": "string",
+            "resourceSuffix": "string",
+            "skuPostgreSQLDev": "string",
+            "skuPostgreSQLStageProd": "string",
+            "skuTierPostgreSQLDev": "string",
+            "skuTierPostgreSQLStageProd": "string",
+            "tagsProject": "object",
+            "technicalAdminsEmail": "string",
+            "technicalAdminsObjectID": "string",
+            "useAdGroups": "bool",
+            "vnetNameBase": "string",
+            "vnetNameFull_param": "string",
+            "vnetResourceGroup_param": "string"
+          },
+          "condition": "postgresql",
+          "toggled": {},
+          "chosen": {}
         },
         "project-05-compute-services": {
           "template": "stages/05-compute-services.json",
@@ -2562,11 +3060,7 @@
             "containerAppWExists": false,
             "containerAppsEnvExists": false,
             "diagnosticSettingLevel": "gold",
-            "disableAgentNetworkInjection": false,
-            "enableAIFoundry": true,
-            "enableAISearch": true,
             "enableAIServices": false,
-            "enableAKS": false,
             "enableAppInsightsDashboard": false,
             "enableAzureOpenAI": false,
             "enableBingSearch": false,
@@ -2799,7 +3293,134 @@
             "webAppRuntime": "string",
             "webAppRuntimeVersion": "string",
             "webAppServicePlanExists": "bool"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "disableAgentNetworkInjection": {
+              "choice": "foundry",
+              "negate": true
+            },
+            "enableAIFoundry": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableAISearch": {
+              "choice": "ai-search",
+              "negate": false
+            },
+            "enableAKS": {
+              "choice": "aks",
+              "negate": false
+            }
+          },
+          "chosen": {}
+        },
+        "project-05b-container-apps": {
+          "template": "stages/05b-container-apps.json",
+          "step": "65b-container-apps-attempt-1",
+          "phase": "infra",
+          "scope": "subscription",
+          "resourceGroup": "",
+          "constants": {
+            "IPwhiteList": "",
+            "aca_a_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+            "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+            "addAISearch": false,
+            "aifactorySalt10char": "",
+            "centralDnsZoneByPolicyInHub": false,
+            "commonResourceGroup_param": "",
+            "commonResourceName": "esml-common",
+            "commonResourceSuffix": "-001",
+            "containerAppAExists": false,
+            "containerAppWExists": false,
+            "containerAppsEnvExists": false,
+            "diagnosticSettingLevel": "gold",
+            "enableAISearch": true,
+            "enableAIServices": false,
+            "enableBingSearch": false,
+            "enableContainerApps": true,
+            "enablePublicAccessWithPerimeter": false,
+            "enablePublicGenAIAccess": false,
+            "env": "dev",
+            "network_env": "dev",
+            "projectNumber": "001",
+            "projectPrefix": "esml-",
+            "projectSuffix": "-rg",
+            "resourceSuffix": "-001",
+            "skuContainerAppsDev": "Consumption",
+            "skuContainerAppsStageProd": "Consumption",
+            "useCommonACR": true,
+            "vnetNameBase": "vnt-esmlcmn"
+          },
+          "templated": {
+            "aifactorySuffixRG": "-__P_scalesetNumber__",
+            "commonRGNamePrefix": "__P_prefix__",
+            "location": "__P_location__",
+            "locationSuffix": "__P_locationShort__",
+            "privDnsResourceGroup_param": "__P_commonResourceGroup__",
+            "privDnsSubscription_param": "__P_subscriptionId__",
+            "randomValue": "__P_deploymentRandom__",
+            "subscriptionIdDevTestProd": "__P_subscriptionId__",
+            "vnetNameFull_param": "vnt-esmlcmn-__P_locationShort__-dev-001",
+            "vnetResourceGroup_param": "__P_prefix__esml-common-__P_locationShort__-dev-__P_scalesetNumber__"
+          },
+          "templatedJson": {
+            "tagsProject": "{\"CostCenter\": \"__P_costCenter__\", \"AIF-Scaleset\": \"-__P_scalesetNumber__\", \"AIF-Environment\": \"dev\", \"AIF-Project Owners\": \"__P_teamMemberEmail__\", \"AIFactory project\": \"001\"}"
+          },
+          "wired": [
+            "aca2SubnetId",
+            "acaSubnetId",
+            "aks2SubnetId",
+            "aksSubnetId",
+            "genaiSubnetId"
+          ],
+          "omitted": [],
+          "sources": {},
+          "types": {
+            "IPwhiteList": "string",
+            "aca_a_registry_image": "string",
+            "aca_w_registry_image": "string",
+            "addAISearch": "bool",
+            "aifactorySalt10char": "string",
+            "aifactorySuffixRG": "string",
+            "centralDnsZoneByPolicyInHub": "bool",
+            "commonRGNamePrefix": "string",
+            "commonResourceGroup_param": "string",
+            "commonResourceName": "string",
+            "commonResourceSuffix": "string",
+            "containerAppAExists": "bool",
+            "containerAppWExists": "bool",
+            "containerAppsEnvExists": "bool",
+            "diagnosticSettingLevel": "string",
+            "enableAISearch": "bool",
+            "enableAIServices": "bool",
+            "enableBingSearch": "bool",
+            "enableContainerApps": "bool",
+            "enablePublicAccessWithPerimeter": "bool",
+            "enablePublicGenAIAccess": "bool",
+            "env": "string",
+            "location": "string",
+            "locationSuffix": "string",
+            "network_env": "string",
+            "privDnsResourceGroup_param": "string",
+            "privDnsSubscription_param": "string",
+            "projectNumber": "string",
+            "projectPrefix": "string",
+            "projectSuffix": "string",
+            "randomValue": "string",
+            "resourceSuffix": "string",
+            "skuContainerAppsDev": "string",
+            "skuContainerAppsStageProd": "string",
+            "subscriptionIdDevTestProd": "string",
+            "tagsProject": "object",
+            "useCommonACR": "bool",
+            "vnetNameBase": "string",
+            "vnetNameFull_param": "string",
+            "vnetResourceGroup_param": "string"
+          },
+          "condition": "container-apps",
+          "toggled": {},
+          "chosen": {}
         },
         "project-06-ai-platform": {
           "template": "stages/06-ai-platform.json",
@@ -2833,7 +3454,6 @@
             "deployModel_text_embedding_ada_002": false,
             "diagnosticSettingLevel": "gold",
             "enableAIFoundryHub": false,
-            "enableAISearch": true,
             "enableAIServices": false,
             "enablePublicAccessWithPerimeter": false,
             "enablePublicGenAIAccess": false,
@@ -3016,7 +3636,15 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "enableAISearch": {
+              "choice": "ai-search",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-07-ml-data-platform": {
           "template": "stages/07-ml-data-platform.json",
@@ -3027,7 +3655,6 @@
           "constants": {
             "AMLStudioUIPrivate": true,
             "IPwhiteList": "",
-            "addAzureMachineLearning": false,
             "aifactorySalt10char": "",
             "aksComputeExists": false,
             "aksExists": false,
@@ -3052,10 +3679,6 @@
             "dataFactoryExists": false,
             "databricksExists": false,
             "diagnosticSettingLevel": "gold",
-            "enableAksForAzureML": false,
-            "enableAzureMachineLearning": false,
-            "enableDatabricks": false,
-            "enableDatafactory": false,
             "enableEncryptionAtHost": true,
             "enablePublicAccessWithPerimeter": false,
             "env": "dev",
@@ -3241,7 +3864,31 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "addAzureMachineLearning": {
+              "choice": "azure-machine-learning",
+              "negate": false
+            },
+            "enableAksForAzureML": {
+              "choice": "aks-for-azure-ml",
+              "negate": false
+            },
+            "enableAzureMachineLearning": {
+              "choice": "azure-machine-learning",
+              "negate": false
+            },
+            "enableDatabricks": {
+              "choice": "databricks",
+              "negate": false
+            },
+            "enableDatafactory": {
+              "choice": "datafactory",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-11-integration": {
           "template": "stages/11-integration.json",
@@ -3262,7 +3909,6 @@
             "commonResourceSuffix": "-001",
             "diagnosticSettingLevel": "gold",
             "enableBotService": false,
-            "enableEventHubs": false,
             "enableFunction": false,
             "enableLogicApps": false,
             "enablePublicAccessWithPerimeter": false,
@@ -3428,7 +4074,15 @@
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string",
             "webAppExists": "bool"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "enableEventHubs": {
+              "choice": "event-hubs",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-08-rbac-security": {
           "template": "stages/08-rbac-security.json",
@@ -3456,20 +4110,15 @@
             "disableContributorAccessForUsers": false,
             "disableRBACAdminOnRGForUsers": true,
             "enableAIDocIntelligence": false,
-            "enableAIFoundry": true,
             "enableAIFoundryHub": false,
-            "enableAISearch": true,
             "enableAIServices": false,
             "enableAppInsightsDashboard": false,
             "enableAzureAIVision": false,
             "enableAzureMachineLearning": false,
             "enableAzureOpenAI": false,
             "enableAzureSpeech": false,
-            "enableContainerApps": false,
-            "enableCosmosDB": true,
             "enableFunction": false,
             "enableLogicApps": false,
-            "enablePostgreSQL": false,
             "enableRedisCache": false,
             "enableSQLDatabase": false,
             "enableWebApp": false,
@@ -3652,7 +4301,31 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "enableAIFoundry": {
+              "choice": "foundry",
+              "negate": false
+            },
+            "enableAISearch": {
+              "choice": "ai-search",
+              "negate": false
+            },
+            "enableContainerApps": {
+              "choice": "container-apps",
+              "negate": false
+            },
+            "enableCosmosDB": {
+              "choice": "cosmos-db",
+              "negate": false
+            },
+            "enablePostgreSQL": {
+              "choice": "postgresql",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-08b-rbac-common-rg": {
           "template": "stages/08b-rbac-common-rg.json",
@@ -3662,7 +4335,6 @@
           "resourceGroup": "",
           "constants": {
             "addAIFoundryHub": false,
-            "addAzureMachineLearning": false,
             "addBastionHost": false,
             "aiHubExists": false,
             "aifactorySalt10char": "",
@@ -3804,7 +4476,15 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {
+            "addAzureMachineLearning": {
+              "choice": "azure-machine-learning",
+              "negate": false
+            }
+          },
+          "chosen": {}
         },
         "project-09-ai-foundry-2025-v4": {
           "template": "stages/09-ai-foundry-2025-v4.json",
@@ -4052,7 +4732,10 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "foundry",
+          "toggled": {},
+          "chosen": {}
         },
         "foundry-injection-rbac": {
           "template": "stages/portal-foundry-injection-rbac.json",
@@ -4073,7 +4756,10 @@
           "sources": {},
           "types": {
             "vnetName": "string"
-          }
+          },
+          "condition": "foundry",
+          "toggled": {},
+          "chosen": {}
         },
         "project-09-ai-foundry-2025-v4-pass2": {
           "template": "stages/09-ai-foundry-2025-v4.json",
@@ -4321,7 +5007,10 @@
             "vnetNameBase": "string",
             "vnetNameFull_param": "string",
             "vnetResourceGroup_param": "string"
-          }
+          },
+          "condition": "foundry",
+          "toggled": {},
+          "chosen": {}
         },
         "foundry-cosmos-rbac": {
           "template": "stages/portal-cosmos-foundry-rbac.json",
@@ -4371,7 +5060,10 @@
             "randomValue": "string",
             "resourceSuffix": "string",
             "subscriptionIdDevTestProd": "string"
-          }
+          },
+          "condition": "foundry",
+          "toggled": {},
+          "chosen": {}
         },
         "hub-app-gateway": {
           "template": "stages/simple-app-gateway.json",
@@ -4399,10 +5091,12 @@
             "gatewayName": "string",
             "location": "string",
             "vnetName": "string"
-          }
+          },
+          "condition": "always",
+          "toggled": {},
+          "chosen": {}
         }
       },
-      "searchSku": "basic",
       "privateDnsZones": [
         "privatelink.__P_locationShort__.backup.windowsazure.com",
         "privatelink.__P_location__.azmk8s.io",
@@ -4467,6 +5161,26 @@
     },
     "plan": "[variables('$fxv#0')]",
     "stages": "[variables('plan').stages]",
+    "requested": {
+      "foundry": "[parameters('enableFoundry')]",
+      "ai-search": "[parameters('enableAISearch')]",
+      "cosmos-db": "[parameters('enableCosmosDB')]",
+      "application-insights": "[parameters('enableApplicationInsights')]",
+      "azure-machine-learning": "[parameters('enableAzureMachineLearning')]",
+      "aks-for-azure-ml": "[parameters('enableAksForAzureML')]",
+      "aks": "[parameters('enableAKS')]",
+      "databricks": "[parameters('enableDatabricks')]",
+      "datafactory": "[parameters('enableDatafactory')]",
+      "event-hubs": "[parameters('enableEventHubs')]",
+      "postgresql": "[parameters('enablePostgreSQL')]",
+      "container-apps": "[parameters('enableContainerApps')]"
+    },
+    "resolved": "[toObject(variables('plan').choices.resources, lambda('choice', lambdaVariables('choice').id), lambda('choice', and(variables('requested')[lambdaVariables('choice').id], equals(length(filter(lambdaVariables('choice').requires, lambda('need', not(variables('requested')[lambdaVariables('need')])))), 0))))]",
+    "effective": "[union(toObject(variables('plan').choices.resources, lambda('choice', lambdaVariables('choice').id), lambda('choice', and(variables('resolved')[lambdaVariables('choice').id], equals(length(filter(lambdaVariables('choice').requires, lambda('need', not(variables('resolved')[lambdaVariables('need')])))), 0)))), createObject('always', true()))]",
+    "skus": {
+      "aiSearchSku": "[parameters('aiSearchSku')]",
+      "storageSku": "[parameters('storageSku')]"
+    },
     "prefixNormalized": "[if(endsWith(parameters('prefix'), '-'), parameters('prefix'), format('{0}-', parameters('prefix')))]",
     "prefixBare": "[substring(variables('prefixNormalized'), 0, sub(length(variables('prefixNormalized')), 1))]",
     "locationShort": "[variables('plan').locationShort[parameters('location')]]",
@@ -4493,12 +5207,7 @@
       "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]"
     },
     "stageName": "[format('aif-{0}-{1}', variables('prefixBare'), parameters('scalesetNumber'))]",
-    "certificateVaultParts": "[split(if(empty(parameters('appGatewayCertificateVaultId')), format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('commonResourceGroup')), parameters('appGatewayCertificateVaultId')), '/')]",
-    "formChoices": {
-      "enableApplicationInsights": {
-        "value": "[parameters('enableApplicationInsights')]"
-      }
-    }
+    "certificateVaultParts": "[split(if(empty(parameters('appGatewayCertificateVaultId')), format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('commonResourceGroup')), parameters('appGatewayCertificateVaultId')), '/')]"
   },
   "resources": {
     "bootstrapGroup": {
@@ -4521,7 +5230,7 @@
         "templateLink": {
           "relativePath": "stages/portal-bootstrap.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['bootstrap-seeding-vault'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['bootstrap-seeding-vault'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "bootstrapGroup"
@@ -4537,7 +5246,7 @@
         "templateLink": {
           "relativePath": "stages/11-rgCommon.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['common-11-rgCommon'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['common-11-rgCommon'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "seedingVault"
@@ -4553,7 +5262,7 @@
         "templateLink": {
           "relativePath": "stages/12-networkCommon.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['common-12-networkCommon'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['common-12-networkCommon'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "commonGroup"
@@ -4569,7 +5278,7 @@
         "templateLink": {
           "relativePath": "stages/13-rgLevel.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['common-13-rgLevel'], variables('tokens')), createObject('adminPassword', createObject('value', format('{0}-{1}', toUpper(take(uniqueString(subscription().id, variables('stageName'), 'admin'), 6)), guid(subscription().id, variables('stageName'), 'unused-admin-vm')))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['common-13-rgLevel'], variables('tokens'), variables('effective'), variables('skus')), createObject('adminPassword', createObject('value', format('{0}-{1}', toUpper(take(uniqueString(subscription().id, variables('stageName'), 'admin'), 6)), guid(subscription().id, variables('stageName'), 'unused-admin-vm')))))]"
       },
       "dependsOn": [
         "commonNetwork"
@@ -4585,7 +5294,7 @@
         "templateLink": {
           "relativePath": "stages/createPrivateDnsZones.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "commonResources"
@@ -4602,7 +5311,7 @@
         "templateLink": {
           "relativePath": "stages/28-Initiatives.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns-initiative'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns-initiative'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "privateDns"
@@ -4619,7 +5328,7 @@
         "templateLink": {
           "relativePath": "stages/portal-private-dns-policy.json"
         },
-        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns-policy'], variables('tokens'))]"
+        "parameters": "[__bicep.stageParameters(variables('stages')['hub-private-dns-policy'], variables('tokens'), variables('effective'), variables('skus'))]"
       },
       "dependsOn": [
         "privateDnsInitiative"
@@ -4635,7 +5344,7 @@
         "templateLink": {
           "relativePath": "stages/portal-hub-access.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-access'], variables('tokens')), createObject('resolverSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets')['snet-dns-private-resolver'])), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'enableBastion', createObject('value', parameters('enableBastion'))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-access'], variables('tokens'), variables('effective'), variables('skus')), createObject('resolverSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets')['snet-dns-private-resolver'])), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'enableBastion', createObject('value', parameters('enableBastion'))))]"
       },
       "dependsOn": [
         "privateDns"
@@ -4652,7 +5361,7 @@
         "templateLink": {
           "relativePath": "stages/portal-vpn-gateway.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-vpn-gateway'], variables('tokens')), createObject('gatewaySubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').GatewaySubnet)), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr'))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-vpn-gateway'], variables('tokens'), variables('effective'), variables('skus')), createObject('gatewaySubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').GatewaySubnet)), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr'))))]"
       },
       "dependsOn": [
         "hubAccess"
@@ -4669,7 +5378,7 @@
         "templateLink": {
           "relativePath": "stages/simple-app-gateway-network.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway-network'], variables('tokens')), createObject('vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'certificateVaultId', createObject('value', parameters('appGatewayCertificateVaultId'))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway-network'], variables('tokens'), variables('effective'), variables('skus')), createObject('vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'certificateVaultId', createObject('value', parameters('appGatewayCertificateVaultId'))))]"
       },
       "dependsOn": [
         "hubAccess",
@@ -4688,7 +5397,7 @@
         "templateLink": {
           "relativePath": "stages/portal-app-gateway-certificate-rbac.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway-certificate-rbac'], variables('tokens')), createObject('certificateVaultId', createObject('value', parameters('appGatewayCertificateVaultId')), 'principalId', createObject('value', reference('appGatewayNetwork').outputs.principalId.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway-certificate-rbac'], variables('tokens'), variables('effective'), variables('skus')), createObject('certificateVaultId', createObject('value', parameters('appGatewayCertificateVaultId')), 'principalId', createObject('value', reference('appGatewayNetwork').outputs.principalId.value)))]"
       },
       "dependsOn": [
         "appGatewayNetwork"
@@ -4704,7 +5413,7 @@
         "templateLink": {
           "relativePath": "stages/portal-seeding-endpoint.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-seeding-endpoint'], variables('tokens')), createObject('keyVaultId', createObject('value', reference('seedingVault').outputs.keyVaultId.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-seeding-endpoint'], variables('tokens'), variables('effective'), variables('skus')), createObject('keyVaultId', createObject('value', reference('seedingVault').outputs.keyVaultId.value)))]"
       },
       "dependsOn": [
         "privateDns",
@@ -4721,7 +5430,7 @@
         "templateLink": {
           "relativePath": "stages/31-network.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-31-network'], variables('tokens')), createObject('genaiSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').genai)), 'aksSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aks)), 'aks2SubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aks2)), 'acaSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aca)), 'aca2SubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aca2)), 'webappSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').webapp)), 'dbxPubSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').dbxpub)), 'dbxPrivSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').dbxpriv))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-31-network'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').genai)), 'aksSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aks)), 'aks2SubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aks2)), 'acaSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aca)), 'aca2SubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').aca2)), 'webappSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').webapp)), 'dbxPubSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').dbxpub)), 'dbxPrivSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets').dbxpriv))))]"
       },
       "dependsOn": [
         "appGatewayNetwork",
@@ -4741,7 +5450,7 @@
         "templateLink": {
           "relativePath": "stages/01-foundation.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-01-foundation'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-01-foundation'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "projectNetwork"
@@ -4757,7 +5466,7 @@
         "templateLink": {
           "relativePath": "stages/02-core-infrastructure.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-02-core-infrastructure'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)), variables('formChoices'), createObject('adminPassword', createObject('value', format('{0}-{1}', toUpper(take(uniqueString(subscription().id, variables('stageName'), 'admin'), 6)), guid(subscription().id, variables('stageName'), 'unused-admin-vm')))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-02-core-infrastructure'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)), createObject('adminPassword', createObject('value', format('{0}-{1}', toUpper(take(uniqueString(subscription().id, variables('stageName'), 'admin'), 6)), guid(subscription().id, variables('stageName'), 'unused-admin-vm')))))]"
       },
       "dependsOn": [
         "foundation",
@@ -4765,6 +5474,7 @@
       ]
     },
     "aiSearch": {
+      "condition": "[variables('effective')[variables('stages')['project-03b-ai-search'].condition]]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-project-03b-ai-search', variables('stageName')), 64)]",
@@ -4774,7 +5484,7 @@
         "templateLink": {
           "relativePath": "stages/03b-ai-search.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-03b-ai-search'], variables('tokens')), createObject('genaiSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).genaiSubnetId, 'aksSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aksSubnetId, 'acaSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).acaSubnetId, 'aca2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aca2SubnetId, 'aks2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aks2SubnetId))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-03b-ai-search'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).genaiSubnetId, 'aksSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aksSubnetId, 'acaSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).acaSubnetId, 'aca2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aca2SubnetId, 'aks2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aks2SubnetId))]"
       },
       "dependsOn": [
         "cognitiveServices",
@@ -4791,7 +5501,7 @@
         "templateLink": {
           "relativePath": "stages/03-cognitive-services.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-03-cognitive-services'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-03-cognitive-services'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "coreInfrastructure",
@@ -4808,10 +5518,28 @@
         "templateLink": {
           "relativePath": "stages/04-databases.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-04-databases'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-04-databases'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "aiSearch",
+        "projectNetwork"
+      ]
+    },
+    "postgresql": {
+      "condition": "[variables('effective')[variables('stages')['project-04b-postgresql'].condition]]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('{0}-project-04b-postgresql', variables('stageName')), 64)]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "relativePath": "stages/04b-postgresql.json"
+        },
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-04b-postgresql'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+      },
+      "dependsOn": [
+        "databases",
         "projectNetwork"
       ]
     },
@@ -4825,10 +5553,28 @@
         "templateLink": {
           "relativePath": "stages/05-compute-services.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-05-compute-services'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-05-compute-services'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
-        "databases",
+        "postgresql",
+        "projectNetwork"
+      ]
+    },
+    "containerApps": {
+      "condition": "[variables('effective')[variables('stages')['project-05b-container-apps'].condition]]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('{0}-project-05b-container-apps', variables('stageName')), 64)]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "relativePath": "stages/05b-container-apps.json"
+        },
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-05b-container-apps'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+      },
+      "dependsOn": [
+        "computeServices",
         "projectNetwork"
       ]
     },
@@ -4842,10 +5588,10 @@
         "templateLink": {
           "relativePath": "stages/06-ai-platform.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-06-ai-platform'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-06-ai-platform'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
-        "computeServices",
+        "containerApps",
         "projectNetwork"
       ]
     },
@@ -4859,7 +5605,7 @@
         "templateLink": {
           "relativePath": "stages/07-ml-data-platform.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-07-ml-data-platform'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-07-ml-data-platform'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "aiPlatform",
@@ -4876,7 +5622,7 @@
         "templateLink": {
           "relativePath": "stages/11-integration.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-11-integration'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-11-integration'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "mlDataPlatform",
@@ -4893,7 +5639,7 @@
         "templateLink": {
           "relativePath": "stages/08-rbac-security.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-08-rbac-security'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-08-rbac-security'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "integration",
@@ -4910,7 +5656,7 @@
         "templateLink": {
           "relativePath": "stages/08b-rbac-common-rg.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-08b-rbac-common-rg'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-08b-rbac-common-rg'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "projectNetwork",
@@ -4918,6 +5664,7 @@
       ]
     },
     "foundryAccount": {
+      "condition": "[variables('effective')[variables('stages')['project-09-ai-foundry-2025-v4'].condition]]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-project-09-foundry-account', variables('stageName')), 64)]",
@@ -4927,7 +5674,7 @@
         "templateLink": {
           "relativePath": "stages/09-ai-foundry-2025-v4.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-09-ai-foundry-2025-v4'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-09-ai-foundry-2025-v4'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "projectNetwork",
@@ -4935,6 +5682,7 @@
       ]
     },
     "foundryInjectionRbac": {
+      "condition": "[variables('effective')[variables('stages')['foundry-injection-rbac'].condition]]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-foundry-injection-rbac', variables('stageName')), 64)]",
@@ -4944,7 +5692,7 @@
         "templateLink": {
           "relativePath": "stages/portal-foundry-injection-rbac.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['foundry-injection-rbac'], variables('tokens')), createObject('accountResourceId', createObject('value', reference('foundryAccount').outputs.aiFoundryV2ResourceId.value), 'agentSubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['foundry-injection-rbac'], variables('tokens'), variables('effective'), variables('skus')), createObject('accountResourceId', createObject('value', reference('foundryAccount').outputs.aiFoundryV2ResourceId.value), 'agentSubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value)))]"
       },
       "dependsOn": [
         "foundryAccount",
@@ -4952,6 +5700,7 @@
       ]
     },
     "foundryAccountUpdate": {
+      "condition": "[variables('effective')[variables('stages')['project-09-ai-foundry-2025-v4-pass2'].condition]]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-project-09-foundry-account-update', variables('stageName')), 64)]",
@@ -4961,7 +5710,7 @@
         "templateLink": {
           "relativePath": "stages/09-ai-foundry-2025-v4.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-09-ai-foundry-2025-v4-pass2'], variables('tokens')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['project-09-ai-foundry-2025-v4-pass2'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)))]"
       },
       "dependsOn": [
         "foundryInjectionRbac",
@@ -4969,6 +5718,7 @@
       ]
     },
     "foundryCosmosRbac": {
+      "condition": "[variables('effective')[variables('stages')['foundry-cosmos-rbac'].condition]]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-foundry-cosmos-rbac', variables('stageName')), 64)]",
@@ -4978,7 +5728,7 @@
         "templateLink": {
           "relativePath": "stages/portal-cosmos-foundry-rbac.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['foundry-cosmos-rbac'], variables('tokens')), createObject('genaiSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).genaiSubnetId, 'aksSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aksSubnetId, 'acaSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).acaSubnetId, 'aca2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aca2SubnetId, 'aks2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aks2SubnetId), createObject('accountName', createObject('value', reference('foundryAccount').outputs.aiFoundryV2Name.value)))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['foundry-cosmos-rbac'], variables('tokens'), variables('effective'), variables('skus')), createObject('genaiSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).genaiSubnetId, 'aksSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aksSubnetId, 'acaSubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).acaSubnetId, 'aca2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aca2SubnetId, 'aks2SubnetId', createObject('genaiSubnetId', createObject('value', reference('projectNetwork').outputs.genaiSubnetId.value), 'aksSubnetId', createObject('value', reference('projectNetwork').outputs.aksSubnetId.value), 'aks2SubnetId', createObject('value', reference('projectNetwork').outputs.aks2SubnetId.value), 'acaSubnetId', createObject('value', reference('projectNetwork').outputs.acaSubnetId.value), 'aca2SubnetId', createObject('value', reference('projectNetwork').outputs.aca2SubnetId.value), 'webappSubnetId', createObject('value', reference('projectNetwork').outputs.webappSubnetId.value), 'dbxPubSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPubSubnetName.value), 'dbxPrivSubnetName', createObject('value', reference('projectNetwork').outputs.dbxPrivSubnetName.value)).aks2SubnetId), createObject('accountName', createObject('value', reference('foundryAccount').outputs.aiFoundryV2Name.value)))]"
       },
       "dependsOn": [
         "foundryAccount",
@@ -4997,11 +5747,12 @@
         "templateLink": {
           "relativePath": "stages/simple-app-gateway.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway'], variables('tokens')), createObject('hostname', createObject('value', parameters('appGatewayHostname')), 'backendFqdn', createObject('value', parameters('appGatewayBackendFqdn')), 'certificateSecretId', createObject('value', parameters('appGatewayCertificateSecretId'))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-app-gateway'], variables('tokens'), variables('effective'), variables('skus')), createObject('hostname', createObject('value', parameters('appGatewayHostname')), 'backendFqdn', createObject('value', parameters('appGatewayBackendFqdn')), 'certificateSecretId', createObject('value', parameters('appGatewayCertificateSecretId'))))]"
       },
       "dependsOn": [
         "appGatewayCertificateRbac",
-        "foundryCosmosRbac"
+        "foundryCosmosRbac",
+        "rbacCommon"
       ]
     }
   },
@@ -5020,7 +5771,7 @@
     },
     "foundryAccountName": {
       "type": "string",
-      "value": "[reference('foundryAccount').outputs.aiFoundryV2Name.value]"
+      "value": "[if(variables('effective').foundry, reference('foundryAccount').outputs.aiFoundryV2Name.value, '')]"
     },
     "dnsResolverInboundIp": {
       "type": "string",

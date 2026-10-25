@@ -4,13 +4,13 @@
 
 Status: **proposed**. The package is tested offline only. It becomes supported after one confirmed deployment in a supported region.
 
-The button deploys the default selection of the v1.25 Simple Mode preset (`private-ai-foundation-v2`, `SIMPLE_MODE_RESOURCE_CATALOG` defaults): private networking, standalone topology `s` with an integrated access hub, Dev only, and project 001. It skips the GitHub repository, OIDC and pipeline steps; the portal deployment runs the stages itself.
+The button deploys the v1.25 Simple Mode preset (`private-ai-foundation-v2`) with your choice of its optional project resources: private networking, standalone topology `s` with an integrated access hub, Dev only, and project 001. It skips the GitHub repository, OIDC and pipeline steps; the portal deployment runs the stages itself.
 
 | Resource group | Contents |
 | --- | --- |
 | `rg-<prefix>-bootstrap-<loc>-<nnn>` | Seeding Key Vault shell (RBAC, purge protection, public access disabled). The stages still reference it; no secret is written to it or read from it. |
 | `<prefix>-esml-common-<loc>-dev-<nnn>` | Common VNet 172.16.0.0/20 (integrated hub), private DNS zones and links, DNS Private Resolver inbound endpoint, Bastion Developer, IP group, common Storage, Key Vaults, Container Registry Premium, Log Analytics. Optional: VPN Gateway and Application Gateway. |
-| `<prefix>-esml-project001-<loc>-dev-<nnn>-rg` | Project Storage, Key Vault, managed identities, Microsoft Foundry account and default project with the standard-agent capability host, AI Search (Basic, the v1.25 primary capacity SKU), Cosmos DB, optional Application Insights. |
+| `<prefix>-esml-project001-<loc>-dev-<nnn>-rg` | Project Storage, Key Vault and managed identities, plus the project resources you choose (defaults: Microsoft Foundry with the standard-agent capability host, AI Search, Cosmos DB, Application Insights). |
 
 The hub is **dedicated**: it is integrated into this factory's own common VNet and resource group (Simple Mode `AIF_ACCESS_HUB_MODE=integrated`). The button never peers to, links to or writes into another connectivity hub. v1.25 coordinates shared hubs through Blob leases (`bootstrap/lib/hub_lock_foundation.py`, container `hub-locks`), and an ARM deployment cannot take those leases. The third resource group is the bootstrap/seeding group.
 
@@ -20,6 +20,27 @@ A portal-deployed factory **cannot be registered with the Factory API** later. R
 
 No model deployments are created. Add models after you have validated quota.
 
+## Choices on the Services tab
+
+| Choice | Default | Requires |
+| --- | --- | --- |
+| Microsoft Foundry (account, default project, capability host) | Yes | AI Search, Cosmos DB |
+| AI Search | Yes | |
+| Azure Cosmos DB | Yes | |
+| Application Insights | Yes | |
+| Azure Machine Learning | No | Application Insights |
+| AKS for Azure ML | No | Azure Machine Learning |
+| Standalone AKS | No | |
+| Azure Databricks (Premium) | No | |
+| Azure Data Factory | No | |
+| Azure Event Hubs (Standard) | No | |
+| Azure Database for PostgreSQL | No | |
+| Azure Container Apps | No | Application Insights |
+| AI Search tier (Dev) | basic | basic, standard or standard2 |
+| Storage redundancy (Dev) | Standard_LRS | Standard_LRS or Standard_ZRS |
+
+The list, defaults and requirements come from `SIMPLE_MODE_RESOURCE_CATALOG`. A choice whose requirements are off is hidden in the form and treated as off by the template. Stage/Prod SKUs do not apply, because the button deploys Dev only. The Container Registry (Premium) and Event Hubs (Standard) SKUs are fixed by Private Link, and AI Search Free has no private endpoints.
+
 ## Before you press the button
 
 - Owner on the target subscription, or Contributor plus User Access Administrator. The stages create role assignments.
@@ -28,7 +49,7 @@ No model deployments are created. Add models after you have validated quota.
 - Resource providers are registered automatically by ARM when the deploying identity may register them. If your policy blocks that, register `Microsoft.CognitiveServices`, `Microsoft.Search`, `Microsoft.DocumentDB`, `Microsoft.App`, `Microsoft.Network`, `Microsoft.KeyVault`, `Microsoft.Storage`, `Microsoft.ContainerRegistry`, `Microsoft.OperationalInsights` and `Microsoft.Insights` first.
 - Application Gateway only: register the `EnableApplicationGatewayNetworkIsolation` feature. You also need a custom hostname, a private HTTPS backend and an exportable PFX certificate in an RBAC Key Vault in this subscription.
 - Use a fresh prefix and scale set number. Like Simple Mode, the button expects a greenfield scale set (`*Exists=false`).
-- Optional Simple Mode services that are off by default in v1.25 (Azure ML, AKS, Databricks, Data Factory, Event Hubs, PostgreSQL, Container Apps) are not offered in the button.
+- Each extra service you switch on adds deployment time and cost. The default selection is the one to try first.
 
 ## Command-line equivalent (what-if first)
 

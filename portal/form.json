@@ -164,9 +164,9 @@
               }
             },
             {
-              "name": "enableApplicationInsights",
+              "name": "enableFoundry",
               "type": "Microsoft.Common.OptionsGroup",
-              "label": "Project Application Insights",
+              "label": "Microsoft Foundry S0",
               "defaultValue": "Yes",
               "constraints": {
                 "allowedValues": [
@@ -181,7 +181,273 @@
                 ],
                 "required": true
               },
-              "toolTip": "Workspace-based. Not private-only, because AMPLS is not enabled in Simple Mode."
+              "toolTip": "Optional private Foundry account and default project; requires capability host, Search and Cosmos DB. No model deployments.",
+              "visible": "[and(equals(steps('services').enableAISearch, 'true'), equals(steps('services').enableCosmosDB, 'true'))]"
+            },
+            {
+              "name": "enableAISearch",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "AI Search",
+              "defaultValue": "Yes",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Basic-tier private search, independently selectable or required with Foundry."
+            },
+            {
+              "name": "enableCosmosDB",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Cosmos DB",
+              "defaultValue": "Yes",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private database, independently selectable or required for Foundry agent history."
+            },
+            {
+              "name": "enableApplicationInsights",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Application Insights",
+              "defaultValue": "Yes",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Optional workspace-based project telemetry; not private-only without AMPLS."
+            },
+            {
+              "name": "enableAzureMachineLearning",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Machine Learning",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private Basic workspace using canonical compute defaults; requires its linked Application Insights.",
+              "visible": "[equals(steps('services').enableApplicationInsights, 'true')]"
+            },
+            {
+              "name": "enableAksForAzureML",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "AKS for Azure ML",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "AKS compute for the selected Azure Machine Learning workspace.",
+              "visible": "[and(equals(steps('services').enableApplicationInsights, 'true'), equals(steps('services').enableAzureMachineLearning, 'true'))]"
+            },
+            {
+              "name": "enableAKS",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Standalone AKS",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Independent private AKS cluster; does not require Azure Machine Learning."
+            },
+            {
+              "name": "enableDatabricks",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Databricks",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private Premium workspace using the canonical project data platform."
+            },
+            {
+              "name": "enableDatafactory",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Data Factory",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Project data pipelines with managed private endpoints."
+            },
+            {
+              "name": "enableEventHubs",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Event Hubs",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private event ingestion using Standard tier (required for Private Link)."
+            },
+            {
+              "name": "enablePostgreSQL",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Database for PostgreSQL",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private flexible server, Burstable Standard_B1ms."
+            },
+            {
+              "name": "enableContainerApps",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Azure Container Apps",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Private Container Apps environment using canonical project defaults and linked Application Insights.",
+              "visible": "[equals(steps('services').enableApplicationInsights, 'true')]"
+            },
+            {
+              "name": "aiSearchSku",
+              "type": "Microsoft.Common.DropDown",
+              "label": "AI Search tier (Dev)",
+              "defaultValue": "basic",
+              "constraints": {
+                "required": true,
+                "allowedValues": [
+                  {
+                    "label": "basic",
+                    "value": "basic"
+                  },
+                  {
+                    "label": "standard",
+                    "value": "standard"
+                  },
+                  {
+                    "label": "standard2",
+                    "value": "standard2"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "storageSku",
+              "type": "Microsoft.Common.DropDown",
+              "label": "Storage redundancy (Dev)",
+              "defaultValue": "Standard_LRS",
+              "constraints": {
+                "required": true,
+                "allowedValues": [
+                  {
+                    "label": "Standard_LRS",
+                    "value": "Standard_LRS"
+                  },
+                  {
+                    "label": "Standard_ZRS",
+                    "value": "Standard_ZRS"
+                  }
+                ]
+              }
             }
           ]
         },
@@ -350,7 +616,20 @@
         "teamGroupName": "[steps('team').teamGroupName]",
         "teamMemberEmail": "[steps('team').teamMemberEmail]",
         "aiSearchLocation": "[steps('services').aiSearchLocation]",
+        "enableFoundry": "[equals(steps('services').enableFoundry, 'true')]",
+        "enableAISearch": "[equals(steps('services').enableAISearch, 'true')]",
+        "enableCosmosDB": "[equals(steps('services').enableCosmosDB, 'true')]",
         "enableApplicationInsights": "[equals(steps('services').enableApplicationInsights, 'true')]",
+        "enableAzureMachineLearning": "[equals(steps('services').enableAzureMachineLearning, 'true')]",
+        "enableAksForAzureML": "[equals(steps('services').enableAksForAzureML, 'true')]",
+        "enableAKS": "[equals(steps('services').enableAKS, 'true')]",
+        "enableDatabricks": "[equals(steps('services').enableDatabricks, 'true')]",
+        "enableDatafactory": "[equals(steps('services').enableDatafactory, 'true')]",
+        "enableEventHubs": "[equals(steps('services').enableEventHubs, 'true')]",
+        "enablePostgreSQL": "[equals(steps('services').enablePostgreSQL, 'true')]",
+        "enableContainerApps": "[equals(steps('services').enableContainerApps, 'true')]",
+        "aiSearchSku": "[steps('services').aiSearchSku]",
+        "storageSku": "[steps('services').storageSku]",
         "enableBastion": "[equals(steps('hub').enableBastion, 'true')]",
         "enablePrivateDnsPolicy": "[equals(steps('hub').enablePrivateDnsPolicy, 'true')]",
         "enableVpnGateway": "[equals(steps('hub').enableVpnGateway, 'true')]",

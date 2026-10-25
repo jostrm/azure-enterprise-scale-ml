@@ -41,8 +41,58 @@ param teamMemberEmail string
 @description('AI Search region. Empty or same-as-factory-region means the AI Factory region. No automatic capacity retry.')
 param aiSearchLocation string = ''
 
-@description('Optional workspace-based project Application Insights.')
+// Project resources: the optional items of the v1.25 SIMPLE_MODE_RESOURCE_CATALOG, defaults as in the catalog.
+// A choice whose required choices are off is treated as off (see 'effective').
+@description('Microsoft Foundry account, default project and capability host (requires AI Search and Cosmos DB).')
+param enableFoundry bool = true
+
+@description('Private AI Search.')
+param enableAISearch bool = true
+
+@description('Private Azure Cosmos DB.')
+param enableCosmosDB bool = true
+
+@description('Workspace-based project Application Insights (not private-only without AMPLS).')
 param enableApplicationInsights bool = true
+
+@description('Azure Machine Learning workspace (requires Application Insights).')
+param enableAzureMachineLearning bool = false
+
+@description('AKS compute for Azure Machine Learning (requires Azure Machine Learning).')
+param enableAksForAzureML bool = false
+
+@description('Standalone private AKS cluster.')
+param enableAKS bool = false
+
+@description('Azure Databricks Premium workspace.')
+param enableDatabricks bool = false
+
+@description('Azure Data Factory with managed private endpoints.')
+param enableDatafactory bool = false
+
+@description('Azure Event Hubs Standard (required for Private Link).')
+param enableEventHubs bool = false
+
+@description('Azure Database for PostgreSQL flexible server.')
+param enablePostgreSQL bool = false
+
+@description('Azure Container Apps environment (requires Application Insights).')
+param enableContainerApps bool = false
+
+@description('AI Search tier for Dev. Free has no private endpoints.')
+@allowed([
+  'basic'
+  'standard'
+  'standard2'
+])
+param aiSearchSku string = 'basic'
+
+@description('Storage account redundancy for Dev.')
+@allowed([
+  'Standard_LRS'
+  'Standard_ZRS'
+])
+param storageSku string = 'Standard_LRS'
 
 @description('Bastion Developer on the common VNet (free, no admin VM).')
 param enableBastion bool = true
@@ -74,6 +124,27 @@ param appGatewayCertificateVaultId string = ''
 
 var plan = loadJsonContent('generated/stage-parameters.json')
 var stages = plan.stages
+var requested = {
+  foundry: enableFoundry
+  'ai-search': enableAISearch
+  'cosmos-db': enableCosmosDB
+  'application-insights': enableApplicationInsights
+  'azure-machine-learning': enableAzureMachineLearning
+  'aks-for-azure-ml': enableAksForAzureML
+  aks: enableAKS
+  databricks: enableDatabricks
+  datafactory: enableDatafactory
+  'event-hubs': enableEventHubs
+  postgresql: enablePostgreSQL
+  'container-apps': enableContainerApps
+}
+// Two passes resolve the catalog's requirement chains (the generator asserts a depth of at most 2).
+var resolved = toObject(plan.choices.resources, choice => choice.id, choice => requested[choice.id] && length(filter(choice.requires, need => !requested[need])) == 0)
+var effective = union(toObject(plan.choices.resources, choice => choice.id, choice => resolved[choice.id] && length(filter(choice.requires, need => !resolved[need])) == 0), { always: true })
+var skus = {
+  aiSearchSku: aiSearchSku
+  storageSku: storageSku
+}
 var prefixNormalized = endsWith(prefix, '-') ? prefix : '${prefix}-'
 var prefixBare = substring(prefixNormalized, 0, length(prefixNormalized) - 1)
 var locationShort = plan.locationShort[location]
@@ -120,11 +191,13 @@ func fill(text string, t object) string =>
     '__P_searchLocation__', t.searchLocation),
     '__P_deploymentRandom__', t.deploymentRandom)
 
-func stageParameters(stage object, t object) object =>
+func stageParameters(stage object, t object, choices object, skus object) object =>
   union(
     toObject(items(stage.constants), item => item.key, item => { value: item.value }),
     toObject(items(stage.templated), item => item.key, item => { value: fill(item.value, t) }),
-    toObject(items(stage.templatedJson), item => item.key, item => { value: json(fill(item.value, t)) }))
+    toObject(items(stage.templatedJson), item => item.key, item => { value: json(fill(item.value, t)) }),
+    toObject(items(stage.toggled), item => item.key, item => { value: item.value.negate ? !choices[item.value.choice] : choices[item.value.choice] }),
+    toObject(items(stage.chosen), item => item.key, item => { value: skus[item.value] }))
 
 func subnetCidr(vnet string, entry array) string => cidrSubnet(vnet, entry[0], entry[1])
 
@@ -145,7 +218,7 @@ resource seedingVault 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-bootstrap.json' }
-    parameters: stageParameters(stages['bootstrap-seeding-vault'], tokens)
+    parameters: stageParameters(stages['bootstrap-seeding-vault'], tokens, effective, skus)
   }
 }
 
@@ -156,7 +229,7 @@ resource commonGroup 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/11-rgCommon.json' }
-    parameters: stageParameters(stages['common-11-rgCommon'], tokens)
+    parameters: stageParameters(stages['common-11-rgCommon'], tokens, effective, skus)
   }
 }
 
@@ -167,7 +240,7 @@ resource commonNetwork 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/12-networkCommon.json' }
-    parameters: stageParameters(stages['common-12-networkCommon'], tokens)
+    parameters: stageParameters(stages['common-12-networkCommon'], tokens, effective, skus)
   }
 }
 
@@ -178,7 +251,7 @@ resource commonResources 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/13-rgLevel.json' }
-    parameters: union(stageParameters(stages['common-13-rgLevel'], tokens), {
+    parameters: union(stageParameters(stages['common-13-rgLevel'], tokens, effective, skus), {
       // enableAdminVM is false (SIMPLE_MODE_DISABLED); the template still declares the password.
       adminPassword: { value: '${toUpper(take(uniqueString(subscription().id, stageName, 'admin'), 6))}-${guid(subscription().id, stageName, 'unused-admin-vm')}' }
     })
@@ -192,7 +265,7 @@ resource privateDns 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/createPrivateDnsZones.json' }
-    parameters: stageParameters(stages['hub-private-dns'], tokens)
+    parameters: stageParameters(stages['hub-private-dns'], tokens, effective, skus)
   }
 }
 
@@ -203,7 +276,7 @@ resource privateDnsInitiative 'Microsoft.Resources/deployments@2022-09-01' = if 
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/28-Initiatives.json' }
-    parameters: stageParameters(stages['hub-private-dns-initiative'], tokens)
+    parameters: stageParameters(stages['hub-private-dns-initiative'], tokens, effective, skus)
   }
 }
 
@@ -214,7 +287,7 @@ resource privateDnsPolicy 'Microsoft.Resources/deployments@2022-09-01' = if (ena
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-private-dns-policy.json' }
-    parameters: stageParameters(stages['hub-private-dns-policy'], tokens)
+    parameters: stageParameters(stages['hub-private-dns-policy'], tokens, effective, skus)
   }
 }
 
@@ -225,7 +298,7 @@ resource hubAccess 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-hub-access.json' }
-    parameters: union(stageParameters(stages['hub-access'], tokens), {
+    parameters: union(stageParameters(stages['hub-access'], tokens, effective, skus), {
       resolverSubnetCidr: { value: subnetCidr(vnetCidr, subnets['snet-dns-private-resolver']) }
       vpnClientCidr: { value: vpnClientCidr }
       enableBastion: { value: enableBastion }
@@ -240,7 +313,7 @@ resource vpnGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableVpn
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-vpn-gateway.json' }
-    parameters: union(stageParameters(stages['hub-vpn-gateway'], tokens), {
+    parameters: union(stageParameters(stages['hub-vpn-gateway'], tokens, effective, skus), {
       gatewaySubnetCidr: { value: subnetCidr(vnetCidr, subnets.GatewaySubnet) }
       vpnClientCidr: { value: vpnClientCidr }
     })
@@ -254,7 +327,7 @@ resource appGatewayNetwork 'Microsoft.Resources/deployments@2022-09-01' = if (en
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/simple-app-gateway-network.json' }
-    parameters: union(stageParameters(stages['hub-app-gateway-network'], tokens), {
+    parameters: union(stageParameters(stages['hub-app-gateway-network'], tokens, effective, skus), {
       vpnClientCidr: { value: vpnClientCidr }
       certificateVaultId: { value: appGatewayCertificateVaultId }
     })
@@ -270,7 +343,7 @@ resource appGatewayCertificateRbac 'Microsoft.Resources/deployments@2022-09-01' 
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-app-gateway-certificate-rbac.json' }
-    parameters: union(stageParameters(stages['hub-app-gateway-certificate-rbac'], tokens), {
+    parameters: union(stageParameters(stages['hub-app-gateway-certificate-rbac'], tokens, effective, skus), {
       certificateVaultId: { value: appGatewayCertificateVaultId }
       principalId: { value: appGatewayNetwork!.properties.outputs.principalId.value }
     })
@@ -284,7 +357,7 @@ resource seedingEndpoint 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-seeding-endpoint.json' }
-    parameters: union(stageParameters(stages['hub-seeding-endpoint'], tokens), {
+    parameters: union(stageParameters(stages['hub-seeding-endpoint'], tokens, effective, skus), {
       keyVaultId: { value: seedingVault.properties.outputs.keyVaultId.value }
     })
   }
@@ -299,7 +372,7 @@ resource projectNetwork 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/31-network.json' }
-    parameters: union(stageParameters(stages['project-31-network'], tokens), {
+    parameters: union(stageParameters(stages['project-31-network'], tokens, effective, skus), {
       genaiSubnetCidr: { value: subnetCidr(vnetCidr, subnets.genai) }
       aksSubnetCidr: { value: subnetCidr(vnetCidr, subnets.aks) }
       aks2SubnetCidr: { value: subnetCidr(vnetCidr, subnets.aks2) }
@@ -330,9 +403,6 @@ var searchNetwork = {
   aca2SubnetId: network.aca2SubnetId
   aks2SubnetId: network.aks2SubnetId
 }
-var formChoices = {
-  enableApplicationInsights: { value: enableApplicationInsights }
-}
 
 resource foundation 'Microsoft.Resources/deployments@2022-09-01' = {
   name: take('${stageName}-project-01-foundation', 64)
@@ -340,7 +410,7 @@ resource foundation 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/01-foundation.json' }
-    parameters: union(stageParameters(stages['project-01-foundation'], tokens), network)
+    parameters: union(stageParameters(stages['project-01-foundation'], tokens, effective, skus), network)
   }
 }
 
@@ -351,21 +421,21 @@ resource coreInfrastructure 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/02-core-infrastructure.json' }
-    parameters: union(stageParameters(stages['project-02-core-infrastructure'], tokens), network, formChoices, {
+    parameters: union(stageParameters(stages['project-02-core-infrastructure'], tokens, effective, skus), network, {
       // enableAdminVM is false (SIMPLE_MODE_DISABLED); the template still declares the password.
       adminPassword: { value: '${toUpper(take(uniqueString(subscription().id, stageName, 'admin'), 6))}-${guid(subscription().id, stageName, 'unused-admin-vm')}' }
     })
   }
 }
 
-resource aiSearch 'Microsoft.Resources/deployments@2022-09-01' = {
+resource aiSearch 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['project-03b-ai-search'].condition]) {
   name: take('${stageName}-project-03b-ai-search', 64)
   location: location
   dependsOn: [cognitiveServices]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/03b-ai-search.json' }
-    parameters: union(stageParameters(stages['project-03b-ai-search'], tokens), searchNetwork)
+    parameters: union(stageParameters(stages['project-03b-ai-search'], tokens, effective, skus), searchNetwork)
   }
 }
 
@@ -376,7 +446,7 @@ resource cognitiveServices 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/03-cognitive-services.json' }
-    parameters: union(stageParameters(stages['project-03-cognitive-services'], tokens), network)
+    parameters: union(stageParameters(stages['project-03-cognitive-services'], tokens, effective, skus), network)
   }
 }
 
@@ -387,29 +457,51 @@ resource databases 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/04-databases.json' }
-    parameters: union(stageParameters(stages['project-04-databases'], tokens), network)
+    parameters: union(stageParameters(stages['project-04-databases'], tokens, effective, skus), network)
+  }
+}
+
+resource postgresql 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['project-04b-postgresql'].condition]) {
+  name: take('${stageName}-project-04b-postgresql', 64)
+  location: location
+  dependsOn: [databases]
+  properties: {
+    mode: 'Incremental'
+    templateLink: { relativePath: 'stages/04b-postgresql.json' }
+    parameters: union(stageParameters(stages['project-04b-postgresql'], tokens, effective, skus), network)
   }
 }
 
 resource computeServices 'Microsoft.Resources/deployments@2022-09-01' = {
   name: take('${stageName}-project-05-compute-services', 64)
   location: location
-  dependsOn: [databases]
+  dependsOn: [postgresql]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/05-compute-services.json' }
-    parameters: union(stageParameters(stages['project-05-compute-services'], tokens), network)
+    parameters: union(stageParameters(stages['project-05-compute-services'], tokens, effective, skus), network)
+  }
+}
+
+resource containerApps 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['project-05b-container-apps'].condition]) {
+  name: take('${stageName}-project-05b-container-apps', 64)
+  location: location
+  dependsOn: [computeServices]
+  properties: {
+    mode: 'Incremental'
+    templateLink: { relativePath: 'stages/05b-container-apps.json' }
+    parameters: union(stageParameters(stages['project-05b-container-apps'], tokens, effective, skus), network)
   }
 }
 
 resource aiPlatform 'Microsoft.Resources/deployments@2022-09-01' = {
   name: take('${stageName}-project-06-ai-platform', 64)
   location: location
-  dependsOn: [computeServices]
+  dependsOn: [containerApps]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/06-ai-platform.json' }
-    parameters: union(stageParameters(stages['project-06-ai-platform'], tokens), network)
+    parameters: union(stageParameters(stages['project-06-ai-platform'], tokens, effective, skus), network)
   }
 }
 
@@ -420,7 +512,7 @@ resource mlDataPlatform 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/07-ml-data-platform.json' }
-    parameters: union(stageParameters(stages['project-07-ml-data-platform'], tokens), network)
+    parameters: union(stageParameters(stages['project-07-ml-data-platform'], tokens, effective, skus), network)
   }
 }
 
@@ -431,7 +523,7 @@ resource integration 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/11-integration.json' }
-    parameters: union(stageParameters(stages['project-11-integration'], tokens), network)
+    parameters: union(stageParameters(stages['project-11-integration'], tokens, effective, skus), network)
   }
 }
 
@@ -442,7 +534,7 @@ resource rbacSecurity 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/08-rbac-security.json' }
-    parameters: union(stageParameters(stages['project-08-rbac-security'], tokens), network)
+    parameters: union(stageParameters(stages['project-08-rbac-security'], tokens, effective, skus), network)
   }
 }
 
@@ -453,56 +545,56 @@ resource rbacCommon 'Microsoft.Resources/deployments@2022-09-01' = {
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/08b-rbac-common-rg.json' }
-    parameters: union(stageParameters(stages['project-08b-rbac-common-rg'], tokens), network)
+    parameters: union(stageParameters(stages['project-08b-rbac-common-rg'], tokens, effective, skus), network)
   }
 }
 
 // --- Foundry: two passes (account, then account update binding the capability host) --------------------
 
-resource foundryAccount 'Microsoft.Resources/deployments@2022-09-01' = {
+resource foundryAccount 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['project-09-ai-foundry-2025-v4'].condition]) {
   name: take('${stageName}-project-09-foundry-account', 64)
   location: location
   dependsOn: [rbacCommon]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/09-ai-foundry-2025-v4.json' }
-    parameters: union(stageParameters(stages['project-09-ai-foundry-2025-v4'], tokens), network)
+    parameters: union(stageParameters(stages['project-09-ai-foundry-2025-v4'], tokens, effective, skus), network)
   }
 }
 
-resource foundryInjectionRbac 'Microsoft.Resources/deployments@2022-09-01' = {
+resource foundryInjectionRbac 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['foundry-injection-rbac'].condition]) {
   name: take('${stageName}-foundry-injection-rbac', 64)
   resourceGroup: commonResourceGroup
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-foundry-injection-rbac.json' }
-    parameters: union(stageParameters(stages['foundry-injection-rbac'], tokens), {
-      accountResourceId: { value: foundryAccount.properties.outputs.aiFoundryV2ResourceId.value }
+    parameters: union(stageParameters(stages['foundry-injection-rbac'], tokens, effective, skus), {
+      accountResourceId: { value: foundryAccount!.properties.outputs.aiFoundryV2ResourceId.value }
       agentSubnetId: { value: projectNetwork.properties.outputs.aca2SubnetId.value }
     })
   }
 }
 
-resource foundryAccountUpdate 'Microsoft.Resources/deployments@2022-09-01' = {
+resource foundryAccountUpdate 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['project-09-ai-foundry-2025-v4-pass2'].condition]) {
   name: take('${stageName}-project-09-foundry-account-update', 64)
   location: location
   dependsOn: [foundryInjectionRbac]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/09-ai-foundry-2025-v4.json' }
-    parameters: union(stageParameters(stages['project-09-ai-foundry-2025-v4-pass2'], tokens), network)
+    parameters: union(stageParameters(stages['project-09-ai-foundry-2025-v4-pass2'], tokens, effective, skus), network)
   }
 }
 
-resource foundryCosmosRbac 'Microsoft.Resources/deployments@2022-09-01' = {
+resource foundryCosmosRbac 'Microsoft.Resources/deployments@2022-09-01' = if (effective[stages['foundry-cosmos-rbac'].condition]) {
   name: take('${stageName}-foundry-cosmos-rbac', 64)
   location: location
   dependsOn: [foundryAccountUpdate]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-cosmos-foundry-rbac.json' }
-    parameters: union(stageParameters(stages['foundry-cosmos-rbac'], tokens), searchNetwork, {
-      accountName: { value: foundryAccount.properties.outputs.aiFoundryV2Name.value }
+    parameters: union(stageParameters(stages['foundry-cosmos-rbac'], tokens, effective, skus), searchNetwork, {
+      accountName: { value: foundryAccount!.properties.outputs.aiFoundryV2Name.value }
     })
   }
 }
@@ -510,11 +602,11 @@ resource foundryCosmosRbac 'Microsoft.Resources/deployments@2022-09-01' = {
 resource appGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableApplicationGateway) {
   name: take('${stageName}-hub-app-gateway', 64)
   resourceGroup: commonResourceGroup
-  dependsOn: [foundryCosmosRbac, appGatewayCertificateRbac]
+  dependsOn: [rbacCommon, foundryCosmosRbac, appGatewayCertificateRbac]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/simple-app-gateway.json' }
-    parameters: union(stageParameters(stages['hub-app-gateway'], tokens), {
+    parameters: union(stageParameters(stages['hub-app-gateway'], tokens, effective, skus), {
       hostname: { value: appGatewayHostname }
       backendFqdn: { value: appGatewayBackendFqdn }
       certificateSecretId: { value: appGatewayCertificateSecretId }
@@ -525,5 +617,5 @@ resource appGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableApp
 output commonResourceGroup string = commonResourceGroup
 output bootstrapResourceGroup string = bootstrapResourceGroup
 output projectResourceGroup string = foundation.properties.outputs.foundationOutputs.value.projectResourceGroupName
-output foundryAccountName string = foundryAccount.properties.outputs.aiFoundryV2Name.value
+output foundryAccountName string = effective.foundry ? foundryAccount!.properties.outputs.aiFoundryV2Name.value : ''
 output dnsResolverInboundIp string = hubAccess.properties.outputs.dnsResolverInboundIp.value

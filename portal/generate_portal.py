@@ -71,7 +71,8 @@ SOURCE_TEMPLATES = {
     **{name: f"{BICEP}/esml-genai-1/{name}.bicep" for name in (
         "01-foundation", "02-core-infrastructure", "03-cognitive-services", "04-databases",
         "05-compute-services", "06-ai-platform", "07-ml-data-platform", "11-integration",
-        "08-rbac-security", "08b-rbac-common-rg", "09-ai-foundry-2025-v4")},
+        "08-rbac-security", "08b-rbac-common-rg", "09-ai-foundry-2025-v4",
+        "04b-postgresql", "05b-container-apps")},
 }
 
 # Network plan replacing subnetCalc_v2.ps1 (projectType "all", genaiSubnetCidrAll defaults) and
@@ -125,8 +126,24 @@ def _greenfield(condition: bool, value: str, message: str) -> str:
     if not condition:
         raise ValueError(message)
     return value
-# Preset values that the form may change (SIMPLE_MODE_RESOURCE_CATALOG optional items); main.bicep sets them.
-FORM_WIRED = {"enableApplicationInsights"}
+# Form choices. Each optional SIMPLE_MODE_RESOURCE_CATALOG project item is a Yes/No choice; foundry and
+# foundry-capability-host require each other (simple_mode_project_resources), so they are one choice.
+# main.bicep parameter per choice; every optional catalog ID must be covered (tested).
+RESOURCE_PARAMETERS = {
+    "foundry": "enableFoundry", "ai-search": "enableAISearch", "cosmos-db": "enableCosmosDB",
+    "application-insights": "enableApplicationInsights", "azure-machine-learning": "enableAzureMachineLearning",
+    "aks-for-azure-ml": "enableAksForAzureML", "aks": "enableAKS", "databricks": "enableDatabricks",
+    "datafactory": "enableDatafactory", "event-hubs": "enableEventHubs", "postgresql": "enablePostgreSQL",
+    "container-apps": "enableContainerApps",
+}
+# Dev SKU choices: preset keys overridden together, allowed values. The first preset value is the default.
+# Free Search has no private endpoints; ACR (Premium) and Event Hubs (Standard) are fixed by Private Link.
+SKU_CHOICES = {
+    "aiSearchSku": {"keys": ("skuAISearchDev", "admin_aiSearchTier"), "values": ("basic", "standard", "standard2"),
+                    "label": "AI Search tier (Dev)"},
+    "storageSku": {"keys": ("skuStorageAccountDev",), "values": ("Standard_LRS", "Standard_ZRS"),
+                   "label": "Storage redundancy (Dev)"},
+}
 
 
 def load_module(path: Path, name: str):
@@ -322,7 +339,7 @@ def search_parameter_mapping(root: Path) -> dict[str, str]:
 
 # --- Simple Mode replay ----------------------------------------------------------------------------
 
-def portal_state() -> dict:
+def portal_state(selection: list[str] | None = None) -> dict:
     """The CLI's state file (aif_write_state_and_configure) for a Simple Mode GHA run, with tokens."""
     subscription = token("subscriptionId")
     return {
@@ -344,7 +361,7 @@ def portal_state() -> dict:
         "github_repository": "portal/deploy-to-azure", "oidc_client_id": "",
         "runner_mode": "github-hosted", "admin_vm_size": "Standard_D2s_v5", "simple_mode": "true",
         "cost_center": token("costCenter"), "team_member_email": token("teamMemberEmail"),
-        "simple_project_resources_json": json.dumps(DEFAULT_PROJECT_RESOURCES),
+        "simple_project_resources_json": json.dumps(DEFAULT_PROJECT_RESOURCES if selection is None else selection),
         "github_repository_visibility": "private",
     }
 
@@ -368,14 +385,14 @@ def _yaml_scalar(value: str) -> str:
     return value
 
 
-def replay_bootstrap(root: Path, config) -> tuple[dict[str, str], dict]:
+def replay_bootstrap(root: Path, config, selection: list[str] | None = None) -> tuple[dict[str, str], dict]:
     """Run apply_gha on a scratch consumer layout; return GitHub variables and variables.json dev."""
     with tempfile.TemporaryDirectory() as scratch:
         consumer = Path(scratch)
         (consumer / "aifactory").mkdir()
         shutil.copyfile(root / WORKFLOWS / ".env.template", consumer / ".env")
         shutil.copyfile(root / "environment_setup/aifactory/variables.json", consumer / "aifactory/variables.json")
-        config.apply_gha(consumer, portal_state())
+        config.apply_gha(consumer, portal_state(selection))
         dotenv = {}
         for line in (consumer / ".env").read_text(encoding="utf-8").splitlines():
             match = config.ENV_ASSIGNMENT.match(line)
@@ -472,9 +489,6 @@ def _has_token(value) -> bool:
 
 def classify(stage: dict, parameter: str, value, declared: dict) -> None:
     kind = declared[parameter]["type"].lower()
-    if parameter in FORM_WIRED:
-        stage["wired"].append(parameter)
-        return
     if isinstance(value, str) and "__P_" in value:
         if kind in ("string", "securestring"):
             stage["templated"][parameter] = value
@@ -725,6 +739,15 @@ def hub_stages(root: Path, dns: dict) -> dict[str, dict]:
 
 
 def foundry_stages(root: Path, stages: dict[str, dict]) -> dict[str, dict]:
+    gateway = portal_stage(
+        root, "simple-app-gateway", "aif_deploy_simple_application_gateway", "completed", "resourceGroup",
+        token("commonResourceGroup"),
+        {"location": token("location"),
+         "gatewayName": "agw-" + token("prefix") + token("locationShort") + "-" + token("scalesetNumber"),
+         "vnetName": "vnt-esmlcmn-" + token("locationShort") + "-dev-001", "costCenter": token("costCenter")},
+        wired=("hostname", "backendFqdn", "certificateSecretId"))
+    if "project-09-ai-foundry-2025-v4" not in stages:  # Foundry not selected: no 69a/69c replacements
+        return {"hub-app-gateway": gateway}
     account = stages["project-09-ai-foundry-2025-v4"]
     cosmos_parameters = _template_parameters(root, "portal-cosmos-foundry-rbac")
     values = derived_values(account, cosmos_parameters)
@@ -739,13 +762,7 @@ def foundry_stages(root: Path, stages: dict[str, dict]) -> dict[str, dict]:
         "foundry-cosmos-rbac": portal_stage(
             root, "portal-cosmos-foundry-rbac", "69c_cosmosdb_data_contributor_for_foundry_project", "foundry",
             "subscription", "", values, wired=tuple(wired)),
-        "hub-app-gateway": portal_stage(
-            root, "simple-app-gateway", "aif_deploy_simple_application_gateway", "completed", "resourceGroup",
-            token("commonResourceGroup"),
-            {"location": token("location"),
-             "gatewayName": "agw-" + token("prefix") + token("locationShort") + "-" + token("scalesetNumber"),
-             "vnetName": "vnt-esmlcmn-" + token("locationShort") + "-dev-001", "costCenter": token("costCenter")},
-            wired=("hostname", "backendFqdn", "certificateSecretId")),
+        "hub-app-gateway": gateway,
     }
 
 
@@ -762,10 +779,14 @@ def should_run(condition: str, env: dict[str, str], inputs: dict, github: dict) 
     return truthy(evaluate(condition.removeprefix("${{").removesuffix("}}"), context))
 
 
-def build_plan(root: Path) -> dict:
+def build_variant(root: Path, selection: list[str] | None = None, overrides: dict | None = None) -> dict:
+    """One plan for a project-resource selection and preset overrides (form choices)."""
     root = Path(root)
     config = load_config(root)
-    github, variables = replay_bootstrap(root, config)
+    if overrides:
+        preset = config.simple_mode_values
+        config.simple_mode_values = lambda *args, **kwargs: {**preset(*args, **kwargs), **overrides}
+    github, variables = replay_bootstrap(root, config, selection)
     workflows = root / WORKFLOWS
     stages: dict[str, dict] = {}
 
@@ -806,15 +827,145 @@ def build_plan(root: Path) -> dict:
                 stages["foundry-injection-rbac"] = None  # placeholder keeps pipeline order
     portal = foundry_stages(root, stages)
     for key in ("foundry-injection-rbac", "foundry-cosmos-rbac", "hub-app-gateway"):
-        stages[key] = portal[key]
+        if key in portal:
+            stages[key] = portal[key]
 
     regions = allowed_regions(root)
     return {
         "bicepVersion": BICEP_VERSION, "tokens": list(TOKENS), "network": NETWORK,
         "regions": regions, "locationShort": {region: cli_regions(root)[region] for region in regions},
         "stages": stages,
-        "searchSku": stages["project-03b-ai-search"]["constants"].get("skuAISearchDev", "standard"),
         "privateDnsZones": sorted({zone["name"] for zone in json.loads(dns["templatedJson"]["privateLinksDnsZones"])}),
+    }
+
+
+def resource_choices(config) -> list[dict]:
+    """Optional catalog items as form choices, with the choices each one requires."""
+    catalog = config.SIMPLE_MODE_RESOURCE_CATALOG["project"]
+    optional = {item["id"]: item for item in catalog if not item["required"]}
+    members = {item_id: [item_id] for item_id in optional}
+    if "foundry" in members and "foundry-capability-host" in members:
+        members["foundry"].append(members.pop("foundry-capability-host")[0])
+    owner = {member: choice for choice, group in members.items() for member in group}
+    choices = []
+    for choice, group in members.items():
+        requires = sorted({owner[dependency] for member in group for dependency in optional[member]["dependencies"]
+                           if dependency in owner and owner[dependency] != choice})
+        defaults = {optional[member]["default_selected"] for member in group}
+        if len(defaults) != 1:
+            raise ValueError(f"{choice}: grouped catalog items disagree on default_selected")
+        choices.append({"id": choice, "members": group, "parameter": RESOURCE_PARAMETERS[choice],
+                        "label": optional[choice]["label"], "description": optional[choice]["description"],
+                        "default": defaults.pop(), "requires": requires})
+    return choices
+
+
+def _closure(states: dict[str, bool], choices: list[dict], flipped: str) -> dict[str, bool]:
+    """Flip one choice; switching on also switches on what it requires, switching off drops what requires it."""
+    requires = {choice["id"]: choice["requires"] for choice in choices}
+    states = dict(states)
+    states[flipped] = not states[flipped]
+    if states[flipped]:
+        states.update({need: True for need in _ancestors(flipped, requires)})
+        return states
+    changed = True
+    while changed:
+        changed = False
+        for choice, needs in requires.items():
+            if states[choice] and any(not states[need] for need in needs):
+                states[choice], changed = False, True
+    return states
+
+
+def _ancestors(choice: str, requires: dict[str, list[str]]) -> set[str]:
+    found, stack = set(), list(requires[choice])
+    while stack:
+        item = stack.pop()
+        if item not in found:
+            found.add(item)
+            stack.extend(requires[item])
+    return {choice} | found
+
+
+def _selection(states: dict[str, bool], choices: list[dict]) -> list[str]:
+    return [member for choice in choices if states[choice["id"]] for member in choice["members"]]
+
+
+def _explain(observations: list[tuple[dict, object]], keys: list[str], label: str):
+    """Find the single choice that explains every observed value: (key, negate) or (key, None) for strings."""
+    found = [(key, negate) for key in keys for negate in (False, True)
+             if all(isinstance(value, bool) for _, value in observations)
+             and all(value == (state[key] != negate) for state, value in observations)]
+    if len(found) != 1:
+        raise ValueError(f"{label}: value is not explained by exactly one form choice ({found})")
+    return found[0]
+
+
+def build_plan(root: Path) -> dict:
+    """Merge the plans of every sampled form choice; varying values must be explained by one choice."""
+    root = Path(root)
+    config = load_config(root)
+    choices = resource_choices(config)
+    defaults = {choice["id"]: choice["default"] for choice in choices}
+    preset = config.simple_mode_values()
+    sku_defaults = {name: preset[spec["keys"][0]] for name, spec in SKU_CHOICES.items()}
+    for name, spec in SKU_CHOICES.items():
+        if sku_defaults[name] not in spec["values"] or any(preset[key] != sku_defaults[name] for key in spec["keys"]):
+            raise ValueError(f"{name}: preset {spec['keys']} disagree with the allowed values")
+    samples = [defaults, {key: True for key in defaults}, {key: False for key in defaults}]
+    samples += [_closure(defaults, choices, choice["id"]) for choice in choices]
+    variants = []
+    for states in samples:
+        states = {**states, **{name: sku_defaults[name] for name in SKU_CHOICES}}
+        if states not in [variant[0] for variant in variants]:
+            variants.append((states, build_variant(root, _selection(states, choices))))
+    for name, spec in SKU_CHOICES.items():
+        for value in spec["values"]:
+            if value != sku_defaults[name]:
+                states = {**defaults, **sku_defaults, name: value}
+                variants.append((states, build_variant(root, _selection(states, choices),
+                                                       {key: value for key in spec["keys"]})))
+    full = next(plan for states, plan in variants if all(states[key] for key in defaults)
+                and all(states[name] == sku_defaults[name] for name in SKU_CHOICES))
+    resource_keys, sku_keys = [choice["id"] for choice in choices], list(SKU_CHOICES)
+    stages = {}
+    for key, stage in full["stages"].items():
+        present = [(states, key in plan["stages"]) for states, plan in variants]
+        stage = json.loads(json.dumps(stage))
+        stage["condition"] = "always"
+        if not all(flag for _, flag in present):
+            choice, negate = _explain(present, resource_keys, f"stage {key}")
+            if negate:
+                raise ValueError(f"stage {key} runs only when {choice} is off")
+            stage["condition"] = choice
+        stage["toggled"], stage["chosen"] = {}, {}
+        observed = [(states, plan["stages"][key]) for states, plan in variants if key in plan["stages"]]
+        for _, other in observed:
+            if set(other["wired"]) != set(stage["wired"]) or set(other["templated"]) != set(stage["templated"]):
+                raise ValueError(f"stage {key}: wiring changes with the form choices")
+        for parameter in list(stage["constants"]):
+            values = [(states, other["constants"].get(parameter, "<missing>")) for states, other in observed]
+            if len({json.dumps(value) for _, value in values}) == 1:
+                continue
+            sku = next((name for name in sku_keys if all(value == states[name] for states, value in values)), None)
+            if sku:
+                stage["chosen"][parameter] = sku
+            else:
+                choice, negate = _explain(values, resource_keys, f"{key}.{parameter}")
+                stage["toggled"][parameter] = {"choice": choice, "negate": negate}
+            del stage["constants"][parameter]
+        stages[key] = stage
+    regions = allowed_regions(root)
+    return {
+        "bicepVersion": BICEP_VERSION, "tokens": list(TOKENS), "network": NETWORK,
+        "regions": regions, "locationShort": full["locationShort"],
+        "choices": {"resources": choices,
+                    "skus": {name: {**{k: list(v) if isinstance(v, tuple) else v for k, v in spec.items()},
+                                    "default": sku_defaults[name]} for name, spec in SKU_CHOICES.items()},
+                    "maxRequiresDepth": max(len(_ancestors(choice["id"], {c["id"]: c["requires"] for c in choices})) - 1
+                                            for choice in choices)},
+        "stages": stages,
+        "privateDnsZones": full["privateDnsZones"],
     }
 
 
@@ -920,9 +1071,20 @@ def build_form(plan: dict) -> dict:
          "constraints": {"required": True,
                          "allowedValues": [{"label": "Same as the AI Factory region", "value": SAME_REGION}]
                          + [{"label": region, "value": region} for region in regions]}},
-        toggle("enableApplicationInsights", "Project Application Insights", True,
-               "Workspace-based. Not private-only, because AMPLS is not enabled in Simple Mode."),
     ]
+    requires = {choice["id"]: choice["requires"] for choice in plan["choices"]["resources"]}
+    for choice in plan["choices"]["resources"]:
+        element = toggle(choice["parameter"], choice["label"], choice["default"], choice["description"])
+        needs = sorted(_ancestors(choice["id"], requires) - {choice["id"]})
+        if needs:  # hidden until every required choice is on; main.bicep applies the same rule
+            conditions = [is_on("services", RESOURCE_PARAMETERS[need])[1:-1] for need in needs]
+            element["visible"] = conditions[0].join("[]") if len(conditions) == 1 else f"[and({', '.join(conditions)})]"
+        services.append(element)
+    for name, spec in plan["choices"]["skus"].items():
+        services.append({"name": name, "type": "Microsoft.Common.DropDown", "label": spec["label"],
+                         "defaultValue": spec["default"],
+                         "constraints": {"required": True,
+                                         "allowedValues": [{"label": value, "value": value} for value in spec["values"]]}})
     hub = [
         {"name": "hubInfo", "type": "Microsoft.Common.InfoBox",
          "options": {"style": "Info", "text": "Private networking is fixed: VNet 172.16.0.0/20, private endpoints, private DNS zones and a DNS Private Resolver inbound endpoint. The options below are billable or take 30-45 minutes and are off by default."}},
@@ -960,7 +1122,8 @@ def build_form(plan: dict) -> dict:
         "teamGroupObjectId": "[steps('team').teamGroupObjectId]", "teamGroupName": "[steps('team').teamGroupName]",
         "teamMemberEmail": "[steps('team').teamMemberEmail]",
         "aiSearchLocation": "[steps('services').aiSearchLocation]",
-        "enableApplicationInsights": is_on("services", "enableApplicationInsights"),
+        **{choice["parameter"]: is_on("services", choice["parameter"]) for choice in plan["choices"]["resources"]},
+        **{name: f"[steps('services').{name}]" for name in plan["choices"]["skus"]},
         "enableBastion": is_on("hub", "enableBastion"), "enablePrivateDnsPolicy": is_on("hub", "enablePrivateDnsPolicy"),
         "enableVpnGateway": is_on("hub", "enableVpnGateway"), "vpnClientCidr": "[steps('hub').vpnClientCidr]",
         "enableApplicationGateway": is_on("hub", "enableApplicationGateway"),

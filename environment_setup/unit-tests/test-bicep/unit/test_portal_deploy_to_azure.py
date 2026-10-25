@@ -211,7 +211,15 @@ def test_disabled_flags_never_appear_in_the_form(form):
     text = json.dumps(form)
     for flag in CONFIG.SIMPLE_MODE_DISABLED:
         assert f'"{flag}"' not in text and f".{flag}" not in text, flag
-    assert "enableEventHubs" not in text
+
+
+def test_event_hubs_is_offered_only_with_a_private_link_sku(committed):
+    """v1.25 makes Event Hubs a catalog option; Basic has no private endpoints, so the preset pins Standard."""
+    assert CONFIG.simple_mode_values()["skuEventHubsDev"] == "Standard"
+    for stage in committed["stages"].values():
+        for parameter, value in stage["constants"].items():
+            if parameter.lower().startswith("skueventhubs") and parameter.endswith("Dev"):  # env=dev only
+                assert value == "Standard", (stage["template"], parameter)
 
 
 def test_costly_hub_options_are_optional_and_off_by_default(form, main_template):
@@ -342,7 +350,7 @@ def test_hub_is_dedicated_and_never_joins_a_shared_hub(committed, main_template)
         if stage["scope"] == "resourceGroup" and stage["resourceGroup"]:
             assert stage["resourceGroup"] in (common, "__P_bootstrapResourceGroup__") or \
                 stage["resourceGroup"].startswith("__P_prefix__esml-common-"), key
-    assert not [name for name in main_template["parameters"] if "hub" in name.lower()]
+    assert not [name for name in main_template["parameters"] if re.search(r"(?<!event)hub", name.lower())]
     texts = [(PORTAL / "azuredeploy.json").read_text(encoding="utf-8")]
     texts += [path.read_text(encoding="utf-8") for path in (PORTAL / "stages").glob("portal-*.json")]
     for text in texts:
@@ -354,3 +362,60 @@ def test_button_does_not_claim_factory_api_registration():
     readme = (PORTAL / "README.md").read_text(encoding="utf-8")
     assert "cannot be registered with the Factory API" in readme
     assert "register.json" not in (PORTAL / "azuredeploy.json").read_text(encoding="utf-8")
+
+
+def test_resource_choices_cover_the_optional_catalog(committed, main_template, form):
+    catalog = CONFIG.SIMPLE_MODE_RESOURCE_CATALOG["project"]
+    optional = {item["id"]: item for item in catalog if not item["required"]}
+    choices = committed["choices"]["resources"]
+    assert {member for choice in choices for member in choice["members"]} == set(optional)
+    assert set(GENERATOR.RESOURCE_PARAMETERS) == {choice["id"] for choice in choices}
+    assert committed["choices"]["maxRequiresDepth"] <= 2, "main.bicep resolves requirement chains in two passes"
+    requested = main_template["variables"]["requested"]
+    elements = {element["name"]: element for element in form_elements(form)}
+    for choice in choices:
+        parameter = choice["parameter"]
+        assert main_template["parameters"][parameter]["defaultValue"] is choice["default"]
+        assert requested[choice["id"]] == f"[parameters('{parameter}')]"
+        assert elements[parameter]["defaultValue"] == ("Yes" if choice["default"] else "No")
+        for need in choice["requires"]:
+            assert f"steps('services').{GENERATOR.RESOURCE_PARAMETERS[need]}" in elements[parameter]["visible"]
+        assert form_outputs(form)[parameter] == f"[equals(steps('services').{parameter}, 'true')]"
+
+
+def test_choice_dependent_values_default_to_the_preset(committed):
+    """A value that follows a choice equals the preset for the catalog's default selection."""
+    preset = CONFIG.simple_mode_values()
+    defaults = {choice["id"]: choice["default"] for choice in committed["choices"]["resources"]}
+    checked = 0
+    for stage in committed["stages"].values():
+        for parameter, rule in stage["toggled"].items():
+            value = defaults[rule["choice"]] != rule["negate"]
+            source = stage["sources"].get(parameter)
+            if source in preset:
+                assert GENERATOR.typed(preset[source], "bool") is value, (stage["template"], parameter)
+                checked += 1
+        for parameter, name in stage["chosen"].items():
+            assert committed["choices"]["skus"][name]["default"] in committed["choices"]["skus"][name]["values"]
+    assert checked >= 10
+
+
+def test_conditional_stages_are_conditional_in_main(committed, main_template):
+    conditional = {stage["template"] for stage in committed["stages"].values() if stage["condition"] != "always"}
+    assert {"stages/04b-postgresql.json", "stages/05b-container-apps.json", "stages/03b-ai-search.json",
+            "stages/09-ai-foundry-2025-v4.json"} <= conditional
+    for resource in linked_deployments(main_template):
+        if resource["properties"]["templateLink"]["relativePath"] in conditional:
+            assert "effective" in str(resource.get("condition", "")), resource["properties"]["templateLink"]
+
+
+def test_sku_choices_are_private_link_capable(committed, main_template, form):
+    skus = committed["choices"]["skus"]
+    assert "free" not in skus["aiSearchSku"]["values"]
+    for name, spec in skus.items():
+        assert main_template["parameters"][name]["allowedValues"] == spec["values"]
+        assert main_template["parameters"][name]["defaultValue"] == spec["default"]
+        element = next(element for element in form_elements(form) if element["name"] == name)
+        assert [item["value"] for item in element["constraints"]["allowedValues"]] == spec["values"]
+    chosen = {name for stage in committed["stages"].values() for name in stage["chosen"].values()}
+    assert chosen == set(skus), "every SKU choice reaches at least one stage"
