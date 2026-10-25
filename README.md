@@ -2,6 +2,10 @@
 ![Header](documentation/v2/10-19/images/header.png)
 
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-124%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-124%2Fportal%2Fform.json)<br>
+<sub>AI Factory v1.24 Simple Mode full bootstrap: private networking, integrated hub, Dev, project 001. Status: <b>proposed</b> until one deployment is confirmed. Read [portal/README.md](portal/README.md) before you press it.</sub>
+
 This AI landing zone, est 2019, and is WAF aligned. It has been designed and used since 2019 for Azure Public Cloud but can be leveraged in the Azure Government and Sovereign Cloud, by configuration. This is an application landingzone that works both with VWAN Hub or a traditional Hub/Spoke<br>
 
 It is an enterprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, AI Search or other services.
