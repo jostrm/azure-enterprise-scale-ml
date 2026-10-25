@@ -127,3 +127,6 @@ debug/
 # Local reference code (not part of the repo)
 aa_ref_code/
 ignore.md
+# Graphify generation scratch (source copies, graphify-out/ and its AST cache); graphs ship as snapshots
+/.graph-work-*/
+graphify-out/

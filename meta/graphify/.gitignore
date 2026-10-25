@@ -1,0 +1,7 @@
+# Generated corpus data is delivered through verified, explicitly pinned bundles.
+snapshots/
+current.json
+graph.json
+graph.html
+GRAPH_REPORT.md
+*.tmp
