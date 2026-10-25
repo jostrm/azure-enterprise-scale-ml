@@ -56,7 +56,7 @@ def linked_deployments(template):
 
 
 def form_outputs(form):
-    return form["parameters"]["outputs"]
+    return form["view"]["outputs"]["parameters"]
 
 
 def form_elements(form):
@@ -66,8 +66,7 @@ def form_elements(form):
         for item in items:
             elements.append(item)
             walk(item.get("elements", []))
-    walk(form["parameters"]["basics"])
-    for step in form["parameters"]["steps"]:
+    for step in form["view"]["properties"]["steps"]:
         walk(step.get("elements", []))
     return elements
 
@@ -193,13 +192,18 @@ def test_main_does_not_inline_stage_templates(main_template):
 
 
 def test_form_outputs_map_one_to_one_to_main_parameters(form, main_template):
-    assert form["$schema"].endswith("CreateUIDefinition.MultiVm.json#")
-    assert form["handler"] == "Microsoft.Azure.CreateUIDef"
+    # The CustomDeploymentBlade uiFormDefinitionUri renders a Form view, not a createUiDefinition.
+    assert form["$schema"].endswith("2021-09-09/uiFormDefinition.schema.json#")
+    assert form["view"]["kind"] == "Form"
+    context = form["view"]["outputs"]
+    assert context["kind"] == "Subscription"
+    assert context["subscriptionId"] == "[steps('basics').subscription.subscriptionId]"
+    assert context["location"] == "[steps('basics').location.name]"
     outputs = form_outputs(form)
     assert set(outputs) == set(main_template["parameters"])
     names = {element["name"] for element in form_elements(form)}
     for value in outputs.values():
-        referenced = re.findall(r"(?:steps\('\w+'\)\.|basics\(')(\w+)", value)
+        referenced = re.findall(r"steps\('\w+'\)\.(\w+)", value)
         assert set(referenced) <= names, value
 
 
@@ -218,9 +222,12 @@ def test_costly_hub_options_are_optional_and_off_by_default(form, main_template)
     for element in form_elements(form):
         choices = {item["label"]: item["value"] for item in element.get("constraints", {}).get("allowedValues", [])}
         defaults[element["name"]] = choices.get(element.get("defaultValue"), element.get("defaultValue"))
-    assert defaults["enableVpnGateway"] is False
-    assert defaults["enableApplicationGateway"] is False
-    assert defaults["enableBastion"] is True and parameters["enableBastion"]["defaultValue"] is True
+    assert defaults["enableVpnGateway"] == "false"
+    assert defaults["enableApplicationGateway"] == "false"
+    assert defaults["enableBastion"] == "true" and parameters["enableBastion"]["defaultValue"] is True
+    for name in ("enableVpnGateway", "enableApplicationGateway", "enableBastion", "enablePrivateDnsPolicy",
+                 "enableApplicationInsights"):
+        assert form_outputs(form)[name].startswith("[equals(steps(") and form_outputs(form)[name].endswith(", 'true')]")
 
 
 def test_form_collects_no_secrets_and_writes_nothing_to_entra(form, main_template):
@@ -235,8 +242,10 @@ def test_region_allow_list_is_sourced(form, main_template):
     expected = GENERATOR.allowed_regions(ROOT)
     assert expected, "at least one region must remain after the intersections"
     assert main_template["parameters"]["location"]["allowedValues"] == expected
-    assert form["parameters"]["config"]["basics"]["location"]["allowedValues"] == expected
-    assert form_outputs(form)["location"] == "[location()]"
+    location = next(element for element in form_elements(form) if element["name"] == "location")
+    assert location["type"] == "Microsoft.Common.LocationSelector"
+    assert location["allowedValues"] == expected
+    assert form_outputs(form)["location"] == "[steps('basics').location.name]"
     cli = GENERATOR.cli_regions(ROOT)
     assert set(expected) <= set(cli)
     assert set(expected) <= set(GENERATOR.bastion_developer_regions(ROOT))
@@ -297,31 +306,15 @@ def strict_requirement(available: bool, reason: str) -> None:
         pytest.skip(reason)
 
 
-def test_form_matches_the_create_ui_definition_schema(form):
+def test_form_matches_the_ui_form_definition_schema(form):
     try:
         import jsonschema
     except ImportError:
         jsonschema = None
     strict_requirement(jsonschema is not None, "jsonschema is required to validate form.json")
-    base = "https://schema.management.azure.com/schemas/0.1.2-preview/"
-
-    def absolute(node, name):
-        if isinstance(node, dict):
-            return {key: (base + (name if value.startswith("#") else value.split("#")[0]) + "#" + value.split("#", 1)[1]
-                          if key == "$ref" and isinstance(value, str) and "#" in value else absolute(value, name))
-                    for key, value in node.items()}
-        if isinstance(node, list):
-            return [absolute(item, name) for item in node]
-        return node
-    store = {}
-    for path in (PORTAL / "data/createuidefinition-schema").glob("CreateUIDefinition.*.json"):
-        document = absolute(json.loads(path.read_text(encoding="utf-8")), path.name)
-        document["id"] = base + path.name
-        store[base + path.name] = document
-    schema = store[base + "CreateUIDefinition.MultiVm.json"]
-    resolver = jsonschema.RefResolver(base_uri=base + "CreateUIDefinition.MultiVm.json", referrer=schema, store=store)
+    schema = json.loads((PORTAL / "data/uiformdefinition-schema/uiFormDefinition.schema.json").read_text(encoding="utf-8"))
     errors = [f"{list(error.path)}: {error.message[:200]}"
-              for error in jsonschema.Draft4Validator(schema, resolver=resolver).iter_errors(form)]
+              for error in jsonschema.Draft7Validator(schema).iter_errors(form)]
     assert not errors
 
 

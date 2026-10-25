@@ -64,7 +64,7 @@ done
 `portal/generate_portal.py` is offline and deterministic. It replays the GitHub route of the Simple Mode bootstrap: `apply_gha()`, then GitHub variables, then workflow job env, then the `variables.json` override, then each stage's `--parameters`. It uses tokens for deployment-time values and writes:
 
 - `generated/stage-parameters.json`: every stage's parameters (constants, token templates, and the names `main.bicep` wires).
-- `form.json`: the createUiDefinition.
+- `form.json`: the portal Form view (uiFormDefinition 2021-09-09) with subscription and region pickers.
 - `stages/*.json` and `azuredeploy.json`, when run with `--bicep <bicep 0.37.4>`.
 
 ```bash

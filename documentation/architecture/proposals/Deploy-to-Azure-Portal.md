@@ -32,7 +32,7 @@ Status: **proposed**. The package is tested offline and in CI. It stays a propos
 
 ## Mechanism
 
-The mechanism is the same as Azure/AI-Landing-Zones' `portal` branch: a compiled ARM `azuredeploy.json` plus a createUiDefinition `form.json`, opened through `portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/<template>/uiFormDefinitionUri/<form>`. The button serves raw files from the `portal-124` branch.
+The mechanism is the same as Azure/AI-Landing-Zones' `portal` branch: a compiled ARM `azuredeploy.json` plus a Form view (uiFormDefinition 2021-09-09) `form.json`, opened through `portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/<template>/uiFormDefinitionUri/<form>`. The button serves raw files from the `portal-124` branch.
 
 Every v1.24 stage entry point the Simple Mode chain deploys is subscription scope, except `31-network` and `createPrivateDnsZones`, which are resource-group scope. Compiled with Bicep 0.37.4, the linked stages total about 7.4 MB; `09-ai-foundry-2025-v4` alone is 2.54 MB and is deployed twice. ARM's template limit is 4 MB, so `portal/main.bicep` is a thin subscription-scope template (0.27 MB, 18 parameters). It creates the bootstrap resource group and calls each stage as `Microsoft.Resources/deployments` with `templateLink.relativePath`. Each stage is below 4 MB and 256 parameters; the largest parameter count is `01-foundation` with 127. Because `relativePath` resolves only against a template URI, CLI use needs `--template-uri`.
 
