@@ -340,7 +340,6 @@ def assert_connectivity_group_allowed(document, identifier, body):
 
 def validate_route(document):
     route = document["route"]
-    fl.require(not fl.single_writer(document), "factory-delete-blob-coordination-required")
     fl.require(fl.guid(document["identity"].get("deployment_object_id")), "bound-deployment-principal-required")
     fl.require(route.get("scoped_contract") == 1
                and isinstance(route.get("auth_namespace"), str)
@@ -390,7 +389,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
     connectivity_groups(document, {})
     projects = normalize_projects(document, registered_projects)
     cloud.verify_identity()
-    fl.BlobLocks(cloud, document).verify_enrollment()
+    reader = fl.deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
     hub, links = access_hub(document), shared_hub_links(document)
@@ -417,8 +416,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
         proof = {"ownership_source": "tags", "owner": owner}
         if not owner and key in records:
             evidence = records[key]
-            owner = fl.verified_receipt_owner(fl.BlobLocks(cloud, document),
-                                             evidence.get("ownership_evidence"), key, fl.resource_digest(body), cache)
+            owner = fl.verified_receipt_owner(reader, evidence.get("ownership_evidence"), key,
+                                             fl.resource_digest(body), cache)
             fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
             proof = {**evidence, "owner": owner}
         if hub_covers(hub, key):
@@ -752,7 +751,7 @@ def run_worker(envelope, source_root, expected_run, expected_hash, cloud=None, s
         fl.require(fl.sys.platform.startswith("linux"), "linux-scoped-worker-required")
     cloud = cloud or fl.Cloud(document, expected_object_id=document["identity"]["deployment_object_id"])
     cloud.verify_identity(require_default=True)
-    locks = fl.BlobLocks(cloud, document)
+    locks = (fl._RepositoryDeletionWorker if fl.single_writer(document) else fl.BlobLocks)(cloud, document)
     locks.held = dict(context)
     locks.verify_enrollment()
     locks.execution_claim = fl._ExecutionClaim(document, locks.read_claim())
@@ -897,9 +896,16 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         fl.require(not (set(document["deletion"]["bodies"]) & (deletes - own)),
                    "factory-delete-overlapping-closure-requires-one-manifest")
     require_unique_hub_links(documents)
+    # Single-writer: one repository CAS reserves the cohort; its worker and receipts live in the state ref.
+    repository = fl.single_writer(first)
+    fl.require(all(fl.single_writer(document) == repository for document in documents),
+               "cohort-coordination-mode-mismatch")
     clouds = [cloud_factory(document) for document in documents]
-    members = [(lock_factory or fl.BlobLocks)(cloud, document) for cloud, document in zip(clouds, documents)]
-    union = fl._CohortLeases(members)
+    members = [(lock_factory or (fl._RepositoryDeletionMember if repository else fl.BlobLocks))(cloud, document)
+               for cloud, document in zip(clouds, documents)]
+    union = (fl._RepositoryDeletionCohort if repository else fl._CohortLeases)(members)
+    scopes = {scope.lower() for document in documents
+              for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
     # Same aggregate identity as the generic cohort, so catalog verification is shared.
     cohort_hash = fl.digest(sorted(document["manifest_hash"] for document in documents))
     claimed, claim_attempted = set(), False
@@ -933,8 +939,11 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         for locks, receipt in zip(members, aggregate["children"]):
             receipt["locks_retained"] = sorted(locks.held)
             receipt["lock_retained"] = bool(locks.held)
-            if receipt["run_id"] in claimed:
+            if not repository and receipt["run_id"] in claimed:
                 locks.store_receipt(receipt)
+        if repository:
+            union.persist(aggregate["children"], aggregate)
+        for receipt in aggregate["children"]:
             fl.write_receipt(execution_root / (receipt["run_id"] + ".receipt.json"), receipt)
         fl.write_receipt(receipt_path, aggregate)
 
@@ -958,10 +967,13 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                     verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
                 return aggregate
             context = aggregate.get("lease_context")
-            fl.require(isinstance(context, dict) and set(context) == set(union.owners)
+            fl.require(isinstance(context, dict) and set(context) == scopes
                        and all(fl.guid(value) for value in context.values()),
                        "factory-delete-retained-leases-required")
-            union.held = dict(context)
+            if repository:
+                union.resume(context)
+            else:
+                union.held = dict(context)
             claim_attempted = True
             for locks, document, receipt in zip(members, documents, aggregate["children"]):
                 locks.held = {scope.lower(): context[scope.lower()] for scope in
@@ -1027,6 +1039,15 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         union.assert_held()
         for cloud, document in zip(clouds, documents):
             verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
+        if repository:
+            # The repository claim is released only against durable succeeded receipts.
+            for receipt in aggregate["children"]:
+                receipt["status"] = "succeeded"
+            aggregate["status"] = "succeeded"
+            persist()
+            union.release()
+            persist()
+            return aggregate
         # Store completion while leases still exist; the final receipt is only
         # successful after every lease is durably observed released.
         persist()
@@ -1041,14 +1062,26 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         aggregate.update(fl.failure_fields(error, "unexpected-factory-delete-failure"))
         if not claim_attempted:
             try:
-                union.release()
-            except (fl.Blocked, OSError):
+                if repository:
+                    # The aborted reservation stores these receipts as its terminal records.
+                    for receipt in aggregate["children"]:
+                        receipt["status"] = aggregate["status"]
+                    union.abort(aggregate["children"], aggregate)
+                else:
+                    union.release()
+            except BaseException:
                 aggregate["status"] = "reconciliation-required"
         # Keep active durable claims available to an already-running worker.
         for receipt in aggregate["children"]:
             if receipt["run_id"] not in claimed:
                 receipt["status"] = aggregate["status"]
-        persist()
+        try:
+            persist()
+        except BaseException:
+            # Durable storage refused the write; local evidence still names every retained scope.
+            for receipt in aggregate["children"]:
+                fl.write_receipt(execution_root / (receipt["run_id"] + ".receipt.json"), receipt)
+            fl.write_receipt(receipt_path, aggregate)
     finally:
         for cloud in clouds:
             cloud.tokens.clear()

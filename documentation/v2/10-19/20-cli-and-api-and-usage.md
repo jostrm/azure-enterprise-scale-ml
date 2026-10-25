@@ -682,8 +682,9 @@ become real Python/JSON booleans, never strings. `False` keeps the named
 resources; `True` includes them. The subnet choice does not approve a shared
 group. Inspect exact resource IDs and both delete/retain lists.
 
-**Modern layout 2 is required; single-writer selective project deletion is
-blocked.** The selected source must support `selective-project-resources-v1`,
+**Modern layout 2 is required.** Blob and single-writer factories both support
+selective project deletion; a single-writer factory needs its deletion permission
+granted first (`authorize-deletion`). The selected source must support `selective-project-resources-v1`,
 with an exact registered placement per environment. This is the selective
 lifecycle path, **not necessarily GitHub Actions or whole-factory pipelines**.
 
@@ -1191,8 +1192,9 @@ Use unique environments in any order. Both independent choices must be JSON
 booleans, not strings: `false` keeps the named resources; `true` includes them
 for deletion. Subnet permission does not approve shared-group deletion.
 
-**Modern layout 2 is required; single-writer selective project deletion is
-blocked.** The selected source needs `selective-project-resources-v1` and
+**Modern layout 2 is required.** Blob and single-writer factories both support
+it; grant a single-writer factory's deletion permission first (`authorize-deletion`).
+The selected source needs `selective-project-resources-v1` and
 one exact registered placement per chosen environment. Ordinary project
 deletion uses the selective lifecycle path; do not assume GitHub Actions
 or the whole-factory ordered-pipeline path.
@@ -1633,9 +1635,11 @@ both project deletion flags must be actual booleans.
 The API baseline is `d52463f`. Its frozen accelerator pin
 `3e9102ee07c959d91e5ac508432bd1545d258a15` is not changed by this guide and
 does not provide the named ordered-pipeline runtime. Published source advertises
-`factory_deletion_pipeline_coordination_modes: ["blob"]`; generic single-writer
-whole-owned-group support is not this named contract or selective project
-deletion. The API checks the selected immutable source and enrolled mode.
+`factory_deletion_pipeline_coordination_modes: ["blob", "single-writer"]`: a
+single-writer factory runs the same ordered pipeline (project workers first, then
+common teardown) under one repository deletion-cohort claim instead of Blob leases,
+and supports selective project deletion. The API checks the selected immutable
+source and enrolled mode.
 No client publication, optional preflight or offline test approves execution.
 
 ### Whole-factory plan and retention contract
