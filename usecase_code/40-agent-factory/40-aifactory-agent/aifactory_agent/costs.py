@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -44,6 +45,26 @@ _CURRENCIES = frozenset(
 _RG = r"^[A-Za-z0-9_.()-]{1,90}$"
 _MAX_BYTES = 2_000_000
 _MAX_ITEMS = 2000
+# Cost Management throttles per tenant/client (HTTP 429). Retry a few times, but keep the
+# total wait short enough for a chat or voice answer; a longer requested wait fails fast.
+_THROTTLE_ATTEMPTS = 3
+_THROTTLE_MAX_WAIT = 10
+_THROTTLE_DEFAULT_WAIT = 2
+
+
+def _retry_after(headers) -> float:
+    waits = []
+    for key, value in headers.items():
+        key = key.lower()
+        if key == "retry-after" or (key.startswith("x-ms-ratelimit-microsoft.costmanagement-")
+                                    and key.endswith("-retry-after")):
+            try:
+                wait = float(value)
+            except ValueError:
+                continue
+            if wait >= 0:
+                waits.append(wait)
+    return max(waits) if waits else _THROTTLE_DEFAULT_WAIT
 
 
 def _fail(code, message, status=409):
@@ -252,6 +273,8 @@ _KNOWN_FLAGS = frozenset({
     "enableAKS", "enableAISearch", "enableCosmosDB", "enableAIFoundry", "enableProjectVM",
     "enableAdminVM", "enableDatafactoryCommon", "enableBing", "enableBingCustomSearch",
     "enableDefenderforAISubLevel", "enableDefenderforAIResourceLevel", "ENABLE_APIM", "ENABLE_KONG",
+    # Encryption at host is a VM/AKS-node hardening setting with no separate charge.
+    "enableEncryptionAtHost",
 }) | {feature[0] for feature in _FEATURES} | set(_MODELS)
 
 
@@ -439,12 +462,13 @@ def template_components(document, environment):
 
 
 class CostSkills:
-    def __init__(self, settings, principal, scope_key, cred=None, http_client=None, clock=None):
+    def __init__(self, settings, principal, scope_key, cred=None, http_client=None, clock=None, sleep=None):
         self.settings, self.principal, self.scope_key = settings, principal, scope_key
         configured = getattr(settings, "costs", None)
         self.options = configured if isinstance(configured, CostSettings) else CostSettings.model_validate(configured or {})
         self.cred, self.http_client = cred, http_client
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.sleep = sleep or time.sleep
 
     def descriptors(self):
         try:
@@ -494,9 +518,31 @@ class CostSkills:
                 headers["Authorization"] = "Bearer " + self.cred.get_token(ARM + "/.default").token
             except AzureError:
                 _fail("cost_auth_unavailable", "The configured Azure identity could not obtain an ARM token.", 503)
+        for attempt in range(1, _THROTTLE_ATTEMPTS + 1):
+            payload = self._stream(client, method, url, headers, body, arm, attempt)
+            if isinstance(payload, bytearray):
+                break
+            self.sleep(payload)
+        try:
+            result = json.loads(payload)
+        except (ValueError, UnicodeError):
+            _fail("invalid_cost_response", "Azure returned invalid JSON.", 502)
+        if not isinstance(result, dict):
+            _fail("invalid_cost_response", "Azure returned an invalid cost/resource object.", 502)
+        return result
+
+    def _stream(self, client, method, url, headers, body, arm, attempt):
+        """Return the bounded response body, or the seconds to wait before retrying a throttled request."""
         try:
             with client.stream(method, url, headers=headers, json=body,
                                timeout=30, follow_redirects=False) as response:
+                if response.status_code == 429:
+                    wait = _retry_after(response.headers)
+                    if attempt < _THROTTLE_ATTEMPTS and wait <= _THROTTLE_MAX_WAIT:
+                        return wait
+                    _fail("cost_service_unavailable", "Azure throttled the cost/resource/pricing request "
+                          f"(HTTP 429, retry after {wait:g} s, attempt {attempt}); try again shortly. "
+                          "No extrapolation or zero was substituted.", 503)
                 if response.status_code in (401, 403):
                     message = ("Azure denied billing/resource read access. Review Cost Management Reader "
                                "and resource Reader permissions for this exact RG; no permissions were changed."
@@ -514,13 +560,7 @@ class CostSkills:
                         _fail("cost_response_limit", "Azure cost/pricing response exceeded the bounded response limit.", 502)
         except (httpx.HTTPError, OSError):
             _fail("cost_service_unavailable", "The read-only Azure cost/pricing request failed; no estimate was substituted.", 503)
-        try:
-            result = json.loads(payload)
-        except (ValueError, UnicodeError):
-            _fail("invalid_cost_response", "Azure returned invalid JSON.", 502)
-        if not isinstance(result, dict):
-            _fail("invalid_cost_response", "Azure returned an invalid cost/resource object.", 502)
-        return result
+        return payload
 
     @staticmethod
     def _continuation(url, initial, *, retail=False):
