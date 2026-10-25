@@ -1078,7 +1078,8 @@ class Knowledge:
             raise ValueError("Unknown configured knowledge scope.")
         if not isinstance(query, str) or not query.strip() or len(query) > 4000:
             raise ValueError("Provide a nonempty knowledge query of at most 4000 characters.")
-        self._verify_complete(manifest, client)
+        # Only a verified snapshot reaches here (snapshot() verifies it), and the full scan after the query proves the
+        # rows came from that snapshot; a second scan before the query only cost every voice turn ~2 s.
         vector = self._embeddings([query.strip()])[0]
         fields = self._selected_fields(manifest) + ["ingested_at"]
         options = {

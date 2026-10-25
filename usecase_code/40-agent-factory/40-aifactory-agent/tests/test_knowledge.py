@@ -280,6 +280,42 @@ def test_snapshot_pins_generation_across_promotion_and_in_progress_read(knowledg
     assert "Old committed" in pinned.search("question", "project001-dev")[0]["content"]
 
 
+def test_a_fresh_snapshot_search_scans_the_index_once_after_the_query(knowledge, settings):
+    # Voice latency: a full-index scan costs ~2 s live. The snapshot was just verified, and the scan after the query
+    # still proves the evidence came from that snapshot, so a scan before the query adds latency and no guarantee.
+    write(settings, "guide.md", "# Original\nCommitted text.\n")
+    knowledge.refresh()
+    pinned = knowledge.snapshot()
+    pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
+    original, order = pinned.client.search, []
+
+    def search(**options):
+        order.append("scan" if options.get("search_text") == "*" else "query")
+        return original(**options)
+
+    pinned.client.search = search
+    assert "Committed" in pinned.search("question", "project001-dev")[0]["content"]
+    assert order == ["query", "scan"]
+
+
+def test_a_change_during_the_query_is_still_detected_by_the_scan_after_it(knowledge, settings):
+    write(settings, "guide.md", "# Original\nCommitted text.\n")
+    knowledge.refresh()
+    pinned = knowledge.snapshot()
+    pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
+    original = pinned.client.search
+
+    def search(**options):
+        rows = original(**options)
+        if options.get("search_text") != "*":
+            pinned.client.docs.clear()
+        return rows
+
+    pinned.client.search = search
+    with pytest.raises(IndexingError):
+        pinned.search("question", "project001-dev")
+
+
 def test_unstable_wildcard_paging_is_not_mistaken_for_duplicate_documents(knowledge, settings, monkeypatch):
     # Azure AI Search keys are unique, but an unsorted "*" query pages without a stable order: a page can repeat one
     # document and skip another. The repeat is de-duplicated and the skipped document is waited for (a fresh scan).
