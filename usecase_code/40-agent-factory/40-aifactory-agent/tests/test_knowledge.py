@@ -990,3 +990,54 @@ def test_gitless_snapshot_reuses_only_proven_byte_identical_commit_citations(
     current = next(iter(knowledge.search_client.docs.values()))
     assert current["working_tree"] and current["source_url"].startswith("file:")
     assert current["source_revision"] is None
+
+
+
+def _embedded_inputs(knowledge):
+    return [text for call in knowledge.embedding_client.calls for text in call["input"]]
+
+
+def test_a_refresh_embeds_only_new_or_changed_text_and_reuses_cached_vectors(knowledge, settings):
+    # Every purple push changes some document; re-embedding all of them made each agent deploy take ~20 minutes.
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    write(settings, "other.md", "# Other\nMore committed text.\n")
+    first = knowledge.refresh()
+    assert first["status"] == "ready" and first["embedded_count"] == len(_embedded_inputs(knowledge)) >= 2
+    knowledge.embedding_client.calls.clear()
+    write(settings, "other.md", "# Other\nChanged committed text.\n")
+    second = knowledge.refresh()
+    embedded = _embedded_inputs(knowledge)
+    assert second["status"] == "ready" and embedded and all("Changed committed text." in text for text in embedded)
+    assert second["embedded_count"] == len(embedded) and second["reused_embedding_count"] >= 1
+    assert second["embedded_count"] + second["reused_embedding_count"] == second["uploaded_count"]
+
+
+def test_a_different_embedding_deployment_or_dimension_never_reuses_cached_vectors(knowledge, settings):
+    key = knowledge._embedding_key("text")
+    azure = settings.azure.model_copy(update={"embedding_deployment": "other-embedding"})
+    knowledge.settings = settings.model_copy(update={"azure": azure})
+    assert knowledge._embedding_key("text") != key
+
+
+def test_an_invalid_cached_vector_is_ignored_and_embedded_again(knowledge, settings):
+    from aifactory_agent import knowledge as module
+
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    knowledge.refresh()
+    blob = knowledge.container.blobs[module._EMBEDDING_CACHE]
+    cache = json.loads(blob.body)
+    cache["vectors"] = {key: "AAAAAA==" for key in cache["vectors"]}  # one float, not the configured dimensions
+    blob.body = json.dumps(cache).encode()
+    knowledge.embedding_client.calls.clear()
+    write(settings, "guide.md", "# Guide\nStable committed text, edited.\n")
+    result = knowledge.refresh()
+    assert result["status"] == "ready" and result["reused_embedding_count"] == 0
+
+
+def test_a_failed_cache_write_never_fails_the_committed_refresh(knowledge, settings, monkeypatch):
+    def broken(self, vectors):
+        raise OSError("storage unavailable")
+
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    monkeypatch.setattr(type(knowledge), "_write_embedding_cache", broken)
+    assert knowledge.refresh()["status"] == "ready"

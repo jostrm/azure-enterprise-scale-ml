@@ -643,3 +643,62 @@ def test_the_launchers_build_the_real_deployer_access_from_their_session():
         module = util.module_from_spec(spec)
         spec.loader.exec_module(module)
         assert module.run.__kwdefaults__["access_factory"].__func__ is deployer_access.DeployerAccess.for_session.__func__, folder
+
+
+
+def test_skip_knowledge_deploys_only_the_application_against_the_committed_index(tmp_path):
+    engine, runner = integration(tmp_path)
+    report = engine.run(request(), apply=True, skip_knowledge=True)
+    assert runner.names() == ["venv", "pip install", "pip download", "deploy.py"]
+    assert {"resource": "knowledge index", "action": "skipped",
+            "detail": "the application keeps the last committed index; its refresh job updates it"} in report["actions"]
+
+
+def _agent_dir(tmp_path, lock="azure-identity==1.25.1\n"):
+    agent = tmp_path / "agent"
+    agent.mkdir(exist_ok=True)
+    (agent / "requirements.lock.txt").write_text(lock, encoding="utf-8")
+    return agent
+
+
+def test_a_cached_environment_and_wheels_are_reused_until_the_lock_file_changes(tmp_path):
+    cache, agent = tmp_path / "cache", _agent_dir(tmp_path)
+
+    def run():
+        runner = FakeRunner()
+        engine = live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / "work", repository_root=Path("/work/checkout"),
+                                           agent_dir=agent, cache_dir=cache)
+        return engine.run(request(), apply=True), runner
+
+    first, runner = run()
+    assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
+    assert str(cache) in " ".join(map(str, runner.calls[0]["args"])), "the environment lives in the cache, not the run"
+    second, runner = run()
+    assert runner.names() == ["ingest", "deploy.py"]
+    reused = [item["resource"] for item in second["actions"] if item["action"] == "reused"]
+    assert reused == ["isolated python environment", "linux wheels for the bundle"]
+    _agent_dir(tmp_path, lock="azure-identity==1.26.0\n")
+    _, runner = run()
+    assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
+
+
+def test_a_failed_environment_step_is_never_marked_reusable(tmp_path):
+    cache, agent = tmp_path / "cache", _agent_dir(tmp_path)
+    failing = live.LiveVoiceIntegration(FakeArm(), FakeRunner(fail_on="pip install"), work_dir=tmp_path / "work",
+                                        repository_root=Path("/work/checkout"), agent_dir=agent, cache_dir=cache)
+    with pytest.raises(live.CommandError):
+        failing.run(request(), apply=True)
+    runner = FakeRunner()
+    live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / "work", repository_root=Path("/work/checkout"),
+                              agent_dir=agent, cache_dir=cache).run(request(), apply=True)
+    assert runner.names()[:2] == ["venv", "pip install"]
+
+
+def test_the_launcher_passes_skip_knowledge_and_a_persistent_cache_directory(tmp_path):
+    module, arm, runner = launcher(), FakeArm(), FakeRunner()
+    environ = values(RUNNER_TEMP=str(tmp_path / "temp"), AGENT_TOOLSDIRECTORY=str(tmp_path / "tools"))
+    args = type("Args", (), {"command": "apply", "apply": True, "skip_knowledge": True})()
+    module.run(args, environ, lambda subscription, tenant: arm, runner, access_factory=lambda session: None)
+    assert "ingest" not in runner.names()
+    assert module.cache_directory(environ) == tmp_path / "tools" / "aifactory-agent-cache"
+    assert module.cache_directory({}).name == "aifactory-agent-cache"

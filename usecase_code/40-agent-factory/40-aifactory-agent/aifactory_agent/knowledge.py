@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
+import base64
 import json
 import logging
 import math
 import os
 import re
+import struct
 import subprocess
 import threading
 import time
@@ -52,6 +54,9 @@ _SCHEMA = 1
 _MANIFEST = "repository-manifest.json"
 _PENDING = "repository-pending.json"
 _STATUS = "repository-status.json"
+# Vectors of the committed documents, keyed by embedding deployment, dimensions and exact text: a refresh embeds only
+# new or changed text (every repository push changes some document; re-embedding all of them took ~20 minutes).
+_EMBEDDING_CACHE = "repository-embeddings.json"
 _BATCH = 32
 _INDEX_READY_TIMEOUT = 60
 _INDEX_READY_POLL = 1
@@ -784,6 +789,36 @@ class Knowledge:
             self._read_state(_MANIFEST)
         return self.container.get_blob_client(_MANIFEST)
 
+    def _embedding_key(self, text: str) -> str:
+        azure = self.settings.azure
+        return _digest(f"{azure.embedding_deployment}\n{azure.embedding_dimensions}\n{text}")
+
+    def _read_embedding_cache(self) -> dict[str, list[float]]:
+        """Valid cached vectors only; a missing, foreign-schema or malformed cache just means embedding again."""
+        try:
+            payload = self._read_state(_EMBEDDING_CACHE)
+        except (OwnershipError, ValueError, AzureError):
+            return {}
+        dimensions = self.settings.azure.embedding_dimensions
+        vectors = {}
+        for key, encoded in ((payload or {}).get("vectors") or {}).items():
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+                if not _ID.fullmatch(key) or len(raw) != 4 * dimensions:
+                    continue
+                vector = list(struct.unpack(f"<{dimensions}f", raw))
+            except (ValueError, TypeError, struct.error):
+                continue
+            if all(math.isfinite(value) for value in vector):
+                vectors[key] = vector
+        return vectors
+
+    def _write_embedding_cache(self, vectors: dict[str, list[float]]) -> None:
+        dimensions = self.settings.azure.embedding_dimensions
+        self._write_state(_EMBEDDING_CACHE, {"vectors": {
+            key: base64.b64encode(struct.pack(f"<{dimensions}f", *vector)).decode("ascii")
+            for key, vector in sorted(vectors.items())}})
+
     def _embeddings(self, texts: list[str]) -> list[list[float]]:
         if any(not text.strip() or len(text.encode("utf-8")) > _embedding_limit(self.settings) for text in texts):
             raise ValueError("Embedding input exceeds the configured safe token cap or is empty.")
@@ -886,10 +921,20 @@ class Knowledge:
                     "attempted_at": summary["attempted_at"],
                 })
                 staged = [] if unchanged else list(desired.values())
+                cache = self._read_embedding_cache() if staged else {}
+                current, embedded = {}, 0
                 for offset in range(0, len(staged), _BATCH):
                     guard.check()
                     batch = staged[offset:offset + _BATCH]
-                    vectors = self._embeddings([doc["heading"] + "\n\n" + doc["content"] for doc in batch])
+                    texts = [doc["heading"] + "\n\n" + doc["content"] for doc in batch]
+                    keys = [self._embedding_key(text) for text in texts]
+                    missing = [position for position, key in enumerate(keys) if key not in cache]
+                    if missing:
+                        for position, vector in zip(missing, self._embeddings([texts[position] for position in missing])):
+                            cache[keys[position]] = vector
+                        embedded += len(missing)
+                    vectors = [cache[key] for key in keys]
+                    current.update(zip(keys, vectors))
                     guard.check()
                     uploads = [
                         {**doc, "contentVector": vector, "ingested_at": summary["attempted_at"],
@@ -903,6 +948,7 @@ class Knowledge:
                 summary.update({
                     "status": "ready", "refreshed_at": completed,
                     "indexed_document_count": len(desired), "uploaded_count": len(staged),
+                    "embedded_count": embedded, "reused_embedding_count": len(staged) - embedded,
                     "deleted_count": len(set(previous) - set(desired)),
                     "active_index": active_index, "snapshot_id": snapshot_id,
                 })
@@ -926,6 +972,12 @@ class Knowledge:
                 guard.check()
                 self._write_state(_PENDING, {"managed_ids": []})
                 self._write_state(_STATUS, summary)
+                if current:
+                    try:
+                        self._write_embedding_cache(current)
+                    except (AzureError, OSError, ValueError) as error:
+                        # The index is committed; a missing cache only makes the next refresh embed again.
+                        _LOG.warning("knowledge_embedding_cache_not_saved error=%s", type(error).__name__)
                 return summary
             except (AzureError, OpenAIError, OSError, ValueError, RuntimeError) as exc:
                 failed = {

@@ -18,7 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 USAGE = ("Usage: <ADO|GHA>-azurefactory.sh add-aifactory-agent-chat --to-project <NNN> [--environment dev] "
-         "[--consumer-root <repo>] [--config <variables.json>] [--agent-config <agent.json>] [--without-voice] [--apply]")
+         "[--consumer-root <repo>] [--config <variables.json>] [--agent-config <agent.json>] [--without-voice] [--skip-knowledge] [--apply]")
 SUBMODULE = "azure-enterprise-scale-ml"
 AGENT_FACTORY = Path("usecase_code/40-agent-factory")
 PROJECT = re.compile(r"^\d{1,3}$")
@@ -31,7 +31,7 @@ class UsageError(ValueError):
 
 def parse(arguments: list[str]) -> dict:
     options = {"environment": "dev", "consumer_root": os.getcwd(), "config": "", "agent_config": None,
-               "voice": True, "apply": False, "project": ""}
+               "voice": True, "apply": False, "project": "", "skip_knowledge": False}
     # -toProject is the short form that matches the -addAIFactoryAgentChat action alias.
     values = {"--to-project": "project", "-toProject": "project", "--environment": "environment",
               "--consumer-root": "consumer_root", "--config": "config", "--agent-config": "agent_config"}
@@ -49,6 +49,8 @@ def parse(arguments: list[str]) -> dict:
             options["apply"] = True
         elif argument == "--without-voice":
             options["voice"] = False
+        elif argument == "--skip-knowledge":
+            options["skip_knowledge"] = True
         else:
             raise UsageError(f"Unsupported argument: {argument}. {USAGE}")
         index += 1
@@ -147,7 +149,8 @@ def main(argv=None, chat_runner=None, voice_runner=None) -> int:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
     environ = {**os.environ, **values}
-    command = SimpleNamespace(command="apply" if options["apply"] else "plan", apply=options["apply"])
+    command = SimpleNamespace(command="apply" if options["apply"] else "plan", apply=options["apply"],
+                              skip_knowledge=options["skip_knowledge"])
     steps = {}
     try:
         steps["factory_chat_agent"] = chat_runner(command, environ)

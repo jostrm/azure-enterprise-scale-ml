@@ -244,3 +244,22 @@ def test_the_report_never_echoes_identifiers_or_configuration_values(tmp_path, c
     run(entry(), ["--to-project", "012", "--consumer-root", str(root)])
     out = capsys.readouterr().out
     assert SUB not in out and TENANT not in out and READER not in out
+
+
+
+def test_skip_knowledge_is_passed_to_the_voice_step_only(tmp_path):
+    root = registered(tmp_path)
+    module = entry()
+    seen = []
+
+    def voice(args, environ):
+        seen.append(getattr(args, "skip_knowledge", None))
+        return {"mode": "plan"}
+
+    assert module.main(["ado", "--to-project", "012", "--consumer-root", str(root), "--skip-knowledge"],
+                       chat_runner=Recorder("chat"), voice_runner=voice) == 0
+    assert seen == [True]
+    seen.clear()
+    assert module.main(["ado", "--to-project", "012", "--consumer-root", str(root)],
+                       chat_runner=Recorder("chat"), voice_runner=voice) == 0
+    assert seen == [False]

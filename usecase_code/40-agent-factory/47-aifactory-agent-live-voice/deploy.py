@@ -43,6 +43,12 @@ def work_directory(environ) -> Path:
     return Path(base) / "aifactory-agent-live-voice"
 
 
+def cache_directory(environ) -> Path:
+    """Persistent per-runner cache (self-hosted tool directory, laptop temp) for the operator environment."""
+    base = environ.get("AGENT_TOOLSDIRECTORY") or environ.get("RUNNER_TOOL_CACHE") or tempfile.gettempdir()
+    return Path(base) / "aifactory-agent-cache"
+
+
 def consumer_root(environ) -> Path:
     """The consumer checkout that contains this accelerator as its azure-enterprise-scale-ml submodule."""
     for name in ("BUILD_SOURCESDIRECTORY", "GITHUB_WORKSPACE"):
@@ -81,14 +87,16 @@ def run(args, environ=os.environ, session_factory=AzureSession, runner=subproces
         return {"mode": "validated", "reason": decision.reason, "voice": decision.voice, "mutations": False}
     session = session_factory(request.subscription_id, request.tenant_id)
     engine = LiveVoiceIntegration(session, runner, work_dir=work_directory(environ), repository_root=REPOSITORY_ROOT,
-                                  access=access_factory(session))
-    return engine.run(request, apply=args.command == "apply")
+                                  access=access_factory(session), cache_dir=cache_directory(environ))
+    return engine.run(request, apply=args.command == "apply", skip_knowledge=getattr(args, "skip_knowledge", False))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["validate", "plan", "apply"])
     parser.add_argument("--apply", action="store_true", help="Required with apply; plan and validate never write.")
+    parser.add_argument("--skip-knowledge", action="store_true",
+                        help="Deploy only the application (code changes); the committed knowledge index stays.")
     try:
         result = run(parser.parse_args())
     except (ValueError, RuntimeError) as error:
