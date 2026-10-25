@@ -1802,7 +1802,16 @@ coordination and runner/private-network setup.</p>
 <p>GitHub full-bootstrap paths can create environment names <code>Dev</code>, <code>Stage</code>, <code>Prod</code>
 and store the logical-to-actual mapping in <code>AIFACTORY_GITHUB_ENVIRONMENTS</code>.
 That does not mean Stage/Prod Azure infrastructure has been deployed.
-Existing environments and OIDC subjects must not be silently renamed.</p>
+Existing environments and OIDC subjects must not be silently renamed.
+Factory enrollment of a registered repository federates <code>environment:&lt;auth_namespace&gt;</code>;
+when that name is not the classic workflows' lowercase fallback (<code>dev</code>, <code>stage</code>, <code>prod</code>)
+and the variable is absent, enrollment creates <code>AIFACTORY_GITHUB_ENVIRONMENTS</code> with that
+name (other entries <code>Dev</code>/<code>Stage</code>/<code>Prod</code>). An existing variable is never overwritten; the
+plan warns when it names a different environment.</p>
+<p>Classic workflows that route their runner through <code>deploy-dashboards-only.py</code>
+(Add-Factory-Agent, project dashboards) take the self-hosted runner OS from
+<code>selfHostedRunnerOS</code> in <code>variables.json</code>, else from the registered binding's
+runner in <code>azurefactory/register.json</code> (Linux), else Windows.</p>
 <h2 id="configuration-and-private-access">Configuration and private access<a class="headerlink" href="#configuration-and-private-access" title="Permanent link">&para;</a></h2>
 <p>GitHub <code>.env</code> template names are often uppercase; JSON/YAML names can differ.
 Use <a href="../../parameters/advanced/">Parameters</a> instead of mechanical case conversion.
