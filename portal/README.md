@@ -65,6 +65,13 @@ az deployment sub create --name aif-portal-001 --location swedencentral --templa
 
 `--template-uri` is required: the stages are linked with `templateLink.relativePath`, which ARM resolves only relative to a template URI.
 
+## Redeploy after a failure
+
+Press the button again with the same prefix, scale set number and region. Deployments are incremental: finished stages pass quickly and the chain continues where it stopped.
+
+- If the first run created the common VNet (`vnt-esmlcmn-<loc>-dev-<nnn>`), set **Common VNet already exists (redeploy)** to **Yes** (CLI: `commonVnetExists=true`). Stage `12-networkCommon` writes the whole VNet with only its own four subnets, and Azure refuses to delete the resolver, gateway and project subnets added later (`InUseSubnetCannotBeDeleted`). The switch mirrors the CLI's `RUN_JOB1_NETWORKING=false`.
+- Don't use **Redeploy** on a failed deployment's page. It reuses the stored template, which can't resolve the linked `stages/` files without the template URI.
+
 ## After deployment: verification checklist
 
 - [ ] The three resource groups above exist.

@@ -94,6 +94,9 @@ param aiSearchSku string = 'basic'
 ])
 param storageSku string = 'Standard_LRS'
 
+@description('Redeploy only: the common VNet exists, so skip 12-networkCommon. Its VNet PUT would delete the subnets added later.')
+param commonVnetExists bool = false
+
 @description('Bastion Developer on the common VNet (free, no admin VM).')
 param enableBastion bool = true
 
@@ -233,7 +236,7 @@ resource commonGroup 'Microsoft.Resources/deployments@2022-09-01' = {
   }
 }
 
-resource commonNetwork 'Microsoft.Resources/deployments@2022-09-01' = {
+resource commonNetwork 'Microsoft.Resources/deployments@2022-09-01' = if (!commonVnetExists) {
   name: take('${stageName}-common-12-networkCommon', 64)
   location: location
   dependsOn: [commonGroup]

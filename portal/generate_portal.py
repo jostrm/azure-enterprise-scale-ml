@@ -1053,6 +1053,11 @@ def build_form(plan: dict) -> dict:
         {"name": "costCenter", "type": "Microsoft.Common.TextBox", "label": "Cost center tag", "defaultValue": "123456",
          "constraints": {"required": True, "regex": "^[A-Za-z0-9_-]{1,64}$",
                          "validationMessage": "1-64 letters, digits, underscores or hyphens."}},
+        # 12-networkCommon PUTs the whole VNet; on a redeploy that PUT would delete the subnets added later.
+        # ARM cannot test existence, so this mirrors the CLI's RUN_JOB1_NETWORKING=false.
+        toggle("commonVnetExists", "Common VNet already exists (redeploy)", False,
+               "Choose Yes only when you redeploy the same prefix, region and scale set after an earlier run created "
+               "the common VNet. Yes skips the 12-networkCommon stage; every other stage runs again."),
     ]
     team = [
         {"name": "teamInfo", "type": "Microsoft.Common.InfoBox",
@@ -1123,6 +1128,7 @@ def build_form(plan: dict) -> dict:
         "scalesetNumber": "[steps('basics').scalesetNumber]", "costCenter": "[steps('basics').costCenter]",
         "teamGroupObjectId": "[steps('team').teamGroupObjectId]", "teamGroupName": "[steps('team').teamGroupName]",
         "teamMemberEmail": "[steps('team').teamMemberEmail]",
+        "commonVnetExists": is_on("basics", "commonVnetExists"),
         "aiSearchLocation": "[steps('services').aiSearchLocation]",
         **{choice["parameter"]: is_on("services", choice["parameter"]) for choice in plan["choices"]["resources"]},
         **{name: f"[steps('services').{name}]" for name in plan["choices"]["skus"]},
