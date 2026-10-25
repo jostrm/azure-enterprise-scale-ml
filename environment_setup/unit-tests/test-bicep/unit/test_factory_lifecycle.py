@@ -2375,6 +2375,16 @@ def test_throttled_arm_reads_wait_for_retry_after_and_retry(throttled_reads, cap
     assert "synthetic-private-token" not in json.dumps(events)
 
 
+def test_throttled_read_event_names_the_azure_host_behind_a_proxy(throttled_reads, capsys, monkeypatch):
+    # Behind an HTTPS proxy urllib points request.host at the proxy; the event still names the Azure host.
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:9")
+    cloud, _ = throttled_reads.cloud((429, "1"), (200, None))
+    assert cloud.request("GET", THROTTLED_URL, fl.ARM)[0] == 200
+    [event] = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
+    assert event["host"] == "management.azure.com" and event["path"] == GROUP
+
+
 def test_a_throttled_head_is_repeated_too(throttled_reads):
     cloud, server = throttled_reads.cloud((429, "3"), (200, None))
     assert cloud.request("HEAD", THROTTLED_URL, fl.ARM)[0] == 200
