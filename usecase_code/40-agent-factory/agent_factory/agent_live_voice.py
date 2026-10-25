@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -459,8 +460,9 @@ class LiveVoiceIntegration:
         # access (deployer_access.DeployerAccess) grants the deploying principal its Foundry, blob and Search data
         # roles before the first data-plane call; None skips it (the caller already holds them).
         self.session, self.runner, self.access = session, runner, access
-        # cache_dir keeps the operator virtual environment and marks the Linux wheels as current per lock file, so
-        # repeated deployments skip both pip steps; None keeps everything in the run's own work directory.
+        # cache_dir keeps the operator virtual environment and the Linux wheels per lock file outside the checkout (a
+        # pipeline checkout is fresh each run), so repeated deployments skip both pip steps; None keeps everything in
+        # the run's own work directory and the checkout's .build/wheels.
         self.cache_dir = Path(cache_dir) if cache_dir is not None else None
         self.work_dir, self.repository_root = Path(work_dir), Path(repository_root)
         self.agent_dir = agent_dir or Path(__file__).resolve().parents[1] / "40-aifactory-agent"
@@ -478,16 +480,17 @@ class LiveVoiceIntegration:
                 if self.cache_dir is not None else "")
         env_dir = self.cache_dir / f"agent-env-{lock}" if self.cache_dir is not None else self.work_dir / "agent-env"
         python = str(env_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+        wheels = str(self.cache_dir / f"wheels-{lock}") if self.cache_dir is not None else ".build/wheels"
         ready = {} if self.cache_dir is None else {
             "python environment": env_dir / ".aifactory-ready",
-            "wheel download": self.agent_dir / ".build" / "wheels" / f".aifactory-lock-{lock}",
+            "wheel download": Path(wheels) / ".aifactory-ready",
         }
         steps = [
             ("isolated python environment", "python environment", [
                 [sys.executable, "-m", "venv", str(env_dir)],
                 [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "-r", "requirements.lock.txt"]]),
             ("linux wheels for the bundle", "wheel download", [
-                [python, "-m", "pip", "download", "--quiet", "--disable-pip-version-check", "--dest", ".build/wheels",
+                [python, "-m", "pip", "download", "--quiet", "--disable-pip-version-check", "--dest", wheels,
                  "--platform", "manylinux2014_x86_64", "--platform", "manylinux_2_28_x86_64", "--python-version", "312",
                  "--implementation", "cp", "--abi", "cp312", "--only-binary", ":all:", "-r", "requirements.lock.txt",
                  "pip==25.3"]]),
@@ -506,6 +509,14 @@ class LiveVoiceIntegration:
                 continue
             steps = [step for step in steps if step[1] != marker]
         return steps, skipped, {marker: (path, lock) for marker, path in ready.items()}
+
+    def _stage_wheels(self, source: Path) -> None:
+        """deploy.py bundles the checkout's .build/wheels: refill it with exactly this lock file's cached wheels."""
+        target = self.agent_dir / ".build" / "wheels"
+        shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True)
+        for wheel in source.glob("*.whl"):
+            shutil.copy2(wheel, target / wheel.name)
 
     def run(self, request: LiveVoiceRequest, *, apply: bool, skip_knowledge: bool = False) -> dict:
         decision = decide(request)
@@ -551,6 +562,8 @@ class LiveVoiceIntegration:
                 report.add(resource, "would run", details.get(marker, ""))
                 continue
             result = ""
+            if marker == "deploy.py" and "wheel download" in ready:
+                self._stage_wheels(ready["wheel download"][0].parent)
             for command in commands:
                 try:
                     result = self.runner(command, cwd=self.agent_dir, env=self._command_env())

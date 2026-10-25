@@ -682,6 +682,48 @@ def test_a_cached_environment_and_wheels_are_reused_until_the_lock_file_changes(
     assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
 
 
+class WheelRunner(FakeRunner):
+    """pip download writes a wheel to --dest; deploy.py records what it would bundle from .build/wheels."""
+
+    def __init__(self):
+        super().__init__()
+        self.bundled = None
+
+    def __call__(self, args, *, cwd, env=None):
+        if "download" in args:
+            dest = Path(cwd) / args[args.index("--dest") + 1]
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "azure_identity-1.25.1-py3-none-any.whl").write_bytes(b"wheel")
+        if "deploy.py" in args:
+            wheels = Path(cwd) / ".build" / "wheels"
+            self.bundled = sorted(path.name for path in wheels.iterdir()) if wheels.is_dir() else []
+        return super().__call__(args, cwd=cwd, env=env)
+
+
+def test_cached_wheels_survive_a_fresh_checkout_and_are_staged_for_the_bundle(tmp_path):
+    cache = tmp_path / "cache"
+
+    def run(checkout, stale=False):
+        (tmp_path / checkout).mkdir()
+        agent = _agent_dir(tmp_path / checkout)
+        if stale:
+            (agent / ".build" / "wheels").mkdir(parents=True)
+            (agent / ".build" / "wheels" / "azure_identity-1.0.0-py3-none-any.whl").write_bytes(b"old")
+        runner = WheelRunner()
+        live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / checkout / "work",
+                                  repository_root=Path("/work/checkout"), agent_dir=agent,
+                                  cache_dir=cache).run(request(), apply=True)
+        return runner
+
+    first = run("checkout-1")
+    download = next(call["args"] for call in first.calls if "download" in call["args"])
+    assert str(cache) in download[download.index("--dest") + 1], "wheels are kept in the cache, not the checkout"
+    assert first.bundled == ["azure_identity-1.25.1-py3-none-any.whl"]
+    second = run("checkout-2", stale=True)
+    assert second.names() == ["ingest", "deploy.py"], "a fresh pipeline checkout reuses the cached wheels"
+    assert second.bundled == ["azure_identity-1.25.1-py3-none-any.whl"], "only this lock file's wheels are bundled"
+
+
 def test_a_failed_environment_step_is_never_marked_reusable(tmp_path):
     cache, agent = tmp_path / "cache", _agent_dir(tmp_path)
     failing = live.LiveVoiceIntegration(FakeArm(), FakeRunner(fail_on="pip install"), work_dir=tmp_path / "work",
