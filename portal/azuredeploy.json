@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "1225914422441165485"
+      "templateHash": "4077669162599265503"
     }
   },
   "functions": [
@@ -133,6 +133,13 @@
       "defaultValue": true,
       "metadata": {
         "description": "Optional workspace-based project Application Insights."
+      }
+    },
+    "commonVnetExists": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Redeploy only: the common VNet exists, so skip 12-networkCommon. Its VNet PUT would delete the subnets added later."
       }
     },
     "enableBastion": {
@@ -4463,6 +4470,7 @@
       ]
     },
     "commonNetwork": {
+      "condition": "[not(parameters('commonVnetExists'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-common-12-networkCommon', variables('stageName')), 64)]",

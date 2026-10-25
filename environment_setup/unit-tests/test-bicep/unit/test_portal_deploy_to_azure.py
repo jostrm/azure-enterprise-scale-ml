@@ -200,6 +200,18 @@ def test_vnet_writes_in_the_hub_are_serialized(main_template):
     assert "hubAccess" in resources["seedingEndpoint"]["dependsOn"]
 
 
+def test_redeploy_can_skip_the_common_vnet_put(form, main_template):
+    # 12-networkCommon PUTs the whole common VNet with its four subnets. On a redeploy that PUT tries to delete the
+    # resolver, gateway and project subnets added later (observed: InUseSubnetCannotBeDeleted on
+    # snet-dns-private-resolver). ARM cannot test existence, so the form mirrors the CLI's RUN_JOB1_NETWORKING=false.
+    assert main_template["parameters"]["commonVnetExists"] == {"type": "bool", "defaultValue": False,
+                                                               "metadata": main_template["parameters"]["commonVnetExists"]["metadata"]}
+    assert main_template["resources"]["commonNetwork"]["condition"] == "[not(parameters('commonVnetExists'))]"
+    toggle = next(element for element in form_elements(form) if element["name"] == "commonVnetExists")
+    assert toggle["defaultValue"] == "No"
+    assert form_outputs(form)["commonVnetExists"] == "[equals(steps('basics').commonVnetExists, 'true')]"
+
+
 def test_main_does_not_inline_stage_templates(main_template):
     for resource in linked_deployments(main_template):
         assert "template" not in resource["properties"]

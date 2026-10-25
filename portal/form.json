@@ -66,6 +66,26 @@
                 "regex": "^[A-Za-z0-9_-]{1,64}$",
                 "validationMessage": "1-64 letters, digits, underscores or hyphens."
               }
+            },
+            {
+              "name": "commonVnetExists",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Common VNet already exists (redeploy)",
+              "defaultValue": "No",
+              "constraints": {
+                "allowedValues": [
+                  {
+                    "label": "Yes",
+                    "value": "true"
+                  },
+                  {
+                    "label": "No",
+                    "value": "false"
+                  }
+                ],
+                "required": true
+              },
+              "toolTip": "Choose Yes only when you redeploy the same prefix, region and scale set after an earlier run created the common VNet. Yes skips the 12-networkCommon stage; every other stage runs again."
             }
           ]
         },
@@ -344,6 +364,7 @@
         "teamGroupObjectId": "[steps('team').teamGroupObjectId]",
         "teamGroupName": "[steps('team').teamGroupName]",
         "teamMemberEmail": "[steps('team').teamMemberEmail]",
+        "commonVnetExists": "[equals(steps('basics').commonVnetExists, 'true')]",
         "aiSearchLocation": "[steps('services').aiSearchLocation]",
         "enableApplicationInsights": "[equals(steps('services').enableApplicationInsights, 'true')]",
         "enableBastion": "[equals(steps('hub').enableBastion, 'true')]",
