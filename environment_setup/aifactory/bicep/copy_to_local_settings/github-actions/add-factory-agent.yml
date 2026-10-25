@@ -1,0 +1,99 @@
+# Copy to .github/workflows/add-factory-agent.yml in the consumer.
+# Add-Factory-Agent (Dev): the AI Factory Agent chat only, step 70 (Foundry chat agent) and step 72 (live voice) without the project
+# infrastructure, on the AI gateway workflow's principle. Use it to deploy or test agent changes in minutes.
+# It runs the same entry as the terminal route (GHA-azurefactory.sh -addAIFactoryAgentChat -toProject NNN), signed in
+# with the dev environment's existing OIDC identity (AZURE_CLIENT_ID, TENANT_ID, vars.AZURE_SUBSCRIPTION_ID), which
+# grants itself the agent's data roles (agent_factory/deployer_access.py). The project must already be deployed.
+name: Add-Factory-Agent
+run-name: Add-Factory-Agent project${{ inputs.project_number }} Dev (${{ inputs.mode }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_number:
+        description: Project number as 3 digits, e.g. 001
+        type: string
+        required: true
+        default: '001'
+      config_file:
+        description: The project's variables.json (repository-relative; registered projects use their own file)
+        type: string
+        required: true
+        default: aifactory/variables.json
+      mode:
+        description: plan reads only; apply deploys the agent and the voice application
+        type: choice
+        required: true
+        default: apply
+        options: [plan, apply]
+      refresh_knowledge:
+        description: Refresh the knowledge index (clear for code-only changes; only new or changed documents are embedded)
+        type: boolean
+        required: true
+        default: true
+      runner_selection:
+        description: Runner (the agent's Foundry, Search and storage are private, so from-config uses the self-hosted runner)
+        type: choice
+        required: true
+        default: from-config
+        options: [from-config, github-hosted, self-hosted, self-hosted-windows, self-hosted-linux]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  configure:
+    name: Select runner (offline, no Azure access)
+    runs-on: ubuntu-latest
+    outputs:
+      runs_on: ${{ steps.resolve.outputs.runs_on }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Resolve only allowlisted routing values
+        id: resolve
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
+          RUNNER_SELECTION: ${{ inputs.runner_selection }}
+        run: |
+          set -euo pipefail
+          python3 azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py \
+            --consumer-root "$GITHUB_WORKSPACE" --variables-json "$CONFIG_FILE" --environment dev \
+            --project "$PROJECT_NUMBER" --ci-output github --runner-selection "$RUNNER_SELECTION"
+
+  agent:
+    name: AI Factory Agent chat ${{ inputs.mode }}
+    needs: configure
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')['dev'] }}
+    runs-on: ${{ fromJSON(needs.configure.outputs.runs_on) }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Sign in with the existing dev environment OIDC identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: 70+72 AI Factory Agent chat (Dev)
+        shell: bash
+        env:
+          AGENT_PROJECT: ${{ inputs.project_number }}
+          AGENT_CONFIG_FILE: ${{ inputs.config_file }}
+          AGENT_MODE: ${{ inputs.mode }}
+          AGENT_REFRESH_KNOWLEDGE: ${{ inputs.refresh_knowledge }}
+        run: |
+          set -euo pipefail
+          python="$(command -v python3 || command -v python)"
+          arguments=(--to-project "$AGENT_PROJECT" --consumer-root "$GITHUB_WORKSPACE" --config "$AGENT_CONFIG_FILE")
+          if [ "$AGENT_MODE" = "apply" ]; then arguments+=(--apply); fi
+          if [ "${AGENT_REFRESH_KNOWLEDGE,,}" = "false" ]; then arguments+=(--skip-knowledge); fi
+          "$python" azure-enterprise-scale-ml/bootstrap/lib/agent_chat_entry.py gha "${arguments[@]}"
