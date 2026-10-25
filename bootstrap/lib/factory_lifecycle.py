@@ -43,6 +43,8 @@ from uuid import uuid4
 
 CONTRACT = 1
 SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
+# Reviewed inventories a single-writer repository cohort may delete; never legacy leaf lists.
+SINGLE_WRITER_DELETION_INVENTORIES = ["arm-provider-closure-v1", "ordered-project-pipelines-v1", SELECTIVE_PROJECT_DELETE]
 PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
 # ARM back-references name a dependent (deleted first), never a dependency of this resource.
 REVERSE_LINKS = {
@@ -416,6 +418,15 @@ def coordination(cloud, document):
     return RepositoryCoordination(cloud, document) if single_writer(document) else BlobLocks(cloud, document)
 
 
+def deletion_reader(cloud, document):
+    """Enrollment-verified read-only coordination for a deletion freeze; never a claim."""
+    reader = coordination(cloud, document)
+    reader.verify_enrollment()
+    if single_writer(document):
+        require(reader.state()[1]["active"] is None, "single-writer-repository-active-claim")
+    return reader
+
+
 def validate_manifest(document, now=None):
     _validate_manifest(document)
     now = time.time() if now is None else now
@@ -477,8 +488,10 @@ def _validate_manifest(document):
                 and set(locks) <= {"provider", "coordination_mode", "repository", "state_ref", "coordination_hash",
                                    "revision", "scopes", "common_dependencies"}, "invalid-single-writer-coordinates")
         if document["operation"] == "delete":
-            require("deployment" not in document and "deletion_scope" not in document
-                    and document.get("deletion", {}).get("inventory_mode") == "arm-provider-closure-v1",
+            # Whole owned groups, the ordered factory pipeline or one selected project; never legacy leaves.
+            mode = document.get("deletion", {}).get("inventory_mode")
+            require("deployment" not in document and mode in SINGLE_WRITER_DELETION_INVENTORIES
+                    and ("deletion_scope" in document) == (mode == SELECTIVE_PROJECT_DELETE),
                     "single-writer-whole-owned-groups-required")
         else:
             require("deployment" in document, "single-writer-scoped-deployment-required")
@@ -798,6 +811,7 @@ def capabilities():
         "single_writer": "provider-repository-cas-v1",
         "single_writer_operations": ["create-factory", "create-scaleset", "deploy-project", "delete"],
         "single_writer_deletion": "provider-repository-cas-cohort-v1",
+        "single_writer_deletion_inventories": list(SINGLE_WRITER_DELETION_INVENTORIES),
         "project_routes": ["ado", "gha"],
         "project_environments": ["dev", "stage", "prod"],
         "persona_access": "persona-groups-v1",
@@ -817,7 +831,7 @@ def capabilities():
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_group_protection": "case-insensitive-name-globs-v1",
         "factory_deletion_connectivity_retention": "whole-connectivity-resource-groups-v1",
-        "factory_deletion_pipeline_coordination_modes": ["blob"],
+        "factory_deletion_pipeline_coordination_modes": ["blob", "single-writer"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
         "factory_deletion_shared_hub_links": "shared-hub-spoke-links-v1",
         "bootstrap_operator_teardown": "bootstrap-operator-teardown-v1",
@@ -1812,10 +1826,7 @@ def inherited_new_resource_owner(resource_id, bodies):
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; untaggable owners need real receipts."""
     cloud.verify_identity()
-    reader = coordination(cloud, document)
-    reader.verify_enrollment()
-    if single_writer(document):
-        require(reader.state()[1]["active"] is None, "single-writer-repository-active-claim")
+    deletion_reader(cloud, document)
     scopes = document["locks"]["scopes"]
     closure, bodies = collect_resource_closure(cloud, scopes)
     verify_deletion_identity(document, bodies)
@@ -2016,7 +2027,7 @@ def project_owner(cloud, document, body, records, cache):
     record = records.get(key, {})
     if record.get("ownership_source") == "deployment-receipt":
         evidence = record.get("ownership_evidence")
-        verified = verified_receipt_owner(BlobLocks(cloud, document), evidence, key, resource_digest(body), cache)
+        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache)
         require(verified == record.get("owner"), "project-receipt-owner-mismatch")
         return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
     return {"owner": {}, "ownership_source": "retained-unowned"}
@@ -2044,7 +2055,7 @@ def verify_project_permissions(cloud, data):
 def freeze_project_deletion(cloud, document, ownership_records):
     options = project_deletion_policy(document)
     cloud.verify_identity()
-    BlobLocks(cloud, document).verify_enrollment()
+    deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     closure, bodies = collect_resource_closure(cloud, scopes)
 
@@ -2200,7 +2211,7 @@ def verify_project_inventory(cloud, document, removed=()):
         if item.get("ownership_source") == "tags":
             verify_ownership(bodies[key], item["owner"])
         elif item.get("ownership_source") == "deployment-receipt":
-            require(verified_receipt_owner(BlobLocks(cloud, document), item["ownership_evidence"], key,
+            require(verified_receipt_owner(coordination(cloud, document), item["ownership_evidence"], key,
                     item["body_hash"], cache) == item["owner"], "project-ownership-receipt-changed")
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
@@ -5892,6 +5903,18 @@ class _RepositoryDeletionMember(RepositoryCoordination):
         self.authorize(self.document)
 
 
+class _RepositoryDeletionWorker(RepositoryCoordination):
+    """A scoped deletion worker writes only inside its parent's single-writer deletion cohort."""
+
+    def _active(self, value):
+        active = value["active"]
+        require(self.held and isinstance(active, dict) and active.get("kind") == "deletion-cohort"
+                and self.document["manifest_hash"] in active.get("manifests", [])
+                and active.get("owner_hash") == digest({key: item for key, item in active.items() if key != "owner_hash"})
+                and all(active.get("context", {}).get(scope) == lease for scope, lease in self.held.items()),
+                "single-writer-active-claim-changed")
+
+
 class _RepositoryDeletionCohort:
     """One Git CAS reserves the entire cohort, including its logical identities.
 
@@ -5969,6 +5992,23 @@ class _RepositoryDeletionCohort:
         _, value = self._state()
         self._active(value)
 
+    def resume(self, context):
+        """Re-adopt this cohort's own retained reservation for an interrupted execution."""
+        _, value = self._state()
+        active = value["active"]
+        scopes = {scope.lower() for member in self.members for scope in
+                  member.settings["scopes"] + member.settings["common_dependencies"]}
+        require(isinstance(active, dict) and active.get("kind") == "deletion-cohort"
+                and active.get("cohort_hash") == self.cohort_hash
+                and active.get("owner_hash") == digest({key: item for key, item in active.items() if key != "owner_hash"})
+                and isinstance(context, dict) and set(context) == scopes
+                and all(active["context"].get(scope) == lease for scope, lease in context.items()),
+                "single-writer-active-claim-changed")
+        self.active, self.held, self.claimed = active, dict(context), True
+        for member in self.members:
+            member.held = {scope.lower(): context[scope.lower()] for scope in
+                           member.settings["scopes"] + member.settings["common_dependencies"]}
+
     def claim_runs(self):
         if self.claimed:
             return
@@ -6043,8 +6083,9 @@ class _RepositoryDeletionCohort:
             document = member.document
             name = "runs/" + document["run_id"]
             receipt = value["records"].get(name + ".json", {})
-            expected = {row["id"].lower() for row in document["deletion"]["resource_groups"] +
-                        document["deletion"]["resources"]}
+            rows = [row for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]
+                    if row["delete"]]
+            expected = {row["id"].lower() for row in rows}
             deleted = receipt.get("deleted_resources", [])
             require(receipt.get("status") == "succeeded" and receipt.get("operation") == "delete"
                     and receipt == child and receipt.get("run_id") == document["run_id"]
@@ -6060,7 +6101,7 @@ class _RepositoryDeletionCohort:
                     and len(deleted) == len(expected) and {key.lower() for key in deleted} == expected,
                     "single-writer-deletion-receipt-incomplete")
             member.cloud.verify_identity()
-            for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]:
+            for row in rows:
                 status, _, _ = member.cloud.arm("GET", row["id"], row.get("api_version", RG_API),
                                                allowed=(200, 404))
                 require(status == 404, "single-writer-terminal-deletion-unverified")

@@ -145,6 +145,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_selective_project_deletion.py",
         "unit/test_simple_bootstrap.py",
         "unit/test_single_writer_coordination.py",
+        "unit/test_single_writer_deletion.py",
         "unit/test_single_writer_repository.py",
     )),
     Tier(5, "capacity", "Preflight and capacity: capacity preflight, regional and SKU fallback, "
