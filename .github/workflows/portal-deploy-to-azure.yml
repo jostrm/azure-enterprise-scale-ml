@@ -1,0 +1,68 @@
+name: Portal - Deploy to Azure package
+
+# Builds the "Deploy to Azure" package with Bicep 0.37.4, runs the offline portal tests, validates
+# form.json against the createUiDefinition schema and checks that the files the button serves from this
+# branch (raw.githubusercontent.com/<repo>/portal-124/portal/...) are exactly what the generator produces.
+# No Azure sign-in and no deployment.
+
+on:
+  push:
+    branches:
+      - portal-124
+  pull_request:
+    branches:
+      - portal-124
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BICEP_VERSION: 0.37.4
+  BICEP_SHA256: 7da88bfe816173578b5b03f3293782fbb62d29cf2c60687d5d95be916606f0f9
+
+jobs:
+  portal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install "pytest>=7.4" "pytest-mock>=3.12" "PyYAML>=6.0" "jsonschema>=4.20,<5"
+
+      - name: Install Bicep ${{ env.BICEP_VERSION }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/bicep" "https://github.com/Azure/bicep/releases/download/v${BICEP_VERSION}/bicep-linux-x64"
+          echo "${BICEP_SHA256}  $RUNNER_TEMP/bicep" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/bicep"
+          "$RUNNER_TEMP/bicep" --version
+
+      - name: Generated files have no drift
+        run: python portal/generate_portal.py --check
+
+      - name: Portal tests (strict, compiles every template)
+        working-directory: environment_setup/unit-tests/test-bicep
+        env:
+          PORTAL_STRICT: '1'
+          PORTAL_BICEP: ${{ runner.temp }}/bicep
+        run: python -m pytest unit/test_portal_deploy_to_azure.py -q
+
+      - name: ARM-TTK report (main template and form; informational)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/Azure/arm-ttk.git "$env:RUNNER_TEMP/arm-ttk"
+          Import-Module "$env:RUNNER_TEMP/arm-ttk/arm-ttk/arm-ttk.psd1"
+          $staging = Join-Path $env:RUNNER_TEMP 'ttk'
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item portal/azuredeploy.json (Join-Path $staging 'mainTemplate.json')
+          Copy-Item portal/form.json (Join-Path $staging 'createUiDefinition.json')
+          $results = Test-AzTemplate -TemplatePath $staging
+          $results | Where-Object { -not $_.Passed } | Format-Table Name, File, @{ n = 'Error'; e = { $_.Errors | Select-Object -First 1 } } -AutoSize -Wrap
