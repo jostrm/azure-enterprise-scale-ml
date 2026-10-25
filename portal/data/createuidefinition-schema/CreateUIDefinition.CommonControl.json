@@ -1,0 +1,1085 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "id": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.CommonControl.json#",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/Microsoft.Common.TextBlock"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.InfoBox"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.TextBox"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.PasswordBox"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.DropDown"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.OptionsGroup"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.FileUpload"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.Section-common"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.Selector-common"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.CheckBox"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Compute.UserNameTextBox"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Compute.CredentialsCombo-windows"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Compute.CredentialsCombo-linux"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.EditableGrid"
+    },
+    {
+      "$ref": "#/definitions/Microsoft.Common.ServicePrincipalSelector"
+    }
+  ],
+  "definitions": {
+    "Microsoft.Common.TextBox": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.TextBox"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": [ "boolean", "string" ]
+                },
+                "regex": {
+                  "type": "string"
+                },
+                "validationMessage": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": [ "boolean", "string" ]
+                },
+                "validations": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "isValid": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "message",
+                          "isValid"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "regex": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "message",
+                          "regex"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label"
+      ]
+    },
+    "Microsoft.Common.PasswordBox": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.PasswordBox"
+          ]
+        },
+        "label": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "confirmPassword": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "password",
+            "confirmPassword"
+          ]
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "regex": {
+              "type": "string"
+            },
+            "validationMessage": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "hideConfirmation": {
+              "type": [ "boolean", "string" ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label"
+      ]
+    },
+    "Microsoft.Common.DropDown": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.DropDown"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "allowedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "label",
+                  "value"
+                ]
+              },
+              "minItems": 1
+            },
+            "required": {
+              "type": [ "boolean", "string" ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "allowedValues"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "constraints"
+      ]
+    },
+    "Microsoft.Common.OptionsGroup": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.OptionsGroup"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "allowedValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "label",
+                  "value"
+                ]
+              },
+              "minItems": 1
+            },
+            "required": {
+              "type": [ "boolean", "string" ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "allowedValues"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "constraints"
+      ]
+    },
+    "Microsoft.Common.TextBlock": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.TextBlock"
+          ]
+        },
+        "options": {
+          "type": "object",
+          "oneOf": [
+            {
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ]
+            },
+            {
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "uri": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "uri"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "link"
+              ]
+            }
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "options"
+      ]
+    },
+    "Microsoft.Common.InfoBox": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.InfoBox"
+          ]
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "icon": {
+              "type": "string",
+              "enum": [
+                "None",
+                "Info",
+                "Warning",
+                "Error"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "icon",
+            "text"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "options"
+      ]
+    },
+    "Microsoft.Common.FileUpload": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.FileUpload"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "accept": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "multiple": {
+              "type": [ "boolean", "string" ]
+            },
+            "uploadMode": {
+              "type": "string"
+            },
+            "openMode": {
+              "type": "string"
+            },
+            "encoding": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label"
+      ]
+    },
+    "Microsoft.Common.Section-common": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.Section"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#"
+              },
+              {
+                "not": {
+                  "$ref": "#/definitions/Microsoft.Common.Section-common"
+                }
+              }
+            ]
+          },
+          "minItems": 1
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "elements"
+      ]
+    },
+    "Microsoft.Common.Selector-common": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.Selector"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "sublabel": {
+          "type": "object",
+          "properties": {
+            "prevalidation": {
+              "type": "string"
+            },
+            "postvalidation": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "prevalidation",
+            "postvalidation"
+          ]
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "bladeTitle": {
+          "type": "string"
+        },
+        "bladeSubtitle": {
+          "type": "string"
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "$ref": "#"
+          },
+          "minItems": 1
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "sublabel",
+        "bladeTitle",
+        "bladeSubtitle",
+        "elements"
+      ]
+    },
+    "Microsoft.Common.CheckBox": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.CheckBox"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "validationMessage": {
+              "type": "string"
+            }
+          }
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label"
+      ]
+    },
+    "Microsoft.Compute.UserNameTextBox": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Compute.UserNameTextBox"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "toolTip": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "regex": {
+              "type": "string"
+            },
+            "validationMessage": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "osPlatform": {
+          "type": "string"
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "osPlatform"
+      ]
+    },
+    "Microsoft.Compute.CredentialsCombo-windows": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Compute.CredentialsCombo"
+          ]
+        },
+        "label": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "confirmPassword": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "password",
+            "confirmPassword"
+          ]
+        },
+        "toolTip": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "customPasswordRegex": {
+              "type": "string"
+            },
+            "customValidationMessage": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "hideConfirmation": {
+              "type": [ "boolean", "string" ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "osPlatform": {
+          "type": "string",
+          "enum": [
+            "Windows"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "osPlatform"
+      ]
+    },
+    "Microsoft.Compute.CredentialsCombo-linux": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Compute.CredentialsCombo"
+          ]
+        },
+        "label": {
+          "type": "object",
+          "properties": {
+            "authenticationType": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "confirmPassword": {
+              "type": "string"
+            },
+            "sshPublicKey": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "authenticationType",
+            "password",
+            "confirmPassword",
+            "sshPublicKey"
+          ]
+        },
+        "toolTip": {
+          "type": "object",
+          "properties": {
+            "authenticationType": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "sshPublicKey": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [ "boolean", "string" ]
+            },
+            "customPasswordRegex": {
+              "type": "string"
+            },
+            "customValidationMessage": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "hideConfirmation": {
+              "type": [ "boolean", "string" ]
+            },
+            "hidePassword": {
+              "type": [ "boolean", "string" ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "osPlatform": {
+          "type": "string",
+          "enum": [
+            "Linux"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "osPlatform"
+      ]
+    },
+    "Microsoft.Common.EditableGrid": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.EditableGrid"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "ariaLabel": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "header": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": "string"
+                  },
+                  "element": {
+                    "type": "object"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "header",
+                  "element"
+                ]
+              },
+              "minItems": 1
+            },
+            "rows": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "integer"
+                    },
+                    "max": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            },
+            "width": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "columns"
+          ]
+        },
+        "visible": {
+          "type": [ "boolean", "string" ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label",
+        "ariaLabel",
+        "constraints"
+      ]
+    },
+    "Microsoft.Common.ServicePrincipalSelector": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Microsoft.Common.ServicePrincipalSelector"
+          ]
+        },
+        "label": {
+          "type": "object",
+          "properties": {
+            "principalId": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "certificateThumbprint": {
+              "type": "string"
+            },
+            "authenticationType": {
+              "type": "string"
+            },
+            "sectionHeader": {
+              "type": "string"
+            }
+          }
+        },
+        "toolTip": {
+          "type": "object",
+          "properties": {
+            "principalId": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "certificateThumbprint": {
+              "type": "string"
+            },
+            "authenticationType": {
+              "type": "string"
+            }
+          }
+        },
+        "defaultValue": {
+          "type": "object",
+          "properties": {
+            "principalId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "visible": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "hideCertificate": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "regex": {
+              "type": "string"
+            },
+            "validationMessage": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type"
+      ]
+    }
+  }
+}

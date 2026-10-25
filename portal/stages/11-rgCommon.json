@@ -1,0 +1,933 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "15743078908011229395"
+    }
+  },
+  "parameters": {
+    "aifactorySuffixRG": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "resource suffix, example: \"-002\" if this is a new ESML AI Factory"
+      }
+    },
+    "env": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Specifies the name of the environment. This name is reflected in resource group and sub-resources"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Deployment location, westeurope, swedencentral"
+      }
+    },
+    "locationSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "resource location awareness suffix. Example:\"-weu\""
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "Specifies the tags that should be applied to newly created resources"
+      }
+    },
+    "technicalContactEmail": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Specifies project owner email and will be used for tagging and RBAC"
+      }
+    },
+    "technicalContactId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Specifies project owner objectId and will be used for tagging and RBAC"
+      }
+    },
+    "commonRGNamePrefix": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource group prefix. If \"rg-msft-word\" then \"rg-msft-word-{commonResourceName}-weu-dev-001\""
+      }
+    },
+    "technicalAdminsObjectID": {
+      "type": "string",
+      "defaultValue": "null",
+      "metadata": {
+        "description": "Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup \"adsf,asdf\" "
+      }
+    },
+    "technicalAdminsEmail": {
+      "type": "string",
+      "defaultValue": "null",
+      "metadata": {
+        "description": "Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup \"adsf,asdf\" "
+      }
+    },
+    "commonResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "useAdGroups": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enableAdminVM": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "esmlCommonOverride": {
+      "type": "string",
+      "defaultValue": "esml-common",
+      "metadata": {
+        "description": "Common resource name identifier. Default is \"esml-common\""
+      }
+    },
+    "enableDefenderforAISubLevel": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Opt in to subscription-wide paid Defender plans for AI, Key Vault and Storage, plus Servers P2 when enableAdminVM is true. Review existing plans, extensions and costs before enabling."
+      }
+    },
+    "enableDefenderforAIResourceLevel": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "commonResourceSuffix": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "cmk": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "cmkKeyName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "inputKeyvault": {
+      "type": "string",
+      "metadata": {
+        "description": "Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project"
+      }
+    },
+    "inputKeyvaultSubscription": {
+      "type": "string"
+    },
+    "inputKeyvaultResourcegroup": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+    "personaGroupsEnabled": "[if(contains(parameters('tags'), 'AIF-Persona-Access'), equals(parameters('tags')['AIF-Persona-Access'], 'groups-v1'), false())]",
+    "technicalAdminsObjectID_array_safe": "[if(variables('personaGroupsEnabled'), createArray(), union(filter(map(split(parameters('technicalAdminsObjectID'), ','), lambda('id', toLower(trim(lambdaVariables('id'))))), lambda('id', and(not(empty(lambdaVariables('id'))), not(equals(lambdaVariables('id'), 'null'))))), createArray()))]",
+    "technicalAdminsEmail_array_safe": "[if(or(or(variables('personaGroupsEnabled'), empty(parameters('technicalAdminsEmail'))), equals(parameters('technicalAdminsEmail'), 'null')), createArray(), variables('technicalAdminsEmail_array'))]",
+    "subscriptionIdDevTestProd": "[subscription().subscriptionId]",
+    "commonResourceGroupName": "[if(not(equals(parameters('commonResourceGroup_param'), '')), parameters('commonResourceGroup_param'), format('{0}{1}-{2}-{3}{4}', parameters('commonRGNamePrefix'), parameters('esmlCommonOverride'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG')))]",
+    "commonResourceGroupId": "[resourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroupName'))]",
+    "uniqueInAIFenv": "[substring(uniqueString(variables('commonResourceGroupId')), 0, 5)]",
+    "cmkIdentityName": "[format('id-cmn-cmk-{0}-{1}{2}', parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+    "cmkIdentityIdString": "[resourceId(variables('subscriptionIdDevTestProd'), variables('commonResourceGroupName'), 'Microsoft.ManagedIdentity/userAssignedIdentities', variables('cmkIdentityName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('CommonRG{0}-depl{1}{2}{3}{4}', parameters('env'), parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "rgName": {
+            "value": "[variables('commonResourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "2257646037398526068"
+            }
+          },
+          "parameters": {
+            "rgName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2021-04-01",
+              "name": "[parameters('rgName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "rgId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('rgName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('ContributorPermissionsOnRGCmn-depl{0}{1}{2}{3}', parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('commonResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "userEmail": "[if(variables('personaGroupsEnabled'), createObject('value', ''), createObject('value', parameters('technicalContactEmail')))]",
+          "additionalUserIds": {
+            "value": "[variables('technicalAdminsObjectID_array_safe')]"
+          },
+          "additionalUserEmails": {
+            "value": "[variables('technicalAdminsEmail_array_safe')]"
+          },
+          "useAdGroups": {
+            "value": "[parameters('useAdGroups')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "986165067717466327"
+            }
+          },
+          "parameters": {
+            "userId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Specifies the objectId of the person that ordered the resources"
+              }
+            },
+            "userEmail": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the email address of the person that ordered the resources"
+              }
+            },
+            "useAdGroups": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "contributorRoleId": {
+              "type": "string",
+              "defaultValue": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+              "metadata": {
+                "description": "Contributor role ID for RBAC assignments. Default is the built-in Contributor role."
+              }
+            },
+            "additionalUserIds": {
+              "type": "array",
+              "metadata": {
+                "description": "Additional optional Object ID of more people to access Resource group"
+              }
+            },
+            "additionalUserEmails": {
+              "type": "array",
+              "metadata": {
+                "description": "Additional optional email adress of more people to access the Resource group"
+              }
+            }
+          },
+          "variables": {
+            "main_principal_2_array": "[array(parameters('userId'))]",
+            "main_email_2_array": "[array(parameters('userEmail'))]",
+            "all_emails": "[union(variables('main_email_2_array'), parameters('additionalUserEmails'))]"
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "contributorRole2userOrGroup",
+                "count": "[length(range(0, length(parameters('additionalUserIds'))))]"
+              },
+              "condition": "[not(empty(parameters('additionalUserIds')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-04-01-preview",
+              "name": "[guid(format('{0}-contributor-{1}', parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]], resourceGroup().id))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('contributorRoleId'))]",
+                "principalId": "[parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]]]",
+                "principalType": "[if(parameters('useAdGroups'), 'Group', 'User')]",
+                "description": "[format('Contributor to user {0} to get Contributor on resource group: {1}', if(less(range(0, length(parameters('additionalUserIds')))[copyIndex()], length(parameters('additionalUserEmails'))), parameters('additionalUserEmails')[range(0, length(parameters('additionalUserIds')))[copyIndex()]], parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]]), resourceGroup().name)]"
+              }
+            },
+            {
+              "copy": {
+                "name": "contributorRole2user",
+                "count": "[length(range(0, length(variables('main_principal_2_array'))))]"
+              },
+              "condition": "[and(equals(parameters('useAdGroups'), false()), not(empty(parameters('userId'))))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-04-01-preview",
+              "name": "[guid(format('{0}-contributor-{1}', variables('main_principal_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]], resourceGroup().id))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('contributorRoleId'))]",
+                "principalId": "[variables('main_principal_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]]]",
+                "principalType": "[if(parameters('useAdGroups'), 'Group', 'User')]",
+                "description": "[format('Contributor to user {0} to get Contributor on resource group: {1}', variables('main_email_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]], resourceGroup().name)]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('CommonRG{0}-depl{1}{2}{3}{4}', parameters('env'), parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('enableAdminVM')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('VMAdminLoginPermissions-depl{0}{1}{2}{3}', parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('commonResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "userEmail": "[if(variables('personaGroupsEnabled'), createObject('value', ''), createObject('value', parameters('technicalContactEmail')))]",
+          "additionalUserIds": {
+            "value": "[variables('technicalAdminsObjectID_array_safe')]"
+          },
+          "additionalUserEmails": {
+            "value": "[variables('technicalAdminsEmail_array_safe')]"
+          },
+          "useAdGroups": {
+            "value": "[parameters('useAdGroups')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "10569625387980918735"
+            }
+          },
+          "parameters": {
+            "userId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Specifies the objectId of the person that ordered the resources"
+              }
+            },
+            "userEmail": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the email address of the person that ordered the resources"
+              }
+            },
+            "additionalUserIds": {
+              "type": "array",
+              "metadata": {
+                "description": "Additional optional Object ID of more people to access the Vm vmAdminLoginRole"
+              }
+            },
+            "additionalUserEmails": {
+              "type": "array",
+              "metadata": {
+                "description": "Additional optional email address of more people to access the Vm vmAdminLoginRole"
+              }
+            },
+            "useAdGroups": {
+              "type": "bool",
+              "defaultValue": false
+            }
+          },
+          "variables": {
+            "main_principal_2_array": "[array(parameters('userId'))]",
+            "main_email_2_array": "[array(parameters('userEmail'))]"
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "vmAdminLoginRole",
+                "count": "[length(range(0, length(parameters('additionalUserIds'))))]"
+              },
+              "condition": "[not(empty(parameters('additionalUserIds')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-04-01-preview",
+              "name": "[guid(format('{0}-vmadminlogin-{1}', parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]], resourceGroup().id))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1c0163c0-47e6-4577-8991-ea5c82e286e4')]",
+                "principalId": "[parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]]]",
+                "principalType": "[if(parameters('useAdGroups'), 'Group', 'User')]",
+                "description": "[format('Contributor to user {0} to get VMAdminLogin', parameters('additionalUserIds')[range(0, length(parameters('additionalUserIds')))[copyIndex()]])]"
+              }
+            },
+            {
+              "copy": {
+                "name": "vmAdminLoginRoleUser",
+                "count": "[length(range(0, length(variables('main_principal_2_array'))))]"
+              },
+              "condition": "[and(equals(parameters('useAdGroups'), false()), not(empty(parameters('userId'))))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-04-01-preview",
+              "name": "[guid(format('{0}-vmadminlogin-{1}', variables('main_principal_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]], resourceGroup().id))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1c0163c0-47e6-4577-8991-ea5c82e286e4')]",
+                "principalId": "[variables('main_principal_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]]]",
+                "principalType": "User",
+                "description": "[format('Contributor to user {0} to get VMAdminLogin', variables('main_email_2_array')[range(0, length(variables('main_principal_2_array')))[copyIndex()]])]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('CommonRG{0}-depl{1}{2}{3}{4}', parameters('env'), parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('cmk')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('cmkIdentity-{0}', variables('uniqueInAIFenv'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('commonResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('cmkIdentityName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "2410545921408180306"
+            },
+            "description": "Creates a user assigned MI, needed to be created before ACA, and needs to be assigned ACR Pull permissions to access an Azure Container Registry, before ACA"
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "variables": {
+            "cognitiveServicesUserRoleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2024-11-30",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('azd-service-name', parameters('name')))]"
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), variables('cognitiveServicesUserRoleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[variables('cognitiveServicesUserRoleDefinitionId')]",
+                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "managedIdentityName": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "managedIdentityClientId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').clientId]"
+            },
+            "managedIdentityPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]"
+            },
+            "managedIdentityId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('CommonRG{0}-depl{1}{2}{3}{4}', parameters('env'), parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('enableDefenderforAISubLevel')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('DefenderForCloud-depl{0}{1}{2}{3}', parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "enableAll": {
+            "value": false
+          },
+          "pricingTier": {
+            "value": "Standard"
+          },
+          "advancedPricingTier": {
+            "value": "Standard"
+          },
+          "enableDefenderForAI": {
+            "value": "[parameters('enableDefenderforAISubLevel')]"
+          },
+          "enableDefenderForKeyVault": {
+            "value": true
+          },
+          "enableDefenderForStorage": {
+            "value": true
+          },
+          "enableDefenderForContainers": {
+            "value": false
+          },
+          "enableDefenderForCloudPosture": {
+            "value": false
+          },
+          "enableDefenderForVirtualMachines": {
+            "value": "[parameters('enableAdminVM')]"
+          },
+          "vmSubPlan": {
+            "value": "P2"
+          },
+          "enforce": {
+            "value": "False"
+          },
+          "enableAIPromptEvidence": {
+            "value": false
+          },
+          "enableStorageMalwareScanning": {
+            "value": true
+          },
+          "enableStorageSensitiveDataDiscovery": {
+            "value": true
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "10657077190824422214"
+            }
+          },
+          "parameters": {
+            "enableAll": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Explicitly manage all six plans implemented by this module, overriding individual flags. False respects individual flags; disable every flag to leave every plan unmanaged. This is not a complete subscription compliance baseline."
+              }
+            },
+            "pricingTier": {
+              "type": "string",
+              "defaultValue": "Standard",
+              "allowedValues": [
+                "Standard",
+                "Free"
+              ],
+              "metadata": {
+                "description": "Pricing tier for AI and Key Vault. Free explicitly disables paid protection; Standard can incur subscription-wide charges."
+              }
+            },
+            "advancedPricingTier": {
+              "type": "string",
+              "defaultValue": "Standard",
+              "allowedValues": [
+                "Standard",
+                "Free"
+              ],
+              "metadata": {
+                "description": "Pricing tier for Storage, Containers, Cloud Posture, and Virtual Machines plans."
+              }
+            },
+            "enableDefenderForAI": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Optional. Enable Microsoft Defender for AI."
+              }
+            },
+            "enableDefenderForKeyVault": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Optional. Enable Defender for Key Vault."
+              }
+            },
+            "enableDefenderForStorage": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Optional. Enable Defender for Storage."
+              }
+            },
+            "aiPlanName": {
+              "type": "string",
+              "defaultValue": "AI",
+              "metadata": {
+                "description": "AI plan name."
+              }
+            },
+            "enforce": {
+              "type": "string",
+              "defaultValue": "False",
+              "allowedValues": [
+                "True",
+                "False"
+              ],
+              "metadata": {
+                "description": "If set to True, prevents overrides and forces this pricing configuration on all descendants."
+              }
+            },
+            "aiSubPlan": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional sub-plan for AI pricing (when applicable)."
+              }
+            },
+            "enableAIPromptEvidence": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable AIPromptEvidence extension for AI plan."
+              }
+            },
+            "storageCapGBPerMonthPerStorageAccount": {
+              "type": "string",
+              "defaultValue": "5000",
+              "metadata": {
+                "description": "Storage scanning capacity limit (GB per month per storage account)."
+              }
+            },
+            "enableStorageMalwareScanning": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Enable OnUploadMalwareScanning extension for Storage."
+              }
+            },
+            "enableStorageSensitiveDataDiscovery": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Enable SensitiveDataDiscovery extension for Storage."
+              }
+            },
+            "enableDefenderForContainers": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Optional. Enable Defender for Containers."
+              }
+            },
+            "enableContainerRegistriesVulnerabilityAssessments": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable ContainerRegistriesVulnerabilityAssessments extension for Containers/CloudPosture."
+              }
+            },
+            "enableContainerSensor": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable ContainerSensor extension for Containers plan."
+              }
+            },
+            "enableAgentlessDiscoveryForKubernetes": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable AgentlessDiscoveryForKubernetes extension for Containers/CloudPosture."
+              }
+            },
+            "enableDefenderForCloudPosture": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Optional. Enable Defender for Cloud Posture Management."
+              }
+            },
+            "enableDefenderForVirtualMachines": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Optional. Enable Defender for Virtual Machines."
+              }
+            },
+            "vmSubPlan": {
+              "type": "string",
+              "defaultValue": "P2",
+              "allowedValues": [
+                "P1",
+                "P2",
+                ""
+              ],
+              "metadata": {
+                "description": "Sub-plan for Virtual Machines (P1 or P2)."
+              }
+            },
+            "enableMdeDesignatedSubscription": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable MdeDesignatedSubscription extension for VirtualMachines plan."
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForAI'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "[parameters('aiPlanName')]",
+              "properties": {
+                "pricingTier": "[parameters('pricingTier')]",
+                "enforce": "[parameters('enforce')]",
+                "subPlan": "[if(not(empty(parameters('aiSubPlan'))), parameters('aiSubPlan'), null())]",
+                "extensions": "[if(and(equals(parameters('pricingTier'), 'Standard'), parameters('enableAIPromptEvidence')), createArray(createObject('name', 'AIPromptEvidence', 'isEnabled', 'True')), createArray())]"
+              }
+            },
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForStorage'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "StorageAccounts",
+              "properties": {
+                "pricingTier": "[parameters('advancedPricingTier')]",
+                "enforce": "[parameters('enforce')]",
+                "subPlan": "[if(equals(parameters('advancedPricingTier'), 'Standard'), 'DefenderForStorageV2', null())]",
+                "extensions": "[if(equals(parameters('advancedPricingTier'), 'Standard'), concat(if(parameters('enableStorageMalwareScanning'), createArray(createObject('name', 'OnUploadMalwareScanning', 'isEnabled', 'True', 'additionalExtensionProperties', createObject('CapGBPerMonthPerStorageAccount', parameters('storageCapGBPerMonthPerStorageAccount')))), createArray()), if(parameters('enableStorageSensitiveDataDiscovery'), createArray(createObject('name', 'SensitiveDataDiscovery', 'isEnabled', 'True')), createArray())), createArray())]"
+              }
+            },
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForKeyVault'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "KeyVaults",
+              "properties": {
+                "pricingTier": "[parameters('pricingTier')]",
+                "enforce": "[parameters('enforce')]"
+              }
+            },
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForContainers'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "Containers",
+              "properties": {
+                "pricingTier": "[parameters('advancedPricingTier')]",
+                "enforce": "[parameters('enforce')]",
+                "extensions": "[if(equals(parameters('advancedPricingTier'), 'Standard'), concat(if(parameters('enableContainerRegistriesVulnerabilityAssessments'), createArray(createObject('name', 'ContainerRegistriesVulnerabilityAssessments', 'isEnabled', 'True')), createArray()), if(parameters('enableContainerSensor'), createArray(createObject('name', 'ContainerSensor', 'isEnabled', 'True')), createArray()), if(parameters('enableAgentlessDiscoveryForKubernetes'), createArray(createObject('name', 'AgentlessDiscoveryForKubernetes', 'isEnabled', 'True')), createArray())), createArray())]"
+              }
+            },
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForCloudPosture'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "CloudPosture",
+              "properties": {
+                "pricingTier": "[parameters('advancedPricingTier')]",
+                "enforce": "[parameters('enforce')]",
+                "extensions": "[if(and(equals(parameters('advancedPricingTier'), 'Standard'), parameters('enableAgentlessDiscoveryForKubernetes')), createArray(createObject('name', 'AgentlessDiscoveryForKubernetes', 'isEnabled', 'True')), createArray())]"
+              }
+            },
+            {
+              "condition": "[or(parameters('enableAll'), parameters('enableDefenderForVirtualMachines'))]",
+              "type": "Microsoft.Security/pricings",
+              "apiVersion": "2024-01-01",
+              "name": "VirtualMachines",
+              "properties": {
+                "pricingTier": "[parameters('advancedPricingTier')]",
+                "enforce": "[parameters('enforce')]",
+                "subPlan": "[if(and(equals(parameters('advancedPricingTier'), 'Standard'), not(empty(parameters('vmSubPlan')))), parameters('vmSubPlan'), null())]",
+                "extensions": "[if(and(equals(parameters('advancedPricingTier'), 'Standard'), parameters('enableMdeDesignatedSubscription')), createArray(createObject('name', 'MdeDesignatedSubscription', 'isEnabled', 'True')), createArray())]"
+              }
+            }
+          ],
+          "outputs": {
+            "defenderForAIEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for AI enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForAI'))]"
+            },
+            "defenderForStorageEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for Storage enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForStorage'))]"
+            },
+            "defenderForKeyVaultEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for Key Vault enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForKeyVault'))]"
+            },
+            "aiPromptEvidenceEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "AI Prompt Evidence extension enabled."
+              },
+              "value": "[and(and(or(parameters('enableAll'), parameters('enableDefenderForAI')), equals(parameters('pricingTier'), 'Standard')), parameters('enableAIPromptEvidence'))]"
+            },
+            "storageMalwareScanningEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Storage Malware Scanning extension enabled."
+              },
+              "value": "[parameters('enableStorageMalwareScanning')]"
+            },
+            "storageSensitiveDataDiscoveryEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Storage Sensitive Data Discovery extension enabled."
+              },
+              "value": "[parameters('enableStorageSensitiveDataDiscovery')]"
+            },
+            "defenderForContainersEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for Containers enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForContainers'))]"
+            },
+            "containerRegistriesVulnerabilityAssessmentsEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Container Registries Vulnerability Assessments extension enabled."
+              },
+              "value": "[parameters('enableContainerRegistriesVulnerabilityAssessments')]"
+            },
+            "containerSensorEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Container Sensor extension enabled."
+              },
+              "value": "[parameters('enableContainerSensor')]"
+            },
+            "agentlessDiscoveryForKubernetesEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Agentless Discovery For Kubernetes extension enabled."
+              },
+              "value": "[parameters('enableAgentlessDiscoveryForKubernetes')]"
+            },
+            "defenderForCloudPostureEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for Cloud Posture enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForCloudPosture'))]"
+            },
+            "defenderForVirtualMachinesEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "Defender for Virtual Machines enabled."
+              },
+              "value": "[or(parameters('enableAll'), parameters('enableDefenderForVirtualMachines'))]"
+            },
+            "mdeDesignatedSubscriptionEnabled": {
+              "type": "bool",
+              "metadata": {
+                "description": "MDE Designated Subscription extension enabled."
+              },
+              "value": "[parameters('enableMdeDesignatedSubscription')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('CommonRG{0}-depl{1}{2}{3}{4}', parameters('env'), parameters('commonRGNamePrefix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('locationSuffix')))]"
+      ]
+    }
+  ]
+}

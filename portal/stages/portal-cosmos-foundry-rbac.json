@@ -1,0 +1,919 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "7395467573295345797"
+    }
+  },
+  "parameters": {
+    "env": {
+      "type": "string"
+    },
+    "projectNumber": {
+      "type": "string"
+    },
+    "locationSuffix": {
+      "type": "string"
+    },
+    "commonResourceSuffix": {
+      "type": "string"
+    },
+    "resourceSuffix": {
+      "type": "string"
+    },
+    "aifactorySalt10char": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "randomValue": {
+      "type": "string"
+    },
+    "aifactorySuffixRG": {
+      "type": "string"
+    },
+    "commonRGNamePrefix": {
+      "type": "string"
+    },
+    "projectPrefix": {
+      "type": "string"
+    },
+    "projectSuffix": {
+      "type": "string"
+    },
+    "commonResourceGroup": {
+      "type": "string"
+    },
+    "subscriptionIdDevTestProd": {
+      "type": "string"
+    },
+    "genaiSubnetId": {
+      "type": "string"
+    },
+    "aksSubnetId": {
+      "type": "string"
+    },
+    "acaSubnetId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "aca2SubnetId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "aks2SubnetId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "accountName": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+    "targetResourceGroup": "[format('{0}{1}{2}-{3}-{4}{5}{6}', parameters('commonRGNamePrefix'), parameters('projectPrefix'), replace(variables('projectName'), 'prj', 'project'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('projectSuffix'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('portal-naming-{0}', variables('targetResourceGroup')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "projectNumber": {
+            "value": "[parameters('projectNumber')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "commonResourceSuffix": {
+            "value": "[parameters('commonResourceSuffix')]"
+          },
+          "resourceSuffix": {
+            "value": "[parameters('resourceSuffix')]"
+          },
+          "aifactorySalt10char": {
+            "value": "[parameters('aifactorySalt10char')]"
+          },
+          "randomValue": {
+            "value": "[parameters('randomValue')]"
+          },
+          "aifactorySuffixRG": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "commonRGNamePrefix": {
+            "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "commonResourceGroupName": {
+            "value": "[parameters('commonResourceGroup')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[parameters('subscriptionIdDevTestProd')]"
+          },
+          "genaiSubnetId": {
+            "value": "[parameters('genaiSubnetId')]"
+          },
+          "aksSubnetId": {
+            "value": "[parameters('aksSubnetId')]"
+          },
+          "acaSubnetId": {
+            "value": "[parameters('acaSubnetId')]"
+          },
+          "aca2SubnetId": {
+            "value": "[parameters('aca2SubnetId')]"
+          },
+          "aks2SubnetId": {
+            "value": "[parameters('aks2SubnetId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "13745055328049010968"
+            }
+          },
+          "definitions": {
+            "aifactoryNamingType": {
+              "type": "object",
+              "properties": {
+                "genaiSubnetName": {
+                  "type": "string"
+                },
+                "aksSubnetName": {
+                  "type": "string"
+                },
+                "aks2SubnetName": {
+                  "type": "string"
+                },
+                "acaSubnetName": {
+                  "type": "string"
+                },
+                "aca2SubnetName": {
+                  "type": "string"
+                },
+                "defaultSubnet": {
+                  "type": "string"
+                },
+                "aifV1HubName": {
+                  "type": "string"
+                },
+                "aifV1ProjectName": {
+                  "type": "string"
+                },
+                "aifV2Name": {
+                  "type": "string"
+                },
+                "aifV2PrjName": {
+                  "type": "string"
+                },
+                "aifV2NameAdd": {
+                  "type": "string"
+                },
+                "aifV2PrjNameAdd": {
+                  "type": "string"
+                },
+                "aoaiName": {
+                  "type": "string"
+                },
+                "amlName": {
+                  "type": "string"
+                },
+                "safeNameAISearch": {
+                  "type": "string"
+                },
+                "aiServicesName": {
+                  "type": "string"
+                },
+                "dashboardInsightsName": {
+                  "type": "string"
+                },
+                "applicationInsightName": {
+                  "type": "string"
+                },
+                "applicationInsightName2": {
+                  "type": "string"
+                },
+                "bingName": {
+                  "type": "string"
+                },
+                "containerAppsEnvName": {
+                  "type": "string"
+                },
+                "containerAppAName": {
+                  "type": "string"
+                },
+                "containerAppWName": {
+                  "type": "string"
+                },
+                "cosmosDBName": {
+                  "type": "string"
+                },
+                "redisName": {
+                  "type": "string"
+                },
+                "postgreSQLName": {
+                  "type": "string"
+                },
+                "sqlServerName": {
+                  "type": "string"
+                },
+                "sqlDBName": {
+                  "type": "string"
+                },
+                "functionAppName": {
+                  "type": "string"
+                },
+                "webAppName": {
+                  "type": "string"
+                },
+                "funcAppServicePlanName": {
+                  "type": "string"
+                },
+                "webbAppServicePlanName": {
+                  "type": "string"
+                },
+                "vmName": {
+                  "type": "string"
+                },
+                "keyvaultName": {
+                  "type": "string"
+                },
+                "storageAccount1001Name": {
+                  "type": "string"
+                },
+                "storageAccount2001Name": {
+                  "type": "string"
+                },
+                "acrProjectName": {
+                  "type": "string"
+                },
+                "acrCommonName": {
+                  "type": "string"
+                },
+                "miACAName": {
+                  "type": "string"
+                },
+                "miPrjName": {
+                  "type": "string"
+                },
+                "laWorkspaceName": {
+                  "type": "string"
+                },
+                "projectName": {
+                  "type": "string"
+                },
+                "cmnName": {
+                  "type": "string"
+                },
+                "kvNameCommon": {
+                  "type": "string"
+                },
+                "genaiName": {
+                  "type": "string"
+                },
+                "prjResourceSuffixNoDash": {
+                  "type": "string"
+                },
+                "twoNumbers": {
+                  "type": "string"
+                },
+                "p011_genai_team_lead_array": {
+                  "type": "array"
+                },
+                "p011_genai_team_lead_email_array": {
+                  "type": "array"
+                },
+                "uniqueInAIFenv": {
+                  "type": "string"
+                },
+                "randomSalt": {
+                  "type": "string"
+                },
+                "projectTypeESMLName": {
+                  "type": "string"
+                },
+                "projectTypeGenAIName": {
+                  "type": "string"
+                },
+                "aksClusterName": {
+                  "type": "string"
+                },
+                "dataFactoryName": {
+                  "type": "string"
+                }
+              },
+              "metadata": {
+                "__bicep_imported_from!": {
+                  "sourceTemplate": "../types/aifactoryNaming.bicep"
+                }
+              }
+            }
+          },
+          "functions": [
+            {
+              "namespace": "__bicep",
+              "members": {
+                "normalizedObjectIds": {
+                  "parameters": [
+                    {
+                      "type": "array",
+                      "name": "ids"
+                    }
+                  ],
+                  "output": {
+                    "type": "array",
+                    "value": "[union(filter(map(parameters('ids'), lambda('id', toLower(trim(lambdaVariables('id'))))), lambda('id', and(not(empty(lambdaVariables('id'))), not(equals(lambdaVariables('id'), 'null'))))), createArray())]"
+                  },
+                  "metadata": {
+                    "description": "Trimmed, lower-cased object IDs without duplicates, empty or 'null' entries, in first-seen order.",
+                    "__bicep_imported_from!": {
+                      "sourceTemplate": "objectIds.bicep"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "parameters": {
+            "env": {
+              "type": "string",
+              "allowedValues": [
+                "dev",
+                "test",
+                "prod"
+              ],
+              "metadata": {
+                "description": "Environment: dev, test, prod"
+              }
+            },
+            "keepMIandKVsuffixAs001": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "projectNumber": {
+              "type": "string",
+              "metadata": {
+                "description": "Project number (e.g., \"005\")"
+              }
+            },
+            "locationSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Location suffix (e.g., \"weu\", \"swc\")"
+              }
+            },
+            "commonResourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Common resource suffix (e.g., \"-001\")"
+              }
+            },
+            "resourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Project-specific resource suffix"
+              }
+            },
+            "aifactorySalt10char": {
+              "type": "string",
+              "metadata": {
+                "description": "Random salt for unique naming"
+              }
+            },
+            "randomValue": {
+              "type": "string"
+            },
+            "aifactorySuffixRG": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Factory suffix for resource groups"
+              }
+            },
+            "commonRGNamePrefix": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Common resource group name prefix"
+              }
+            },
+            "technicalAdminsObjectID": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins OID list"
+              }
+            },
+            "technicalAdminsEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins EMAIL list"
+              }
+            },
+            "commonResourceGroupName": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "genaiSubnetId": {
+              "type": "string"
+            },
+            "aksSubnetId": {
+              "type": "string"
+            },
+            "aks2SubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "acaSubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "aca2SubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "webappSubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "postGresAdminEmails": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "addAIFoundryHub": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Add AI Foundry Hub with random naming for debugging/testing"
+              }
+            },
+            "addAzureMachineLearning": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Add Azure Machine Learning with random naming for debugging/testing"
+              }
+            }
+          },
+          "variables": {
+            "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+            "cmnName": "cmn",
+            "genaiName": "genai",
+            "prjResourceSuffixNoDash": "[replace(parameters('resourceSuffix'), '-', '')]",
+            "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
+            "resourceSuffixPlusOne": "[format('-{0}', padLeft(string(add(int(substring(parameters('resourceSuffix'), 1, 3)), 1)), 3, '0'))]",
+            "p011_genai_team_lead_array": "[__bicep.normalizedObjectIds(split(parameters('technicalAdminsObjectID'), ','))]",
+            "postGresAdminEmailsLocal_array": "[array(split(replace(parameters('postGresAdminEmails'), '\\s+', ''), ','))]",
+            "postGresAdminEmailsLocal": "[if(empty(parameters('postGresAdminEmails')), createArray(), union(variables('postGresAdminEmailsLocal_array'), createArray()))]",
+            "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+            "p011_genai_team_lead_email_array": "[if(empty(parameters('technicalAdminsEmail')), createArray(), variables('technicalAdminsEmail_array'))]",
+            "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 0, 10), parameters('aifactorySalt10char'))]",
+            "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', parameters('commonResourceGroupName'))), 0, 5)]",
+            "cleanRandomValue": "[toLower(replace(replace(variables('randomSalt'), '-', ''), '_', ''))]",
+            "aifRandom": "[take(variables('cleanRandomValue'), 2)]",
+            "aifWithRandom": "[take(format('aif-hub-{0}-{1}-{2}-{3}{4}{5}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('aifRandom'), parameters('resourceSuffix')), 64)]",
+            "aifV1HubName": "[if(parameters('addAIFoundryHub'), variables('aifWithRandom'), format('aif-hub-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix')))]",
+            "aifV1ProjectName": "[format('aif-p-{0}-1-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifV2NameBase": "[take(replace(toLower(format('aif2{0}{1}', variables('uniqueInAIFenv'), variables('cleanRandomValue'))), '-', ''), 12)]",
+            "aifV2PrjNameBase": "[take(toLower(format('aif2-p{0}{1}{2}', parameters('projectNumber'), variables('uniqueInAIFenv'), variables('cleanRandomValue'))), 12)]",
+            "aifV2Name": "[take(toLower(format('{0}{1}{2}', variables('aifV2NameBase'), parameters('projectNumber'), parameters('env'))), 20)]",
+            "aifV2PrjName": "[take(toLower(format('{0}{1}', variables('aifV2PrjNameBase'), parameters('env'))), 20)]",
+            "lastSuffixChar": "[if(and(not(empty(parameters('resourceSuffix'))), greater(length(parameters('resourceSuffix')), 0)), substring(parameters('resourceSuffix'), max(0, sub(length(parameters('resourceSuffix')), 1)), 1), '')]",
+            "aif2RandomBase": "[take(format('aif2{0}{1}', variables('lastSuffixChar'), variables('cleanRandomValue')), 12)]",
+            "aifp2RandomBase": "[take(format('aif2-p{0}{1}{2}', parameters('projectNumber'), variables('lastSuffixChar'), variables('cleanRandomValue')), 12)]",
+            "aif2Random": "[take(toLower(format('{0}{1}{2}', variables('aif2RandomBase'), parameters('projectNumber'), parameters('env'))), 20)]",
+            "aifp2Random": "[take(toLower(format('{0}{1}', variables('aifp2RandomBase'), parameters('env'))), 20)]",
+            "aifV2NameAdd": "[variables('aif2Random')]",
+            "aifV2PrjNameAdd": "[variables('aifp2Random')]",
+            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "amlWithRandom": "[take(format('aml-{0}-{1}-{2}-{3}{4}{5}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('aifRandom'), parameters('resourceSuffix')), 64)]",
+            "amlName": "[if(parameters('addAzureMachineLearning'), variables('amlWithRandom'), format('aml-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix')))]",
+            "safeNameAISearch": "[take(replace(toLower(format('aisearch{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', ''), 64)]",
+            "aiServicesName": "[take(replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', ''), 64)]",
+            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName2": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('resourceSuffixPlusOne'))]",
+            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('twoNumbers'))]",
+            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
+            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', variables('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
+            "miSuffix": "[if(parameters('keepMIandKVsuffixAs001'), '-001', parameters('resourceSuffix'))]",
+            "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('miSuffix'))]",
+            "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('miSuffix'))]",
+            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "segments": "[filter(split(parameters('genaiSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "genaiSubnetName": "[if(greater(length(variables('segments')), 0), variables('segments')[sub(length(variables('segments')), 1)], '')]",
+            "defaultSubnet": "[variables('genaiSubnetName')]",
+            "segmentsAKS": "[filter(split(parameters('aksSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "segmentsAKS2": "[filter(split(parameters('aks2SubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "aksSubnetName": "[if(greater(length(variables('segmentsAKS')), 0), variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)], '')]",
+            "aks2SubnetName": "[if(greater(length(variables('segmentsAKS2')), 0), variables('segmentsAKS2')[sub(length(variables('segmentsAKS2')), 1)], '')]",
+            "segmentsACA": "[filter(split(parameters('acaSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "segmentsACA2": "[filter(split(parameters('aca2SubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "acaSubnetName": "[if(greater(length(variables('segmentsACA')), 0), variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)], '')]",
+            "aca2SubnetName": "[if(greater(length(variables('segmentsACA2')), 0), variables('segmentsACA2')[sub(length(variables('segmentsACA2')), 1)], '')]",
+            "segmentsWebapp": "[filter(split(parameters('webappSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "webappSubnetName": "[if(greater(length(variables('segmentsWebapp')), 0), variables('segmentsWebapp')[sub(length(variables('segmentsWebapp')), 1)], '')]",
+            "adfName": "[format('adf-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]"
+          },
+          "resources": {
+            "commonResourceGroupRef": {
+              "existing": true,
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2024-07-01",
+              "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+              "name": "[parameters('commonResourceGroupName')]"
+            }
+          },
+          "outputs": {
+            "genaiSubnetName": {
+              "type": "string",
+              "value": "[variables('genaiSubnetName')]"
+            },
+            "aksSubnetName": {
+              "type": "string",
+              "value": "[variables('aksSubnetName')]"
+            },
+            "aks2SubnetName": {
+              "type": "string",
+              "value": "[variables('aks2SubnetName')]"
+            },
+            "acaSubnetName": {
+              "type": "string",
+              "value": "[variables('acaSubnetName')]"
+            },
+            "aca2SubnetName": {
+              "type": "string",
+              "value": "[variables('aca2SubnetName')]"
+            },
+            "webappSubnetName": {
+              "type": "string",
+              "value": "[variables('webappSubnetName')]"
+            },
+            "defaultSubnet": {
+              "type": "string",
+              "value": "[variables('defaultSubnet')]"
+            },
+            "aoaiName": {
+              "type": "string",
+              "value": "[variables('aoaiName')]"
+            },
+            "amlName": {
+              "type": "string",
+              "value": "[variables('amlName')]"
+            },
+            "safeNameAISearch": {
+              "type": "string",
+              "value": "[variables('safeNameAISearch')]"
+            },
+            "aiServicesName": {
+              "type": "string",
+              "value": "[variables('aiServicesName')]"
+            },
+            "dashboardInsightsName": {
+              "type": "string",
+              "value": "[variables('dashboardInsightsName')]"
+            },
+            "applicationInsightName": {
+              "type": "string",
+              "value": "[variables('applicationInsightName')]"
+            },
+            "applicationInsightName2": {
+              "type": "string",
+              "value": "[variables('applicationInsightName2')]"
+            },
+            "bingName": {
+              "type": "string",
+              "value": "[variables('bingName')]"
+            },
+            "containerAppsEnvName": {
+              "type": "string",
+              "value": "[variables('containerAppsEnvName')]"
+            },
+            "containerAppAName": {
+              "type": "string",
+              "value": "[variables('containerAppAName')]"
+            },
+            "containerAppWName": {
+              "type": "string",
+              "value": "[variables('containerAppWName')]"
+            },
+            "cosmosDBName": {
+              "type": "string",
+              "value": "[variables('cosmosDBName')]"
+            },
+            "redisName": {
+              "type": "string",
+              "value": "[variables('redisName')]"
+            },
+            "postgreSQLName": {
+              "type": "string",
+              "value": "[variables('postgreSQLName')]"
+            },
+            "sqlServerName": {
+              "type": "string",
+              "value": "[variables('sqlServerName')]"
+            },
+            "sqlDBName": {
+              "type": "string",
+              "value": "[variables('sqlDBName')]"
+            },
+            "functionAppName": {
+              "type": "string",
+              "value": "[variables('functionAppName')]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[variables('webAppName')]"
+            },
+            "funcAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('funcAppServicePlanName')]"
+            },
+            "webbAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('webbAppServicePlanName')]"
+            },
+            "vmName": {
+              "type": "string",
+              "value": "[variables('vmName')]"
+            },
+            "aifV1HubName": {
+              "type": "string",
+              "value": "[variables('aifV1HubName')]"
+            },
+            "aifV1ProjectName": {
+              "type": "string",
+              "value": "[variables('aifV1ProjectName')]"
+            },
+            "aifV2Name": {
+              "type": "string",
+              "value": "[variables('aifV2Name')]"
+            },
+            "aifV2PrjName": {
+              "type": "string",
+              "value": "[variables('aifV2PrjName')]"
+            },
+            "aifV2NameAdd": {
+              "type": "string",
+              "value": "[variables('aifV2NameAdd')]"
+            },
+            "aifV2PrjNameAdd": {
+              "type": "string",
+              "value": "[variables('aifV2PrjNameAdd')]"
+            },
+            "keyvaultName": {
+              "type": "string",
+              "value": "[variables('keyvaultName')]"
+            },
+            "storageAccount1001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount1001Name')]"
+            },
+            "storageAccount2001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount2001Name')]"
+            },
+            "acrProjectName": {
+              "type": "string",
+              "value": "[variables('acrProjectName')]"
+            },
+            "acrCommonName": {
+              "type": "string",
+              "value": "[variables('acrCommonName')]"
+            },
+            "miACAName": {
+              "type": "string",
+              "value": "[variables('miACAName')]"
+            },
+            "miPrjName": {
+              "type": "string",
+              "value": "[variables('miPrjName')]"
+            },
+            "laWorkspaceName": {
+              "type": "string",
+              "value": "[variables('laWorkspaceName')]"
+            },
+            "projectName": {
+              "type": "string",
+              "value": "[variables('projectName')]"
+            },
+            "cmnName": {
+              "type": "string",
+              "value": "[variables('cmnName')]"
+            },
+            "kvNameCommon": {
+              "type": "string",
+              "value": "[format('kv-{0}{1}-{2}{3}', variables('cmnName'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]"
+            },
+            "genaiName": {
+              "type": "string",
+              "value": "[variables('genaiName')]"
+            },
+            "prjResourceSuffixNoDash": {
+              "type": "string",
+              "value": "[variables('prjResourceSuffixNoDash')]"
+            },
+            "twoNumbers": {
+              "type": "string",
+              "value": "[variables('twoNumbers')]"
+            },
+            "p011_genai_team_lead_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_array')]"
+            },
+            "postGresAdminEmails": {
+              "type": "array",
+              "value": "[variables('postGresAdminEmailsLocal')]"
+            },
+            "p011_genai_team_lead_email_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_email_array')]"
+            },
+            "uniqueInAIFenv": {
+              "type": "string",
+              "value": "[variables('uniqueInAIFenv')]"
+            },
+            "randomSalt": {
+              "type": "string",
+              "value": "[variables('randomSalt')]"
+            },
+            "projectTypeESMLName": {
+              "type": "string",
+              "value": "esml"
+            },
+            "projectTypeGenAIName": {
+              "type": "string",
+              "value": "genai"
+            },
+            "aksClusterName": {
+              "type": "string",
+              "value": "[format('aks{0}-{1}-{2}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'))]"
+            },
+            "dataFactoryName": {
+              "type": "string",
+              "value": "[variables('adfName')]"
+            },
+            "namingConvention": {
+              "$ref": "#/definitions/aifactoryNamingType",
+              "value": {
+                "genaiSubnetName": "[variables('genaiSubnetName')]",
+                "aksSubnetName": "[variables('aksSubnetName')]",
+                "aks2SubnetName": "[variables('aks2SubnetName')]",
+                "acaSubnetName": "[variables('acaSubnetName')]",
+                "aca2SubnetName": "[variables('aca2SubnetName')]",
+                "defaultSubnet": "[variables('defaultSubnet')]",
+                "aifV1HubName": "[variables('aifV1HubName')]",
+                "aifV1ProjectName": "[variables('aifV1ProjectName')]",
+                "aifV2Name": "[variables('aifV2Name')]",
+                "aifV2PrjName": "[variables('aifV2PrjName')]",
+                "aifV2NameAdd": "[variables('aifV2NameAdd')]",
+                "aifV2PrjNameAdd": "[variables('aifV2PrjNameAdd')]",
+                "aoaiName": "[variables('aoaiName')]",
+                "amlName": "[variables('amlName')]",
+                "safeNameAISearch": "[variables('safeNameAISearch')]",
+                "aiServicesName": "[variables('aiServicesName')]",
+                "dashboardInsightsName": "[variables('dashboardInsightsName')]",
+                "applicationInsightName": "[variables('applicationInsightName')]",
+                "applicationInsightName2": "[variables('applicationInsightName2')]",
+                "bingName": "[variables('bingName')]",
+                "containerAppsEnvName": "[variables('containerAppsEnvName')]",
+                "containerAppAName": "[variables('containerAppAName')]",
+                "containerAppWName": "[variables('containerAppWName')]",
+                "cosmosDBName": "[variables('cosmosDBName')]",
+                "redisName": "[variables('redisName')]",
+                "postgreSQLName": "[variables('postgreSQLName')]",
+                "sqlServerName": "[variables('sqlServerName')]",
+                "sqlDBName": "[variables('sqlDBName')]",
+                "functionAppName": "[variables('functionAppName')]",
+                "webAppName": "[variables('webAppName')]",
+                "funcAppServicePlanName": "[variables('funcAppServicePlanName')]",
+                "webbAppServicePlanName": "[variables('webbAppServicePlanName')]",
+                "vmName": "[variables('vmName')]",
+                "keyvaultName": "[variables('keyvaultName')]",
+                "storageAccount1001Name": "[variables('storageAccount1001Name')]",
+                "storageAccount2001Name": "[variables('storageAccount2001Name')]",
+                "acrProjectName": "[variables('acrProjectName')]",
+                "acrCommonName": "[variables('acrCommonName')]",
+                "miACAName": "[variables('miACAName')]",
+                "miPrjName": "[variables('miPrjName')]",
+                "laWorkspaceName": "[variables('laWorkspaceName')]",
+                "projectName": "[variables('projectName')]",
+                "cmnName": "[variables('cmnName')]",
+                "kvNameCommon": "[format('kv-{0}{1}-{2}{3}', variables('cmnName'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+                "genaiName": "[variables('genaiName')]",
+                "prjResourceSuffixNoDash": "[variables('prjResourceSuffixNoDash')]",
+                "twoNumbers": "[variables('twoNumbers')]",
+                "p011_genai_team_lead_array": "[variables('p011_genai_team_lead_array')]",
+                "p011_genai_team_lead_email_array": "[variables('p011_genai_team_lead_email_array')]",
+                "uniqueInAIFenv": "[variables('uniqueInAIFenv')]",
+                "randomSalt": "[variables('randomSalt')]",
+                "projectTypeESMLName": "esml",
+                "projectTypeGenAIName": "genai",
+                "aksClusterName": "[format('aks{0}-{1}-{2}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'))]",
+                "dataFactoryName": "[variables('adfName')]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('portal-cosmos-rbac-{0}', variables('targetResourceGroup')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "cosmosAccountName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('portal-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.cosmosDBName.value]"
+          },
+          "accountName": {
+            "value": "[parameters('accountName')]"
+          },
+          "projectName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('portal-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aifV2PrjName.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "13474278556778068442"
+            }
+          },
+          "parameters": {
+            "cosmosAccountName": {
+              "type": "string"
+            },
+            "accountName": {
+              "type": "string"
+            },
+            "projectName": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "dataContributor": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+              "apiVersion": "2024-11-15",
+              "name": "[format('{0}/{1}', parameters('cosmosAccountName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')), resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName')), variables('dataContributor')))]",
+              "properties": {
+                "roleDefinitionId": "[variables('dataContributor')]",
+                "principalId": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName')), '2025-06-01', 'full').identity.principalId]",
+                "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName'))]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('portal-naming-{0}', variables('targetResourceGroup')), 64))]"
+      ]
+    }
+  ]
+}

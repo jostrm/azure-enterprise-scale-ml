@@ -1,0 +1,74 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "421293288695048596"
+    }
+  },
+  "parameters": {
+    "privDnsSubscription": {
+      "type": "string"
+    },
+    "privDnsResourceGroup": {
+      "type": "string"
+    },
+    "vNetName": {
+      "type": "string"
+    },
+    "vNetResourceGroup": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "allGlobal": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "privateLinksDnsZones": {
+      "type": "array"
+    }
+  },
+  "variables": {
+    "locationGlobal": "global"
+  },
+  "resources": [
+    {
+      "copy": {
+        "name": "privateDnsZones",
+        "count": "[length(parameters('privateLinksDnsZones'))]"
+      },
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2024-06-01",
+      "name": "[parameters('privateLinksDnsZones')[copyIndex()].name]",
+      "location": "[if(and(equals(parameters('privateLinksDnsZones')[copyIndex()].name, format('{0}.data.privatelink.azurecr.io', parameters('location'))), equals(parameters('allGlobal'), false())), parameters('location'), variables('locationGlobal'))]",
+      "properties": {}
+    },
+    {
+      "copy": {
+        "name": "filePrivateDnsZoneVnetLinkLoop",
+        "count": "[length(range(0, length(parameters('privateLinksDnsZones'))))]"
+      },
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name, uniqueString(resourceId('Microsoft.Network/privateDnsZones', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name)))]",
+      "location": "[if(and(equals(parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name, format('{0}.data.privatelink.azurecr.io', parameters('location'))), equals(parameters('allGlobal'), false())), parameters('location'), variables('locationGlobal'))]",
+      "properties": {
+        "registrationEnabled": false,
+        "resolutionPolicy": "NxDomainRedirect",
+        "virtualNetwork": {
+          "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vNetResourceGroup')), 'Microsoft.Network/virtualNetworks', parameters('vNetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name)]",
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name)]",
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name)]",
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateLinksDnsZones')[range(0, length(parameters('privateLinksDnsZones')))[copyIndex()]].name)]"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,276 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "18421181183548485545"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "gatewayName": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "hostname": {
+      "type": "string"
+    },
+    "backendFqdn": {
+      "type": "string"
+    },
+    "certificateSecretId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Versionless Key Vault secret URI of an existing valid exportable PFX certificate; never a certificate value."
+      }
+    },
+    "costCenter": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "gatewayId": "[resourceId('Microsoft.Network/applicationGateways', parameters('gatewayName'))]",
+    "identityId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('mi-{0}', parameters('gatewayName')))]",
+    "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies",
+      "apiVersion": "2024-05-01",
+      "name": "[format('waf-{0}', parameters('gatewayName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      },
+      "properties": {
+        "policySettings": {
+          "state": "Enabled",
+          "mode": "Prevention",
+          "requestBodyCheck": true
+        },
+        "managedRules": {
+          "managedRuleSets": [
+            {
+              "ruleSetType": "OWASP",
+              "ruleSetVersion": "3.2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/applicationGateways",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('gatewayName')]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      },
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', variables('identityId'))]": {}
+        }
+      },
+      "properties": {
+        "sku": {
+          "name": "WAF_v2",
+          "tier": "WAF_v2"
+        },
+        "autoscaleConfiguration": {
+          "minCapacity": 1,
+          "maxCapacity": 2
+        },
+        "firewallPolicy": {
+          "id": "[resourceId('Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies', format('waf-{0}', parameters('gatewayName')))]"
+        },
+        "forceFirewallPolicyAssociation": true,
+        "enableHttp2": true,
+        "sslPolicy": {
+          "policyType": "Predefined",
+          "policyName": "AppGwSslPolicy20220101S"
+        },
+        "gatewayIPConfigurations": [
+          {
+            "name": "private-gateway",
+            "properties": {
+              "subnet": {
+                "id": "[format('{0}/subnets/snet-application-gateway', variables('vnetId'))]"
+              }
+            }
+          }
+        ],
+        "frontendIPConfigurations": [
+          {
+            "name": "private-frontend",
+            "properties": {
+              "privateIPAddress": "172.16.2.10",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[format('{0}/subnets/snet-application-gateway', variables('vnetId'))]"
+              }
+            }
+          }
+        ],
+        "frontendPorts": [
+          {
+            "name": "https",
+            "properties": {
+              "port": 443
+            }
+          }
+        ],
+        "sslCertificates": [
+          {
+            "name": "frontend-tls",
+            "properties": {
+              "keyVaultSecretId": "[parameters('certificateSecretId')]"
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "private-backend",
+            "properties": {
+              "backendAddresses": [
+                {
+                  "fqdn": "[parameters('backendFqdn')]"
+                }
+              ]
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "https-health",
+            "properties": {
+              "protocol": "Https",
+              "host": "[parameters('backendFqdn')]",
+              "path": "/",
+              "interval": 30,
+              "timeout": 30,
+              "unhealthyThreshold": 3,
+              "match": {
+                "statusCodes": [
+                  "200-399"
+                ]
+              }
+            }
+          }
+        ],
+        "backendHttpSettingsCollection": [
+          {
+            "name": "private-https",
+            "properties": {
+              "port": 443,
+              "protocol": "Https",
+              "cookieBasedAffinity": "Disabled",
+              "requestTimeout": 30,
+              "hostName": "[parameters('backendFqdn')]",
+              "probe": {
+                "id": "[format('{0}/probes/https-health', variables('gatewayId'))]"
+              }
+            }
+          }
+        ],
+        "httpListeners": [
+          {
+            "name": "private-https",
+            "properties": {
+              "protocol": "Https",
+              "hostName": "[parameters('hostname')]",
+              "requireServerNameIndication": true,
+              "frontendIPConfiguration": {
+                "id": "[format('{0}/frontendIPConfigurations/private-frontend', variables('gatewayId'))]"
+              },
+              "frontendPort": {
+                "id": "[format('{0}/frontendPorts/https', variables('gatewayId'))]"
+              },
+              "sslCertificate": {
+                "id": "[format('{0}/sslCertificates/frontend-tls', variables('gatewayId'))]"
+              }
+            }
+          }
+        ],
+        "requestRoutingRules": [
+          {
+            "name": "private-https",
+            "properties": {
+              "priority": 100,
+              "ruleType": "Basic",
+              "httpListener": {
+                "id": "[format('{0}/httpListeners/private-https', variables('gatewayId'))]"
+              },
+              "backendAddressPool": {
+                "id": "[format('{0}/backendAddressPools/private-backend', variables('gatewayId'))]"
+              },
+              "backendHttpSettings": {
+                "id": "[format('{0}/backendHttpSettingsCollection/private-https', variables('gatewayId'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies', format('waf-{0}', parameters('gatewayName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('hostname')]",
+      "location": "global",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', parameters('hostname'), 'application-gateway')]",
+      "location": "global",
+      "properties": {
+        "virtualNetwork": {
+          "id": "[variables('vnetId')]"
+        },
+        "registrationEnabled": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('hostname'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/A",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', parameters('hostname'), '@')]",
+      "properties": {
+        "ttl": 300,
+        "aRecords": [
+          {
+            "ipv4Address": "172.16.2.10"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('hostname'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "gatewayId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/applicationGateways', parameters('gatewayName'))]"
+    },
+    "endpoint": {
+      "type": "string",
+      "value": "[format('https://{0}', parameters('hostname'))]"
+    }
+  }
+}
