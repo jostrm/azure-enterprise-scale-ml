@@ -1,9 +1,9 @@
 ---
-name: progress
-description: Show the session's task status as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /progress or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
+name: task-status
+description: Show the session's task status as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /task-status or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
 ---
 
-# /progress — timed task checklist
+# /task-status — timed task checklist
 
 Report every step of the current work (yours, and those of any subagents you
 started) as a checklist with real clock times, then keep timing every step for
@@ -78,7 +78,7 @@ Invoking this skill turns timing on for the rest of the session:
 - When it completes, run `date` again, replace the suffix with
   `(HH:MM–HH:MM, N min)` and mark it completed, before starting the next step.
 - Whenever you show progress (checkbox a step done and start the next one),
-  show the times, even when the user did not type /progress.
+  show the times, even when the user did not type /task-status.
 - When you start a subagent, ask it to report each of its steps with start and
   end times in this same format, and include its steps in your list.
 
