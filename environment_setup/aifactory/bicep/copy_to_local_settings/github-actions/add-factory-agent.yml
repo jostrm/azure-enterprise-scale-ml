@@ -4,6 +4,8 @@
 # It runs the same entry as the terminal route (GHA-azurefactory.sh -addAIFactoryAgentChat -toProject NNN), signed in
 # with the dev environment's existing OIDC identity (AZURE_CLIENT_ID, TENANT_ID, vars.AZURE_SUBSCRIPTION_ID), which
 # grants itself the agent's data roles (agent_factory/deployer_access.py). The project must already be deployed.
+# Classic consumers keep the identity in secrets; registered repositories (factory-lifecycle) in the variables
+# AZURE_CLIENT_ID and AZURE_TENANT_ID, which are used when the secrets are absent.
 name: Add-Factory-Agent
 run-name: Add-Factory-Agent project${{ inputs.project_number }} Dev (${{ inputs.mode }})
 
@@ -80,8 +82,8 @@ jobs:
       - name: Sign in with the existing dev environment OIDC identity
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.TENANT_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID || vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: 70+72 AI Factory Agent chat (Dev)
         shell: bash

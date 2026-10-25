@@ -67,7 +67,9 @@ def test_github_workflow_routes_offline_then_runs_the_agent_entry_with_oidc():
     assert agent["needs"] == "configure" and agent["runs-on"] == "${{ fromJSON(needs.configure.outputs.runs_on) }}"
     assert "dev" in agent["environment"]
     login = next(step for step in agent["steps"] if step.get("uses") == "azure/login@v2")
-    assert login["with"]["client-id"] == "${{ secrets.AZURE_CLIENT_ID }}"
+    # Classic consumers keep the OIDC identity in secrets; registered repositories (factory-lifecycle) in variables.
+    assert login["with"]["client-id"] == "${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}"
+    assert login["with"]["tenant-id"] == "${{ secrets.TENANT_ID || vars.AZURE_TENANT_ID }}"
     run = next(step for step in agent["steps"] if "agent_chat_entry.py" in step.get("run", ""))
     assert "agent_chat_entry.py" in run["run"] and " gha " in run["run"] and "--to-project" in run["run"]
     assert run["env"]["AGENT_MODE"] == "${{ inputs.mode }}" and '"$AGENT_MODE" = "apply"' in run["run"]
