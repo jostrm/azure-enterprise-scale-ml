@@ -349,3 +349,105 @@ def test_operator_teardown_cloud_reaches_arm_without_locks():
         cloud.request("GET", "https://management.azure.com" + COMMON + "?api-version=2022-09-01",
                       "https://management.azure.com/")
     assert calls and calls[0].startswith("https://management.azure.com/")
+
+
+class AbsentGroupsCloud(TeardownCloud):
+    """aif-130 (2026-10-25): the operator removed the factory's groups with `az group delete` before teardown.
+
+    Like ARM, a deleted group answers 404 ResourceGroupNotFound on its exact id, and anything listed
+    or read beneath it fails with remote-request-failed-404 unless the caller allows a 404.
+    """
+
+    def __init__(self, gone, status=404, error_code="ResourceGroupNotFound"):
+        super().__init__()
+        self.gone = {value.lower() for value in gone}
+        self.status, self.error_code = status, error_code
+        self.bodies = {key: body for key, body in self.bodies.items()
+                       if not any(key == group or key.startswith(group + "/") for group in self.gone)}
+
+    def _missing(self, resource_id):
+        key = resource_id.lower()
+        return next((group for group in self.gone if key == group or key.startswith(group + "/")), None)
+
+    def assert_no_active_deployments(self, scope):
+        fl.require(not self._missing(scope), "remote-request-failed-404")
+        super().assert_no_active_deployments(scope)
+
+    def list_resources(self, scope):
+        fl.require(not self._missing(scope), "remote-request-failed-404")
+        return super().list_resources(scope)
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "GET" and self._missing(resource_id):
+            fl.require(self.status in allowed, "remote-request-failed-" + str(self.status))
+            error = {"code": self.error_code, "message": "Resource group could not be found."}
+            return self.status, {}, ({"error": error} if self.error_code else None)
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+def test_groups_already_deleted_outside_the_teardown_leave_nothing_to_delete(workspace):
+    cloud = AbsentGroupsCloud([GROUP, COMMON])
+    document, cloud = frozen(cloud)
+    fl.validate_bootstrap_teardown(document)
+    data = document["deletion"]
+    assert data["resource_groups"] == [] and data["resources"] == []
+    assert data["absent_resource_groups"] == sorted([GROUP.lower(), COMMON.lower()])
+    # The factory's own hub DNS link still points at its recorded, now deleted VNet: it is still unlinked.
+    assert data["factory_virtual_networks"] == [VNET.lower()]
+    assert [row["id"] for row in data["hub_links"]] == sorted([OWN_HUB_LINK, OWN_PEERING], key=str.lower)
+    run = workspace / "teardown-absent"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "succeeded", receipt.get("error_code")
+    assert receipt["absent_resource_groups"] == data["absent_resource_groups"]
+    assert receipt["deleted_resources"] == []
+    assert sorted(value.lower() for value in cloud.deleted) == sorted([OWN_HUB_LINK.lower(), OWN_PEERING.lower()])
+    assert {SPIDER_HUB_LINK.lower(), SPIDER_PEERING.lower(), HUB_ZONE.lower(), HUB_VNET.lower()} <= set(cloud.bodies)
+
+
+def test_one_group_already_deleted_still_tears_down_the_other(workspace):
+    cloud = AbsentGroupsCloud([GROUP])
+    document, cloud = frozen(cloud)
+    data = document["deletion"]
+    assert data["absent_resource_groups"] == [GROUP.lower()]
+    assert [row["id"].lower() for row in data["resource_groups"]] == [COMMON.lower()]
+    run = workspace / "teardown-partial"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "succeeded", receipt.get("error_code")
+    assert COMMON.lower() in [value.lower() for value in cloud.deleted]
+    assert not any(key.startswith(COMMON.lower()) for key in cloud.bodies)
+
+
+@pytest.mark.parametrize("status,error_code,code", [
+    (403, "AuthorizationFailed", "remote-request-failed-403"),
+    (404, "SubscriptionNotFound", "bootstrap-teardown-group-absence-unverified"),
+    (404, "ResourceNotFound", "bootstrap-teardown-group-absence-unverified"),
+    (404, None, "bootstrap-teardown-group-absence-unverified"),
+])
+def test_group_absence_must_be_proven_not_inferred_from_an_error(status, error_code, code):
+    cloud = AbsentGroupsCloud([GROUP], status=status, error_code=error_code)
+    with pytest.raises(fl.Blocked, match=code):
+        frozen(cloud)
+    assert not cloud.deleted
+
+
+def test_a_recorded_group_that_reappears_after_review_blocks_before_any_change(workspace):
+    cloud = AbsentGroupsCloud([GROUP, COMMON])
+    document, cloud = frozen(cloud)
+    cloud.gone.discard(GROUP.lower())
+    cloud.bodies[GROUP.lower()] = untagged(GROUP, "Microsoft.Resources/resourceGroups")
+    run = workspace / "teardown-reappeared"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "blocked"
+    assert receipt["error_code"] == "bootstrap-teardown-absent-group-reappeared"
+    assert not cloud.deleted
+
+
+def test_absent_groups_cannot_be_added_to_a_frozen_review():
+    cloud = AbsentGroupsCloud([GROUP])
+    document, _ = frozen(cloud)
+    document["deletion"]["absent_resource_groups"] = sorted([GROUP.lower(), COMMON.lower()])
+    with pytest.raises(fl.Blocked):
+        fl.validate_bootstrap_teardown(document)

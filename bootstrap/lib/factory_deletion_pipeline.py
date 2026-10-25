@@ -1217,10 +1217,33 @@ def teardown_owner(document, closure, bodies, key):
     return teardown_owner(document, closure, bodies, parent)[0], "parent"
 
 
+def absent_groups(cloud, scopes):
+    """Recorded groups already deleted (for example by `az group delete`): ARM answers 404
+    ResourceGroupNotFound on the exact group id. Any other status or 404 body is not proof of absence."""
+    absent = []
+    for scope in scopes:
+        status, _, body = cloud.arm("GET", scope, fl.RG_API, allowed=(200, 404))
+        if status == 404:
+            error = body.get("error") if isinstance(body, dict) else None
+            fl.require(isinstance(error, dict) and error.get("code") == "ResourceGroupNotFound",
+                       "bootstrap-teardown-group-absence-unverified")
+            absent.append(scope)
+    return absent
+
+
+def _recorded_vnets(document, absent):
+    """The bootstrap-recorded VNets of groups proven absent: their hub links are still this factory's own."""
+    return {value for value in document["bootstrap_record"]["resources"]
+            if fl.arm_scope(value) in absent and fl.resource_type_from_id(value) == VNET_TYPE
+            and value.count("/") == 8}
+
+
 def freeze_teardown(cloud, document):
     validate_teardown_request(document)
     cloud.verify_identity()
-    scopes = document["scopes"]
+    # Idempotent: a recorded group that is already gone has nothing left to delete; it is recorded, not read.
+    absent = absent_groups(cloud, document["scopes"])
+    scopes = [scope for scope in document["scopes"] if scope not in absent]
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
     fl.verify_deletion_identity(document, bodies)
     record = document["bootstrap_record"]
@@ -1265,6 +1288,7 @@ def freeze_teardown(cloud, document):
         item["delete_via_parent"] = max(parents, key=len)
     factory_vnets ={key for key in bodies if not fl.RG_ID.fullmatch(key)
                      and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    factory_vnets |= _recorded_vnets(document, absent)
     links, hub_vnets = _hub_links(cloud, document, factory_vnets)
     # This factory's own side of each hub peering goes in the same unlink stage.
     links += [{"id": entries[key]["id"], "type": PEERING_TYPE, "api_version": entries[key]["api_version"],
@@ -1278,7 +1302,7 @@ def freeze_teardown(cloud, document):
             "closure_hash": fl.digest(closure), "bodies": bodies,
             "hub_links": sorted(links, key=lambda row: row["id"].lower()),
             "factory_virtual_networks": sorted(factory_vnets), "hub_virtual_networks": sorted(hub_vnets),
-            "request_hash": fl.digest(_request(document))}
+            "absent_resource_groups": absent, "request_hash": fl.digest(_request(document))}
     validate_teardown({**document, "deletion": data}, check_hash=False)
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
@@ -1301,9 +1325,12 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                "bootstrap-teardown-inventory-unbound")
     validate_flags(data.get("flags"))
     groups, resources = data["resource_groups"], data["resources"]
+    absent = data.get("absent_resource_groups", [])
     entries = {row["id"].lower(): row for row in groups + resources}
-    fl.require({row["id"].lower() for row in groups} == set(document["scopes"])
-               and len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
+    fl.require(_sorted_ids(absent, fl.RG_ID, allow_empty=True) and set(absent) <= set(document["scopes"])
+               and {row["id"].lower() for row in groups} == set(document["scopes"]) - set(absent)
+               and len(entries) == len(groups + resources) and set(entries) == set(data["bodies"])
+               and not any(fl.arm_scope(key) in absent for key in entries),
                "bootstrap-teardown-inventory-unbound")
     record = document["bootstrap_record"]
     proof = {"resource_ids": record["resources"]}
@@ -1329,6 +1356,7 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                            "factory-delete-service-cascade-unreviewed")
     vnets ={key for key in entries if not fl.RG_ID.fullmatch(key)
              and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    vnets |= _recorded_vnets(document, absent)
     links = data.get("hub_links")
     fl.require(data.get("factory_virtual_networks") == sorted(vnets)
                and _sorted_ids(data.get("hub_virtual_networks"), fl.NESTED_ID, allow_empty=True)
@@ -1381,7 +1409,8 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
     receipt = {"schema": 1, "contract": TEARDOWN_CONTRACT, "run_id": document["run_id"],
                "manifest_hash": document["manifest_hash"], "source_commit": document["source"]["commit"],
                "target": document["target"], "status": "running", "mutation_started": False,
-               "deleted_hub_links": [], "deleted_resources": [], "observed_absent": []}
+               "deleted_hub_links": [], "deleted_resources": [], "observed_absent": [],
+               "absent_resource_groups": data.get("absent_resource_groups", [])}
 
     def persist():
         receipt["updated_at"] = fl.utc_now()
@@ -1391,8 +1420,11 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
     try:
         persist()
         cloud.verify_identity()
+        absent = receipt["absent_resource_groups"]
+        fl.require(absent_groups(cloud, absent) == absent, "bootstrap-teardown-absent-group-reappeared")
         for scope in document["scopes"]:
-            cloud.assert_no_active_deployments(scope)
+            if scope not in absent:
+                cloud.assert_no_active_deployments(scope)
         receipt["observed_absent"] = observed_absent(cloud, document)
         fl.verify_project_inventory(cloud, document, receipt["observed_absent"])
         verify_permissions(cloud, data, receipt["observed_absent"])
