@@ -1,7 +1,7 @@
 name: Portal - Deploy to Azure package
 
 # Builds the "Deploy to Azure" package with Bicep 0.37.4, runs the offline portal tests, validates
-# form.json against the createUiDefinition schema and checks that the files the button serves from this
+# form.json against the Form view (uiFormDefinition) schema and checks that the files the button serves from this
 # branch (raw.githubusercontent.com/<repo>/portal-124/portal/...) are exactly what the generator produces.
 # No Azure sign-in and no deployment.
 
@@ -54,7 +54,7 @@ jobs:
           PORTAL_BICEP: ${{ runner.temp }}/bicep
         run: python -m pytest unit/test_portal_deploy_to_azure.py -q
 
-      - name: ARM-TTK report (main template and form; informational)
+      - name: ARM-TTK report (main template; informational)
         continue-on-error: true
         shell: pwsh
         run: |
@@ -63,6 +63,5 @@ jobs:
           $staging = Join-Path $env:RUNNER_TEMP 'ttk'
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item portal/azuredeploy.json (Join-Path $staging 'mainTemplate.json')
-          Copy-Item portal/form.json (Join-Path $staging 'createUiDefinition.json')
           $results = Test-AzTemplate -TemplatePath $staging -ErrorAction Continue 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }
           $results | Where-Object { -not $_.Passed } | Format-Table Name, File, @{ n = 'Error'; e = { $_.Errors | Select-Object -First 1 } } -AutoSize -Wrap

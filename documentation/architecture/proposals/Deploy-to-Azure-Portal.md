@@ -29,7 +29,7 @@ reviewed_source: 'release/v1.25 956a8f6e + portal-125 working tree; observed 202
 
 Status: **proposed**. The package is tested offline and in CI only. It stays a proposal until a user confirms one successful deployment. Live Azure behaviour has not been observed.
 
-The button deploys the default selection of the Simple Mode preset (`private-ai-foundation-v2`) as compiled ARM linked templates, opened through the portal's CustomDeploymentBlade with a createUiDefinition form. The v1.24 package is on branch `portal-124`; the v1.25 package is on `portal-125`. Both have the same layout: `portal/generate_portal.py`, `portal/main.bicep`, `portal/stages/*.json`, `portal/form.json` and the offline tests in `test_portal_deploy_to_azure.py`.
+The button deploys the default selection of the Simple Mode preset (`private-ai-foundation-v2`) as compiled ARM linked templates, opened through the portal's CustomDeploymentBlade with a Form view (uiFormDefinition 2021-09-09). The v1.24 package is on branch `portal-124`; the v1.25 package is on `portal-125`. Both have the same layout: `portal/generate_portal.py`, `portal/main.bicep`, `portal/stages/*.json`, `portal/form.json` and the offline tests in `test_portal_deploy_to_azure.py`.
 
 ## How the parameters are derived
 
