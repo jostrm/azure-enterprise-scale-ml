@@ -1,12 +1,13 @@
 ---
 name: task-status
-description: Show the session's task status as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /task-status or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
+description: Show the chat's goal in one sentence, then its task status as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /task-status or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
 ---
 
 # /task-status — timed task checklist
 
-Report every step of the current work (yours, and those of any subagents you
-started) as a checklist with real clock times, then keep timing every step for
+State the chat's goal in one sentence, then report every step of the current
+work (yours, and those of any subagents you started) as a checklist with real
+clock times, then keep timing every step for
 the rest of the session.
 
 ## 1. Get the current time
@@ -29,7 +30,7 @@ exists, otherwise from the work done so far in this conversation plus the plan
 for what is left. Include steps that subagents ran, labelled with the agent.
 
 For each step, use the start and end times you recorded when the step started
-and ended (see section 4). Format:
+and ended (see section 5). Format:
 
 | State | Format |
 | --- | --- |
@@ -46,7 +47,15 @@ and ended (see section 4). Format:
   or derive it from evidence you have (a timestamp in a log, a job's start time,
   a commit time) and mark it `~` for approximate, e.g. `(~17:40–17:52, ~12 min)`.
 
-## 3. Output it in both places
+## 3. Write the goal
+
+Start the output with the chat's GOAL: one sentence, at most 200 characters,
+saying what the user wants this chat to achieve (the outcome, not the current
+step). Take it from the user's request and any later change of direction they
+gave. Keep it the same between calls unless the user changed the goal. If the
+goal is unclear, write your best reading and end it with `(assumed)`.
+
+## 4. Output it in both places
 
 1. **Task list UI**: update the task subjects (TaskUpdate, or TodoWrite) so each
    one carries its time suffix, completed steps marked completed, the current
@@ -55,6 +64,8 @@ and ended (see section 4). Format:
    clients (e.g. mobile) do not show the task list panel:
 
 ```markdown
+**Goal:** Deploy project005 on the spider factory and verify Scenario 3 live before any deletion.
+
 **Status at 18:00 CEST** — 2 of 6 done, 15 min elapsed, ~40 min left
 
 - [x] Find spider's layout and deploy path (17:45–17:59, 14 min)
@@ -65,11 +76,11 @@ and ended (see section 4). Format:
 - [ ] Report and ask before deleting, Scenario 4 (est. ~5 min)
 ```
 
-The header line gives the current time, done/total, time elapsed since the first
+The goal line comes first. The status line gives the current time, done/total, time elapsed since the first
 step started, and the sum of the remaining estimates. Add one line under the
 list only for a blocker or a decision the user must make; nothing else.
 
-## 4. Keep timing from now on
+## 5. Keep timing from now on
 
 Invoking this skill turns timing on for the rest of the session:
 
@@ -85,5 +96,6 @@ Invoking this skill turns timing on for the rest of the session:
 ## When you are a subagent
 
 If you were started by another agent and asked for status, return only the
-Markdown checklist from section 3 (with times for your own steps) so the parent
+goal line (your own task's goal) and the Markdown checklist from section 4
+(with times for your own steps) so the parent
 can merge it into its list.
