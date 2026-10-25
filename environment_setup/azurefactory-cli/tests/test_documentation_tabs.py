@@ -327,3 +327,48 @@ def test_smoke_python_file_runs_independently_without_shell_state(monkeypatch, t
     assert calls == ["health", "catalog_list"]
     output = capsys.readouterr().out
     assert '"factories": []' in output and "private-test-key" not in output
+
+
+def test_guide20_long_deletion_previews_use_an_explicit_long_timeout():
+    # Deletion previews read Azure for minutes; the SDK and CLI default of 30 s timed out
+    # ("API request timed out.") while the server kept the catalog lock.
+    tabs = guide_tabs((DOCS / "20-cli-and-api-and-usage.md").read_text(encoding="utf-8"))
+    assert "AzureFactoryClient(base_url=api_url, api_key=api_key, timeout=1800)" in tabs["Python SDK"]
+    assert "AzureFactoryClient(base_url=api_url, api_key=api_key)\n" not in tabs["Python SDK"]
+    assert "& $Python -m azurefactory --timeout 1800 @Arguments" in tabs["CLI (PowerShell)"]
+
+
+@pytest.mark.parametrize("label,call", [
+    ("CLI (PowerShell)", "'authorize-deletion', 'prepare'"),
+    ("Python SDK", "client.authorize_deletion_prepare("),
+    ("REST (curl)", "/api/v1/operations/authorize-deletion/prepare"),
+])
+def test_guide20_grants_deletion_permission_before_project_and_scale_set_deletion(label, call):
+    tab = guide_tabs((DOCS / "20-cli-and-api-and-usage.md").read_text(encoding="utf-8"))[label]
+    grant = tab.index("### Grant deletion permission first")
+    assert grant < tab.index("### C. ") < tab.index("### D. ")
+    section = tab[grant:tab.index("### C. ")]
+    assert call in section and "ALLOW DELETE" in section and "revoke" in section.lower()
+
+
+def test_cli_readme_explains_how_to_review_grant_and_revoke_deletion_permission():
+    readme = (ROOT / "environment_setup" / "azurefactory-cli" / "readme.md").read_text(encoding="utf-8")
+    assert "A confirmation prompt does not grant that permission" not in readme
+    section = readme.split("### Grant or revoke a factory's deletion permission", 1)[1].split("\n### ", 1)[0]
+    for text in ("azurefactory authorize-deletion prepare", "--mode allow", "--mode revoke",
+                 "azurefactory authorize-deletion confirm", "ALLOW DELETE <factory key>",
+                 "REVOKE DELETE <factory key>", "deletion-authorizations/<factory id>/<confirmation id>.json",
+                 "authorize_deletion_prepare", "authorize_deletion_confirm", "no fallback"):
+        assert text in section
+    assert readme.index("### Release a failed run's retained single-writer claim") < readme.index(
+        "### Grant or revoke a factory's deletion permission")
+    assert "| `authorize_deletion_prepare(body)` |" in readme
+
+
+def test_guide17_deletion_scenarios_state_their_prerequisites():
+    text = (DOCS / "17-cli-and-api-and-usage.md").read_text(encoding="utf-8")
+    rows = {line.split("|")[1].strip(): line for line in text.splitlines() if line.startswith("| 4.")
+            or line.startswith("| 5.") or line.startswith("| 6.")}
+    for scenario in ("4. Delete project", "5. Delete scaleset"):
+        assert "authorize-deletion" in rows[scenario] and "Prerequisite" in rows[scenario]
+    assert "single-writer" in rows["6. Delete AI Factory"] and "being added" in rows["6. Delete AI Factory"]

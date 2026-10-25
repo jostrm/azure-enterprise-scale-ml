@@ -287,6 +287,34 @@ class AzureFactoryClient(SavedMonitoringClient):
             "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase,
         })
 
+    def _deletion_authorization_request(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return self._object(self.request("POST", f"/api/v1/operations/authorize-deletion/{action}", body=body),
+                                "deletion authorization")
+        except APIError as exc:
+            detail = exc.details.get("detail") if isinstance(exc.details, dict) else None
+            # The operation's own 404 (an unknown enrollment) is kept; only a missing route is translated.
+            if exc.status == 405 or (exc.status == 404 and not (
+                    isinstance(detail, str) and detail.startswith("Deletion authorization"))):
+                raise APIError("Deletion authorization requires an API supporting the authorize-deletion routes; "
+                               "no fallback was attempted.", status=exc.status) from None
+            raise
+
+    def authorize_deletion_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Review granting (mode allow) or revoking (mode revoke) a factory's deletion permission; never writes."""
+        from .authorization import validate_request
+
+        validate_request(body)
+        return self._deletion_authorization_request("prepare", body)
+
+    def authorize_deletion_confirm(self, *, folder: str, confirmation_id: str,
+                                   preview_hash: str, confirmation_phrase: str) -> dict[str, Any]:
+        """Submit exactly one confirmation; an uncertain outcome is never retried."""
+        return self._deletion_authorization_request("confirm", {
+            "contract_version": 1, "folder": folder, "confirmation_id": confirmation_id,
+            "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase,
+        })
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 

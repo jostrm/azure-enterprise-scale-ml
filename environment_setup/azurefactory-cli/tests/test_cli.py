@@ -872,3 +872,16 @@ def valid_openapi():
     for path, name in refs.items():
         paths[path] = {"post": {"requestBody": {"content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{name}"}}}}}}
     return {"info": {"title": "AIFactory Config API", "version": "1"}, "paths": paths, "components": {"schemas": schemas}}
+
+
+@pytest.mark.parametrize("command", ["prepare", "confirm"])
+def test_authorize_deletion_help_names_the_permission_and_its_review(command, capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["authorize-deletion", command, "--help"])
+    assert exc.value.code == 0
+    output = capsys.readouterr().out
+    assert ("--mode" in output) is (command == "prepare")
+    assert ("--confirmation-phrase" in output) is (command == "confirm")
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    assert "authorize-deletion" in capsys.readouterr().out
