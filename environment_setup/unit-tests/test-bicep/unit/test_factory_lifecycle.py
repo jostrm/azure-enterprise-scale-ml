@@ -1986,6 +1986,67 @@ def test_collection_top_level_error_code_is_diagnostic_settings_specific():
     assert cloud.collection(path, "2022-06-01", extension=True) == ([], "ScopeNotSupported")
 
 
+WORKSPACE = GROUP + "/providers/Microsoft.OperationalInsights/workspaces/la-cmn-reviewed-001"
+
+
+@pytest.mark.parametrize("path,api,status,body,expected_type,expected_code", [
+    # aif-130 bootstrap operator teardown (2026-10-25) stopped with this code and nothing else.
+    (WORKSPACE + "/dataSources", "2020-08-01", 400,
+     {"error": {"code": "KindNotSpecified", "message": "Must specify a valid kind filter."}},
+     "microsoft.operationalinsights/workspaces/datasources", "KindNotSpecified"),
+    (WORKSPACE + "/linkedServices", "2023-09-01", 404, None,
+     "microsoft.operationalinsights/workspaces/linkedservices", None),
+    (RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings", "2021-05-01-preview", 405,
+     {"error": {"code": "AuthorizationFailed"}},
+     "microsoft.network/publicipaddresses/providers/microsoft.insights/diagnosticsettings", "AuthorizationFailed"),
+    (GROUP + "/providers/Microsoft.Authorization/locks", "2016-09-01", 404, {"error": {"code": "Not Found!"}},
+     "microsoft.authorization/locks", None),
+])
+def test_unsupported_child_inventory_endpoint_names_the_failed_collection(
+        path, api, status, body, expected_type, expected_code):
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=Mock())
+    cloud.request = Mock(return_value=(status, {}, body))
+    with pytest.raises(fl.Blocked) as raised:
+        cloud.collection(path, api, extension="/providers/microsoft.insights/" in path.lower())
+    error = raised.value
+    assert error.code == str(error) == "unsupported-child-inventory-endpoint"
+    detail = {"resource_type": expected_type, "api_version": api, "status": status, "error_code": expected_code}
+    assert error.error_diagnostic == detail
+    assert fl.failure_fields(error, "unused") == {"error_code": error.code, "error_diagnostic": detail}
+    text = json.dumps(fl.failure_fields(error, "unused")).lower()
+    assert SUB not in text and "/resourcegroups/" not in text and "reviewed" not in text
+    assert "kind filter" not in text
+
+
+@pytest.mark.parametrize("detail", [
+    None, {},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400, "error_code": "KindNotSpecified", "message": "private"},
+    {"resource_type": GROUP + "/providers/microsoft.operationalinsights/workspaces/datasources",
+     "api_version": "2020-08-01", "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/la-cmn-ws/datasources",
+     "api_version": "2020-08-01", "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "latest",
+     "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 500, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": True, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400, "error_code": "Kind filter: secret value"},
+])
+def test_child_inventory_diagnostic_is_closed_and_revalidated(detail):
+    error = fl.Blocked("unsupported-child-inventory-endpoint")
+    error.error_diagnostic = detail
+    assert fl.failure_fields(error, "unused") == {"error_code": error.code}
+    good = {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+            "status": 400, "error_code": "KindNotSpecified"}
+    assert fl.safe_instance_diagnostic("unsupported-child-inventory-endpoint", good) == good
+    assert fl.safe_instance_diagnostic("bootstrap-resource-instance-changed", good) is None
+
+
 def test_what_if_accepts_empty_202_polls_before_final_changes():
     document, _ = scoped_manifest()
     location = fl.ARM + f"/subscriptions/{SUB}/providers/Microsoft.Resources/operationresults/reviewed"
