@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "10606833127240995630"
+      "templateHash": "15460409693422565932"
     }
   },
   "functions": [
@@ -125,7 +125,7 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "AI Search region. Empty means the AI Factory region. No automatic capacity retry."
+        "description": "AI Search region. Empty or same-as-factory-region means the AI Factory region. No automatic capacity retry."
       }
     },
     "enableApplicationInsights": {
@@ -4408,7 +4408,7 @@
       "seedingKeyVaultName": "[take(format('kv{0}{1}{2}', replace(variables('prefixNormalized'), '-', ''), variables('locationShort'), parameters('scalesetNumber')), 24)]",
       "bootstrapResourceGroup": "[variables('bootstrapResourceGroup')]",
       "commonResourceGroup": "[variables('commonResourceGroup')]",
-      "searchLocation": "[if(empty(parameters('aiSearchLocation')), parameters('location'), parameters('aiSearchLocation'))]",
+      "searchLocation": "[if(or(empty(parameters('aiSearchLocation')), equals(parameters('aiSearchLocation'), 'same-as-factory-region')), parameters('location'), parameters('aiSearchLocation'))]",
       "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]"
     },
     "stageName": "[format('aif-{0}-{1}', variables('prefixBare'), parameters('scalesetNumber'))]",

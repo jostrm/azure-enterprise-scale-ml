@@ -38,7 +38,7 @@ param teamGroupName string
 @description('Technical contact e-mail (technicalAdminsEmail).')
 param teamMemberEmail string
 
-@description('AI Search region. Empty means the AI Factory region. No automatic capacity retry.')
+@description('AI Search region. Empty or same-as-factory-region means the AI Factory region. No automatic capacity retry.')
 param aiSearchLocation string = ''
 
 @description('Optional workspace-based project Application Insights.')
@@ -96,7 +96,7 @@ var tokens = {
   seedingKeyVaultName: take('kv${replace(prefixNormalized, '-', '')}${locationShort}${scalesetNumber}', 24)
   bootstrapResourceGroup: bootstrapResourceGroup
   commonResourceGroup: commonResourceGroup
-  searchLocation: empty(aiSearchLocation) ? location : aiSearchLocation
+  searchLocation: empty(aiSearchLocation) || aiSearchLocation == 'same-as-factory-region' ? location : aiSearchLocation
   deploymentRandom: take(uniqueString(subscription().id, prefixNormalized, scalesetNumber, location), 10)
 }
 

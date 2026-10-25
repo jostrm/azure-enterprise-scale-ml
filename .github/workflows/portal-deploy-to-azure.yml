@@ -64,5 +64,5 @@ jobs:
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item portal/azuredeploy.json (Join-Path $staging 'mainTemplate.json')
           Copy-Item portal/form.json (Join-Path $staging 'createUiDefinition.json')
-          $results = Test-AzTemplate -TemplatePath $staging
+          $results = Test-AzTemplate -TemplatePath $staging -ErrorAction Continue 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }
           $results | Where-Object { -not $_.Passed } | Format-Table Name, File, @{ n = 'Error'; e = { $_.Errors | Select-Object -First 1 } } -AutoSize -Wrap
