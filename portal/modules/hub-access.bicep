@@ -2,6 +2,8 @@
 // aif_ensure_bastion_developer, aif_ensure_simple_hub_artifacts (IP group) and
 // aif_ensure_dns_private_resolver. The VNet DNS servers are not rewritten: an ARM PUT of the VNet
 // would replace its subnets, and in-VNet clients already resolve the linked private zones.
+// VNet writes run one at a time (subnet, resolver, inbound endpoint, Bastion): Azure rejects a resolver or
+// Bastion while the VNet is still Updating after the subnet write.
 targetScope = 'resourceGroup'
 
 param location string
@@ -49,6 +51,7 @@ resource resolver 'Microsoft.Network/dnsResolvers@2025-05-01' = {
       id: vnet.id
     }
   }
+  dependsOn: [resolverSubnet]
 }
 
 resource inbound 'Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01' = {
@@ -79,6 +82,7 @@ resource bastion 'Microsoft.Network/bastionHosts@2024-05-01' = if (enableBastion
       id: vnet.id
     }
   }
+  dependsOn: [inbound]
 }
 
 resource ipGroup 'Microsoft.Network/ipGroups@2024-05-01' = {

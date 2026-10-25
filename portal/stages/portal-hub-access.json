@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "12817082973016655369"
+      "templateHash": "9469589293276337133"
     }
   },
   "parameters": {
@@ -73,7 +73,10 @@
         "virtualNetwork": {
           "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
         }
-      }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'snet-dns-private-resolver')]"
+      ]
     },
     {
       "type": "Microsoft.Network/dnsResolvers/inboundEndpoints",
@@ -109,7 +112,10 @@
         "virtualNetwork": {
           "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
         }
-      }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/dnsResolvers/inboundEndpoints', format('dnspr-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')), format('inbound-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')))]"
+      ]
     },
     {
       "type": "Microsoft.Network/ipGroups",

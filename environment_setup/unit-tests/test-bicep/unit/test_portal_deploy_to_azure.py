@@ -186,6 +186,20 @@ def test_wired_stage_parameters_are_set_by_main(main_template, committed):
             assert f"'{parameter}'" in bodies or f'"{parameter}"' in bodies, (key, parameter)
 
 
+def test_vnet_writes_in_the_hub_are_serialized(main_template):
+    # Azure rejects a resolver, Bastion or endpoint on a VNet that is still "Updating" after a subnet write
+    # (observed on portal-125: bastion-<prefix>-<loc>-dev-001 failed "not found ... or is not in a Succeeded state").
+    stage = json.loads((PORTAL / "stages/portal-hub-access.json").read_text(encoding="utf-8"))
+    by_type = {resource["type"]: resource for resource in stage["resources"]}
+
+    def depends(kind):
+        return " ".join(by_type[kind].get("dependsOn", []))
+    assert "virtualNetworks/subnets" in depends("Microsoft.Network/dnsResolvers")
+    assert "dnsResolvers/inboundEndpoints" in depends("Microsoft.Network/bastionHosts")
+    resources = main_template["resources"]
+    assert "hubAccess" in resources["seedingEndpoint"]["dependsOn"]
+
+
 def test_main_does_not_inline_stage_templates(main_template):
     for resource in linked_deployments(main_template):
         assert "template" not in resource["properties"]

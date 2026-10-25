@@ -353,7 +353,8 @@ resource appGatewayCertificateRbac 'Microsoft.Resources/deployments@2022-09-01' 
 resource seedingEndpoint 'Microsoft.Resources/deployments@2022-09-01' = {
   name: take('${stageName}-hub-seeding-endpoint', 64)
   resourceGroup: commonResourceGroup
-  dependsOn: [privateDns]
+  // After the other common VNet writes: the endpoint's subnet join fails while the VNet is Updating.
+  dependsOn: [privateDns, hubAccess, vpnGateway, appGatewayNetwork]
   properties: {
     mode: 'Incremental'
     templateLink: { relativePath: 'stages/portal-seeding-endpoint.json' }
