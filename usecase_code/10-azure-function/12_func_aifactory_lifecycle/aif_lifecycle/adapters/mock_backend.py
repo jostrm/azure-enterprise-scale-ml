@@ -16,7 +16,7 @@ from ..application import resolver
 from ..domain.errors import Conflict, RevisionMismatch, UnknownId, UpstreamTimeout
 from ..domain.ids import FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Preview, StepKind
-from ..domain.scenarios import Scenario, adds_project
+from ..domain.scenarios import Scenario, adds_project, enrollment_phrase
 from ..ports import Catalog, ConfirmResult, StateStore, StepRequest, StoreConflict
 
 PARTITION, KEY = "mockcatalog", "catalog"
@@ -67,6 +67,9 @@ class MockFactoryBackend:
         phrase = None
         if request.step_name == "delete-factory":
             phrase = f"DELETE {request.resolved['factory_key']}"
+        elif request.kind is StepKind.ENROLL:  # the mock factory is single-writer: the enrollment is always reviewed
+            scaleset = ScalesetId.parse(request.target)
+            phrase = enrollment_phrase(scaleset.factory.prefix, scaleset.suffix)
         ttl = int(request.options.get("ttlSeconds") or self._ttl)
         return Preview(plan=plan, affected_resource_groups=groups, blockers=[], can_execute=True,
                        expires_at=self._clock.now().timestamp() + ttl, confirmation_phrase=phrase,
@@ -87,6 +90,9 @@ class MockFactoryBackend:
             self._save(data, etag)
             return ConfirmResult(job={"kind": "catalog", "confirmation_id": preview.backend_ref["confirmation_id"]},
                                  targets=[], resolved_updates=updates)
+        if request.kind is StepKind.ENROLL:  # provider state only: no runs, the step succeeds on confirm
+            return ConfirmResult(job={"kind": "enrollment", "status": "enrolled",
+                                      "confirmation_id": preview.backend_ref["confirmation_id"]}, targets=[])
         return ConfirmResult(job={"job_id": self._ids(), "action": preview.backend_ref["action"]},
                              targets=list(preview.affected_resource_groups))
 
@@ -121,11 +127,17 @@ class MockFactoryBackend:
                 return "add-project"
             return {Scenario.INIT_FACTORY: "create-factory", Scenario.ADD_SCALESET: "create-scale-set"}.get(
                 request.scenario, "configure-settings")
+        if request.kind is StepKind.ENROLL:
+            return "enroll-scale-set"
         return request.step_name if request.kind is StepKind.DELETE else "deploy"
 
     def _plan(self, request: StepRequest, action: str, groups: list[str]) -> list[str]:
         if request.kind is StepKind.CONFIGURE:
             return [f"Save the catalog change '{action}' for {request.target} (configuration only, no Azure change)."]
+        if request.kind is StepKind.ENROLL:
+            return [f"Enroll {request.target} in the single-writer enrollment and re-pin the saved binding."] + [
+                f"Assign Contributor and Role Based Access Control Administrator to the deployment identity on {group}"
+                for group in groups]
         verb = "Delete" if request.kind is StepKind.DELETE else "Deploy"
         return [f"{verb} resource group {group}" for group in groups]
 
@@ -142,6 +154,8 @@ class MockFactoryBackend:
             return stages[name]
         if request.scenario is Scenario.ADD_SCALESET:
             scaleset = ScalesetId.parse(target)
+            if request.kind is StepKind.ENROLL:  # the common group plus every project placed on it by now
+                return [scaleset.common_resource_group, str(ProjectId(scaleset, "001"))]
             return [scaleset.common_resource_group] if name == "deploy-common" else [str(ProjectId(scaleset, "001"))]
         if request.scenario in (Scenario.ADD_OR_UPDATE_PROJECT, Scenario.DELETE_PROJECT):
             return [target]

@@ -121,6 +121,23 @@ def test_sdk_and_rest_report_the_same_review(function):
     assert bodies["rest"]["preview"] == bodies["sdk"]["preview"]
 
 
+@pytest.mark.parametrize("backend", ["rest", "sdk"])
+def test_the_runner_reviews_and_confirms_a_scale_set_enrollment_once_with_its_phrase(function, backend):
+    request = step_request("enroll-scaleset", StepKind.ENROLL)
+    with FakeFactoryApi() as api:
+        runner.main(env_for(api.url, function, {"action": "prepare", "request": request}, backend))
+        review = parse_result(function.result()).preview
+        assert review.confirmation_phrase == "ENROLL SCALE SET aif-121 002" and review.can_execute
+        runner.main(env_for(api.url, function, {"action": "confirm", "request": request, "preview": review,
+                                                "phrase": review.confirmation_phrase}, backend))
+        confirmed = parse_result(function.result())
+        confirms = [call["body"] for call in api.calls if call["path"].endswith("/enroll-scale-set/confirm")]
+    assert confirmed.outcome == "ok" and confirmed.confirm.targets == []
+    assert confirmed.confirm.job["kind"] == "enrollment" and confirmed.confirm.job["status"] == "enrolled"
+    assert confirms == [{"contract_version": 1, "folder": "C:/aif/byor-121", "confirmation_id": CONFIRMATION_ID,
+                         "preview_hash": "e" * 64, "confirmation_phrase": "ENROLL SCALE SET aif-121 002"}]
+
+
 def delete_request():
     return StepRequest(operation_id="00000000-0000-4000-8000-000000000001", scenario=Scenario.DELETE_SCALESET,
                        step_index=1, step_name="delete-scaleset", kind=StepKind.DELETE, target="aif-121-sdc-dev-001",

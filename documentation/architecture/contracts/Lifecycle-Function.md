@@ -69,7 +69,11 @@ GitHub runs through `workflow_run` events.
   end-to-end tests without Azure. Scenario 1 saves the factory through `/api/v1/creation/prepare|confirm` (full
   bootstrap, dev scale set 001, prefix/region/suffix pinned to the FactoryId) and runs the creation workflow under one
   whole-workflow approval that the API continues by itself; a mid-workflow review request stops the step
-  (`action_required`) rather than being auto-confirmed.
+  (`action_required`) rather than being auto-confirmed. Scenario 2 is configure -> add-project001 -> enroll-scaleset
+  -> deploy-common -> deploy-project001: `enroll-scaleset` (step kind `enroll`) is the reviewed provider-state
+  operation `enroll-scale-set` that extends a single-writer factory's binding and enrollment to the new scale set and
+  the projects placed on it at prepare time; the API's exact Blob-coordination blocker marks it not needed
+  (PREPARING -> SUCCEEDED, `step-not-needed`), and a missing route is 502 `factory-api-too-old`.
 - **Executors**: `inprocess` (the API on this host's loopback), `github-dummy` (dummy workflow runs) and
   `github-runner` (the management runner calls the API on 127.0.0.1). The Function never calls the Factory API over
   the network because catalog and deployment routes require a loopback client.

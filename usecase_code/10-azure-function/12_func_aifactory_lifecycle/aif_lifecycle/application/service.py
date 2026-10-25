@@ -308,6 +308,11 @@ class LifecycleService:
         self._review(operation, preview, now)
 
     def _review(self, operation: Operation, preview: Preview, now: datetime) -> None:
+        not_needed = preview.backend_ref.get("not_needed")
+        if not_needed:  # the backend recognized the API's exact "this factory does not need it" answer
+            operation.step_not_needed(preview, str(not_needed), now)
+            _info(operation, f"a step was not needed: {not_needed}")
+            return
         if operation.scenario.destructive and not preview.confirmation_phrase:
             preview.confirmation_phrase = f"DELETE {operation.target}"
         operation.review_ready(preview, now)

@@ -9,7 +9,7 @@ Every secret and identity, and the full solution with copyable examples: [README
 | # | Scenario | Route segment | Input | What it does |
 |---|---|---|---|---|
 | 1 | Init AI Factory | `init-factory` | `factoryId` | Catalog entry, then connectivity, scale set 001 (common RG + vNet) and project001 |
-| 2 | Add scale set | `add-scaleset` | `scalesetId` | New common RG, vNet and default project001 |
+| 2 | Add scale set | `add-scaleset` | `scalesetId` | New common RG, vNet and default project001; enrolls the scale set first in a single-writer factory |
 | 3 | Add or update project | `add-or-update-project` | `projectId` | A new number adds the project; an existing number updates it |
 | 4 | Delete project | `delete-project` | `projectId` | Deletes one project in a scale set |
 | 5 | Delete scale set | `delete-scaleset` | `scalesetId` | Deletes its projects and its common RG |
@@ -109,11 +109,29 @@ then runs the creation workflow under one whole-workflow approval, which the API
 If the API asks for a new human review mid-workflow (`requires_review`), the step stops with `action_required` and the
 API's message.
 
+Scenario 2 runs five reviewed steps: `configure` (create-scale-set, a draft without projects), `add-project001` (a new
+logical project001 with an explicit placement on the new scale set; configuration only, so it needs nothing deployed),
+`enroll-scaleset`, `deploy-common` and `deploy-project001`. A single-writer factory's binding and live enrollment cover
+only what was enrolled, and the API refuses to deploy the new scale set until they cover it: `enroll-scaleset` reviews
+and confirms the Factory API's `enroll-scale-set` operation (`POST /api/v1/operations/enroll-scale-set/prepare` and
+`/confirm`, capability `enroll-scale-set-v1`). It covers the scale set's common RG plus the RG of every project placed
+on it when it is prepared (so project001 is placed first), creates missing RGs, assigns Contributor and Role Based
+Access Control Administrator to the deployment identity on exactly those RGs, writes the enrollment and re-pins the
+saved binding. Its review shows the RG IDs, creations and role assignments and is confirmed like every other step:
+the confirmation token plus the typed phrase `ENROLL SCALE SET <factory key> <suffix>` (for example
+`ENROLL SCALE SET aif-121 002`); the Function sends the API's preview hash once and never retries. The catalog does not
+say how a factory is coordinated, so a Blob-coordinated factory is recognized by the API's exact blocker "Blob-coordinated
+factories are not supported yet; nothing was changed.": the step is recorded as not needed (`succeeded`, history event
+`step-not-needed`, no confirmation) and the operation continues. Any other blocker stops the operation (`blocked`), and
+an API without the operation fails the step with 502 `factory-api-too-old` ("Factory API too old for
+enroll-scale-set"). With `AIF_EXECUTOR=github-runner`, update the runner on the API host with the Function: an older
+runner refuses the new step kind.
+
 Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, never stack traces or secrets:
 400 `validation-failed` / `invalid-id` / `invalid-json` / `unsupported-scenario` / `confirmation-mismatch` /
 `confirmation-phrase-mismatch`, 401 `invalid-signature`, 403 `protected-target`, 404 `unknown-id` /
 `operation-not-found`, 409 `already-exists` / `in-progress` / `revision-mismatch` / `invalid-state` /
-`scope-not-supported`, 410 `confirmation-expired`, 502 `upstream-error` / `upstream-refused`, 503 `upstream-unavailable`
+`scope-not-supported`, 410 `confirmation-expired`, 502 `upstream-error` / `upstream-refused` / `factory-api-too-old`, 503 `upstream-unavailable`
 / `configuration-invalid`, 504 `upstream-timeout`.
 
 ## Settings

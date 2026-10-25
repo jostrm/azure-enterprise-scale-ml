@@ -228,7 +228,7 @@ Function plans the steps; each step waits in `awaiting_confirmation` with its re
 | # | Route segment | Body | Steps (one confirmation each) |
 |---|---|---|---|
 | 1 | `init-factory` | `{"factoryId":"contoso-ai-sdc-dev","wholeWorkflow":true,"bootstrapConfig":{...}}` | configure (saves the factory), bootstrap (one bounded approval for every stage) |
-| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"subscriptionId":"11111111-1111-1111-1111-111111111111","tenantId":"00000000-0000-0000-0000-000000000000","orchestrator":"gha","vnetCidr":"10.20.64.0/18","maxProjects":7}}` | configure, deploy-common, add-project001 (a new logical project001 on the new scale set), deploy-project001 |
+| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"subscriptionId":"11111111-1111-1111-1111-111111111111","tenantId":"00000000-0000-0000-0000-000000000000","orchestrator":"gha","vnetCidr":"10.20.64.0/18","maxProjects":7}}` | configure, add-project001 (a new logical project001 on the new scale set), enroll-scaleset (single-writer: extends the binding and enrollment to the scale set, phrase `ENROLL SCALE SET <factory key> <suffix>`; not needed for a Blob-coordinated factory), deploy-common, deploy-project001 |
 | 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | configure (add-project for a new number, configure-settings for an existing one), deploy-project |
 | 4 | `delete-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg"}` | delete-project (phrase `DELETE <factory key>`) |
 | 5 | `delete-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002"}` | delete-scaleset (phrase) |

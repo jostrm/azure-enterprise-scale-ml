@@ -47,6 +47,13 @@ Invoke-RestMethod -Uri "$base/v1/operations/$($op.operationId)" -Headers $header
 Deletes also need `confirmationPhrase` (shown in the preview, for example `DELETE aif-121-sdc-dev-002`). A review
 expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application/problem+json` with a stable `code`.
 
+Adding a scale set runs `configure`, `add-project001`, `enroll-scaleset`, `deploy-common` and `deploy-project001`. In
+a single-writer factory, `enroll-scaleset` extends the deployment binding and live enrollment to the new scale set
+(its common resource group and the project placed on it just before), so the Factory API accepts its deployments;
+confirm it with the phrase in its preview, for example `ENROLL SCALE SET aif-121 002`. A Blob-coordinated factory does
+not need it: the step is recorded as not needed and the operation continues. An older Factory API without the
+operation fails the step with `factory-api-too-old`.
+
 ## Set it up in a project
 
 1. Copy the template to your consumer repo (`aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/`)

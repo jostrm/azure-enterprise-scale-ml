@@ -107,3 +107,11 @@ class SdkFactoryBackend(FactoryApiBackend):
 
     def _job(self, job_id):
         return self._call(lambda: self._client.catalog_job(self.folder, job_id))
+
+    def _enroll_scale_set_prepare(self, body):
+        return self._call(lambda: self._client.enroll_scale_set_prepare(body))
+
+    def _enroll_scale_set_confirm(self, body):
+        return self._call(lambda: self._client.enroll_scale_set_confirm(
+            folder=body["folder"], confirmation_id=body["confirmation_id"], preview_hash=body["preview_hash"],
+            confirmation_phrase=body["confirmation_phrase"]))

@@ -190,7 +190,7 @@ def test_a_failed_ops_run_without_a_result_fails_a_prepare(runner, github):
 def running(runner, github, clock):
     operation = confirmed(runner, github)
     answer(runner, github, confirm={"job": {"kind": "catalog"}, "targets": [], "resolvedUpdates": {}})
-    answer(runner, github, preview=api_preview())          # deploy-common review
+    answer(runner, github, preview=api_preview())          # step 1's review (faked runner answers)
     view = runner.get(operation.id).to_public()["steps"][1]
     runner.confirm(operation.id, {"confirmationToken": view["preview"]["confirmationToken"]})
     answer(runner, github, confirm={"job": {"kind": "job", "job_id": JOB_ID, "status": "queued"},

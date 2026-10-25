@@ -177,3 +177,17 @@ def test_records_round_trip_without_losing_state(clock):
     restored = Operation.from_record(operation.to_record())
     assert restored.to_public() == operation.to_public()
     assert restored.steps[0].preview.backend_ref == {"confirmation_id": "c-1"}
+
+
+def test_a_step_the_api_reports_as_not_needed_succeeds_without_a_confirmation(clock):
+    operation = new_operation(clock, Step.new("enroll-scaleset", StepKind.ENROLL),
+                              Step.new("deploy-common", StepKind.DEPLOY))
+    review = preview(clock=clock, can_execute=False, groups=())
+    operation.step_not_needed(review, "Blob-coordinated factories need no single-writer enrollment.", clock.now())
+    assert operation.steps[0].status is Status.SUCCEEDED and operation.steps[0].plan_hash is None
+    assert operation.steps[0].preview is review
+    assert operation.current == 1 and operation.status is Status.PREPARING
+    assert operation.history[-1]["event"] == "step-not-needed"
+    assert operation.to_public()["steps"][0]["preview"]["confirmationToken"] is None
+    with pytest.raises(InvalidState):
+        operation.step_not_needed(review, "again", clock.now())

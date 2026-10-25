@@ -10,8 +10,8 @@ from aif_lifecycle.domain.operation import StepKind
 from aif_lifecycle.domain.scenarios import Scenario
 from aif_lifecycle.ports import StepRequest
 
-from fake_factory_api import (AUTHORIZATION_HASH, CONFIRMATION_ID, FACTORY_ID, JOB_ID, PROJECT_ID, SCALESET_ID,
-                              WORKFLOW_ID, FakeFactoryApi)
+from fake_factory_api import (AUTHORIZATION_HASH, CONFIRMATION_ID, ENROLL_PHRASE, FACTORY_ID, JOB_ID, PROJECT_ID,
+                              SCALESET_ID, WORKFLOW_ID, FakeFactoryApi)
 
 REPO = r"C:\repos\azure-enterprise-scale-byor-121"
 FOLDER = REPO + r"\azurefactory"
@@ -44,9 +44,12 @@ SCENARIOS = {
         step(Scenario.ADD_SCALESET, "configure", StepKind.CONFIGURE, "aif-121-sdc-dev-002",
              {"factory_id": FACTORY_ID, "environment": "dev", "suffix": "002", "project_number": "001"},
              options={"scaleSet": SCALE_SET}),
-        step(Scenario.ADD_SCALESET, "deploy-common", StepKind.DEPLOY, "aif-121-sdc-dev-002", IDS),
+        # project001 is placed before the enrollment, which covers only projects placed when it is prepared.
         step(Scenario.ADD_SCALESET, "add-project001", StepKind.CONFIGURE, "aif-121-sdc-dev-002",
              {**IDS, "project_number": "001"}),
+        step(Scenario.ADD_SCALESET, "enroll-scaleset", StepKind.ENROLL, "aif-121-sdc-dev-002", IDS,
+             phrase=ENROLL_PHRASE),
+        step(Scenario.ADD_SCALESET, "deploy-common", StepKind.DEPLOY, "aif-121-sdc-dev-002", IDS),
         # project_id is what add-project001's confirm resolves; test_add_scaleset_factory_api.py proves that flow.
         step(Scenario.ADD_SCALESET, "deploy-project001", StepKind.DEPLOY, "aif-121-sdc-dev-002",
              {**IDS, "project_id": PROJECT_ID}),
@@ -82,7 +85,11 @@ EXPECTED_ROUTES = {
                        "GET /api/v1/factory-catalog", "POST /api/v1/creation/workflows/prepare",
                        "POST /api/v1/creation/workflows/start"],
     "2-add-scaleset": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
-                       "POST /api/v1/factory-catalog/confirm"] * 4,
+                       "POST /api/v1/factory-catalog/confirm"] * 2
+                      + ["POST /api/v1/operations/enroll-scale-set/prepare",
+                         "POST /api/v1/operations/enroll-scale-set/confirm"]
+                      + ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
+                         "POST /api/v1/factory-catalog/confirm"] * 2,
     "3-add-project": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
                       "POST /api/v1/factory-catalog/confirm"] * 2,
     "3-update-project": ["GET /api/v1/factory-catalog", "POST /api/v1/factory-catalog/prepare",
@@ -196,3 +203,13 @@ def test_delete_factory_confirm_sends_the_reviewed_hash_and_phrase_once():
     assert len(confirms) == 1
     assert confirms[0]["body"]["preview_hash"] == "b" * 64
     assert confirms[0]["body"]["confirmation_phrase"] == "DELETE aif-121-swedencentral"
+
+
+def test_the_enrollment_sends_the_closed_request_and_the_reviewed_hash_and_phrase_once():
+    calls = record("sdk", SCENARIOS["2-add-scaleset"])
+    by_route = {call["path"]: call["body"] for call in calls}
+    assert by_route["/api/v1/operations/enroll-scale-set/prepare"] == {
+        "contract_version": 1, "folder": FOLDER, "factory_id": FACTORY_ID, "scale_set_id": SCALESET_ID}
+    assert by_route["/api/v1/operations/enroll-scale-set/confirm"] == {
+        "contract_version": 1, "folder": FOLDER, "confirmation_id": CONFIRMATION_ID, "preview_hash": "e" * 64,
+        "confirmation_phrase": ENROLL_PHRASE}

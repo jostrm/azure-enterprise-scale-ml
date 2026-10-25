@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import ntpath
 import posixpath
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
-from ..domain.errors import DeletesDisabled, UnknownId, UpstreamError, ValidationFailed
+from ..domain.errors import DeletesDisabled, LifecycleError, UnknownId, UpstreamError, ValidationFailed
+from ..domain.ids import ScalesetId
 from ..domain.operation import Preview, StepKind
-from ..domain.scenarios import Scenario, adds_project
+from ..domain.scenarios import Scenario, adds_project, enrollment_phrase
 from ..ports import Catalog, ConfirmResult, StepRequest
+from .api_errors import UpstreamTooOld
 
 RUNTIME_STEPS = {"deploy-common", "deploy-project001", "deploy-project", "delete-project", "delete-scaleset"}
 WHOLE_WORKFLOW_SECONDS = 21600  # the full bootstrap's one approval; the API allows 60-86400 s
@@ -67,6 +70,127 @@ def scale_set_body(request: StepRequest, suffix: str) -> dict[str, Any]:
         network["common_subnets"] = dict(spec["commonSubnets"])
     return {"environment": request.resolved["environment"], "suffix": suffix, "subscription_id": spec["subscriptionId"],
             "tenant_id": spec["tenantId"], "orchestrator": spec["orchestrator"], "network": network}
+
+
+# enroll-scale-set (capability enroll-scale-set-v1): pink's contract for extending a single-writer enrollment.
+ENROLL_CAPABILITY = "enroll-scale-set-v1"
+ENROLL_MODE = "provider-state-and-arm"
+ENROLL_BLOCKED = "Scale-set enrollment blocked: "
+BLOB_BLOCKER = "Blob-coordinated factories are not supported yet; nothing was changed."
+STATE_REF = "refs/heads/aifactory-state/single-writer-v1"
+ENROLL_STATUSES = ("enrolled", "binding-repaired")
+ROLE_NAMES = {"b24988ac-6180-42a0-ab88-20f7382dd24c": "Contributor",
+              "f58310d9-a9f6-439a-9e8d-f62e7b41a168": "Role Based Access Control Administrator"}
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_HASH = re.compile(r"[0-9a-f]{64}")
+
+
+def _expires_at(response: dict[str, Any]) -> float:
+    try:
+        return datetime.fromisoformat(str(response.get("expires_at")).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        raise UpstreamError("The Factory API review has no valid expires_at.") from None
+
+
+def enrollment_request(folder: str, request: StepRequest) -> dict[str, Any]:
+    """The closed enroll-scale-set prepare body: the exact folder, factory and scale set, nothing else."""
+    r = request.resolved
+    return {"contract_version": 1, "folder": folder, "factory_id": r["factory_id"], "scale_set_id": r["scale_set_id"]}
+
+
+def enrollment_preview(request: StepRequest, folder: str, response: Any) -> Preview:
+    """The API's enroll-scale-set review as a step preview, checked fail-closed (the API re-verifies on confirm).
+
+    A Blob-coordinated factory has no single-writer enrollment to extend: its review is blocked with exactly
+    BLOB_BLOCKER, which becomes a preview marked not needed, so scenario 2 continues with deploy-common. Any other
+    blocker blocks the step; a review that does not describe exactly this scale set's enrollment is refused.
+    """
+    def unsafe(reason: str):
+        raise UpstreamError(f"Unsafe or incompatible scale-set enrollment review: {reason}. Nothing was changed.")
+
+    r = request.resolved
+    if (not isinstance(response, dict) or response.get("contract_version") != 1
+            or ENROLL_CAPABILITY not in (response.get("capabilities") or [])
+            or response.get("operation_mode") != ENROLL_MODE):
+        unsafe(f"the Factory API must acknowledge {ENROLL_CAPABILITY} in {ENROLL_MODE} mode")
+    if (response.get("folder"), response.get("factory_id"), response.get("scale_set_id")) != (
+            folder, r["factory_id"], r["scale_set_id"]):
+        unsafe("the exact folder, factory and scale set were not preserved")
+    blockers, warnings = response.get("blockers"), response.get("warnings")
+    if (not isinstance(blockers, list) or not all(isinstance(item, str) and item for item in blockers)
+            or not isinstance(warnings, list) or type(response.get("can_execute")) is not bool
+            or response["can_execute"] == bool(blockers)):
+        unsafe("can_execute must be a boolean that agrees with the blockers")
+    warnings = [str(item) for item in warnings]
+    expires_at = _expires_at(response)
+    base = {"operation": "enroll-scale-set", "folder": folder, "factory_id": r["factory_id"],
+            "scale_set_id": r["scale_set_id"]}
+    if blockers == [BLOB_BLOCKER]:
+        return Preview(plan=[f"Not needed: {BLOB_BLOCKER} A Blob-coordinated factory has no single-writer "
+                             "enrollment to extend, so the scale set is deployed without one."],
+                       affected_resource_groups=[], blockers=[], can_execute=False, expires_at=expires_at,
+                       backend_ref={**base, "not_needed": "Blob-coordinated factory: no single-writer enrollment"},
+                       warnings=warnings)
+    if blockers:
+        return Preview(plan=["Enroll the scale set in the single-writer enrollment (blocked)."],
+                       affected_resource_groups=[], blockers=blockers, can_execute=False, expires_at=expires_at,
+                       backend_ref=base, warnings=warnings)
+    target = ScalesetId.parse(request.target)
+    expected = enrollment_phrase(target.factory.prefix, target.suffix)
+    if response.get("confirmation_phrase") != expected:
+        unsafe(f"the confirmation phrase must be exactly {expected}")
+    confirmation_id, preview_hash = response.get("confirmation_id"), response.get("preview_hash")
+    if (not isinstance(confirmation_id, str) or not _UUID.fullmatch(confirmation_id)
+            or not isinstance(preview_hash, str) or not _HASH.fullmatch(preview_hash)):
+        unsafe("missing the exact confirmation identity or server review fingerprint")
+    groups, creations = response.get("resource_group_ids"), response.get("resource_group_creations")
+    assignments = response.get("role_assignments")
+    if (not isinstance(groups, list) or not groups or not all(isinstance(item, str) and item for item in groups)
+            or not isinstance(creations, list) or any(item not in groups for item in creations)):
+        unsafe("the resource groups to enroll and create must be exact IDs")
+    if not isinstance(assignments, list) or any(not isinstance(item, dict) or item.get("scope") not in groups
+                                                for item in assignments):
+        unsafe("the role assignments must name enrolled resource group scopes")
+    audit = response.get("audit_record")
+    if (response.get("state_ref") != STATE_REF or not isinstance(audit, str)
+            or not audit.startswith(f"scale-set-enrollments/{r['factory_id']}/") or not audit.endswith(".json")):
+        unsafe("missing the provider state ref or this factory's audit record")
+    revision = response.get("enrollment_revision") or {}
+    bindings = [str(item) for item in response.get("bindings") or []]
+    identity = response.get("deployment_object_id")
+    plan = [f"Enroll scale set {target} in the single-writer enrollment of {response.get('repository')} "
+            f"({STATE_REF} at {response.get('provider_head')}), revision {revision.get('from')} -> "
+            f"{revision.get('to')}."]
+    if revision.get("from") == revision.get("to"):
+        plan.append("Binding-only repair: the enrollment already covers these resource groups.")
+    plan += [f"Create resource group {group} (tagged)." for group in creations]
+    for item in assignments:
+        role = str(item.get("role_definition_id") or "")
+        name = ROLE_NAMES.get(role.rsplit("/", 1)[-1].lower(), role)
+        verb = "Keep the existing" if item.get("exists") is True else "Assign"
+        plan.append(f"{verb} {name} role for the deployment identity {identity} on {item['scope']}.")
+    if bindings:
+        plan.append(f"Re-pin the saved binding(s): {', '.join(bindings)}.")
+    plan.append("Azure changes: yes (resource groups or role assignments)." if response.get("azure_writes") is True
+                else "Azure changes: none (provider state and binding only).")
+    reference = {**base, "confirmation_id": confirmation_id, "preview_hash": preview_hash,
+                 "repository": response.get("repository"), "provider_head": response.get("provider_head"),
+                 "audit_record": audit}
+    return Preview(plan=plan, affected_resource_groups=list(groups), blockers=[], can_execute=True,
+                   expires_at=expires_at, confirmation_phrase=expected, backend_ref=reference, warnings=warnings)
+
+
+def check_enrollment_result(result: Any, reference: dict[str, Any]) -> dict[str, Any]:
+    """The confirm result must describe the reviewed enrollment; otherwise its outcome is uncertain (never retried)."""
+    keys = ("folder", "factory_id", "scale_set_id", "repository", "audit_record")
+    if (not isinstance(result, dict) or result.get("status") not in ENROLL_STATUSES
+            or any(result.get(key) != reference.get(key) for key in keys)
+            or result.get("previous_head") != reference.get("provider_head") or not isinstance(result.get("head"), str)
+            or (result["head"] == result["previous_head"]) != (result["status"] == "binding-repaired")):
+        raise UpstreamError("Scale-set enrollment returned an unexpected result. Read the provider state before any "
+                            "further action; nothing was retried.")
+    return {"kind": "enrollment", "status": result["status"], "head": result["head"],
+            "audit_record": result["audit_record"]}
 
 
 def preview_from_api(response: dict[str, Any]) -> Preview:
@@ -126,6 +250,9 @@ class FactoryApiBackend(ABC):
 
     def prepare(self, request: StepRequest) -> Preview:
         refuse_deletes(self.delete_mode, request)
+        if request.kind is StepKind.ENROLL:  # a provider-state operation: no catalog revision in its closed request
+            body = enrollment_request(self.folder, request)
+            return enrollment_preview(request, self.folder, self._enrollment(lambda: self._enroll_scale_set_prepare(body)))
         try:
             revision = self._catalog_list().get("revision")
         except UnknownId:
@@ -138,6 +265,11 @@ class FactoryApiBackend(ABC):
         refuse_deletes(self.delete_mode, request)
         ref = preview.backend_ref
         name = request.step_name
+        if request.kind is StepKind.ENROLL:
+            result = self._enrollment(lambda: self._enroll_scale_set_confirm({
+                "contract_version": 1, "folder": self.folder, "confirmation_id": ref["confirmation_id"],
+                "preview_hash": ref["preview_hash"], "confirmation_phrase": phrase}))
+            return ConfirmResult(job=check_enrollment_result(result, ref), targets=[])
         if request.kind is StepKind.CONFIGURE:
             if _saves_new_factory(request):
                 confirmed = self._creation_confirm(ref["folder"], ref["confirmation_id"])
@@ -232,6 +364,19 @@ class FactoryApiBackend(ABC):
                 "bootstrap_config": self._bootstrap_config(request), "approval_mode": "whole-workflow",
                 "authorization_valid_for_seconds": WHOLE_WORKFLOW_SECONDS}
 
+    @staticmethod
+    def _enrollment(call: Callable[[], Any]) -> Any:
+        """An API without the enroll-scale-set routes answers 404/405 without the operation's own detail."""
+        try:
+            return call()
+        except LifecycleError as error:
+            status = getattr(error, "upstream_status", None)
+            if status in (404, 405) and not error.detail.startswith(ENROLL_BLOCKED):
+                raise UpstreamTooOld(f"Factory API too old for enroll-scale-set (HTTP {status}): update the Factory "
+                                     f"API on its host to a version with {ENROLL_CAPABILITY}. Nothing was "
+                                     "changed.") from None
+            raise
+
     def _repository_root(self) -> str:
         """The consumer repository (the parent of its azurefactory folder), as the creation routes take it."""
         paths = ntpath if ("\\" in self.folder or ntpath.splitdrive(self.folder)[0]) else posixpath
@@ -288,6 +433,12 @@ class FactoryApiBackend(ABC):
 
     @abstractmethod
     def _job(self, job_id): ...
+
+    @abstractmethod
+    def _enroll_scale_set_prepare(self, body): ...
+
+    @abstractmethod
+    def _enroll_scale_set_confirm(self, body): ...
 
 
 def _saves_new_factory(request: StepRequest) -> bool:
