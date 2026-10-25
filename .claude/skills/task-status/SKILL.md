@@ -1,13 +1,13 @@
 ---
 name: task-status
-description: Show the session's task status as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /task-status or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
+description: Show the session's task status, starting with the chat's GOAL in one sentence, as a checklist with clock times — completed steps with start–end time and duration, the current step with how long it has run, and planned steps with an estimated duration. Use when the user types /task-status or asks for status, progress, or "your tasks checkboxed with time". Also usable by subagents to report their own steps.
 ---
 
 # /task-status — timed task checklist
 
-Report every step of the current work (yours, and those of any subagents you
-started) as a checklist with real clock times, then keep timing every step for
-the rest of the session.
+Start with the chat's GOAL in one sentence, then report every step of the
+current work (yours, and those of any subagents you started) as a checklist with
+real clock times, then keep timing every step for the rest of the session.
 
 ## 1. Get the current time
 
@@ -24,7 +24,12 @@ that zone. Use the same zone for every time you show.
 
 ## 2. Build the list
 
-Take the steps from the task list (TaskCreate/TaskUpdate or TodoWrite) if one
+First write the chat's GOAL: one sentence of at most 200 characters saying what
+this chat is trying to achieve (the outcome the user asked for, not the current
+step). Take it from the user's request; when the goal changed during the chat,
+state the current one.
+
+Then take the steps from the task list (TaskCreate/TaskUpdate or TodoWrite) if one
 exists, otherwise from the work done so far in this conversation plus the plan
 for what is left. Include steps that subagents ran, labelled with the agent.
 
@@ -55,6 +60,8 @@ and ended (see section 4). Format:
    clients (e.g. mobile) do not show the task list panel:
 
 ```markdown
+**GOAL:** Deploy project005 to the spider factory and prove Scenario 3 works live.
+
 **Status at 18:00 CEST** — 2 of 6 done, 15 min elapsed, ~40 min left
 
 - [x] Find spider's layout and deploy path (17:45–17:59, 14 min)
@@ -65,7 +72,7 @@ and ended (see section 4). Format:
 - [ ] Report and ask before deleting, Scenario 4 (est. ~5 min)
 ```
 
-The header line gives the current time, done/total, time elapsed since the first
+The GOAL line always comes first. The status line under it gives the current time, done/total, time elapsed since the first
 step started, and the sum of the remaining estimates. Add one line under the
 list only for a blocker or a decision the user must make; nothing else.
 
@@ -85,5 +92,5 @@ Invoking this skill turns timing on for the rest of the session:
 ## When you are a subagent
 
 If you were started by another agent and asked for status, return only the
-Markdown checklist from section 3 (with times for your own steps) so the parent
-can merge it into its list.
+Markdown checklist from section 3 (with times for your own steps, without the
+GOAL line) so the parent can merge it into its list.
