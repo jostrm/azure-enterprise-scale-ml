@@ -387,6 +387,57 @@ def test_github_output_is_only_runs_on(workspace, monkeypatch):
     assert output.read_text() == 'runs_on=["self-hosted","Windows","aifactory-admin-vm"]\n'
 
 
+def registered_binding(workspace, runner_value, *, on_target=True):
+    path, document = register(workspace)
+    binding = {"contract_version": 1, "orchestrator": "gha", "writer_id": "dev-writer",
+               "repository": "https://github.com/org/consumer", "ref": "refs/heads/main", "shared_remote": False,
+               "auth_namespace": "Dev", "locks": {},
+               "targets": [{"scale_set_id": SCALE, "resource_group_ids": ["/subscriptions/x/resourceGroups/y"]}]}
+    if on_target:
+        binding["targets"][0]["execution"] = {"writer_id": "dev-writer", "auth_namespace": "Dev",
+                                              "deployment_object_id": DEV, "runner": runner_value}
+    else:
+        binding["runner"] = runner_value
+    document["bindings"] = {FACTORY: {"gha": binding}}
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+@pytest.mark.parametrize("on_target", [True, False])
+def test_registered_github_routing_takes_runner_os_from_the_binding(workspace, monkeypatch, on_target):
+    # Observed 2026-10-25 in a registered repository: variables.json has no selfHostedRunnerOS, the Linux runner is
+    # only in register.json's binding, and from-config asked for a Windows runner that never picked the job up.
+    args, _ = arguments(workspace, environment="stage")
+    registered_binding(workspace, {"kind": "self-hosted", "os": "linux",
+                                   "labels": ["self-hosted", "linux", "aifactory-admin-vm"]}, on_target=on_target)
+    args.ci_output = "github"
+    output = workspace / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    runner.run(args)
+    assert output.read_text() == 'runs_on=["self-hosted","Linux","aifactory-admin-vm"]\n'
+
+
+def test_explicit_runner_os_in_variables_wins_over_the_binding(workspace, monkeypatch):
+    document = payload()
+    document["stage_prod"]["selfHostedRunnerOS"] = "Windows"
+    args, _ = arguments(workspace, environment="stage", document=document)
+    registered_binding(workspace, {"kind": "self-hosted", "os": "linux", "labels": ["self-hosted", "linux"]})
+    args.ci_output = "github"
+    output = workspace / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    runner.run(args)
+    assert output.read_text() == 'runs_on=["self-hosted","Windows","aifactory-admin-vm"]\n'
+
+
+def test_registered_routing_without_a_binding_keeps_the_windows_default(workspace, monkeypatch):
+    args, _ = arguments(workspace, environment="stage")
+    register(workspace)
+    args.ci_output = "github"
+    output = workspace / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    runner.run(args)
+    assert output.read_text() == 'runs_on=["self-hosted","Windows","aifactory-admin-vm"]\n'
+
+
 def test_compiled_current_module_passes_and_parameters_are_allowlisted(compiled):
     azure = fake_azure(payload(), "dev", compiled)
     values, cfg, _ = runner.configuration(payload(), "dev", "001")

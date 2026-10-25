@@ -985,6 +985,54 @@ def test_variable_conflict_and_custom_subject_are_blocked(workspace):
     assert not fake.writes
 
 
+ENVIRONMENT_MAP = "AIFACTORY_GITHUB_ENVIRONMENTS"
+
+
+@pytest.mark.parametrize("namespace", ["Stage", "factory-stage"])
+def test_github_environment_map_names_the_federated_environment_for_classic_workflows(workspace, namespace):
+    # Observed 2026-10-25: classic workflows fell back to environment "dev" while the registered repository's
+    # environment and federated subject were "Dev", and azure/login failed with AADSTS7002138.
+    req = request(workspace, auth_namespace=namespace)
+    fake = Fake(req)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert "create-github-repository-variable:" + ENVIRONMENT_MAP in review["actions"]
+    assert ENVIRONMENT_MAP not in fake.variables
+    assert review["federation"]["subject"].endswith(":environment:" + namespace)
+    result = enroll(req, fake)
+    assert result["enrollment_complete"], result
+    assert json.loads(fake.variables[ENVIRONMENT_MAP]) == {"dev": "Dev", "stage": namespace, "prod": "Prod"}
+    assert ("gh", "POST", "repos/org/repo/actions/variables",
+            {"name": ENVIRONMENT_MAP, "value": fake.variables[ENVIRONMENT_MAP]}) in fake.writes
+    count = len(fake.writes)
+    assert enroll(req, fake)["status"] == "unchanged"
+    assert len(fake.writes) == count
+
+
+def test_default_environment_name_needs_no_github_environment_map(workspace):
+    req = request(workspace, auth_namespace="stage")
+    fake = Fake(req)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert not any(ENVIRONMENT_MAP in action for action in review["actions"])
+    enroll(req, fake)
+    assert ENVIRONMENT_MAP not in fake.variables
+
+
+def test_existing_github_environment_map_is_never_overwritten(workspace):
+    req = request(workspace, auth_namespace="Stage")
+    fake = Fake(req)
+    fake.variables[ENVIRONMENT_MAP] = '{"dev":"Dev","prod":"Prod","stage":"Stage"}'
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert not any(ENVIRONMENT_MAP in action for action in review["actions"])
+    assert not review.get("warnings")
+    fake.variables[ENVIRONMENT_MAP] = '{"dev":"dev","prod":"prod","stage":"stage"}'
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert not any(ENVIRONMENT_MAP in action for action in review["actions"])
+    assert any(ENVIRONMENT_MAP in warning and "stage" in warning for warning in review["warnings"])
+    enroll(req, fake)
+    assert fake.variables[ENVIRONMENT_MAP] == '{"dev":"dev","prod":"prod","stage":"stage"}'
+    assert not any(ENVIRONMENT_MAP in str(write) for write in fake.writes)
+
+
 def test_immutable_github_oidc_subject_is_planned_recorded_and_federated_exactly(workspace):
     # Observed 2026-10-22: a repository created after 2026-07-15 presents repo:OWNER@OWNER_ID/REPO@REPO_ID, so a
     # federated credential with the classic subject failed azure/login with AADSTS700213.

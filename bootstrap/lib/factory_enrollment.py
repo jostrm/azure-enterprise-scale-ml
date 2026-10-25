@@ -21,6 +21,9 @@ upsert and does not support conditional creation; even GET-then-PUT can replace
 concurrently created protection rules. This helper never calls that PUT. It
 reuses environments unchanged and creates only absent OIDC variables with POST;
 duplicate/conflicting variable creation fails without updating the variable.
+When auth_namespace is not the classic workflows' lowercase fallback, an absent
+repository variable AIFACTORY_GITHUB_ENVIRONMENTS is created the same way so
+they select the federated environment; an existing map is only warned about.
 
 ARM resource-group, user-assigned identity, federated credential, storage-account
 and role-assignment provisioning uses the documented idempotent create-or-update
@@ -111,6 +114,8 @@ STORAGE_API = "2023-05-01"
 ROLE_API = "2022-04-01"
 MAX_BYTES = 8 * 1024 * 1024
 NAME = r"[A-Za-z0-9_.-]{1,128}"
+GITHUB_ENVIRONMENT_MAP = "AIFACTORY_GITHUB_ENVIRONMENTS"
+GITHUB_ENVIRONMENT_DEFAULTS = {"dev": "Dev", "stage": "Stage", "prod": "Prod"}
 RG = re.compile(r"/subscriptions/([a-f0-9-]{36})/resourcegroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 OPTIONS = {
     "repository", "ref", "writer_id", "auth_namespace", "runner", "shared_remote",
@@ -921,6 +926,28 @@ def github_subject_prefix(repository, repo, customization):
     return expected
 
 
+def _github_environment_map(route, target, saved):
+    """Classic workflows sign in through the environment AIFACTORY_GITHUB_ENVIRONMENTS names for dev/stage/prod (the
+    lowercase name without it), and Entra matches environment:<auth_namespace> case-sensitively. The map is planned
+    only when it is absent and the fallback would miss this enrollment's environment; the other entries are the
+    environments registered repository initialization creates. An existing map is never overwritten."""
+    logical, namespace = target["environment"], route["auth_namespace"]
+    result = {"value": saved["body"].get("value") if saved else None, "planned": None, "differs": False}
+    if saved:
+        try:
+            current = json.loads(result["value"])
+        except (TypeError, ValueError):
+            current = None
+        result["differs"] = not isinstance(current, dict) or current.get(logical) != namespace
+    elif namespace != logical:
+        mapping = {**GITHUB_ENVIRONMENT_DEFAULTS, logical: namespace}
+        if len({name.casefold() for name in mapping.values()}) == len(mapping):
+            result["planned"] = canonical(mapping).decode("utf-8")
+        else:
+            result["differs"] = True
+    return result
+
+
 def _provider(cloud, request, identity):
     route, target = request["route"], request["target"]
     if route["kind"] == "gha":
@@ -929,6 +956,9 @@ def _provider(cloud, request, identity):
         _, _, repo = cloud.gh("GET", base)
         _, _, customization = cloud.gh("GET", base + "/actions/oidc/customization/sub")
         prefix = github_subject_prefix(repository, repo, customization)
+        environment_map = _github_environment_map(route, target, _absent(cloud.gh(
+            "GET", base + "/actions/variables/" + GITHUB_ENVIRONMENT_MAP, allowed=(200, 404))))
+        environment_map["endpoint"] = base + "/actions/variables"
         path = base + "/environments/" + quote(route["auth_namespace"], safe="")
         environment = _absent(cloud.gh("GET", path, allowed=(200, 404)))
         variables = {}
@@ -941,7 +971,7 @@ def _provider(cloud, request, identity):
                     require(expected is not None and variables[name]["body"].get("value") == expected,
                             "github-variable-conflict")
         return {"kind": "gha", "environment": environment, "variables": variables, "path": path,
-                "issuer": "https://token.actions.githubusercontent.com",
+                "environment_map": environment_map, "issuer": "https://token.actions.githubusercontent.com",
                 "subject": prefix + ":environment:" + route["auth_namespace"]}
     parts = unquote(urlsplit(route["repository"]).path).strip("/").split("/")
     organization, project = parts[:2]
@@ -1430,6 +1460,8 @@ def _collect_single_writer_snapshot(request, cloud):
             blockers.append("github-environment-must-be-preprovisioned-no-atomic-create")
         actions.extend("create-github-variable:" + name for name in (
             "AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID") if not provider["variables"].get(name))
+        if provider["environment_map"]["planned"]:
+            actions.append("create-github-repository-variable:" + GITHUB_ENVIRONMENT_MAP)
     elif not provider["endpoint"]:
         actions.append("create-ado-workload-identity-service-connection")
     fic = _fic(cloud, request, provider, identity)
@@ -1572,6 +1604,8 @@ def _collect_snapshot(request, cloud):
         for name in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID"):
             if not provider["variables"].get(name):
                 actions.append("create-github-variable:" + name)
+        if provider["environment_map"]["planned"]:
+            actions.append("create-github-repository-variable:" + GITHUB_ENVIRONMENT_MAP)
     elif not provider["endpoint"]:
         actions.append("create-ado-workload-identity-service-connection")
     fic = _fic(cloud, request, provider, identity)
@@ -1664,6 +1698,12 @@ def _review(request, state, acknowledge):
         result["warnings"] = [helper.WARNING, helper.HUB_WARNING,
                               "Single-writer coordination requires a private repository; repository visibility is never changed automatically.",
                               "Private repository administrators can bypass or destroy repository coordination."]
+    environment_map = state["provider"].get("environment_map")
+    if environment_map and environment_map["differs"]:
+        result.setdefault("warnings", []).append(
+            GITHUB_ENVIRONMENT_MAP + " does not map " + request["target"]["environment"] + " to the federated "
+            "environment " + request["route"]["auth_namespace"] + ", so classic workflows cannot sign in with this "
+            "enrollment. Enrollment never overwrites the variable; correct it in the repository if intended.")
     result["plan_hash"] = digest(result)
     return result
 
@@ -1736,6 +1776,12 @@ def _create_provider(cloud, request, state, identity):
                 require(cloud.gh("GET", path + "/variables/" + name, allowed=(200, 404))[0] == 404,
                         "github-variable-changed")
                 cloud.gh("POST", path + "/variables", {"name": name, "value": value}, allowed=(201,))
+        environment_map = provider["environment_map"]
+        if environment_map["planned"]:
+            require(cloud.gh("GET", environment_map["endpoint"] + "/" + GITHUB_ENVIRONMENT_MAP,
+                             allowed=(200, 404))[0] == 404, "github-variable-changed")
+            cloud.gh("POST", environment_map["endpoint"],
+                     {"name": GITHUB_ENVIRONMENT_MAP, "value": environment_map["planned"]}, allowed=(201,))
     elif not provider["endpoint"]:
         require(not _provider(cloud, request, identity)["endpoint"], "service-endpoint-changed")
         body = {"name": route["auth_namespace"], "type": "azurerm", "url": ARM + "/",

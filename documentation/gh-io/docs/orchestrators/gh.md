@@ -28,6 +28,16 @@ GitHub full-bootstrap paths can create environment names `Dev`, `Stage`, `Prod`
 and store the logical-to-actual mapping in `AIFACTORY_GITHUB_ENVIRONMENTS`.
 That does not mean Stage/Prod Azure infrastructure has been deployed.
 Existing environments and OIDC subjects must not be silently renamed.
+Factory enrollment of a registered repository federates `environment:<auth_namespace>`;
+when that name is not the classic workflows' lowercase fallback (`dev`, `stage`, `prod`)
+and the variable is absent, enrollment creates `AIFACTORY_GITHUB_ENVIRONMENTS` with that
+name (other entries `Dev`/`Stage`/`Prod`). An existing variable is never overwritten; the
+plan warns when it names a different environment.
+
+Classic workflows that route their runner through `deploy-dashboards-only.py`
+(Add-Factory-Agent, project dashboards) take the self-hosted runner OS from
+`selfHostedRunnerOS` in `variables.json`, else from the registered binding's
+runner in `azurefactory/register.json` (Linux), else Windows.
 
 ## Configuration and private access
 
