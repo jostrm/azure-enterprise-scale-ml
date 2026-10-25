@@ -696,7 +696,10 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
-        assert_connectivity_group_allowed(document, row["id"], body)
+        # Bootstrap teardown deletes only the bootstrap record's own groups, so it has no shared
+        # connectivity groups to protect (and its document carries none).
+        if document["deletion"]["inventory_mode"] != TEARDOWN_CONTRACT:
+            assert_connectivity_group_allowed(document, row["id"], body)
         fl.assert_deletion_group_allowed(document, row["id"], body)
         if fresh:
             fresh(row, body)

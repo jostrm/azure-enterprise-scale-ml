@@ -877,8 +877,8 @@ class ThrottledReadHandler(BaseHandler):
         response.read()
         response.close()
         print(json.dumps({
-            "event": "remote-request-throttled", "method": request.get_method(), "host": request.host,
-            "path": urlsplit(request.full_url).path, "status": code, "attempt": attempt, "delay_seconds": delay,
+            "event": "remote-request-throttled", "method": request.get_method(),
+            "host": urlsplit(request.full_url).netloc, "path": urlsplit(request.full_url).path, "status": code, "attempt": attempt, "delay_seconds": delay,
         }, sort_keys=True), file=sys.stderr, flush=True)
         self._sleep(delay)
         request.aifactory_throttled, request.aifactory_throttled_since = attempt, since
