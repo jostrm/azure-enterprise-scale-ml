@@ -342,6 +342,30 @@ own detail) is reported as requiring them; there is no fallback. SDK:
 `authorize_deletion_prepare` and `authorize_deletion_confirm`, with the same
 client checks in `azurefactory.authorization`.
 
+### Enroll an added scale set (single-writer)
+
+A single-writer factory's binding and live enrollment cover only what was
+enrolled, so the Factory API refuses to deploy a newly added scale set until the
+reviewed operation `enroll-scale-set` (capability `enroll-scale-set-v1`,
+`operation_mode` `provider-state-and-arm`) extends them. It covers the scale
+set's common resource group plus the group of every project already placed on
+it at prepare time, creates missing groups (tagged), assigns Contributor and
+Role Based Access Control Administrator to the deployment identity on exactly
+those groups, writes the enrollment with one compare-and-swap and re-pins the
+saved binding. Place the scale set's projects first, then enroll, then deploy.
+SDK only (no CLI command yet): `enroll_scale_set_prepare({"contract_version": 1,
+"folder", "factory_id", "scale_set_id"})` (closed request) and
+`enroll_scale_set_confirm(folder=, confirmation_id=, preview_hash=,
+confirmation_phrase=)` with the phrase `ENROLL SCALE SET <factory key> <suffix>`
+(the factory key is the prefix without its trailing dash, for example
+`ENROLL SCALE SET aif-128 002`); the review expires after 10 minutes and a confirm
+is never retried. `azurefactory.scale_set_enrollment` holds the client checks
+(`validate_preview`, `validate_result`, `blob_blocked`). A Blob-coordinated
+factory's review is blocked with exactly "Blob-coordinated factories are not
+supported yet; nothing was changed." A 404/405 without the operation's own
+"Scale-set enrollment blocked: " detail is reported as "Factory API too old for
+enroll-scale-set"; there is no fallback.
+
 ### Shell-first registered onboarding
 
 From the root of an existing consumer Git repository, with a **current approved**
@@ -856,6 +880,7 @@ These supported methods return a prepare preview only:
 | `scaleset_delete_prepare(folder, factory_id, scale_set_id, *, expected_revision, version_ref=None)` | `delete-scale-set` |
 | `draft_remove_prepare(folder, factory_id, *, kind, expected_revision, scale_set_id=None, project_id=None)` | `delete-draft-factory`, `delete-draft-scale-set`, `delete-draft-project` |
 | `authorize_deletion_prepare(body)` | none: the named `authorize-deletion` provider-state operation (`mode` `allow` or `revoke`); confirm with `authorize_deletion_confirm` |
+| `enroll_scale_set_prepare(body)` | none: the named `enroll-scale-set` provider-state-and-ARM operation for a single-writer factory's added scale set; confirm with `enroll_scale_set_confirm` |
 
 CLI and SDK use shared request builders. Project helpers require nonempty
 `placements` **or** `environments`, never both; omitted scale IDs stay omitted on

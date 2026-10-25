@@ -315,6 +315,37 @@ class AzureFactoryClient(SavedMonitoringClient):
             "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase,
         })
 
+    def _scale_set_enrollment_request(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
+        from .scale_set_enrollment import BLOCKED_PREFIX, TOO_OLD
+
+        try:
+            return self._object(self.request("POST", f"/api/v1/operations/enroll-scale-set/{action}", body=body),
+                                "scale-set enrollment")
+        except APIError as exc:
+            detail = exc.details.get("detail") if isinstance(exc.details, dict) else None
+            # The operation's own 404 (a review of another caller) is kept; only a missing route is translated.
+            if exc.status == 405 or (exc.status == 404 and not (
+                    isinstance(detail, str) and detail.startswith(BLOCKED_PREFIX))):
+                raise APIError(TOO_OLD, status=exc.status) from None
+            raise
+
+    def enroll_scale_set_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Review extending a single-writer factory's binding and enrollment to an added scale set; never writes."""
+        from .scale_set_enrollment import validate_request
+
+        validate_request(body)
+        return self._scale_set_enrollment_request("prepare", body)
+
+    def enroll_scale_set_confirm(self, *, folder: str, confirmation_id: str,
+                                 preview_hash: str, confirmation_phrase: str) -> dict[str, Any]:
+        """Submit exactly one confirmation; an uncertain outcome is never retried."""
+        from .scale_set_enrollment import validate_confirm_request
+
+        body = {"contract_version": 1, "folder": folder, "confirmation_id": confirmation_id,
+                "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase}
+        validate_confirm_request(body)
+        return self._scale_set_enrollment_request("confirm", body)
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 
