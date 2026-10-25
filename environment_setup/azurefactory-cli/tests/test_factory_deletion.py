@@ -966,3 +966,72 @@ def test_broadened_or_changed_shared_hub_links_are_rejected(tmp_path, transport,
 def test_a_plan_without_shared_hub_links_still_reviews():
     from azurefactory.factory_deletion import describe_shared_hub_links
     assert describe_shared_hub_links({"contract": "ordered-project-pipelines-v1"}) == []
+
+
+def with_absent_teardown(transport):
+    """aif-130 shape: a failed single-writer bootstrap whose recorded groups are already gone (404)."""
+    plan = with_teardown(transport)
+    unlink, stage = plan["stages"]
+    unlink["links"], stage["resource_group_ids"], stage["delete"] = [], [], []
+    plan["protected_resources"] = []
+    transport.preview.update(deletion_targets=[], inventory=[], retained_resources=[])
+    return plan
+
+
+def test_already_absent_bootstrap_teardown_is_reviewed_and_confirmed(tmp_path, transport, capsys):
+    rehash(with_absent_teardown(transport))
+    assert prepare(tmp_path) == 0, capsys.readouterr().err
+    assert "operator-teardown" in capsys.readouterr().err
+    transport.records.clear()
+    assert confirm(tmp_path, "--yes", "--confirmation-phrase", PHRASE) == 0, capsys.readouterr().err
+    assert [record["url"] for record in transport.records] == [BASE + ENDPOINT + "/confirm"]
+
+
+@pytest.mark.parametrize("defect", ["ordered-pipeline", "teardown-still-deletes", "groups-still-frozen",
+                                    "hub-link-left", "extra-stage-kind", "retained-resource", "executor"])
+def test_empty_manifest_outside_the_absent_teardown_shape_is_refused(tmp_path, transport, capsys, defect):
+    if defect == "ordered-pipeline":
+        transport.preview.update(deletion_targets=[], inventory=[], retained_resources=[HUB])
+        plan = transport.preview["deletion_plan"]
+    else:
+        plan = with_absent_teardown(transport)
+        unlink, stage = plan["stages"]
+        if defect == "teardown-still-deletes":
+            stage["delete"] = [GROUP]
+        elif defect == "groups-still-frozen":
+            stage["resource_group_ids"] = [GROUP]
+        elif defect == "hub-link-left":
+            unlink["links"] = [{"id": HUB_DNS_LINK, "side": "hub", "remote_virtual_network_id": SPOKE_VNET.lower()}]
+        elif defect == "extra-stage-kind":
+            plan["stages"].append({**stage, "id": "common:" + SCALE, "kind": "common"})
+        elif defect == "retained-resource":
+            plan["protected_resources"] = [HUB_GROUP]
+            transport.preview["retained_resources"] = [HUB_GROUP]
+        elif defect == "executor":
+            plan["executor"] = "pipeline"
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert "empty deletion manifest" in capsys.readouterr().err
+    assert not (tmp_path / "receipt.json").exists()
+
+
+@pytest.mark.parametrize("defect", ["missing", "empty", "foreign-scale", "duplicate", "workflow", "record-hash"])
+def test_absent_teardown_requires_one_bootstrap_evidence_per_scale_set(tmp_path, transport, capsys, defect):
+    plan = with_absent_teardown(transport)
+    row = plan["bootstrap_evidence"][0]
+    if defect == "missing":
+        plan.pop("bootstrap_evidence")
+    elif defect == "empty":
+        plan["bootstrap_evidence"] = []
+    elif defect == "foreign-scale":
+        row["scale_set_id"] = "88888888-8888-4888-8888-888888888888"
+    elif defect == "duplicate":
+        plan["bootstrap_evidence"].append(dict(row))
+    elif defect == "workflow":
+        row["workflow_id"] = "not-a-uuid"
+    elif defect == "record-hash":
+        row["record_hash"] = "E" * 64
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert "bootstrap evidence" in capsys.readouterr().err
+    assert not (tmp_path / "receipt.json").exists()
