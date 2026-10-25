@@ -1514,6 +1514,11 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 continue
             if full_type in inline:
                 yield "inline", key + "/" + tail, None, None
+            elif (full_type + "/read" not in operations[namespace]
+                  and "supportstags" not in resource_capabilities.get(full_type, set())):
+                # A schema child without a read operation (none at all, or write-only) is a provider endpoint,
+                # not an inventoriable child: record it, never list it. Actual references still classify strictly.
+                yield "metadata", key + "/" + tail, full_type, None
             elif resource_kind(full_type) != "resource":
                 yield "metadata", key + "/" + tail, full_type, None
             else:

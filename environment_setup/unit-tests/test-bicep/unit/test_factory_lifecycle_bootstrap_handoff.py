@@ -379,6 +379,53 @@ def test_resource_closure_excludes_proven_action_metadata_not_actual_dependencie
     assert external.lower() not in closure["resources"]
 
 
+@pytest.mark.parametrize("child,operations", [
+    # aif-130 COMMON (2026-10-25): registries/agentPoolsOperationResults, registries/privateLinkResources,
+    # workspaces/metadata and workspaces/purgeLakeData have no operations; registries/updatePolicies,
+    # workspaces/api and storageAccounts/services are write-only. None is a readable child resource, yet the
+    # walk classified every schema child and stopped a succeeded COMMON with provider-resource-kind-unclassified.
+    ("networkSecurityGroups/privateLinkResources", ()),
+    ("networkSecurityGroups/updatePolicies", ("write",)),
+])
+def test_unreadable_provider_schema_children_are_metadata_not_a_closure_stop(child, operations):
+    class UnreadableChildCloud(MetadataCloud):
+        listed = []
+
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": child, "apiVersions": ["2024-05-01"]})
+            return result
+
+        def provider_operations(self, namespace):
+            return super().provider_operations(namespace) + [
+                namespace.lower() + "/" + child.lower() + "/" + action for action in operations]
+
+        def collection(self, path, api_version, extension=False):
+            self.listed.append(path.lower())
+            return super().collection(path, api_version, extension=extension)
+
+    cloud = UnreadableChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    path = NSG.lower() + "/" + child.split("/", 1)[1].lower()
+    assert closure["collections"][path] == {"non_resource_metadata": "microsoft.network/" + child.lower()}
+    assert path not in cloud.listed
+    assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
+
+
+def test_an_actual_reference_to_an_unreadable_kind_still_fails_closed():
+    class UnreadableChildCloud(MetadataCloud):
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": "networkSecurityGroups/updatePolicies",
+                                            "apiVersions": ["2024-05-01"]})
+            return result
+
+    cloud = UnreadableChildCloud()
+    cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": NSG + "/updatePolicies/default"}
+    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
+        fl.collect_resource_closure(cloud, [GROUP])
+
+
 @pytest.mark.parametrize("reference", [
     NSG + "/listDnsForwardingRulesets/not-a-resource",
     GROUP + "/providers/Unknown.Provider/resources/foreign",
