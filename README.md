@@ -2,8 +2,8 @@
 ![Header](documentation/v2/10-19/images/header.png)
 
 <p align="center">
-<b>Private, WAF-aligned AI landing zones on Azure, used since 2019.</b><br>
-Governed Microsoft Foundry, Azure Machine Learning and AI Search projects for every team, isolated across Dev, Stage and Prod.
+<b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
+Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources for full-stack development for every team, isolated across Dev, Stage and Prod environment. Reusable "Use Case Templates via "agent-factory" and "ml-factory" compatible with the already automated setup of the landingzones by the Azure factory.
 </p>
 
 <table>
