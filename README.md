@@ -1,4 +1,45 @@
 # Enterprise Scale AI Factory - submodule
+
+## Executive summary
+
+<p align="center">
+<b>Private, WAF-aligned AI landing zones on Azure, used since 2019.</b><br>
+Governed Microsoft Foundry, Azure Machine Learning and AI Search projects for every team, isolated across Dev, Stage and Prod.
+</p>
+
+<table>
+<tr>
+<td width="50%" rowspan="2" valign="top">
+<a href="./documentation/v2/10-19/10-factory-onion-architecture.md"><img src="./documentation/v2/10-19/images/10-factory-onion-architecture.gif" width="100%" alt="AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, with the time spent in each layer"></a><br>
+<sub><b>Architecture</b> · five layers, one direction, time per layer</sub>
+</td>
+<td width="50%" valign="top">
+<a href="./documentation/v2/30-39/37-mlops.md"><img src="./documentation/v2/10-19/images/concepts/mlops.gif" width="100%" alt="MLOps: versioned data, training, evaluation, registration, approved release and monitoring"></a><br>
+<sub><b>MLOps</b> · from versioned data to a monitored model</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="./documentation/v2/10_index.md#38-how-to-guide-llmops--rag-chat-agent"><img src="./documentation/v2/10-19/images/concepts/dataops-rag.gif" width="100%" alt="GenAIOps: DataOps and retrieval-augmented generation with permitted, cited evidence"></a><br>
+<sub><b>GenAIOps</b> · governed knowledge, grounded answers</sub>
+</td>
+</tr>
+</table>
+
+- **One governed lifecycle.** Create a factory, add scale sets and projects, update or delete them through one reviewed API: CLI, Python SDK, wizards or an Azure Function.
+- **Private by design.** Hub-spoke or Virtual WAN, private endpoints and DNS, isolation per team, Bicep through GitHub Actions or Azure DevOps.
+- **Operating models included.** DataOps, MLOps and GenAIOps templates that run on the secure infrastructure.
+
+<p align="center">
+<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up</b></a> &nbsp;·&nbsp;
+<a href="./documentation/v2/10-19/10-factory-onion-architecture.md"><b>Architecture</b></a> &nbsp;·&nbsp;
+<a href="./documentation/v2/10-19/22-lifecycle-azure-function.md"><b>Lifecycle API</b></a> &nbsp;·&nbsp;
+<a href="./documentation/readme.md"><b>Documentation</b></a><br>
+<sub>MLOps and GenAIOps are illustrative concept animations from the AI Factory Config Wizard.</sub>
+</p>
+
+---
+
 ![Header](documentation/v2/10-19/images/header.png)
 
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
