@@ -1172,7 +1172,7 @@ post_json "$review_dir/authorize-preview.json" /api/v1/operations/authorize-dele
   "$review_dir/authorize-request.json"
 jq . "$review_dir/authorize-preview.json"
 jq -e --arg factory "$factory_id" '.operation_mode == "provider-state" and .azure_writes == false
-  and .factory_id == $factory and .mode == "allow" and (.blockers | length == 0)
+  and .factory_id == $factory and .mode == "allow" and .can_execute == true and (.blockers | length == 0)
   and (.capabilities | index("authorize-deletion-v1") != null)' "$review_dir/authorize-preview.json" >/dev/null
 # STOP. After approval, type the exact phrase and POST it once; never retry an uncertain result.
 read -r -p 'Exact confirmation phrase from the preview: ' phrase

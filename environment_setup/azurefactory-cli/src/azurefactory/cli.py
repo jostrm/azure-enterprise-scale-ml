@@ -864,7 +864,7 @@ def _authorization_review(preview):
 
 
 def cmd_authorize_deletion_prepare(args):
-    from .authorization import OPERATION, PURPOSE, receipt_preview, validate_preview
+    from .authorization import OPERATION, PURPOSE, validate_preview
 
     if os.path.lexists(args.save_receipt):
         raise ConfigError("Refusing to overwrite an existing deletion authorization receipt.")
@@ -876,7 +876,7 @@ def cmd_authorize_deletion_prepare(args):
     _authorization_review(preview)
     try:
         write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation=OPERATION,
-                      request_body=request, preview=receipt_preview(preview))
+                      request_body=request, preview=preview)
     except OSError:
         raise ConfigError("Cannot write a new deletion authorization receipt; nothing was confirmed.") from None
     return emit(preview)

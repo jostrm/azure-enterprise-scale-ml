@@ -300,15 +300,23 @@ azurefactory authorize-deletion prepare --folder $env:FACTORY_FOLDER `
   --save-receipt .\authorize-deletion.receipt.json
 ```
 
-Use `--mode revoke` to remove the permission. Preparation writes nothing. The
-review shows the provider repository, state ref and reviewed head, the resource
-group scopes, the enrollment revision and coordination hash before and after,
-the bindings that change, warnings, blockers and the audit record that will be
-added. The CLI refuses a review that is not `provider-state`, does not state
-`azure_writes: false`, lacks `authorize-deletion-v1`, changes the folder,
-factory or mode, or whose phrase is not exactly `ALLOW DELETE <factory key>`
-(`--mode allow`) or `REVOKE DELETE <factory key>` (`--mode revoke`). A review
-with blockers is reported and never saved as approvable. Then, after a human
+Use `--mode revoke` to remove the permission. Preparation writes nothing; the
+review expires after 10 minutes. The API changes only `allow_delete` of the
+`aifactory-owned` scopes named in this factory's saved bindings. The review
+shows the provider repository, state ref and reviewed head, the scopes that
+change, the enrollment revision and coordination hash before and after, the
+saved bindings (`ado`/`gha`) it re-pins, warnings, blockers and the audit record.
+Blockers (`can_execute: false`) include an active run claim (run
+`reconcile-run-claim` first), queued or running workflow runs, a running local
+job, another factory's scopes or bindings, nothing to change and Blob
+coordination (not supported yet); a review blocked before reading the provider
+shows null repository, head and revisions. The CLI refuses a review that is not
+`provider-state`, does not state `azure_writes: false`, lacks
+`authorize-deletion-v1`, changes the folder, factory or mode, or whose phrase is
+not exactly `ALLOW DELETE <factory key>` (`--mode allow`) or
+`REVOKE DELETE <factory key>` (`--mode revoke`); the factory key is the factory
+prefix without its trailing dash, for example `aif-130`. A blocked review is
+reported and never saved as approvable. Then, after a human
 approves it:
 
 ```powershell
@@ -317,12 +325,15 @@ azurefactory authorize-deletion confirm --receipt .\authorize-deletion.receipt.j
 
 Confirmation requires the exact phrase (or, without a terminal, `--yes` together
 with `--confirmation-phrase`). The API repeats every check, requires the state
-to be unchanged since the review and makes one compare-and-swap that updates
-the reviewed bindings and adds
-`deletion-authorizations/<factory id>/<confirmation id>.json`; the result status
-is `authorized` or `revoked`. It never changes Azure, pipelines or the catalog
-and is never retried: after a timeout or an unexpected result, prepare again to
-read the current permission. The permission alone deletes nothing and lifts no
+to be unchanged since the review and makes one compare-and-swap of the state
+ref (enrollment revision + 1) that adds
+`deletion-authorizations/<factory id>/<confirmation id>.json`, then re-pins the
+saved bindings to the new enrollment; the result status is `authorized` or
+`revoked`. If only that local binding save failed, the next prepare offers a
+binding repair alone: no scopes, the original audit record, and a result whose
+`head` equals `previous_head`. It never changes Azure or pipelines and is never
+retried: after a timeout or an unexpected result, prepare again to read the
+current permission. The permission alone deletes nothing and lifts no
 other blocker; named whole-factory deletion under single-writer coordination is
 still pending (see
 [Delete a whole factory's Azure resources](#delete-a-whole-factorys-azure-resources)).

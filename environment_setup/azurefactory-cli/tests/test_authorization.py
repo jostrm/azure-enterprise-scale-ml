@@ -33,11 +33,11 @@ PHRASES = {"allow": "ALLOW DELETE " + FACTORY_KEY, "revoke": "REVOKE DELETE " + 
 def preview(mode="allow"):
     return {
         "contract_version": 1, "capabilities": ["authorize-deletion-v1"], "operation_mode": "provider-state",
-        "azure_writes": False, "folder": FOLDER, "factory_id": FACTORY, "mode": mode,
+        "azure_writes": False, "can_execute": True, "folder": FOLDER, "factory_id": FACTORY, "mode": mode,
         "repository": REPOSITORY, "state_ref": STATE_REF, "provider_head": HEAD, "scopes": list(SCOPES),
         "enrollment_revision": {"from": 3, "to": 4},
         "coordination_hash": {"from": "d" * 64, "to": "e" * 64},
-        "bindings": {"allow_delete": {"from": mode != "allow", "to": mode == "allow"}},
+        "bindings": ["gha"],
         "warnings": ["Deletion permission lets a reviewed delete-aifactory run remove these resource groups."],
         "blockers": [],
         "confirmation_id": CONFIRMATION, "preview_hash": "c" * 64,
@@ -52,7 +52,7 @@ def result(mode="allow"):
             "folder": FOLDER, "factory_id": FACTORY, "repository": REPOSITORY, "state_ref": STATE_REF,
             "previous_head": HEAD, "head": NEW_HEAD,
             "audit_record": "deletion-authorizations/" + FACTORY + "/" + CONFIRMATION + ".json",
-            "bindings_updated": 1, "message": "Deletion permission updated."}
+            "bindings_updated": ["gha"], "message": "Deletion permission updated."}
 
 
 @pytest.fixture
@@ -159,7 +159,10 @@ def change(field, value):
     change("scopes", None), change("scopes", [""]),
     change("enrollment_revision", None), change("enrollment_revision", {"to": 4}),
     change("coordination_hash", {"from": "d" * 64}),
-    change("bindings", None), change("warnings", None), change("warnings", [""]),
+    change("bindings", None), change("bindings", {"gha": 1}), change("bindings", ["github"]),
+    change("bindings", ["gha", "gha"]), change("can_execute", KeyError), change("can_execute", "true"),
+    change("enrollment_revision", {"from": 3, "to": 3}), change("coordination_hash", {"from": "d" * 64, "to": "d" * 64}),
+    change("repository", None), change("provider_head", None), change("warnings", None), change("warnings", [""]),
     change("blockers", None), change("expires_at", ""),
 ])
 def test_unsafe_or_changed_preview_never_saves_an_approvable_receipt(tmp_path, transport, capsys, unsafe):
@@ -171,26 +174,65 @@ def test_unsafe_or_changed_preview_never_saves_an_approvable_receipt(tmp_path, t
 
 
 def test_a_preview_with_blockers_is_reported_and_not_saved(tmp_path, transport, capsys):
-    transport.preview["blockers"] = ["The enrollment has an active run claim; reconcile it first."]
+    transport.preview.update(can_execute=False,
+                             blockers=["The enrollment has an active run claim; reconcile it first."])
     assert prepare(tmp_path) == 3
     assert not (tmp_path / "receipt.json").exists()
     assert "active run claim" in capsys.readouterr().err
 
 
-def test_an_explicit_can_execute_false_is_never_saved_as_approvable(tmp_path, transport, capsys):
-    transport.preview["can_execute"] = False
-    assert prepare(tmp_path) == 3
+@pytest.mark.parametrize("can_execute,blockers", [(False, []), (True, ["Nothing to change."])])
+def test_can_execute_that_disagrees_with_blockers_is_never_saved(tmp_path, transport, capsys, can_execute, blockers):
+    transport.preview.update(can_execute=can_execute, blockers=blockers)
+    assert prepare(tmp_path) == 2
     assert not (tmp_path / "receipt.json").exists()
 
 
-def test_the_exact_contract_needs_no_can_execute_and_an_explicit_true_is_accepted(tmp_path, transport, capsys):
-    assert "can_execute" not in transport.preview
-    make_receipt(tmp_path, transport, capsys)
-    receipt = json.loads((tmp_path / "receipt.json").read_text())
-    assert receipt["can_execute"] is True and receipt["preview"]["blockers"] == []
-    (tmp_path / "receipt.json").unlink()
-    transport.preview = {**preview(), "can_execute": True}
+def test_a_preview_blocked_before_reading_the_provider_is_reported_not_rejected(tmp_path, transport, capsys):
+    # Pink 68d5e8e: Blob coordination (or no binding) blocks before any provider read, so the
+    # repository, head and every {from,to} value are null.
+    transport.preview.update(
+        can_execute=False, repository=None, provider_head=None, scopes=[], bindings=[],
+        enrollment_revision={"from": None, "to": None}, coordination_hash={"from": None, "to": None},
+        blockers=["Blob-coordinated factories are not supported yet; nothing was changed."])
+    assert prepare(tmp_path) == 3
+    assert not (tmp_path / "receipt.json").exists()
+    assert "Blob-coordinated" in capsys.readouterr().err
+
+
+def repair(p):
+    # Pink 68d5e8e: only the local binding save failed; the next prepare repairs just the binding.
+    p.update(scopes=[], enrollment_revision={"from": 4, "to": 4}, coordination_hash={"from": "e" * 64, "to": "e" * 64},
+             audit_record="deletion-authorizations/" + FACTORY + "/" + OTHER + ".json")
+    return p
+
+
+def test_a_binding_repair_review_reuses_its_audit_record_and_keeps_the_head(tmp_path, transport, capsys):
+    repair(transport.preview)
+    transport.result.update(head=HEAD, audit_record=transport.preview["audit_record"])
     assert prepare(tmp_path) == 0
+    transport.records.clear()
+    capsys.readouterr()
+    assert confirm(tmp_path, "--yes", "--confirmation-phrase", PHRASES["allow"]) == 0
+    assert json.loads(capsys.readouterr().out)["head"] == HEAD
+
+
+@pytest.mark.parametrize("unsafe", [
+    change("bindings", []), change("audit_record", "deletion-authorizations/" + OTHER + "/" + OTHER + ".json"),
+    change("enrollment_revision", {"from": 4, "to": 5}),
+])
+def test_a_binding_repair_review_must_name_bindings_and_its_own_factory_record(tmp_path, transport, capsys, unsafe):
+    unsafe(repair(transport.preview))
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_a_binding_repair_result_that_moves_the_head_is_a_failure(tmp_path, transport, capsys):
+    repair(transport.preview)
+    transport.result.update(audit_record=transport.preview["audit_record"])
+    assert prepare(tmp_path) == 0
+    capsys.readouterr()
+    assert confirm(tmp_path, "--yes", "--confirmation-phrase", PHRASES["allow"]) == 5
 
 
 @pytest.mark.parametrize("mode", ["allow", "revoke"])
@@ -245,7 +287,7 @@ def test_interactive_review_comes_before_the_questions(tmp_path, transport, caps
     ("status", "revoked"), ("status", "uncertain"), ("factory_id", OTHER), ("contract_version", 2),
     ("head", HEAD), ("previous_head", NEW_HEAD), ("state_ref", "refs/heads/main"),
     ("audit_record", "deletion-authorizations/other.json"), ("folder", r"C:\another\azurefactory"),
-    ("repository", "https://github.com/org/other"),
+    ("repository", "https://github.com/org/other"), ("bindings_updated", ["ado"]), ("bindings_updated", None),
 ])
 def test_an_unexpected_confirmation_result_is_a_failure_not_success(tmp_path, transport, capsys, field, value):
     make_receipt(tmp_path, transport, capsys)
