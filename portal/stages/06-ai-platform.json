@@ -1,0 +1,2692 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "6510586849866158344"
+    }
+  },
+  "parameters": {
+    "env": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment: dev, test, prod"
+      }
+    },
+    "projectNumber": {
+      "type": "string",
+      "metadata": {
+        "description": "Project number (e.g., \"005\")"
+      }
+    },
+    "resolvedManagedIdentityNames": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming."
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "locationSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "Location suffix (e.g., \"weu\", \"swc\")"
+      }
+    },
+    "commonResourceSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "Common resource suffix (e.g., \"-001\")"
+      }
+    },
+    "resourceSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "Project-specific resource suffix"
+      }
+    },
+    "aiHubExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "aifProjectExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "miPrjExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enableAIFoundryHub": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "addAIFoundryHub": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enableAzureOpenAI": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enableAISearch": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enableAIServices": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "addAISearch": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "diagnosticSettingLevel": {
+      "type": "string",
+      "defaultValue": "silver",
+      "allowedValues": [
+        "gold",
+        "silver",
+        "bronze"
+      ],
+      "metadata": {
+        "description": "Diagnostic setting level for monitoring and logging"
+      }
+    },
+    "cmk": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Customer Managed Keys (CMK) encryption"
+      }
+    },
+    "cmkKeyName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Name of the Customer Managed Key in Key Vault"
+      }
+    },
+    "deployModel_gpt_X": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy GPT-X model"
+      }
+    },
+    "modelGPTXName": {
+      "type": "string",
+      "defaultValue": "gpt-5.4-mini",
+      "metadata": {
+        "description": "GPT-X model name if deploying"
+      }
+    },
+    "modelGPTXVersion": {
+      "type": "string",
+      "defaultValue": "2026-03-17",
+      "metadata": {
+        "description": "GPT-X model version if deploying"
+      }
+    },
+    "modelGPTXSku": {
+      "type": "string",
+      "defaultValue": "DataZoneStandard",
+      "allowedValues": [
+        "Standard",
+        "DataZoneStandard",
+        "GlobalStandard"
+      ]
+    },
+    "modelGPTXCapacity": {
+      "type": "int",
+      "defaultValue": 30,
+      "metadata": {
+        "description": "TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K"
+      }
+    },
+    "deployModel_text_embedding_ada_002": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy text-embedding-ada-002 model"
+      }
+    },
+    "deployModel_text_embedding_3_large": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy text-embedding-3-large model"
+      }
+    },
+    "deployModel_text_embedding_3_small": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy text-embedding-3-small model"
+      }
+    },
+    "default_embedding_capacity": {
+      "type": "int",
+      "defaultValue": 25,
+      "metadata": {
+        "description": "Default capacity for embedding models"
+      }
+    },
+    "default_gpt_capacity": {
+      "type": "int",
+      "defaultValue": 40,
+      "metadata": {
+        "description": "Default capacity for GPT models"
+      }
+    },
+    "deployModel_gpt_4o": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy GPT-4o model"
+      }
+    },
+    "default_gpt_4o_version": {
+      "type": "string",
+      "defaultValue": "2024-11-20"
+    },
+    "deployModel_gpt_54_mini": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether to deploy GPT-5.4-mini model"
+      }
+    },
+    "default_gpt_54_mini_version": {
+      "type": "string",
+      "defaultValue": "2026-03-17"
+    },
+    "default_model_sku": {
+      "type": "string",
+      "defaultValue": "DataZoneStandard",
+      "allowedValues": [
+        "Standard",
+        "DataZoneStandard",
+        "GlobalStandard"
+      ],
+      "metadata": {
+        "description": "Default SKU for models"
+      }
+    },
+    "inputKeyvault": {
+      "type": "string",
+      "metadata": {
+        "description": "Keyvault seeding configuration"
+      }
+    },
+    "inputKeyvaultResourcegroup": {
+      "type": "string"
+    },
+    "inputKeyvaultSubscription": {
+      "type": "string"
+    },
+    "projectServicePrincipleOID_SeedingKeyvaultName": {
+      "type": "string"
+    },
+    "enablePublicGenAIAccess": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "allowPublicAccessWhenBehindVnet": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enablePublicAccessWithPerimeter": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "centralDnsZoneByPolicyInHub": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "genaiSubnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "Required subnet IDs from subnet calculator"
+      }
+    },
+    "aksSubnetId": {
+      "type": "string"
+    },
+    "acaSubnetId": {
+      "type": "string"
+    },
+    "aca2SubnetId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional subnets from subnet calculator"
+      }
+    },
+    "aks2SubnetId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "webappSubnetId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)"
+      }
+    },
+    "logicappSubnetId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "dbxPubSubnetName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "if projectype is not genai-1, but instead all"
+      }
+    },
+    "dbxPrivSubnetName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "vnetNameBase": {
+      "type": "string"
+    },
+    "vnetResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "vnetNameFull_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "network_env": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "common_subnet_name": {
+      "type": "string"
+    },
+    "subnetCommon": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetCommonScoring": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "privDnsSubscription_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "privDnsResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "commonResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "tagsProject": {
+      "type": "object",
+      "defaultValue": {}
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {}
+    },
+    "IPwhiteList": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "aifactorySuffixRG": {
+      "type": "string"
+    },
+    "commonRGNamePrefix": {
+      "type": "string"
+    },
+    "aifactorySalt10char": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "randomValue": {
+      "type": "string"
+    },
+    "technicalAdminsObjectID": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "technicalAdminsEmail": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subscriptionIdDevTestProd": {
+      "type": "string",
+      "defaultValue": "[subscription().subscriptionId]"
+    },
+    "useCommonACR": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "useAdGroups": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "projectPrefix": {
+      "type": "string",
+      "defaultValue": "esml-"
+    },
+    "projectSuffix": {
+      "type": "string",
+      "defaultValue": "-rg"
+    },
+    "commonResourceName": {
+      "type": "string",
+      "defaultValue": "esml-common",
+      "metadata": {
+        "description": "Common resource name identifier. Default is \"esml-common\""
+      }
+    }
+  },
+  "variables": {
+    "copy": [
+      {
+        "name": "ipWhitelist_remove_ending_32",
+        "count": "[length(variables('ipWhitelist_array'))]",
+        "input": "[replace(variables('ipWhitelist_array')[copyIndex('ipWhitelist_remove_ending_32')], '/32', '')]"
+      },
+      {
+        "name": "ipWhitelist_normalized",
+        "count": "[length(variables('ipWhitelist_array'))]",
+        "input": "[if(contains(trim(variables('ipWhitelist_array')[copyIndex('ipWhitelist_normalized')]), '/'), trim(variables('ipWhitelist_array')[copyIndex('ipWhitelist_normalized')]), format('{0}/32', trim(variables('ipWhitelist_array')[copyIndex('ipWhitelist_normalized')])))]"
+      },
+      {
+        "name": "processedIpRulesAzureML",
+        "count": "[length(variables('ipWhitelist_array'))]",
+        "input": {
+          "action": "Allow",
+          "value": "[if(contains(variables('ipWhitelist_array')[copyIndex('processedIpRulesAzureML')], '/'), variables('ipWhitelist_array')[copyIndex('processedIpRulesAzureML')], format('{0}/32', variables('ipWhitelist_array')[copyIndex('processedIpRulesAzureML')]))]"
+        }
+      },
+      {
+        "name": "processedIpRulesAIHub",
+        "count": "[length(variables('ipWhitelist_array'))]",
+        "input": {
+          "action": "Allow",
+          "value": "[trim(variables('ipWhitelist_array')[copyIndex('processedIpRulesAIHub')])]"
+        }
+      }
+    ],
+    "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+    "commonResourceGroup": "[if(not(empty(parameters('commonResourceGroup_param'))), parameters('commonResourceGroup_param'), format('{0}{1}-{2}-{3}{4}', parameters('commonRGNamePrefix'), parameters('commonResourceName'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG')))]",
+    "targetResourceGroup": "[format('{0}{1}{2}-{3}-{4}{5}{6}', parameters('commonRGNamePrefix'), parameters('projectPrefix'), replace(variables('projectName'), 'prj', 'project'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG'), parameters('projectSuffix'))]",
+    "vnetNameFull": "[if(not(empty(parameters('vnetNameFull_param'))), replace(parameters('vnetNameFull_param'), '<network_env>', parameters('network_env')), format('{0}-{1}-{2}{3}', parameters('vnetNameBase'), parameters('locationSuffix'), parameters('env'), parameters('commonResourceSuffix')))]",
+    "vnetResourceGroupName": "[if(not(empty(parameters('vnetResourceGroup_param'))), replace(parameters('vnetResourceGroup_param'), '<network_env>', parameters('network_env')), variables('commonResourceGroup'))]",
+    "privDnsResourceGroupName": "[if(and(not(empty(parameters('privDnsResourceGroup_param'))), parameters('centralDnsZoneByPolicyInHub')), parameters('privDnsResourceGroup_param'), variables('vnetResourceGroupName'))]",
+    "privDnsSubscription": "[if(and(not(empty(parameters('privDnsSubscription_param'))), parameters('centralDnsZoneByPolicyInHub')), parameters('privDnsSubscription_param'), parameters('subscriptionIdDevTestProd'))]",
+    "randomSalt": "[substring(uniqueString(subscription().subscriptionId, variables('targetResourceGroup')), 0, 5)]",
+    "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', variables('projectName'), parameters('env'), variables('randomSalt'))]",
+    "segments": "[split(parameters('genaiSubnetId'), '/')]",
+    "vnetName": "[variables('segments')[sub(length(variables('segments')), 3)]]",
+    "commonSubnetPends": "[if(not(equals(parameters('subnetCommon'), '')), replace(parameters('subnetCommon'), '<network_env>', parameters('network_env')), parameters('common_subnet_name'))]",
+    "commonSubnetResourceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', split(format('{0}/{1}', variables('vnetNameFull'), variables('commonSubnetPends')), '/')[0], split(format('{0}/{1}', variables('vnetNameFull'), variables('commonSubnetPends')), '/')[1])]",
+    "ipWhitelist_array": "[if(not(empty(parameters('IPwhiteList'))), split(parameters('IPwhiteList'), ','), createArray())]",
+    "cmnName_Static": "cmn",
+    "laWorkspaceName_Static": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName_Static'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv_Static'), parameters('commonResourceSuffix'))]",
+    "uniqueInAIFenv_Static": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup'))), 0, 5)]",
+    "randomSaltLogic": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 0, 10), parameters('aifactorySalt10char'))]",
+    "miPrjName_Static": "[if(empty(tryGet(parameters('resolvedManagedIdentityNames'), 'project')), format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv_Static'), variables('randomSaltLogic'), parameters('resourceSuffix')), parameters('resolvedManagedIdentityNames').project)]",
+    "aiModels": "[concat(if(parameters('deployModel_gpt_X'), createArray(createObject('modelName', parameters('modelGPTXName'), 'version', parameters('modelGPTXVersion'), 'capacity', parameters('modelGPTXCapacity'), 'skuLocation', parameters('modelGPTXSku'))), createArray()), if(parameters('deployModel_gpt_54_mini'), createArray(createObject('modelName', 'gpt-5.4-mini', 'version', parameters('default_gpt_54_mini_version'), 'capacity', parameters('default_gpt_capacity'), 'skuLocation', 'DataZoneStandard')), createArray()), if(parameters('deployModel_gpt_4o'), createArray(createObject('modelName', 'gpt-4o', 'version', parameters('default_gpt_4o_version'), 'capacity', parameters('default_gpt_capacity'), 'skuLocation', parameters('default_model_sku'))), createArray()), if(parameters('deployModel_text_embedding_ada_002'), createArray(createObject('modelName', 'text-embedding-ada-002', 'version', '2', 'capacity', parameters('default_embedding_capacity'), 'skuLocation', parameters('default_model_sku'))), createArray()), if(parameters('deployModel_text_embedding_3_large'), createArray(createObject('modelName', 'text-embedding-3-large', 'version', '1', 'capacity', parameters('default_embedding_capacity'), 'skuLocation', parameters('default_model_sku'))), createArray()), if(parameters('deployModel_text_embedding_3_small'), createArray(createObject('modelName', 'text-embedding-3-small', 'version', '1', 'capacity', parameters('default_embedding_capacity'), 'skuLocation', parameters('default_model_sku'))), createArray()))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('06-naming-{0}', variables('targetResourceGroup')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resolvedManagedIdentityNames": {
+            "value": "[parameters('resolvedManagedIdentityNames')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "projectNumber": {
+            "value": "[parameters('projectNumber')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "commonResourceSuffix": {
+            "value": "[parameters('commonResourceSuffix')]"
+          },
+          "resourceSuffix": {
+            "value": "[parameters('resourceSuffix')]"
+          },
+          "aifactorySalt10char": {
+            "value": "[parameters('aifactorySalt10char')]"
+          },
+          "randomValue": {
+            "value": "[parameters('randomValue')]"
+          },
+          "aifactorySuffixRG": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "commonRGNamePrefix": {
+            "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "technicalAdminsObjectID": {
+            "value": "[parameters('technicalAdminsObjectID')]"
+          },
+          "technicalAdminsEmail": {
+            "value": "[parameters('technicalAdminsEmail')]"
+          },
+          "commonResourceGroupName": {
+            "value": "[variables('commonResourceGroup')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[parameters('subscriptionIdDevTestProd')]"
+          },
+          "acaSubnetId": {
+            "value": "[parameters('acaSubnetId')]"
+          },
+          "aksSubnetId": {
+            "value": "[parameters('aksSubnetId')]"
+          },
+          "genaiSubnetId": {
+            "value": "[parameters('genaiSubnetId')]"
+          },
+          "aca2SubnetId": {
+            "value": "[parameters('aca2SubnetId')]"
+          },
+          "aks2SubnetId": {
+            "value": "[parameters('aks2SubnetId')]"
+          },
+          "addAIFoundryHub": {
+            "value": "[parameters('addAIFoundryHub')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "11645696908663760612"
+            }
+          },
+          "definitions": {
+            "aifactoryNamingType": {
+              "type": "object",
+              "properties": {
+                "genaiSubnetName": {
+                  "type": "string"
+                },
+                "aksSubnetName": {
+                  "type": "string"
+                },
+                "aks2SubnetName": {
+                  "type": "string"
+                },
+                "acaSubnetName": {
+                  "type": "string"
+                },
+                "aca2SubnetName": {
+                  "type": "string"
+                },
+                "defaultSubnet": {
+                  "type": "string"
+                },
+                "aifV1HubName": {
+                  "type": "string"
+                },
+                "aifV1ProjectName": {
+                  "type": "string"
+                },
+                "aifV2Name": {
+                  "type": "string"
+                },
+                "aifV2PrjName": {
+                  "type": "string"
+                },
+                "aifV2NameAdd": {
+                  "type": "string"
+                },
+                "aifV2PrjNameAdd": {
+                  "type": "string"
+                },
+                "aoaiName": {
+                  "type": "string"
+                },
+                "amlName": {
+                  "type": "string"
+                },
+                "safeNameAISearch": {
+                  "type": "string"
+                },
+                "aiServicesName": {
+                  "type": "string"
+                },
+                "dashboardInsightsName": {
+                  "type": "string"
+                },
+                "applicationInsightName": {
+                  "type": "string"
+                },
+                "applicationInsightName2": {
+                  "type": "string"
+                },
+                "bingName": {
+                  "type": "string"
+                },
+                "containerAppsEnvName": {
+                  "type": "string"
+                },
+                "containerAppAName": {
+                  "type": "string"
+                },
+                "containerAppWName": {
+                  "type": "string"
+                },
+                "cosmosDBName": {
+                  "type": "string"
+                },
+                "redisName": {
+                  "type": "string"
+                },
+                "postgreSQLName": {
+                  "type": "string"
+                },
+                "sqlServerName": {
+                  "type": "string"
+                },
+                "sqlDBName": {
+                  "type": "string"
+                },
+                "functionAppName": {
+                  "type": "string"
+                },
+                "webAppName": {
+                  "type": "string"
+                },
+                "funcAppServicePlanName": {
+                  "type": "string"
+                },
+                "webbAppServicePlanName": {
+                  "type": "string"
+                },
+                "vmName": {
+                  "type": "string"
+                },
+                "keyvaultName": {
+                  "type": "string"
+                },
+                "storageAccount1001Name": {
+                  "type": "string"
+                },
+                "storageAccount2001Name": {
+                  "type": "string"
+                },
+                "acrProjectName": {
+                  "type": "string"
+                },
+                "acrCommonName": {
+                  "type": "string"
+                },
+                "miACAName": {
+                  "type": "string"
+                },
+                "miPrjName": {
+                  "type": "string"
+                },
+                "laWorkspaceName": {
+                  "type": "string"
+                },
+                "projectName": {
+                  "type": "string"
+                },
+                "cmnName": {
+                  "type": "string"
+                },
+                "kvNameCommon": {
+                  "type": "string"
+                },
+                "genaiName": {
+                  "type": "string"
+                },
+                "prjResourceSuffixNoDash": {
+                  "type": "string"
+                },
+                "twoNumbers": {
+                  "type": "string"
+                },
+                "p011_genai_team_lead_array": {
+                  "type": "array"
+                },
+                "p011_genai_team_lead_email_array": {
+                  "type": "array"
+                },
+                "uniqueInAIFenv": {
+                  "type": "string"
+                },
+                "randomSalt": {
+                  "type": "string"
+                },
+                "projectTypeESMLName": {
+                  "type": "string"
+                },
+                "projectTypeGenAIName": {
+                  "type": "string"
+                },
+                "aksClusterName": {
+                  "type": "string"
+                },
+                "dataFactoryName": {
+                  "type": "string"
+                }
+              },
+              "metadata": {
+                "__bicep_imported_from!": {
+                  "sourceTemplate": "../types/aifactoryNaming.bicep"
+                }
+              }
+            }
+          },
+          "parameters": {
+            "env": {
+              "type": "string",
+              "allowedValues": [
+                "dev",
+                "test",
+                "prod"
+              ],
+              "metadata": {
+                "description": "Environment: dev, test, prod"
+              }
+            },
+            "keepMIandKVsuffixAs001": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "resolvedManagedIdentityNames": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming."
+              }
+            },
+            "projectNumber": {
+              "type": "string",
+              "metadata": {
+                "description": "Project number (e.g., \"005\")"
+              }
+            },
+            "locationSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Location suffix (e.g., \"weu\", \"swc\")"
+              }
+            },
+            "commonResourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Common resource suffix (e.g., \"-001\")"
+              }
+            },
+            "resourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Project-specific resource suffix"
+              }
+            },
+            "aifactorySalt10char": {
+              "type": "string",
+              "metadata": {
+                "description": "Random salt for unique naming"
+              }
+            },
+            "randomValue": {
+              "type": "string"
+            },
+            "aifactorySuffixRG": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Factory suffix for resource groups"
+              }
+            },
+            "commonRGNamePrefix": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Common resource group name prefix"
+              }
+            },
+            "technicalAdminsObjectID": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins OID list"
+              }
+            },
+            "technicalAdminsEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins EMAIL list"
+              }
+            },
+            "commonResourceGroupName": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "genaiSubnetId": {
+              "type": "string"
+            },
+            "aksSubnetId": {
+              "type": "string"
+            },
+            "aks2SubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "acaSubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "aca2SubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "webappSubnetId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "postGresAdminEmails": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "addAIFoundryHub": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Add AI Foundry Hub with random naming for debugging/testing"
+              }
+            },
+            "addAzureMachineLearning": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Add Azure Machine Learning with random naming for debugging/testing"
+              }
+            }
+          },
+          "variables": {
+            "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+            "cmnName": "cmn",
+            "genaiName": "genai",
+            "prjResourceSuffixNoDash": "[replace(parameters('resourceSuffix'), '-', '')]",
+            "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
+            "resourceSuffixPlusOne": "[format('-{0}', padLeft(string(add(int(substring(parameters('resourceSuffix'), 1, 3)), 1)), 3, '0'))]",
+            "technicalAdminsObjectID_array": "[array(split(replace(parameters('technicalAdminsObjectID'), '\\s+', ''), ','))]",
+            "p011_genai_team_lead_array": "[if(empty(parameters('technicalAdminsObjectID')), createArray(), union(variables('technicalAdminsObjectID_array'), createArray()))]",
+            "postGresAdminEmailsLocal_array": "[array(split(replace(parameters('postGresAdminEmails'), '\\s+', ''), ','))]",
+            "postGresAdminEmailsLocal": "[if(empty(parameters('postGresAdminEmails')), createArray(), union(variables('postGresAdminEmailsLocal_array'), createArray()))]",
+            "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+            "p011_genai_team_lead_email_array": "[if(empty(parameters('technicalAdminsEmail')), createArray(), variables('technicalAdminsEmail_array'))]",
+            "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 0, 10), parameters('aifactorySalt10char'))]",
+            "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', parameters('commonResourceGroupName'))), 0, 5)]",
+            "cleanRandomValue": "[toLower(replace(replace(variables('randomSalt'), '-', ''), '_', ''))]",
+            "aifRandom": "[take(variables('cleanRandomValue'), 2)]",
+            "aifWithRandom": "[take(format('aif-hub-{0}-{1}-{2}-{3}{4}{5}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('aifRandom'), parameters('resourceSuffix')), 64)]",
+            "aifV1HubName": "[if(parameters('addAIFoundryHub'), variables('aifWithRandom'), format('aif-hub-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix')))]",
+            "aifV1ProjectName": "[format('aif-p-{0}-1-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifV2NameBase": "[take(replace(toLower(format('aif2{0}{1}', variables('uniqueInAIFenv'), variables('cleanRandomValue'))), '-', ''), 12)]",
+            "aifV2PrjNameBase": "[take(toLower(format('aif2-p{0}{1}{2}', parameters('projectNumber'), variables('uniqueInAIFenv'), variables('cleanRandomValue'))), 12)]",
+            "aifV2Name": "[take(toLower(format('{0}{1}{2}', variables('aifV2NameBase'), parameters('projectNumber'), parameters('env'))), 20)]",
+            "aifV2PrjName": "[take(toLower(format('{0}{1}', variables('aifV2PrjNameBase'), parameters('env'))), 20)]",
+            "lastSuffixChar": "[if(and(not(empty(parameters('resourceSuffix'))), greater(length(parameters('resourceSuffix')), 0)), substring(parameters('resourceSuffix'), max(0, sub(length(parameters('resourceSuffix')), 1)), 1), '')]",
+            "aif2RandomBase": "[take(format('aif2{0}{1}', variables('lastSuffixChar'), variables('cleanRandomValue')), 12)]",
+            "aifp2RandomBase": "[take(format('aif2-p{0}{1}{2}', parameters('projectNumber'), variables('lastSuffixChar'), variables('cleanRandomValue')), 12)]",
+            "aif2Random": "[take(toLower(format('{0}{1}{2}', variables('aif2RandomBase'), parameters('projectNumber'), parameters('env'))), 20)]",
+            "aifp2Random": "[take(toLower(format('{0}{1}', variables('aifp2RandomBase'), parameters('env'))), 20)]",
+            "aifV2NameAdd": "[variables('aif2Random')]",
+            "aifV2PrjNameAdd": "[variables('aifp2Random')]",
+            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "amlWithRandom": "[take(format('aml-{0}-{1}-{2}-{3}{4}{5}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('aifRandom'), parameters('resourceSuffix')), 64)]",
+            "amlName": "[if(parameters('addAzureMachineLearning'), variables('amlWithRandom'), format('aml-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix')))]",
+            "safeNameAISearch": "[take(replace(toLower(format('aisearch{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', ''), 64)]",
+            "aiServicesName": "[take(replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', ''), 64)]",
+            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName2": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('resourceSuffixPlusOne'))]",
+            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('twoNumbers'))]",
+            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
+            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', variables('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
+            "miSuffix": "[if(parameters('keepMIandKVsuffixAs001'), '-001', parameters('resourceSuffix'))]",
+            "miACAName": "[if(empty(tryGet(parameters('resolvedManagedIdentityNames'), 'containerApps')), format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('miSuffix')), parameters('resolvedManagedIdentityNames').containerApps)]",
+            "miPrjName": "[if(empty(tryGet(parameters('resolvedManagedIdentityNames'), 'project')), format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('miSuffix')), parameters('resolvedManagedIdentityNames').project)]",
+            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "segments": "[filter(split(parameters('genaiSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "genaiSubnetName": "[if(greater(length(variables('segments')), 0), variables('segments')[sub(length(variables('segments')), 1)], '')]",
+            "defaultSubnet": "[variables('genaiSubnetName')]",
+            "segmentsAKS": "[filter(split(parameters('aksSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "segmentsAKS2": "[filter(split(parameters('aks2SubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "aksSubnetName": "[if(greater(length(variables('segmentsAKS')), 0), variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)], '')]",
+            "aks2SubnetName": "[if(greater(length(variables('segmentsAKS2')), 0), variables('segmentsAKS2')[sub(length(variables('segmentsAKS2')), 1)], '')]",
+            "segmentsACA": "[filter(split(parameters('acaSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "segmentsACA2": "[filter(split(parameters('aca2SubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "acaSubnetName": "[if(greater(length(variables('segmentsACA')), 0), variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)], '')]",
+            "aca2SubnetName": "[if(greater(length(variables('segmentsACA2')), 0), variables('segmentsACA2')[sub(length(variables('segmentsACA2')), 1)], '')]",
+            "segmentsWebapp": "[filter(split(parameters('webappSubnetId'), '/'), lambda('s', not(empty(lambdaVariables('s')))))]",
+            "webappSubnetName": "[if(greater(length(variables('segmentsWebapp')), 0), variables('segmentsWebapp')[sub(length(variables('segmentsWebapp')), 1)], '')]",
+            "adfName": "[format('adf-{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]"
+          },
+          "resources": {
+            "commonResourceGroupRef": {
+              "existing": true,
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2024-07-01",
+              "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+              "name": "[parameters('commonResourceGroupName')]"
+            }
+          },
+          "outputs": {
+            "genaiSubnetName": {
+              "type": "string",
+              "value": "[variables('genaiSubnetName')]"
+            },
+            "aksSubnetName": {
+              "type": "string",
+              "value": "[variables('aksSubnetName')]"
+            },
+            "aks2SubnetName": {
+              "type": "string",
+              "value": "[variables('aks2SubnetName')]"
+            },
+            "acaSubnetName": {
+              "type": "string",
+              "value": "[variables('acaSubnetName')]"
+            },
+            "aca2SubnetName": {
+              "type": "string",
+              "value": "[variables('aca2SubnetName')]"
+            },
+            "webappSubnetName": {
+              "type": "string",
+              "value": "[variables('webappSubnetName')]"
+            },
+            "defaultSubnet": {
+              "type": "string",
+              "value": "[variables('defaultSubnet')]"
+            },
+            "aoaiName": {
+              "type": "string",
+              "value": "[variables('aoaiName')]"
+            },
+            "amlName": {
+              "type": "string",
+              "value": "[variables('amlName')]"
+            },
+            "safeNameAISearch": {
+              "type": "string",
+              "value": "[variables('safeNameAISearch')]"
+            },
+            "aiServicesName": {
+              "type": "string",
+              "value": "[variables('aiServicesName')]"
+            },
+            "dashboardInsightsName": {
+              "type": "string",
+              "value": "[variables('dashboardInsightsName')]"
+            },
+            "applicationInsightName": {
+              "type": "string",
+              "value": "[variables('applicationInsightName')]"
+            },
+            "applicationInsightName2": {
+              "type": "string",
+              "value": "[variables('applicationInsightName2')]"
+            },
+            "bingName": {
+              "type": "string",
+              "value": "[variables('bingName')]"
+            },
+            "containerAppsEnvName": {
+              "type": "string",
+              "value": "[variables('containerAppsEnvName')]"
+            },
+            "containerAppAName": {
+              "type": "string",
+              "value": "[variables('containerAppAName')]"
+            },
+            "containerAppWName": {
+              "type": "string",
+              "value": "[variables('containerAppWName')]"
+            },
+            "cosmosDBName": {
+              "type": "string",
+              "value": "[variables('cosmosDBName')]"
+            },
+            "redisName": {
+              "type": "string",
+              "value": "[variables('redisName')]"
+            },
+            "postgreSQLName": {
+              "type": "string",
+              "value": "[variables('postgreSQLName')]"
+            },
+            "sqlServerName": {
+              "type": "string",
+              "value": "[variables('sqlServerName')]"
+            },
+            "sqlDBName": {
+              "type": "string",
+              "value": "[variables('sqlDBName')]"
+            },
+            "functionAppName": {
+              "type": "string",
+              "value": "[variables('functionAppName')]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[variables('webAppName')]"
+            },
+            "funcAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('funcAppServicePlanName')]"
+            },
+            "webbAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('webbAppServicePlanName')]"
+            },
+            "vmName": {
+              "type": "string",
+              "value": "[variables('vmName')]"
+            },
+            "aifV1HubName": {
+              "type": "string",
+              "value": "[variables('aifV1HubName')]"
+            },
+            "aifV1ProjectName": {
+              "type": "string",
+              "value": "[variables('aifV1ProjectName')]"
+            },
+            "aifV2Name": {
+              "type": "string",
+              "value": "[variables('aifV2Name')]"
+            },
+            "aifV2PrjName": {
+              "type": "string",
+              "value": "[variables('aifV2PrjName')]"
+            },
+            "aifV2NameAdd": {
+              "type": "string",
+              "value": "[variables('aifV2NameAdd')]"
+            },
+            "aifV2PrjNameAdd": {
+              "type": "string",
+              "value": "[variables('aifV2PrjNameAdd')]"
+            },
+            "keyvaultName": {
+              "type": "string",
+              "value": "[variables('keyvaultName')]"
+            },
+            "storageAccount1001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount1001Name')]"
+            },
+            "storageAccount2001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount2001Name')]"
+            },
+            "acrProjectName": {
+              "type": "string",
+              "value": "[variables('acrProjectName')]"
+            },
+            "acrCommonName": {
+              "type": "string",
+              "value": "[variables('acrCommonName')]"
+            },
+            "miACAName": {
+              "type": "string",
+              "value": "[variables('miACAName')]"
+            },
+            "miPrjName": {
+              "type": "string",
+              "value": "[variables('miPrjName')]"
+            },
+            "laWorkspaceName": {
+              "type": "string",
+              "value": "[variables('laWorkspaceName')]"
+            },
+            "projectName": {
+              "type": "string",
+              "value": "[variables('projectName')]"
+            },
+            "cmnName": {
+              "type": "string",
+              "value": "[variables('cmnName')]"
+            },
+            "kvNameCommon": {
+              "type": "string",
+              "value": "[format('kv-{0}{1}-{2}{3}', variables('cmnName'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]"
+            },
+            "genaiName": {
+              "type": "string",
+              "value": "[variables('genaiName')]"
+            },
+            "prjResourceSuffixNoDash": {
+              "type": "string",
+              "value": "[variables('prjResourceSuffixNoDash')]"
+            },
+            "twoNumbers": {
+              "type": "string",
+              "value": "[variables('twoNumbers')]"
+            },
+            "p011_genai_team_lead_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_array')]"
+            },
+            "postGresAdminEmails": {
+              "type": "array",
+              "value": "[variables('postGresAdminEmailsLocal')]"
+            },
+            "p011_genai_team_lead_email_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_email_array')]"
+            },
+            "uniqueInAIFenv": {
+              "type": "string",
+              "value": "[variables('uniqueInAIFenv')]"
+            },
+            "randomSalt": {
+              "type": "string",
+              "value": "[variables('randomSalt')]"
+            },
+            "projectTypeESMLName": {
+              "type": "string",
+              "value": "esml"
+            },
+            "projectTypeGenAIName": {
+              "type": "string",
+              "value": "genai"
+            },
+            "aksClusterName": {
+              "type": "string",
+              "value": "[format('aks{0}-{1}-{2}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'))]"
+            },
+            "dataFactoryName": {
+              "type": "string",
+              "value": "[variables('adfName')]"
+            },
+            "namingConvention": {
+              "$ref": "#/definitions/aifactoryNamingType",
+              "value": {
+                "genaiSubnetName": "[variables('genaiSubnetName')]",
+                "aksSubnetName": "[variables('aksSubnetName')]",
+                "aks2SubnetName": "[variables('aks2SubnetName')]",
+                "acaSubnetName": "[variables('acaSubnetName')]",
+                "aca2SubnetName": "[variables('aca2SubnetName')]",
+                "defaultSubnet": "[variables('defaultSubnet')]",
+                "aifV1HubName": "[variables('aifV1HubName')]",
+                "aifV1ProjectName": "[variables('aifV1ProjectName')]",
+                "aifV2Name": "[variables('aifV2Name')]",
+                "aifV2PrjName": "[variables('aifV2PrjName')]",
+                "aifV2NameAdd": "[variables('aifV2NameAdd')]",
+                "aifV2PrjNameAdd": "[variables('aifV2PrjNameAdd')]",
+                "aoaiName": "[variables('aoaiName')]",
+                "amlName": "[variables('amlName')]",
+                "safeNameAISearch": "[variables('safeNameAISearch')]",
+                "aiServicesName": "[variables('aiServicesName')]",
+                "dashboardInsightsName": "[variables('dashboardInsightsName')]",
+                "applicationInsightName": "[variables('applicationInsightName')]",
+                "applicationInsightName2": "[variables('applicationInsightName2')]",
+                "bingName": "[variables('bingName')]",
+                "containerAppsEnvName": "[variables('containerAppsEnvName')]",
+                "containerAppAName": "[variables('containerAppAName')]",
+                "containerAppWName": "[variables('containerAppWName')]",
+                "cosmosDBName": "[variables('cosmosDBName')]",
+                "redisName": "[variables('redisName')]",
+                "postgreSQLName": "[variables('postgreSQLName')]",
+                "sqlServerName": "[variables('sqlServerName')]",
+                "sqlDBName": "[variables('sqlDBName')]",
+                "functionAppName": "[variables('functionAppName')]",
+                "webAppName": "[variables('webAppName')]",
+                "funcAppServicePlanName": "[variables('funcAppServicePlanName')]",
+                "webbAppServicePlanName": "[variables('webbAppServicePlanName')]",
+                "vmName": "[variables('vmName')]",
+                "keyvaultName": "[variables('keyvaultName')]",
+                "storageAccount1001Name": "[variables('storageAccount1001Name')]",
+                "storageAccount2001Name": "[variables('storageAccount2001Name')]",
+                "acrProjectName": "[variables('acrProjectName')]",
+                "acrCommonName": "[variables('acrCommonName')]",
+                "miACAName": "[variables('miACAName')]",
+                "miPrjName": "[variables('miPrjName')]",
+                "laWorkspaceName": "[variables('laWorkspaceName')]",
+                "projectName": "[variables('projectName')]",
+                "cmnName": "[variables('cmnName')]",
+                "kvNameCommon": "[format('kv-{0}{1}-{2}{3}', variables('cmnName'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+                "genaiName": "[variables('genaiName')]",
+                "prjResourceSuffixNoDash": "[variables('prjResourceSuffixNoDash')]",
+                "twoNumbers": "[variables('twoNumbers')]",
+                "p011_genai_team_lead_array": "[variables('p011_genai_team_lead_array')]",
+                "p011_genai_team_lead_email_array": "[variables('p011_genai_team_lead_email_array')]",
+                "uniqueInAIFenv": "[variables('uniqueInAIFenv')]",
+                "randomSalt": "[variables('randomSalt')]",
+                "projectTypeESMLName": "esml",
+                "projectTypeGenAIName": "genai",
+                "aksClusterName": "[format('aks{0}-{1}-{2}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'))]",
+                "dataFactoryName": "[variables('adfName')]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('06-getPrivDnsZ-{0}', variables('targetResourceGroup')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "privDnsResourceGroupName": {
+            "value": "[variables('privDnsResourceGroupName')]"
+          },
+          "privDnsSubscription": {
+            "value": "[variables('privDnsSubscription')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "8962512269424426622"
+            }
+          },
+          "parameters": {
+            "privDnsSubscription": {
+              "type": "string"
+            },
+            "privDnsResourceGroupName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "privateDnsZoneName": {
+              "azureusgovernment": "privatelink.api.ml.azure.us",
+              "azurechinacloud": "privatelink.api.ml.azure.cn",
+              "azurecloud": "privatelink.api.azureml.ms"
+            },
+            "privateAznbDnsZoneName": {
+              "azureusgovernment": "privatelink.notebooks.usgovcloudapi.net",
+              "azurechinacloud": "privatelink.notebooks.chinacloudapi.cn",
+              "azurecloud": "privatelink.notebooks.azure.net"
+            },
+            "privateLinksDnsZones": {
+              "blob": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.blob.{0}', environment().suffixes.storage)]"
+              },
+              "file": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.file.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.file.{0}', environment().suffixes.storage)]"
+              },
+              "dfs": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.dfs.{0}', environment().suffixes.storage)]"
+              },
+              "queue": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.queue.{0}', environment().suffixes.storage)]"
+              },
+              "table": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.table.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.table.{0}', environment().suffixes.storage)]"
+              },
+              "registry": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azurecr.io"
+              },
+              "vault": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.vaultcore.azure.net"
+              },
+              "amlworkspace": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), variables('privateDnsZoneName')[toLower(environment().name)])]",
+                "name": "[variables('privateDnsZoneName')[toLower(environment().name)]]"
+              },
+              "notebooks": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), variables('privateAznbDnsZoneName')[toLower(environment().name)])]",
+                "name": "[variables('privateAznbDnsZoneName')[toLower(environment().name)]]"
+              },
+              "dataFactory": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.datafactory.azure.net"
+              },
+              "portal": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.adf.azure.com"
+              },
+              "openai": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.openai.azure.com"
+              },
+              "searchService": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.search.windows.net"
+              },
+              "azurewebapps": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azurewebsites.net"
+              },
+              "cosmosdbnosql": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.documents.azure.com"
+              },
+              "cognitiveservices": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.cognitiveservices.azure.com"
+              },
+              "azuredatabricks": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azuredatabricks.net"
+              },
+              "namespace": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.servicebus.windows.net"
+              },
+              "azureeventgrid": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.eventgrid.azure.net"
+              },
+              "azuremonitor": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.monitor.azure.com"
+              },
+              "azuremonitoroms": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.oms.opinsights.azure.com"
+              },
+              "azuremonitorods": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.ods.opinsights.azure.com"
+              },
+              "azuremonitoragentsvc": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.agentsvc.azure-automation.net"
+              },
+              "servicesai": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.services.ai.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.services.ai.azure.com"
+              },
+              "azurecontainerapps": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.{2}.azurecontainerapps.io', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), parameters('location'))]",
+                "name": "[format('privatelink.{0}.azurecontainerapps.io', parameters('location'))]"
+              },
+              "redis": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.redis.cache.windows.net"
+              },
+              "postgres": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.postgres.database.azure.com"
+              },
+              "sql": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.database.windows.net"
+              },
+              "cosmosdbmongo": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.mongo.cosmos.azure.com"
+              },
+              "apim": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azure-api.net"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "privateLinksDnsZones": {
+              "type": "object",
+              "value": "[variables('privateLinksDnsZones')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('05-getPrjMI-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "managedIdentityName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.miPrjName.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "1018302119329499090"
+            }
+          },
+          "parameters": {
+            "managedIdentityName": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity name"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal ID of the managed identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), '2024-11-30').principalId]"
+            },
+            "clientId": {
+              "type": "string",
+              "metadata": {
+                "description": "Client ID of the managed identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), '2024-11-30').clientId]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the managed identity"
+              },
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed identity name"
+              },
+              "value": "[parameters('managedIdentityName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('06-spAndMI2Array-{0}', variables('targetResourceGroup')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "managedIdentityOID": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.ManagedIdentity/userAssignedIdentities', variables('miPrjName_Static')), '2024-11-30').principalId]"
+          },
+          "servicePrincipleOIDFromSecret": "[if(and(and(not(empty(parameters('projectServicePrincipleOID_SeedingKeyvaultName'))), not(contains(toLower(parameters('projectServicePrincipleOID_SeedingKeyvaultName')), '<todo>'))), not(contains(toLower(parameters('projectServicePrincipleOID_SeedingKeyvaultName')), '<optional>'))), createObject('reference', createObject('keyVault', createObject('id', extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('inputKeyvaultSubscription'), parameters('inputKeyvaultResourcegroup')), 'Microsoft.KeyVault/vaults', parameters('inputKeyvault'))), 'secretName', parameters('projectServicePrincipleOID_SeedingKeyvaultName'))), createObject('value', ''))]"
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "2078662539835665132"
+            }
+          },
+          "parameters": {
+            "servicePrincipleOIDFromSecret": {
+              "type": "securestring"
+            },
+            "managedIdentityOID": {
+              "type": "string"
+            },
+            "includeManagedIdentity": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Include the managed identity in the output array when true; skip it when false or empty."
+              }
+            }
+          },
+          "variables": {
+            "serviceArray": "[if(empty(parameters('servicePrincipleOIDFromSecret')), createArray(), createArray(parameters('servicePrincipleOIDFromSecret')))]",
+            "managedIdentityArray": "[if(and(parameters('includeManagedIdentity'), not(empty(parameters('managedIdentityOID')))), createArray(parameters('managedIdentityOID')), createArray())]"
+          },
+          "resources": [],
+          "outputs": {
+            "spAndMiArray": {
+              "type": "array",
+              "value": "[concat(variables('serviceArray'), variables('managedIdentityArray'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64))]"
+      ]
+    },
+    {
+      "condition": "[and(not(parameters('aiHubExists')), parameters('enableAIFoundryHub'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('06-aiHubModule{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aifV1HubName.value]"
+          },
+          "managedIdentities": {
+            "value": {
+              "systemAssigned": true
+            }
+          },
+          "defaultProjectName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aifV1ProjectName.value]"
+          },
+          "aiHubExists": {
+            "value": "[parameters('aiHubExists')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "cmk": {
+            "value": "[parameters('cmk')]"
+          },
+          "cmkKeyName": {
+            "value": "[parameters('cmkKeyName')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "tags": {
+            "value": "[parameters('tagsProject')]"
+          },
+          "aifactorySuffix": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "applicationInsightsName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.applicationInsightName.value]"
+          },
+          "acrName": "[if(parameters('useCommonACR'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.acrCommonName.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.acrProjectName.value))]",
+          "acrRGName": "[if(parameters('useCommonACR'), createObject('value', variables('commonResourceGroup')), createObject('value', variables('targetResourceGroup')))]",
+          "keyVaultName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.keyvaultName.value]"
+          },
+          "privateEndpointName": {
+            "value": "[format('p-aihub-{0}{1}{2}{3}amlworkspace', variables('projectName'), parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.projectTypeGenAIName.value)]"
+          },
+          "aifactoryProjectNumber": {
+            "value": "[parameters('projectNumber')]"
+          },
+          "storageAccountName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.storageAccount1001Name.value]"
+          },
+          "subnetName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.genaiSubnetName.value]"
+          },
+          "vnetName": {
+            "value": "[variables('vnetNameFull')]"
+          },
+          "vnetResourceGroupName": {
+            "value": "[variables('vnetResourceGroupName')]"
+          },
+          "enablePublicAccessWithPerimeter": {
+            "value": "[parameters('enablePublicAccessWithPerimeter')]"
+          },
+          "allowPublicAccessWhenBehindVnet": {
+            "value": "[parameters('allowPublicAccessWhenBehindVnet')]"
+          },
+          "enablePublicGenAIAccess": {
+            "value": "[parameters('enablePublicGenAIAccess')]"
+          },
+          "aiSearchName": "[if(and(parameters('enableAISearch'), not(empty(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')))), createObject('value', take(if(parameters('addAISearch'), format('{0}{1}{2}', if(and(parameters('enableAISearch'), not(empty(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')))), take(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, ''), max(sub(length(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')), 3), 0)), ''), take(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.randomSalt.value, 2), if(and(parameters('enableAISearch'), not(empty(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')))), substring(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, ''), max(sub(length(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')), 3), 0), min(3, length(if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')))), '')), if(parameters('enableAISearch'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value, '')), 60)), createObject('value', ''))]",
+          "privateLinksDnsZones": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-getPrivDnsZ-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.privateLinksDnsZones.value]"
+          },
+          "centralDnsZoneByPolicyInHub": {
+            "value": "[parameters('centralDnsZoneByPolicyInHub')]"
+          },
+          "kindAIHub": {
+            "value": "Hub"
+          },
+          "aiServicesName": "[if(parameters('enableAIServices'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aiServicesName.value), createObject('value', ''))]",
+          "logWorkspaceName": {
+            "value": "[variables('laWorkspaceName_Static')]"
+          },
+          "logWorkspaceResoureGroupName": {
+            "value": "[variables('commonResourceGroup')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "resourceSuffix": {
+            "value": "[parameters('resourceSuffix')]"
+          },
+          "aifactorySalt": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.uniqueInAIFenv.value]"
+          },
+          "ipRules": "[if(empty(variables('processedIpRulesAzureML')), createObject('value', createArray()), createObject('value', variables('processedIpRulesAzureML')))]",
+          "ipWhitelist_array": "[if(empty(variables('ipWhitelist_normalized')), createObject('value', createArray()), createObject('value', variables('ipWhitelist_normalized')))]"
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "17275086890370925790"
+            }
+          },
+          "definitions": {
+            "managedIdentityAllType": {
+              "type": "object",
+              "properties": {
+                "systemAssigned": {
+                  "type": "bool",
+                  "nullable": true,
+                  "metadata": {
+                    "description": "Optional. Enables system assigned managed identity on the resource."
+                  }
+                },
+                "userAssignedResourceIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "nullable": true,
+                  "metadata": {
+                    "description": "Optional. The resource ID(s) to assign to the resource. Required if a user assigned identity is used for encryption."
+                  }
+                }
+              },
+              "metadata": {
+                "description": "An AVM-aligned type for a managed identity configuration. To be used if both a system-assigned & user-assigned identities are supported by the resource provider.",
+                "__bicep_imported_from!": {
+                  "sourceTemplate": "br:mcr.microsoft.com/bicep/avm/utl/types/avm-common-types:0.5.1"
+                }
+              }
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the new machine learning studio resources"
+              }
+            },
+            "aifactorySuffix": {
+              "type": "string"
+            },
+            "aifactoryProjectNumber": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the computer pool name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the new machine learning studio resource should be deployed"
+              }
+            },
+            "env": {
+              "type": "string",
+              "metadata": {
+                "description": "ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3"
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the storageaccount id used for the machine learning studio"
+              }
+            },
+            "keyVaultName": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the keyvault id used for the machine learning studio"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to machine learning studio resources"
+              }
+            },
+            "privateEndpointName": {
+              "type": "string",
+              "metadata": {
+                "description": "(Required) Specifies the private endpoint name"
+              }
+            },
+            "vnetName": {
+              "type": "string",
+              "metadata": {
+                "description": "(Required) Specifies the virtual network id associated with private endpoint"
+              }
+            },
+            "subnetName": {
+              "type": "string",
+              "metadata": {
+                "description": "(Required) Specifies the subnet name that will be associated with the private endpoint"
+              }
+            },
+            "vnetResourceGroupName": {
+              "type": "string"
+            },
+            "managedIdentities": {
+              "$ref": "#/definitions/managedIdentityAllType",
+              "nullable": true,
+              "metadata": {
+                "description": "Optional. The managed identity definition for this resource."
+              }
+            },
+            "defaultProjectName": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "centralDnsZoneByPolicyInHub": {
+              "type": "bool"
+            },
+            "allowPublicAccessWhenBehindVnet": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "enablePublicGenAIAccess": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "createPrivateEndpoint": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "aiSearchName": {
+              "type": "string"
+            },
+            "aifactorySalt": {
+              "type": "string"
+            },
+            "aiHubExists": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "privateLinksDnsZones": {
+              "type": "object"
+            },
+            "kindAIHub": {
+              "type": "string",
+              "defaultValue": "Hub",
+              "allowedValues": [
+                "Hub"
+              ]
+            },
+            "ipRules": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "aiServicesName": {
+              "type": "string"
+            },
+            "logWorkspaceName": {
+              "type": "string"
+            },
+            "logWorkspaceResoureGroupName": {
+              "type": "string"
+            },
+            "locationSuffix": {
+              "type": "string"
+            },
+            "resourceSuffix": {
+              "type": "string"
+            },
+            "applicationInsightsName": {
+              "type": "string"
+            },
+            "ipWhitelist_array": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "acrName": {
+              "type": "string"
+            },
+            "acrRGName": {
+              "type": "string"
+            },
+            "cmk": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable Customer Managed Keys (CMK) encryption"
+              }
+            },
+            "cmkKeyName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the Customer Managed Key in Key Vault"
+              }
+            }
+          },
+          "variables": {
+            "aiFactoryNumber": "[substring(parameters('aifactorySuffix'), 1, 3)]",
+            "privateDnsZoneName": {
+              "azureusgovernment": "privatelink.api.ml.azure.us",
+              "azurechinacloud": "privatelink.api.ml.azure.cn",
+              "azurecloud": "privatelink.api.azureml.ms"
+            },
+            "privateDnsZoneNameNotebooks": {
+              "azureusgovernment": "privatelink.notebooks.usgovcloudapi.net",
+              "azurechinacloud": "privatelink.notebooks.chinacloudapi.cn",
+              "azurecloud": "privatelink.notebooks.azure.net"
+            },
+            "azureOpenAIConnectionName": "azureOpenAI",
+            "azureAIServicesConnectionName": "azureAIServices",
+            "azureAISearchConnectionName": "azureAISearch",
+            "aiProjectDiagSettingName": "aiProjectDiagnosticSetting",
+            "aiHubDiagSettingName": "aiHubDiagnosticSetting",
+            "epDefaultName": "[format('ep-{0}-01-{1}-{2}-{3}{4}', parameters('aifactoryProjectNumber'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySalt'), parameters('resourceSuffix'))]",
+            "epDefaultName2": "[format('ep-{0}-1-{1}-{2}-{3}{4}', parameters('aifactoryProjectNumber'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySalt'), parameters('resourceSuffix'))]",
+            "formattedUserAssignedIdentities": "[reduce(map(coalesce(tryGet(parameters('managedIdentities'), 'userAssignedResourceIds'), createArray()), lambda('id', createObject(format('{0}', lambdaVariables('id')), createObject()))), createObject(), lambda('cur', 'next', union(lambdaVariables('cur'), lambdaVariables('next'))))]",
+            "identity": "[if(not(empty(parameters('managedIdentities'))), createObject('type', if(coalesce(tryGet(parameters('managedIdentities'), 'systemAssigned'), false()), if(not(empty(coalesce(tryGet(parameters('managedIdentities'), 'userAssignedResourceIds'), createObject()))), 'SystemAssigned,UserAssigned', 'SystemAssigned'), if(not(empty(coalesce(tryGet(parameters('managedIdentities'), 'userAssignedResourceIds'), createObject()))), 'UserAssigned', 'None')), 'userAssignedIdentities', if(not(empty(variables('formattedUserAssignedIdentities'))), variables('formattedUserAssignedIdentities'), null())), createObject('type', 'SystemAssigned'))]"
+          },
+          "resources": {
+            "aiProject2::aiServicesConnection2": {
+              "condition": "[and(parameters('enablePublicAccessWithPerimeter'), parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.MachineLearningServices/workspaces/connections",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('azureAIServicesConnectionName'))]",
+              "properties": {
+                "authType": "AAD",
+                "category": "AIServices",
+                "isSharedToAll": false,
+                "useWorkspaceManagedIdentity": true,
+                "peRequirement": "[if(parameters('enablePublicAccessWithPerimeter'), 'NotRequired', 'Required')]",
+                "peStatus": "[if(parameters('enablePublicAccessWithPerimeter'), 'Inactive', 'Active')]",
+                "sharedUserList": [],
+                "metadata": {
+                  "ApiType": "Azure",
+                  "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+                },
+                "target": "[format('https://{0}.cognitiveservices.azure.com/', parameters('aiServicesName'))]"
+              },
+              "dependsOn": [
+                "aiProject2"
+              ]
+            },
+            "aiProject2::searchConnection2": {
+              "condition": "[and(parameters('enablePublicAccessWithPerimeter'), and(not(empty(parameters('aiSearchName'))), parameters('enablePublicAccessWithPerimeter')))]",
+              "type": "Microsoft.MachineLearningServices/workspaces/connections",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('azureAISearchConnectionName'))]",
+              "properties": {
+                "authType": "AAD",
+                "category": "CognitiveSearch",
+                "isSharedToAll": false,
+                "useWorkspaceManagedIdentity": true,
+                "peRequirement": "[if(parameters('enablePublicAccessWithPerimeter'), 'NotRequired', 'Required')]",
+                "peStatus": "[if(parameters('enablePublicAccessWithPerimeter'), 'Inactive', 'Active')]",
+                "target": "[format('https://{0}.search.windows.net/', parameters('aiSearchName'))]",
+                "metadata": {
+                  "ApiType": "Azure",
+                  "ResourceId": "[resourceId('Microsoft.Search/searchServices', parameters('aiSearchName'))]"
+                }
+              },
+              "dependsOn": [
+                "aiProject2"
+              ]
+            },
+            "aiProject::aiServicesConnection": {
+              "condition": "[and(not(parameters('enablePublicAccessWithPerimeter')), not(parameters('enablePublicAccessWithPerimeter')))]",
+              "type": "Microsoft.MachineLearningServices/workspaces/connections",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('azureAIServicesConnectionName'))]",
+              "properties": {
+                "authType": "AAD",
+                "category": "AIServices",
+                "isSharedToAll": false,
+                "useWorkspaceManagedIdentity": true,
+                "peRequirement": "[if(parameters('enablePublicAccessWithPerimeter'), 'NotRequired', 'Required')]",
+                "peStatus": "[if(parameters('enablePublicAccessWithPerimeter'), 'Inactive', 'Active')]",
+                "sharedUserList": [],
+                "metadata": {
+                  "ApiType": "Azure",
+                  "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+                },
+                "target": "[format('https://{0}.cognitiveservices.azure.com/', parameters('aiServicesName'))]"
+              },
+              "dependsOn": [
+                "aiProject"
+              ]
+            },
+            "aiProject::searchConnection": {
+              "condition": "[and(not(parameters('enablePublicAccessWithPerimeter')), and(not(empty(parameters('aiSearchName'))), not(parameters('enablePublicAccessWithPerimeter'))))]",
+              "type": "Microsoft.MachineLearningServices/workspaces/connections",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('azureAISearchConnectionName'))]",
+              "properties": {
+                "authType": "AAD",
+                "category": "CognitiveSearch",
+                "isSharedToAll": false,
+                "useWorkspaceManagedIdentity": true,
+                "peRequirement": "[if(parameters('enablePublicGenAIAccess'), 'NotRequired', 'Required')]",
+                "peStatus": "[if(parameters('enablePublicGenAIAccess'), 'Inactive', 'Active')]",
+                "target": "[format('https://{0}.search.windows.net/', parameters('aiSearchName'))]",
+                "metadata": {
+                  "ApiType": "Azure",
+                  "ResourceId": "[resourceId('Microsoft.Search/searchServices', parameters('aiSearchName'))]"
+                }
+              },
+              "dependsOn": [
+                "aiProject"
+              ]
+            },
+            "appInsights": {
+              "existing": true,
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('applicationInsightsName')]"
+            },
+            "aiSearch": {
+              "condition": "[not(empty(parameters('aiSearchName')))]",
+              "existing": true,
+              "type": "Microsoft.Search/searchServices",
+              "apiVersion": "2024-03-01-preview",
+              "name": "[parameters('aiSearchName')]"
+            },
+            "aiServices": {
+              "existing": true,
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-10-01",
+              "name": "[parameters('aiServicesName')]"
+            },
+            "logWorkspace": {
+              "existing": true,
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "resourceGroup": "[parameters('logWorkspaceResoureGroupName')]",
+              "name": "[parameters('logWorkspaceName')]"
+            },
+            "keyVault": {
+              "existing": true,
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('keyVaultName')]"
+            },
+            "existingStorageAccount": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2024-01-01",
+              "name": "[parameters('storageAccountName')]"
+            },
+            "vnet": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2024-05-01",
+              "resourceGroup": "[parameters('vnetResourceGroupName')]",
+              "name": "[parameters('vnetName')]"
+            },
+            "subnet": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2024-05-01",
+              "resourceGroup": "[parameters('vnetResourceGroupName')]",
+              "name": "[format('{0}/{1}', parameters('vnetName'), parameters('subnetName'))]"
+            },
+            "existingAcr": {
+              "existing": true,
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-07-01",
+              "resourceGroup": "[parameters('acrRGName')]",
+              "name": "[parameters('acrName')]"
+            },
+            "cognitiveServicesOpenAiUserRole": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2022-04-01",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd",
+              "metadata": {
+                "description": "Built-in Role: [Cognitive Services OpenAI User](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#cognitive-services-openai-user)"
+              }
+            },
+            "amlWorkspaceSecretsReaderRole": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2022-04-01",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "ea01e6af-a1c1-4350-9563-ad00f8c72ec5",
+              "metadata": {
+                "description": "Built-in Role: [Azure Machine Learning Workspace Connection Secrets Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)"
+              }
+            },
+            "aiHub2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.MachineLearningServices/workspaces",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "identity": "[variables('identity')]",
+              "tags": "[parameters('tags')]",
+              "kind": "[parameters('kindAIHub')]",
+              "properties": {
+                "allowRoleAssignmentOnRG": true,
+                "friendlyName": "[format('{0}-{1}-{2}', parameters('name'), parameters('env'), variables('aiFactoryNumber'))]",
+                "description": "AI Hub with optional enablePublicAccessWithPerimeter. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals",
+                "applicationInsights": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+                "storageAccount": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+                "containerRegistry": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('acrRGName')), 'Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+                "keyVault": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+                "encryption": "[if(parameters('cmk'), createObject('status', 'Enabled', 'identity', createObject('userAssignedIdentity', parameters('managedIdentities').userAssignedResourceIds[0]), 'keyVaultProperties', createObject('keyVaultArmId', resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'keyIdentifier', format('{0}keys/{1}', reference('keyVault').vaultUri, parameters('cmkKeyName')), 'identityClientId', '')), null())]",
+                "systemDatastoresAuthMode": "identity",
+                "hbiWorkspace": false,
+                "provisionNetworkNow": true,
+                "enableDataIsolation": true,
+                "publicNetworkAccess": "Enabled",
+                "allowPublicAccessWhenBehindVnet": "[if(parameters('enablePublicAccessWithPerimeter'), true(), parameters('allowPublicAccessWhenBehindVnet'))]",
+                "managedNetwork": "[if(parameters('enablePublicAccessWithPerimeter'), createObject('isolationMode', 'Disabled', 'enableNetworkMonitor', false(), 'managedNetworkKind', 'V1', 'firewallSku', 'Basic'), createObject('isolationMode', 'AllowInternetOutbound', 'enableNetworkMonitor', false(), 'managedNetworkKind', 'V1', 'firewallSku', 'Basic', 'outboundRules', union(createObject('OpenAI', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), 'subresourceTarget', 'account', 'sparkEnabled', false(), 'sparkStatus', 'Active'), 'status', 'Active'), 'SaBlob', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'subresourceTarget', 'blob', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active'), 'SaFile', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'subresourceTarget', 'file', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active')), if(not(empty(parameters('aiSearchName'))), createObject('search', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Search/searchServices', parameters('aiSearchName')), 'subresourceTarget', 'searchService', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active')), createObject()))))]"
+              },
+              "dependsOn": [
+                "keyVault"
+              ]
+            },
+            "aiHubDiagSettings": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('name'))]",
+              "name": "[variables('aiHubDiagSettingName')]",
+              "properties": {
+                "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "aiHub"
+              ],
+              "metadata": {
+                "description": "Azure Diagnostics: Azure AI Foundry hub - allLogs"
+              }
+            },
+            "aiHub2DiagSettings": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('name'))]",
+              "name": "[variables('aiHubDiagSettingName')]",
+              "properties": {
+                "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "aiHub2"
+              ],
+              "metadata": {
+                "description": "Azure Diagnostics: Azure AI Foundry hub 2 - allLogs"
+              }
+            },
+            "aiProject2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.MachineLearningServices/workspaces",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[parameters('defaultProjectName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "Project",
+              "sku": {
+                "name": "Basic",
+                "tier": "Basic"
+              },
+              "identity": "[variables('identity')]",
+              "properties": {
+                "friendlyName": "[parameters('defaultProjectName')]",
+                "description": "[format('Project for AI Factory project{0} in {1} environment in {2}', parameters('aifactoryProjectNumber'), parameters('env'), parameters('location'))]",
+                "v1LegacyMode": false,
+                "hbiWorkspace": false,
+                "hubResourceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+                "encryption": "[if(parameters('cmk'), createObject('status', 'Enabled', 'identity', createObject('userAssignedIdentity', parameters('managedIdentities').userAssignedResourceIds[0]), 'keyVaultProperties', createObject('keyVaultArmId', resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'keyIdentifier', format('{0}keys/{1}', reference('keyVault').vaultUri, parameters('cmkKeyName')), 'identityClientId', '')), null())]",
+                "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]"
+              },
+              "dependsOn": [
+                "aiHub2",
+                "keyVault"
+              ],
+              "metadata": {
+                "description": "This is a container for the ai foundry project."
+              }
+            },
+            "aiHub": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.MachineLearningServices/workspaces",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "identity": "[variables('identity')]",
+              "tags": "[parameters('tags')]",
+              "kind": "[parameters('kindAIHub')]",
+              "properties": {
+                "allowRoleAssignmentOnRG": true,
+                "friendlyName": "[format('{0}-{1}-{2}', parameters('name'), parameters('env'), variables('aiFactoryNumber'))]",
+                "description": "AI Foundry hub requires an underlying Azure ML workspace. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals",
+                "applicationInsights": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+                "storageAccount": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+                "containerRegistry": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('acrRGName')), 'Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+                "keyVault": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+                "encryption": "[if(parameters('cmk'), createObject('status', 'Enabled', 'identity', createObject('userAssignedIdentity', parameters('managedIdentities').userAssignedResourceIds[0]), 'keyVaultProperties', createObject('keyVaultArmId', resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'keyIdentifier', format('{0}keys/{1}', reference('keyVault').vaultUri, parameters('cmkKeyName')), 'identityClientId', '')), null())]",
+                "systemDatastoresAuthMode": "identity",
+                "hbiWorkspace": false,
+                "provisionNetworkNow": false,
+                "enableDataIsolation": true,
+                "v1LegacyMode": false,
+                "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]",
+                "allowPublicAccessWhenBehindVnet": "[parameters('allowPublicAccessWhenBehindVnet')]",
+                "ipAllowlist": "[if(parameters('allowPublicAccessWhenBehindVnet'), parameters('ipWhitelist_array'), null())]",
+                "networkAcls": "[if(parameters('allowPublicAccessWhenBehindVnet'), createObject('defaultAction', if(and(parameters('enablePublicGenAIAccess'), empty(parameters('ipRules'))), 'Allow', 'Deny'), 'ipRules', parameters('ipRules')), null())]",
+                "managedNetwork": {
+                  "firewallSku": "Basic",
+                  "managedNetworkKind": "V1",
+                  "isolationMode": "AllowInternetOutbound",
+                  "enableNetworkMonitor": false,
+                  "outboundRules": "[union(if(not(empty(parameters('aiSearchName'))), createObject('search', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Search/searchServices', parameters('aiSearchName')), 'subresourceTarget', 'searchService', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active')), createObject()), createObject('OpenAI', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), 'subresourceTarget', 'account', 'sparkEnabled', false(), 'sparkStatus', 'Active'), 'status', 'Active')))]"
+                }
+              },
+              "dependsOn": [
+                "keyVault"
+              ]
+            },
+            "aiProject": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.MachineLearningServices/workspaces",
+              "apiVersion": "2025-07-01-preview",
+              "name": "[parameters('defaultProjectName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "Project",
+              "sku": {
+                "name": "Basic",
+                "tier": "Basic"
+              },
+              "identity": "[variables('identity')]",
+              "properties": {
+                "friendlyName": "[parameters('defaultProjectName')]",
+                "description": "[format('Project for AI Factory project{0} in {1} environment in {2}', parameters('aifactoryProjectNumber'), parameters('env'), parameters('location'))]",
+                "v1LegacyMode": false,
+                "hbiWorkspace": false,
+                "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]",
+                "hubResourceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+                "encryption": "[if(parameters('cmk'), createObject('status', 'Enabled', 'identity', createObject('userAssignedIdentity', parameters('managedIdentities').userAssignedResourceIds[0]), 'keyVaultProperties', createObject('keyVaultArmId', resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'keyIdentifier', format('{0}keys/{1}', reference('keyVault').vaultUri, parameters('cmkKeyName')), 'identityClientId', '')), null())]"
+              },
+              "dependsOn": [
+                "aiHub",
+                "keyVault"
+              ],
+              "metadata": {
+                "description": "This is a container for the ai foundry project."
+              }
+            },
+            "azureMLDataScientistRole": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2022-04-01",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "f6c7c914-8db3-469d-8ca1-694a8f32e121",
+              "metadata": {
+                "description": "Built-in Role: [AzureML Data Scientist](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)"
+              }
+            },
+            "azureMLComputeOperatorRole": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2022-04-01",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "e503ece1-11d0-4e8e-8e2c-7a6c3bf38815",
+              "metadata": {
+                "description": "Built-in Role: [AzureML Compute Operator](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)"
+              }
+            },
+            "projectDataScientistRoleAssignment": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f6c7c914-8db3-469d-8ca1-694a8f32e121'), 'data-scientist')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f6c7c914-8db3-469d-8ca1-694a8f32e121')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "01 - projectDataScientistRoleAssignment with azureMLDataScientistRole"
+              },
+              "dependsOn": [
+                "aiProject"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project MSI the ability to manage online endpoints within its own workspace."
+              }
+            },
+            "projectComputeOperatorRoleAssignment": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e503ece1-11d0-4e8e-8e2c-7a6c3bf38815'), 'compute-operator')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e503ece1-11d0-4e8e-8e2c-7a6c3bf38815')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "02 - projectComputeOperatorRoleAssignment with azureMLComputeOperatorRole"
+              },
+              "dependsOn": [
+                "aiProject"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project MSI compute operator permissions for online endpoints."
+              }
+            },
+            "projectSecretsReaderRoleAssignment": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'), 'secrets-reader')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "03 - projectSecretsReaderRoleAssignment with amlWorkspaceSecretsReaderRole"
+              },
+              "dependsOn": [
+                "aiProject"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project MSI the ability to read secrets from the parent project for online endpoint operations."
+              }
+            },
+            "projectOpenAIUserRoleAssignment": {
+              "condition": "[and(not(parameters('enablePublicAccessWithPerimeter')), not(parameters('aiHubExists')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('aiServicesName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'), 'openai-user')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "04 - projectOpenAIUserRoleAssignment with cognitiveServicesOpenAiUserRole"
+              },
+              "dependsOn": [
+                "aiProject"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project MSI the ability to invoke models in Azure OpenAI."
+              }
+            },
+            "chatProjectDiagSettings": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[variables('aiProjectDiagSettingName')]",
+              "properties": {
+                "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "aiProject"
+              ],
+              "metadata": {
+                "description": "Azure Diagnostics: AI Foundry chat project - allLogs"
+              }
+            },
+            "pendAIHub": {
+              "condition": "[not(parameters('enablePublicAccessWithPerimeter'))]",
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2024-05-01",
+              "name": "[format('{0}-pend', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "customNetworkInterfaceName": "[format('{0}-pend-nic', parameters('name'))]",
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[format('{0}-pend', parameters('name'))]",
+                    "properties": {
+                      "groupIds": [
+                        "amlworkspace"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+                      "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-Approved",
+                        "actionsRequired": "None"
+                      }
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+                }
+              },
+              "dependsOn": [
+                "aiHub"
+              ]
+            },
+            "privateEndpointDns": {
+              "condition": "[and(not(parameters('centralDnsZoneByPolicyInHub')), not(parameters('enablePublicAccessWithPerimeter')))]",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2024-05-01",
+              "name": "[format('{0}/{1}', format('{0}-pend', parameters('name')), format('{0}DnsZone', format('{0}-pend', parameters('name'))))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('privateDnsZoneName')[environment().name]]",
+                    "properties": {
+                      "privateDnsZoneId": "[parameters('privateLinksDnsZones').amlworkspace.id]"
+                    }
+                  },
+                  {
+                    "name": "[variables('privateDnsZoneNameNotebooks')[environment().name]]",
+                    "properties": {
+                      "privateDnsZoneId": "[parameters('privateLinksDnsZones').notebooks.id]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "pendAIHub"
+              ]
+            },
+            "projectDataScientistRoleAssignment2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f6c7c914-8db3-469d-8ca1-694a8f32e121'), 'data-scientist-2')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f6c7c914-8db3-469d-8ca1-694a8f32e121')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject2', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "05 - projectDataScientistRoleAssignment with azureMLDataScientistRole"
+              },
+              "dependsOn": [
+                "aiProject2"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project2 MSI the ability to manage online endpoints within its own workspace."
+              }
+            },
+            "projectComputeOperatorRoleAssignment2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e503ece1-11d0-4e8e-8e2c-7a6c3bf38815'), 'compute-operator-2')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e503ece1-11d0-4e8e-8e2c-7a6c3bf38815')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject2', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "06 - projectComputeOperatorRoleAssignment with azureMLComputeOperatorRole"
+              },
+              "dependsOn": [
+                "aiProject2"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project2 MSI compute operator permissions for online endpoints."
+              }
+            },
+            "projectSecretsReaderRoleAssignment2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'), 'secrets-reader-2')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject2', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "07 - projectSecretsReaderRoleAssignment with amlWorkspaceSecretsReaderRole"
+              },
+              "dependsOn": [
+                "aiProject2"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project2 MSI the ability to read secrets from the parent project for online endpoint operations."
+              }
+            },
+            "projectOpenAIUserRoleAssignment2": {
+              "condition": "[and(parameters('enablePublicAccessWithPerimeter'), not(parameters('aiHubExists')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('aiServicesName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'), 'openai-user-2')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference('aiProject2', '2025-07-01-preview', 'full').identity.principalId]",
+                "description": "08 - projectOpenAIUserRoleAssignment with cognitiveServicesOpenAiUserRole"
+              },
+              "dependsOn": [
+                "aiProject2"
+              ],
+              "metadata": {
+                "description": "Assign the AI Project2 MSI the ability to invoke models in Azure OpenAI."
+              }
+            },
+            "chatProjectDiagSettings2": {
+              "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+              "name": "[variables('aiProjectDiagSettingName')]",
+              "properties": {
+                "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "aiProject2"
+              ],
+              "metadata": {
+                "description": "Azure Diagnostics: AI Foundry chat project - allLogs"
+              }
+            },
+            "pendAIHub2": {
+              "condition": "[and(parameters('enablePublicAccessWithPerimeter'), parameters('createPrivateEndpoint'))]",
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2024-05-01",
+              "name": "[format('{0}-pend', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "customNetworkInterfaceName": "[format('{0}-pend-nic', parameters('name'))]",
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[format('{0}-pend', parameters('name'))]",
+                    "properties": {
+                      "groupIds": [
+                        "amlworkspace"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+                      "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-Approved",
+                        "actionsRequired": "None"
+                      }
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+                }
+              },
+              "dependsOn": [
+                "aiHub2"
+              ]
+            },
+            "privateEndpointDns2": {
+              "condition": "[and(and(not(parameters('centralDnsZoneByPolicyInHub')), parameters('enablePublicAccessWithPerimeter')), parameters('createPrivateEndpoint'))]",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2024-05-01",
+              "name": "[format('{0}/{1}', format('{0}-pend', parameters('name')), format('{0}DnsZone', format('{0}-pend', parameters('name'))))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('privateDnsZoneName')[environment().name]]",
+                    "properties": {
+                      "privateDnsZoneId": "[parameters('privateLinksDnsZones').amlworkspace.id]"
+                    }
+                  },
+                  {
+                    "name": "[variables('privateDnsZoneNameNotebooks')[environment().name]]",
+                    "properties": {
+                      "privateDnsZoneId": "[parameters('privateLinksDnsZones').notebooks.id]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "pendAIHub2"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[if(not(parameters('enablePublicAccessWithPerimeter')), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[if(not(parameters('enablePublicAccessWithPerimeter')), parameters('name'), parameters('name'))]"
+            },
+            "principalId": {
+              "type": "string",
+              "value": "[if(not(parameters('enablePublicAccessWithPerimeter')), reference('aiHub', '2025-07-01-preview', 'full').identity.principalId, reference('aiHub2', '2025-07-01-preview', 'full').identity.principalId)]"
+            },
+            "projectPrincipalId": {
+              "type": "string",
+              "value": "[if(not(parameters('enablePublicAccessWithPerimeter')), reference('aiProject', '2025-07-01-preview', 'full').identity.principalId, reference('aiProject2', '2025-07-01-preview', 'full').identity.principalId)]"
+            },
+            "aiProjectName": {
+              "type": "string",
+              "value": "[if(not(parameters('enablePublicAccessWithPerimeter')), parameters('defaultProjectName'), parameters('defaultProjectName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-getPrivDnsZ-{0}', variables('targetResourceGroup')), 64))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('useCommonACR'), false()), parameters('enableAIFoundryHub'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[take(format('06-rbacAcrProject{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "acrName": "[if(parameters('useCommonACR'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.acrCommonName.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.acrProjectName.value))]",
+          "aiHubName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aifV1HubName.value]"
+          },
+          "aiHubRgName": {
+            "value": "[variables('targetResourceGroup')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "1851622493075134410"
+            }
+          },
+          "parameters": {
+            "aiHubName": {
+              "type": "string"
+            },
+            "aiHubRgName": {
+              "type": "string"
+            },
+            "acrName": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('aiHubName')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('aiHubName'), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8311e382-0749-4cb8-b61a-304f252e45ec'), parameters('acrName'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8311e382-0749-4cb8-b61a-304f252e45ec')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('aiHubRgName')), 'Microsoft.MachineLearningServices/workspaces', parameters('aiHubName')), '2024-10-01-preview', 'full').identity.principalId]"
+              },
+              "metadata": {
+                "description": "Assign AML Workspace's ID: AcrPush to workload's container registry."
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('aiHubName')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('aiHubName'), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'), parameters('acrName'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+                "principalType": "ServicePrincipal",
+                "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('aiHubRgName')), 'Microsoft.MachineLearningServices/workspaces', parameters('aiHubName')), '2024-10-01-preview', 'full').identity.principalId]"
+              },
+              "metadata": {
+                "description": "Assign AML Workspace's Managed Online Endpoint: AcrPull to workload's container registry."
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-aiHubModule{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('06-naming-{0}', variables('targetResourceGroup')), 64))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "aiFoundryHubDeployed": {
+      "type": "bool",
+      "metadata": {
+        "description": "AI Foundry Hub deployment status"
+      },
+      "value": "[and(not(parameters('aiHubExists')), parameters('enableAIFoundryHub'))]"
+    },
+    "acrRbacDeployed": {
+      "type": "bool",
+      "metadata": {
+        "description": "Project-specific ACR RBAC deployment status"
+      },
+      "value": "[and(equals(parameters('useCommonACR'), false()), parameters('enableAIFoundryHub'))]"
+    },
+    "storageReaderRole1001Deployed": {
+      "type": "bool",
+      "metadata": {
+        "description": "Storage Reader Role 1001 deployment status"
+      },
+      "value": "[and(not(parameters('aiHubExists')), parameters('enableAIFoundryHub'))]"
+    },
+    "storageReaderRole2001Deployed": {
+      "type": "bool",
+      "metadata": {
+        "description": "Storage Reader Role 2001 deployment status"
+      },
+      "value": "[and(not(parameters('aiHubExists')), parameters('enableAIFoundryHub'))]"
+    }
+  }
+}

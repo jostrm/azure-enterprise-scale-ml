@@ -1,0 +1,3634 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "2349943803512023906"
+    }
+  },
+  "parameters": {
+    "env": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Specifies the name of the environment. This name is reflected in resource group and sub-resources"
+      }
+    },
+    "locationSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the short location notation. This name is reflected in resource group and sub-resources"
+      }
+    },
+    "commonResourceSuffix": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Deployment location"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "tags"
+      }
+    },
+    "aifactorySuffixRG": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "AI Factory suffix. If you have multiple instances"
+      }
+    },
+    "vnetNameBase": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the virtual network name"
+      }
+    },
+    "common_vnet_cidr": {
+      "type": "string",
+      "metadata": {
+        "description": "CIDR for common vNet "
+      }
+    },
+    "common_pbi_subnet_name": {
+      "type": "string",
+      "defaultValue": "snt-common-pbi-gw"
+    },
+    "common_pbi_subnet_cidr": {
+      "type": "string",
+      "metadata": {
+        "description": "CIDR for common Power BI subnet for gateway"
+      }
+    },
+    "common_subnet_name": {
+      "type": "string",
+      "metadata": {
+        "description": "common subnet"
+      }
+    },
+    "common_subnet_cidr": {
+      "type": "string",
+      "metadata": {
+        "description": "CIDR for common subnet"
+      }
+    },
+    "common_bastion_subnet_name": {
+      "type": "string",
+      "defaultValue": "AzureBastionSubnet",
+      "allowedValues": [
+        "AzureBastionSubnet"
+      ],
+      "metadata": {
+        "description": "common Bastion host subnet for RDP access over private IP. Must remain AzureBastionSubnet per platform requirements"
+      }
+    },
+    "common_bastion_subnet_cidr": {
+      "type": "string",
+      "metadata": {
+        "description": "common Bastion host subnet CIDR"
+      }
+    },
+    "common_subnet_scoring_cidr": {
+      "type": "string",
+      "metadata": {
+        "description": "common scoring subnet CIDR"
+      }
+    },
+    "cidr_range": {
+      "type": "string",
+      "metadata": {
+        "description": "CIDR range. xx.YY.x.x/16"
+      }
+    },
+    "commonRGNamePrefix": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource group prefix. If \"rg-msft-word\" then \"rg-msft-word-{commonResourceName}-weu-dev-001\""
+      }
+    },
+    "IPwhiteList": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion"
+      }
+    },
+    "centralDnsZoneByPolicyInHub": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead."
+      }
+    },
+    "vnetResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "vnetNameFull_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "commonResourceGroup_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "datalakeName_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "kvNameFromCOMMON_param": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "useCommonACR": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "BYO_subnets": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "network_env": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetCommon": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetCommonScoring": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetCommonPowerbiGw": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetProjGenAI": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetProjAKS": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetProjDatabricksPublic": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetProjDatabricksPrivate": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "subnetProjACA": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "DOCS_byovnet_example": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "DOCS_byosnet_common_example": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "DOCS_byosnet_project_example": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "deployAIGatewayNetworking": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "deployOnlyAIGatewayNetworking": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "ai_gateway_apim_cidr": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "ai_gateway_app_cidr": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "byoASEv3": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "byoAseFullResourceId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "byoAseAppServicePlanResourceId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "commonResourceName": {
+      "type": "string",
+      "defaultValue": "esml-common",
+      "metadata": {
+        "description": "Common resource name identifier. Default is \"esml-common\""
+      }
+    }
+  },
+  "variables": {
+    "subscriptionIdDevTestProd": "[subscription().subscriptionId]",
+    "common_vnet_cidr_v": "[replace(parameters('common_vnet_cidr'), 'XX', parameters('cidr_range'))]",
+    "common_subnet_cidr_v": "[replace(parameters('common_subnet_cidr'), 'XX', parameters('cidr_range'))]",
+    "common_pbi_subnet_cidr_v": "[replace(parameters('common_pbi_subnet_cidr'), 'XX', parameters('cidr_range'))]",
+    "common_bastion_subnet_cidr_v": "[replace(parameters('common_bastion_subnet_cidr'), 'XX', parameters('cidr_range'))]",
+    "common_subnet_scoring_cidr_v": "[replace(parameters('common_subnet_scoring_cidr'), 'XX', parameters('cidr_range'))]",
+    "ai_gateway_apim_cidr_v": "[if(parameters('deployAIGatewayNetworking'), replace(parameters('ai_gateway_apim_cidr'), 'XX', parameters('cidr_range')), '')]",
+    "ai_gateway_app_cidr_v": "[if(parameters('deployAIGatewayNetworking'), replace(parameters('ai_gateway_app_cidr'), 'XX', parameters('cidr_range')), '')]",
+    "commonResourceGroupName": "[format('{0}{1}-{2}-{3}{4}', parameters('commonRGNamePrefix'), parameters('commonResourceName'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG'))]",
+    "vnetResourceGroupName": "[if(not(empty(parameters('vnetResourceGroup_param'))), replace(parameters('vnetResourceGroup_param'), '<network_env>', parameters('network_env')), variables('commonResourceGroupName'))]",
+    "vnetNameFull": "[if(not(empty(parameters('vnetNameFull_param'))), parameters('vnetNameFull_param'), format('{0}-{1}-{2}{3}', parameters('vnetNameBase'), parameters('locationSuffix'), parameters('env'), parameters('commonResourceSuffix')))]",
+    "vNetRGsalt": "[substring(uniqueString(subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('vnetResourceGroupName'))), 0, 5)]",
+    "commmonRGsalt": "[substring(uniqueString(variables('commonResourceGroupName')), 0, 5)]",
+    "uniqueDetermenistic": "[format('{0}{1}', variables('commmonRGsalt'), variables('vNetRGsalt'))]",
+    "ipWhitelist_array_1": "[array(split(replace(parameters('IPwhiteList'), '\\s+', ''), ','))]",
+    "ipWhitelist_array": "[if(or(or(empty(parameters('IPwhiteList')), equals(parameters('IPwhiteList'), 'null')), less(length(parameters('IPwhiteList')), 5)), createArray(), union(variables('ipWhitelist_array_1'), createArray()))]",
+    "byoVnet": "[not(empty(parameters('vnetNameFull_param')))]",
+    "aiGwNetworkingName": "ai-gateway"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('nsg-{0}-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('nsg-{0}', parameters('common_subnet_name'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "bastionIpRange": {
+            "value": "[variables('common_bastion_subnet_cidr_v')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "5466512440362561568"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the  network security group should be deployed. Defaults to resourceGroup.location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to the network security group"
+              }
+            },
+            "bastionIpRange": {
+              "type": "string",
+              "metadata": {
+                "description": "To lock INBOUND rule to only allow RDP anbd SSH ports from Azure Bastion  via private IP"
+              }
+            },
+            "enableFlowLogs": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "networkWatcherName": {
+              "type": "string",
+              "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+            },
+            "networkWatcherResourceGroup": {
+              "type": "string",
+              "defaultValue": "NetworkWatcherRG"
+            },
+            "flowLogRetentionDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AML_CI_44224",
+                    "properties": {
+                      "description": "Required for Azure Machine Learning",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "44224",
+                      "sourceAddressPrefix": "AzureMachineLearning",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1200,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AML_Port_29876-29877",
+                    "properties": {
+                      "description": "Required for Azure Machine Learning batch compute nodes",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "29876-29877",
+                      "sourceAddressPrefix": "BatchNodeManagement",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1100,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_GetSessionInformation",
+                    "properties": {
+                      "description": "Bastion will reach to the VM (DSVM / jump server) over private IP. RDP/SSH ports 3389/22. NB! Change the IP range if not working",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "[parameters('bastionIpRange')]",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1300,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "22",
+                        "3389"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Allow_VNet_Inbound",
+                    "properties": {
+                      "description": "Allow all inbound traffic from any subnet in the same VNet (all ports, all protocols).",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 1000,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Allow_APIM",
+                    "properties": {
+                      "description": "Allow inbound from Azure API Management control plane (port 3443).",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "3443",
+                      "sourceAddressPrefix": "ApiManagement",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1010,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "DenyAllInboundExceptExplicit",
+                    "properties": {
+                      "description": "Deny all other inbound traffic not explicitly allowed above",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "*",
+                      "access": "Deny",
+                      "priority": 4000,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureDevOps_Allow_1",
+                    "properties": {
+                      "description": "Required for communication to Azure Devops. Needed to checkin code",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 2000,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": [
+                        "13.107.6.0/24",
+                        "13.107.9.0/24",
+                        "13.107.42.0/24",
+                        "13.107.43.0/24"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "AzureActiveDirectoryDomainServices_Allow",
+                    "properties": {
+                      "description": "Required for Azure Active Directory Domain Services communication",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectoryDomainServices",
+                      "access": "Allow",
+                      "priority": 2050,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AADLoginForWindows_Allow3services",
+                    "properties": {
+                      "description": "To enable Azure AD authentication for Windows VMs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 2100,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AADLoginForWindows_AllowServiceMeta",
+                    "properties": {
+                      "description": "To enable Azure AD authentication for Windows VMs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "169.254.169.254",
+                      "access": "Allow",
+                      "priority": 2200,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureActiveDirectory",
+                    "properties": {
+                      "description": "AML - Azure AD authentication (HTTPS only)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectory",
+                      "access": "Allow",
+                      "priority": 2300,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearningOutbound",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureMachineLearning",
+                      "access": "Allow",
+                      "priority": 2400,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureResourceManager",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureResourceManager",
+                      "access": "Allow",
+                      "priority": 2500,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureStorageAccount",
+                    "properties": {
+                      "description": "AML - Azure Storage (HTTPS and SMB)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRanges": [
+                        "443",
+                        "445"
+                      ],
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('Storage.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 2600,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureFrontDoor",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureFrontDoor.FrontEnd",
+                      "access": "Allow",
+                      "priority": 2700,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureFrontDoorFirstParty",
+                    "properties": {
+                      "description": "Required for MCR pulls — MCR layers/manifests are served via FrontDoor FirstParty backend (AKS/ACA system images).",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureFrontDoor.FirstParty",
+                      "access": "Allow",
+                      "priority": 2710,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureMonitor",
+                    "properties": {
+                      "description": "Required for AKS / ACA / VM log + metric egress (Container Insights, Log Analytics, App Insights).",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureMonitor",
+                      "access": "Allow",
+                      "priority": 2720,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureContainerRegistry",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('AzureContainerRegistry.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 2800,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "MicrosoftContainerRegistry",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "MicrosoftContainerRegistry",
+                      "access": "Allow",
+                      "priority": 2900,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AKS_private_loadbalancer_call_from_DSVM_in_vNet",
+                    "properties": {
+                      "description": "Required for communication from private DSVM to call private AKS cluster endpoints. Needed for Azure ML inferencing.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 1600,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "VirtualNetwork"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_1",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Udp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "5831",
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3100,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "AzureMachineLearning"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_2",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "5831",
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3300,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "[format('BatchNodeManagement.{0}', parameters('location'))]"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_3",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRanges": [
+                        "8787",
+                        "18881"
+                      ],
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3200,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "AzureMachineLearning"
+                    }
+                  },
+                  {
+                    "name": "AzureDataFactory_Portal",
+                    "properties": {
+                      "description": "Required for Data Factory portal authoring and monitoring",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 3400,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureDataFactory_SelfHostedIR",
+                    "properties": {
+                      "description": "Required for self-hosted IR to connect to Data Factory",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('DataFactory.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 3500,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "ServiceBus_InteractiveAuthoring",
+                    "properties": {
+                      "description": "Required for self-hosted IR interactive authoring",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "ServiceBus",
+                      "access": "Allow",
+                      "priority": 3600,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "Microsoft_Downloads",
+                    "properties": {
+                      "description": "Required for self-hosted IR updates from Microsoft",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 3700,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Allow_VNet_Outbound",
+                    "properties": {
+                      "description": "Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols).",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 1000,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+              "type": "Microsoft.Network/networkWatchers/flowLogs",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                "storageId": "[parameters('storageAccountId')]",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('flowLogRetentionDays')]",
+                  "enabled": true
+                },
+                "format": {
+                  "type": "JSON",
+                  "version": 2
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "nsgId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+            },
+            "flowLogId": {
+              "type": "string",
+              "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('nsg-{0}-scoring-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('nsg-{0}-scoring', parameters('common_subnet_name'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "bastionIpRange": {
+            "value": "[variables('common_bastion_subnet_cidr_v')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "15516207366085873099"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the  network security group should be deployed. Defaults to resourceGroup.location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to the network security group"
+              }
+            },
+            "bastionIpRange": {
+              "type": "string",
+              "metadata": {
+                "description": "To lock INBOUND rule to only allow RDP anbd SSH ports from Azure Bastion  via private IP"
+              }
+            },
+            "enableFlowLogs": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "networkWatcherName": {
+              "type": "string",
+              "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+            },
+            "networkWatcherResourceGroup": {
+              "type": "string",
+              "defaultValue": "NetworkWatcherRG"
+            },
+            "flowLogRetentionDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AML_CI_44224",
+                    "properties": {
+                      "description": "Required for Azure Machine Learning",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "44224",
+                      "sourceAddressPrefix": "AzureMachineLearning",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1200,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AML_Port_29876-29877",
+                    "properties": {
+                      "description": "Required for Azure Machine Learning batch compute nodes",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "29876-29877",
+                      "sourceAddressPrefix": "BatchNodeManagement",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1100,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_GetSessionInformation",
+                    "properties": {
+                      "description": "Bastion will reach to the VM (DSVM / jump server) over private IP. RDP/SSH ports 3389/22. NB! Change the IP range if not working",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "[parameters('bastionIpRange')]",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1300,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "22",
+                        "3389"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Allow_VNet_Inbound",
+                    "properties": {
+                      "description": "Allow traffic from other subnets in same VNet",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 1400,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "DenyAllInboundExceptExplicit",
+                    "properties": {
+                      "description": "Deny all other inbound traffic not explicitly allowed above",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "*",
+                      "access": "Deny",
+                      "priority": 4000,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureDevOps_Allow_1",
+                    "properties": {
+                      "description": "Required for communication to Azure Devops. Needed to checkin code",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 2000,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": [
+                        "13.107.6.0/24",
+                        "13.107.9.0/24",
+                        "13.107.42.0/24",
+                        "13.107.43.0/24"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "AzureActiveDirectoryDomainServices_Allow",
+                    "properties": {
+                      "description": "Required for Azure Active Directory Domain Services communication",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectoryDomainServices",
+                      "access": "Allow",
+                      "priority": 2050,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AADLoginForWindows_Allow3services",
+                    "properties": {
+                      "description": "To enable Azure AD authentication for Windows VMs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 2100,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AADLoginForWindows_AllowServiceMeta",
+                    "properties": {
+                      "description": "To enable Azure AD authentication for Windows VMs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "169.254.169.254",
+                      "access": "Allow",
+                      "priority": 2200,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureActiveDirectory",
+                    "properties": {
+                      "description": "AML - Azure AD authentication (HTTPS only)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectory",
+                      "access": "Allow",
+                      "priority": 2300,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearningOutbound",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureMachineLearning",
+                      "access": "Allow",
+                      "priority": 2400,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureResourceManager",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureResourceManager",
+                      "access": "Allow",
+                      "priority": 2500,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureStorageAccount",
+                    "properties": {
+                      "description": "AML - Azure Storage (HTTPS and SMB)",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRanges": [
+                        "443",
+                        "445"
+                      ],
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('Storage.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 2600,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureFrontDoor",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureFrontDoor.FrontEnd",
+                      "access": "Allow",
+                      "priority": 2700,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureContainerRegistry",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('AzureContainerRegistry.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 2800,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "MicrosoftContainerRegistry",
+                    "properties": {
+                      "description": "AML !!",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "MicrosoftContainerRegistry",
+                      "access": "Allow",
+                      "priority": 2900,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AKS_private_loadbalancer_call_from_DSVM_in_vNet",
+                    "properties": {
+                      "description": "Required for communication from private DSVM to call private AKS cluster endpoints. Needed for Azure ML inferencing.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 1600,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "VirtualNetwork"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_1",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Udp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "5831",
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3100,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "AzureMachineLearning"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_2",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "5831",
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3300,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "[format('BatchNodeManagement.{0}', parameters('location'))]"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning_2023_sdkv2_3",
+                    "properties": {
+                      "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRanges": [
+                        "8787",
+                        "18881"
+                      ],
+                      "sourceAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 3200,
+                      "direction": "Outbound",
+                      "destinationAddressPrefix": "AzureMachineLearning"
+                    }
+                  },
+                  {
+                    "name": "AzureDataFactory_Portal",
+                    "properties": {
+                      "description": "Required for Data Factory portal authoring and monitoring",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 3400,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "AzureDataFactory_SelfHostedIR",
+                    "properties": {
+                      "description": "Required for self-hosted IR to connect to Data Factory",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('DataFactory.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 3500,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "ServiceBus_InteractiveAuthoring",
+                    "properties": {
+                      "description": "Required for self-hosted IR interactive authoring",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "ServiceBus",
+                      "access": "Allow",
+                      "priority": 3600,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "Microsoft_Downloads",
+                    "properties": {
+                      "description": "Required for self-hosted IR updates from Microsoft",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 3700,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Allow_VNet_Outbound",
+                    "properties": {
+                      "description": "Allow traffic to other subnets in same VNet",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 1500,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+              "type": "Microsoft.Network/networkWatchers/flowLogs",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                "storageId": "[parameters('storageAccountId')]",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('flowLogRetentionDays')]",
+                  "enabled": true
+                },
+                "format": {
+                  "type": "JSON",
+                  "version": 2
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "nsgId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+            },
+            "flowLogId": {
+              "type": "string",
+              "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic')))]"
+      ]
+    },
+    {
+      "condition": "[equals(empty(variables('ipWhitelist_array')), false())]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('nsg-{0}-depl{1}', parameters('common_bastion_subnet_name'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('nsg-{0}', parameters('common_bastion_subnet_name'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "IPwhiteList_Array": {
+            "value": "[variables('ipWhitelist_array')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "16614962466377681091"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the network security group should be deployed. Defaults to resourceGroup.location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to the network security group"
+              }
+            },
+            "IPwhiteList_Array": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion"
+              }
+            },
+            "enableFlowLogs": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "networkWatcherName": {
+              "type": "string",
+              "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+            },
+            "networkWatcherResourceGroup": {
+              "type": "string",
+              "defaultValue": "NetworkWatcherRG"
+            },
+            "flowLogRetentionDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": {
+            "bastionNsg": {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "Bastion_AllowHttpsInbound",
+                    "properties": {
+                      "description": "Required for Bastion public IP. Source can be either the Internet or a set of public IP addresses (whitelist) that you specify",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 520,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": "[parameters('IPwhiteList_Array')]",
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_GatewayManagerInbound",
+                    "properties": {
+                      "description": "Required for Bastion control plane",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "GatewayManager",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 530,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_AzureLoadBalancerInbound",
+                    "properties": {
+                      "description": "This enables Azure Load Balancer to detect connectivity",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "AzureLoadBalancer",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 540,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_HostCommunication",
+                    "properties": {
+                      "description": "Data plane communication for Azure Bastion",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 550,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "8080",
+                        "5701"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_SshOutbound",
+                    "properties": {
+                      "description": "Reach  target VMs over private IP, to other target VM subnets for port 3389 and 22",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 140,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "22",
+                        "3389"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_AzureCloudOutbound",
+                    "properties": {
+                      "description": "Bastion needs to be able to connect to various public endpoints within Azure for storing logs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureCloud",
+                      "access": "Allow",
+                      "priority": 150,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_Communication",
+                    "properties": {
+                      "description": "Data plane communication for Azure Bastion",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 160,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "8080",
+                        "5701"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_GetSessionInformation",
+                    "properties": {
+                      "description": "Bastion needs to be able to communicate with the Internet for session and certificate validation",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 170,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  }
+                ]
+              }
+            },
+            "nsgFlowLog": {
+              "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+              "type": "Microsoft.Network/networkWatchers/flowLogs",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                "storageId": "[parameters('storageAccountId')]",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('flowLogRetentionDays')]",
+                  "enabled": true
+                },
+                "format": {
+                  "type": "JSON",
+                  "version": 2
+                }
+              },
+              "dependsOn": [
+                "bastionNsg"
+              ]
+            }
+          },
+          "outputs": {
+            "bastionNsgId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+            },
+            "flowLogId": {
+              "type": "string",
+              "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-scoring-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic')))]"
+      ]
+    },
+    {
+      "condition": "[empty(variables('ipWhitelist_array'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('nsg-{0}-NoWLdepl{1}', parameters('common_bastion_subnet_name'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('nsg-{0}', parameters('common_bastion_subnet_name'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "IPwhiteList_Array": {
+            "value": "[variables('ipWhitelist_array')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "814214132505293084"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the network security group should be deployed. Defaults to resourceGroup.location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to the network security group"
+              }
+            },
+            "IPwhiteList_Array": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion"
+              }
+            },
+            "enableFlowLogs": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "networkWatcherName": {
+              "type": "string",
+              "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+            },
+            "networkWatcherResourceGroup": {
+              "type": "string",
+              "defaultValue": "NetworkWatcherRG"
+            },
+            "flowLogRetentionDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": {
+            "bastionNsg": {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "Bastion_GatewayManagerInbound",
+                    "properties": {
+                      "description": "Required for Bastion control plane",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "GatewayManager",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 530,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_AzureLoadBalancerInbound",
+                    "properties": {
+                      "description": "This enables Azure Load Balancer to detect connectivity",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "AzureLoadBalancer",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 540,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_HostCommunication",
+                    "properties": {
+                      "description": "Data plane communication for Azure Bastion",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 550,
+                      "direction": "Inbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "8080",
+                        "5701"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_SshOutbound",
+                    "properties": {
+                      "description": "Reach  target VMs over private IP, to other target VM subnets for port 3389 and 22",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 140,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "22",
+                        "3389"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_AzureCloudOutbound",
+                    "properties": {
+                      "description": "Bastion needs to be able to connect to various public endpoints within Azure for storing logs.",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureCloud",
+                      "access": "Allow",
+                      "priority": 150,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_Communication",
+                    "properties": {
+                      "description": "Data plane communication for Azure Bastion",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "VirtualNetwork",
+                      "access": "Allow",
+                      "priority": 160,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [
+                        "8080",
+                        "5701"
+                      ],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  },
+                  {
+                    "name": "Bastion_GetSessionInformation",
+                    "properties": {
+                      "description": "Bastion needs to be able to communicate with the Internet for session and certificate validation",
+                      "protocol": "*",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "80",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "access": "Allow",
+                      "priority": 170,
+                      "direction": "Outbound",
+                      "sourcePortRanges": [],
+                      "destinationPortRanges": [],
+                      "sourceAddressPrefixes": [],
+                      "destinationAddressPrefixes": []
+                    }
+                  }
+                ]
+              }
+            },
+            "nsgFlowLog": {
+              "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+              "type": "Microsoft.Network/networkWatchers/flowLogs",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                "storageId": "[parameters('storageAccountId')]",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('flowLogRetentionDays')]",
+                  "enabled": true
+                },
+                "format": {
+                  "type": "JSON",
+                  "version": 2
+                }
+              },
+              "dependsOn": [
+                "bastionNsg"
+              ]
+            }
+          },
+          "outputs": {
+            "bastionNsgId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+            },
+            "flowLogId": {
+              "type": "string",
+              "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-scoring-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('nsg-{0}-depl{1}', parameters('common_pbi_subnet_name'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('nsg-{0}', parameters('common_pbi_subnet_name'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "12022968546108205629"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the location where the  network security group should be deployed. Defaults to resourceGroup.location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Specifies the tags that should be applied to the network security group"
+              }
+            },
+            "enableFlowLogs": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "networkWatcherName": {
+              "type": "string",
+              "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+            },
+            "networkWatcherResourceGroup": {
+              "type": "string",
+              "defaultValue": "NetworkWatcherRG"
+            },
+            "flowLogRetentionDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AzureActiveDirectory",
+                    "properties": {
+                      "description": "Optional",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectory",
+                      "access": "Allow",
+                      "priority": 130,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureStorageAccount",
+                    "properties": {
+                      "description": "Optional",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('Storage.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 160,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureFrontDoor",
+                    "properties": {
+                      "description": "Optional",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureFrontDoor.FrontEnd",
+                      "access": "Allow",
+                      "priority": 170,
+                      "direction": "Outbound"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+              "type": "Microsoft.Network/networkWatchers/flowLogs",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                "storageId": "[parameters('storageAccountId')]",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('flowLogRetentionDays')]",
+                  "enabled": true
+                },
+                "format": {
+                  "type": "JSON",
+                  "version": 2
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "nsgId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+            },
+            "flowLogId": {
+              "type": "string",
+              "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-depl{1}', parameters('common_bastion_subnet_name'), variables('uniqueDetermenistic')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-NoWLdepl{1}', parameters('common_bastion_subnet_name'), variables('uniqueDetermenistic')))]"
+      ]
+    },
+    {
+      "condition": "[not(parameters('BYO_subnets'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('{0}depl{1}', variables('vnetNameFull'), variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "common_pbi_subnet_cidr": {
+            "value": "[variables('common_pbi_subnet_cidr_v')]"
+          },
+          "common_pbi_subnet_name": {
+            "value": "[parameters('common_pbi_subnet_name')]"
+          },
+          "common_subnet_cidr": {
+            "value": "[variables('common_subnet_cidr_v')]"
+          },
+          "common_subnet_scoring_cidr": {
+            "value": "[variables('common_subnet_scoring_cidr_v')]"
+          },
+          "common_subnet_name": {
+            "value": "[parameters('common_subnet_name')]"
+          },
+          "common_vnet_cidr": {
+            "value": "[variables('common_vnet_cidr_v')]"
+          },
+          "common_bastion_subnet_name": {
+            "value": "[parameters('common_bastion_subnet_name')]"
+          },
+          "common_bastion_subnet_cidr": {
+            "value": "[variables('common_bastion_subnet_cidr_v')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "vnetNameFull": {
+            "value": "[variables('vnetNameFull')]"
+          },
+          "centralDnsZoneByPolicyInHub": {
+            "value": "[parameters('centralDnsZoneByPolicyInHub')]"
+          },
+          "deployOnlyAIGatewayNetworking": {
+            "value": "[parameters('deployOnlyAIGatewayNetworking')]"
+          },
+          "byoSubnet": {
+            "value": "[parameters('BYO_subnets')]"
+          },
+          "byoVnet": {
+            "value": "[variables('byoVnet')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "5998868512724848774"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Deployment location"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "tags"
+              }
+            },
+            "vnetNameFull": {
+              "type": "string",
+              "metadata": {
+                "description": "Specifies the name of the NSG, network security group"
+              }
+            },
+            "common_vnet_cidr": {
+              "type": "string",
+              "metadata": {
+                "description": "CIDR for common vNet "
+              }
+            },
+            "common_pbi_subnet_name": {
+              "type": "string",
+              "metadata": {
+                "description": "common Power BI subnet for vNet gateway"
+              }
+            },
+            "common_pbi_subnet_cidr": {
+              "type": "string",
+              "metadata": {
+                "description": "CIDR for common Power BI subnet for gateway"
+              }
+            },
+            "common_subnet_name": {
+              "type": "string",
+              "metadata": {
+                "description": "common subnet"
+              }
+            },
+            "common_subnet_cidr": {
+              "type": "string",
+              "metadata": {
+                "description": "CIDR for common subnet"
+              }
+            },
+            "common_subnet_scoring_cidr": {
+              "type": "string",
+              "metadata": {
+                "description": "CIDR for common scoring subnet"
+              }
+            },
+            "common_bastion_subnet_name": {
+              "type": "string",
+              "metadata": {
+                "description": "common Bastion host subnet for RDP access over private IP"
+              }
+            },
+            "common_bastion_subnet_cidr": {
+              "type": "string",
+              "metadata": {
+                "description": "common Bastion host subnet CIDR"
+              }
+            },
+            "centralDnsZoneByPolicyInHub": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead."
+              }
+            },
+            "deployOnlyAIGatewayNetworking": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "byoSubnet": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "byoVnet": {
+              "type": "bool",
+              "defaultValue": false
+            }
+          },
+          "variables": {
+            "pbiSettings": {
+              "cidr": "[parameters('common_pbi_subnet_cidr')]",
+              "delegations": [
+                "Microsoft.PowerPlatform/vnetaccesslinks"
+              ],
+              "serviceEndpoints": []
+            }
+          },
+          "resources": [
+            {
+              "condition": "[and(not(parameters('byoVnet')), not(parameters('byoSubnet')))]",
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2021-03-01",
+              "name": "[parameters('vnetNameFull')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('common_vnet_cidr')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "[parameters('common_subnet_name')]",
+                    "properties": {
+                      "addressPrefix": "[parameters('common_subnet_cidr')]",
+                      "serviceEndpoints": [
+                        {
+                          "locations": [
+                            "[parameters('location')]"
+                          ],
+                          "service": "Microsoft.KeyVault"
+                        },
+                        {
+                          "service": "Microsoft.Storage"
+                        },
+                        {
+                          "service": "Microsoft.CognitiveServices"
+                        }
+                      ],
+                      "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_subnet_name')))))]",
+                      "privateEndpointNetworkPolicies": "Disabled",
+                      "privateLinkServiceNetworkPolicies": "Disabled"
+                    }
+                  },
+                  {
+                    "name": "[format('{0}-scoring', parameters('common_subnet_name'))]",
+                    "properties": {
+                      "addressPrefix": "[parameters('common_subnet_scoring_cidr')]",
+                      "privateEndpointNetworkPolicies": "Disabled",
+                      "privateLinkServiceNetworkPolicies": "Disabled",
+                      "serviceEndpoints": [
+                        {
+                          "service": "Microsoft.KeyVault"
+                        },
+                        {
+                          "service": "Microsoft.ContainerRegistry"
+                        },
+                        {
+                          "service": "Microsoft.Storage"
+                        }
+                      ],
+                      "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}-scoring', parameters('common_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}-scoring', parameters('common_subnet_name')))))]"
+                    }
+                  },
+                  {
+                    "name": "[parameters('common_pbi_subnet_name')]",
+                    "properties": {
+                      "addressPrefix": "[parameters('common_pbi_subnet_cidr')]",
+                      "serviceEndpoints": [],
+                      "delegations": [
+                        {
+                          "properties": {
+                            "serviceName": "[variables('pbiSettings').delegations[0]]"
+                          },
+                          "name": "[format('{0}-del-{1}', toLower(split(split(variables('pbiSettings').delegations[0], '.')[0], '/')[0]), substring(uniqueString(parameters('common_pbi_subnet_name')), 0, 12))]"
+                        }
+                      ],
+                      "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_pbi_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_pbi_subnet_name')))))]"
+                    }
+                  },
+                  {
+                    "name": "[parameters('common_bastion_subnet_name')]",
+                    "properties": {
+                      "addressPrefix": "[parameters('common_bastion_subnet_cidr')]",
+                      "serviceEndpoints": [],
+                      "delegations": [],
+                      "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_bastion_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_bastion_subnet_name')))))]"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[or(parameters('byoVnet'), parameters('byoSubnet'))]",
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('vnetNameFull'), parameters('common_subnet_name'))]",
+              "properties": {
+                "addressPrefix": "[parameters('common_subnet_cidr')]",
+                "serviceEndpoints": [
+                  {
+                    "locations": [
+                      "[parameters('location')]"
+                    ],
+                    "service": "Microsoft.KeyVault"
+                  },
+                  {
+                    "service": "Microsoft.Storage"
+                  },
+                  {
+                    "service": "Microsoft.CognitiveServices"
+                  }
+                ],
+                "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_subnet_name')))))]",
+                "privateEndpointNetworkPolicies": "Disabled",
+                "privateLinkServiceNetworkPolicies": "Disabled"
+              }
+            },
+            {
+              "condition": "[or(parameters('byoVnet'), parameters('byoSubnet'))]",
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('vnetNameFull'), format('{0}-scoring', parameters('common_subnet_name')))]",
+              "properties": {
+                "addressPrefix": "[parameters('common_subnet_scoring_cidr')]",
+                "privateEndpointNetworkPolicies": "Disabled",
+                "privateLinkServiceNetworkPolicies": "Disabled",
+                "serviceEndpoints": [
+                  {
+                    "service": "Microsoft.KeyVault"
+                  },
+                  {
+                    "service": "Microsoft.ContainerRegistry"
+                  },
+                  {
+                    "service": "Microsoft.Storage"
+                  }
+                ],
+                "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}-scoring', parameters('common_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}-scoring', parameters('common_subnet_name')))))]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_subnet_name'))]"
+              ]
+            },
+            {
+              "condition": "[or(parameters('byoVnet'), parameters('byoSubnet'))]",
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('vnetNameFull'), parameters('common_pbi_subnet_name'))]",
+              "properties": {
+                "addressPrefix": "[parameters('common_pbi_subnet_cidr')]",
+                "serviceEndpoints": [],
+                "delegations": [
+                  {
+                    "properties": {
+                      "serviceName": "[variables('pbiSettings').delegations[0]]"
+                    },
+                    "name": "[format('{0}-del-{1}', toLower(split(split(variables('pbiSettings').delegations[0], '.')[0], '/')[0]), substring(uniqueString(parameters('common_pbi_subnet_name')), 0, 12))]"
+                  }
+                ],
+                "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_pbi_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_pbi_subnet_name')))))]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), format('{0}-scoring', parameters('common_subnet_name')))]"
+              ]
+            },
+            {
+              "condition": "[or(parameters('byoVnet'), parameters('byoSubnet'))]",
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2021-03-01",
+              "name": "[format('{0}/{1}', parameters('vnetNameFull'), parameters('common_bastion_subnet_name'))]",
+              "properties": {
+                "addressPrefix": "[parameters('common_bastion_subnet_cidr')]",
+                "serviceEndpoints": [],
+                "delegations": [],
+                "networkSecurityGroup": "[if(equals(resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_bastion_subnet_name'))), ''), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('common_bastion_subnet_name')))))]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_pbi_subnet_name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "subnet1ResourceId": {
+              "type": "string",
+              "value": "[if(or(parameters('byoVnet'), parameters('byoSubnet')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_subnet_name')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_subnet_name')))]"
+            },
+            "subnet2ResourceId": {
+              "type": "string",
+              "value": "[if(or(parameters('byoVnet'), parameters('byoSubnet')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_pbi_subnet_name')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_pbi_subnet_name')))]"
+            },
+            "subnetBastionId": {
+              "type": "string",
+              "value": "[if(or(parameters('byoVnet'), parameters('byoSubnet')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_bastion_subnet_name')), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('common_bastion_subnet_name')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-depl{1}', parameters('common_bastion_subnet_name'), variables('uniqueDetermenistic')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-scoring-depl{1}', parameters('common_subnet_name'), variables('uniqueDetermenistic')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('nsg-{0}-depl{1}', parameters('common_pbi_subnet_name'), variables('uniqueDetermenistic')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployAIGatewayNetworking')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('ai-gateway-networking-{0}', variables('uniqueDetermenistic'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('vnetResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('aiGwNetworkingName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "aifactorySuffixRG": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "commonResourceSuffix": {
+            "value": "[parameters('commonResourceSuffix')]"
+          },
+          "commonRGNamePrefix": {
+            "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[variables('subscriptionIdDevTestProd')]"
+          },
+          "vnetName": {
+            "value": "[variables('vnetNameFull')]"
+          },
+          "vnetNameBase": {
+            "value": "[parameters('vnetNameBase')]"
+          },
+          "network_env": {
+            "value": "[parameters('network_env')]"
+          },
+          "vnetNameFull_param": {
+            "value": "[parameters('vnetNameFull_param')]"
+          },
+          "vnetResourceGroup_param": {
+            "value": "[parameters('vnetResourceGroup_param')]"
+          },
+          "centralDnsZoneByPolicyInHub": {
+            "value": "[parameters('centralDnsZoneByPolicyInHub')]"
+          },
+          "CIDRApim": {
+            "value": "[variables('ai_gateway_apim_cidr_v')]"
+          },
+          "CIDRFunctionApp": {
+            "value": "[variables('ai_gateway_app_cidr_v')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "11351815008357178406"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "defaultValue": "ai-gateway"
+            },
+            "tags": {
+              "type": "object"
+            },
+            "location": {
+              "type": "string"
+            },
+            "locationSuffix": {
+              "type": "string"
+            },
+            "env": {
+              "type": "string"
+            },
+            "aifactorySuffixRG": {
+              "type": "string"
+            },
+            "commonRGNamePrefix": {
+              "type": "string"
+            },
+            "vnetName": {
+              "type": "string"
+            },
+            "commonResourceSuffix": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "vnetResourceGroup_param": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "vnetNameFull_param": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "network_env": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "vnetNameBase": {
+              "type": "string",
+              "defaultValue": "vnt-esmlcmn"
+            },
+            "centralDnsZoneByPolicyInHub": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "CIDRApim": {
+              "type": "string"
+            },
+            "CIDRFunctionApp": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "commonResourceGroupName": "[format('{0}esml-common-{1}-{2}{3}', parameters('commonRGNamePrefix'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySuffixRG'))]",
+            "vnetResourceGroupName": "[if(not(equals(parameters('vnetResourceGroup_param'), '')), replace(parameters('vnetResourceGroup_param'), '<network_env>', parameters('network_env')), variables('commonResourceGroupName'))]",
+            "vnetNameFull": "[if(not(equals(parameters('vnetNameFull_param'), '')), parameters('vnetNameFull_param'), format('{0}-{1}-{2}{3}', parameters('vnetNameBase'), parameters('locationSuffix'), parameters('env'), parameters('commonResourceSuffix')))]",
+            "vNetRGsalt": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('vnetResourceGroupName'))), 0, 5)]",
+            "commmonRGsalt": "[substring(uniqueString(variables('commonResourceGroupName')), 0, 5)]",
+            "uniqueDetermenistic": "[format('{0}{1}', variables('commmonRGsalt'), variables('vNetRGsalt'))]",
+            "apimSubnetSettings": {
+              "cidr": "[parameters('CIDRApim')]",
+              "name": "apimSubnetSettings",
+              "delegations": [],
+              "serviceEndpoints": [
+                "Microsoft.AzureActiveDirectory",
+                "Microsoft.EventHub",
+                "Microsoft.KeyVault",
+                "Microsoft.ServiceBus",
+                "Microsoft.Sql",
+                "Microsoft.Storage"
+              ]
+            },
+            "functionAppSubnetSettings": {
+              "cidr": "[parameters('CIDRFunctionApp')]",
+              "name": "functionAppSubnetSettings",
+              "delegations": [
+                "Microsoft.Web/serverFarms"
+              ],
+              "serviceEndpoints": [
+                "Microsoft.KeyVault",
+                "Microsoft.Storage",
+                "Microsoft.CognitiveServices",
+                "Microsoft.ContainerRegistry",
+                "Microsoft.AzureCosmosDB",
+                "Microsoft.Web"
+              ]
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2022-09-01",
+              "name": "[format('depl-aigw-apim-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))]",
+              "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+              "resourceGroup": "[variables('vnetResourceGroupName')]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[format('nsg-{0}-apim', parameters('name'))]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.37.4.10188",
+                      "templateHash": "11261117265801348341"
+                    }
+                  },
+                  "parameters": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "type": "object"
+                    },
+                    "enableFlowLogs": {
+                      "type": "bool",
+                      "defaultValue": true
+                    },
+                    "storageAccountId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "networkWatcherName": {
+                      "type": "string",
+                      "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+                    },
+                    "networkWatcherResourceGroup": {
+                      "type": "string",
+                      "defaultValue": "NetworkWatcherRG"
+                    },
+                    "flowLogRetentionDays": {
+                      "type": "int",
+                      "defaultValue": 30
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/networkSecurityGroups",
+                      "apiVersion": "2020-06-01",
+                      "name": "[parameters('name')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "securityRules": [
+                          {
+                            "name": "Client-Communication-To-API-Gateway",
+                            "properties": {
+                              "description": "Client communication to API Gateway",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "Internet",
+                              "destinationAddressPrefix": "VirtualNetwork",
+                              "access": "Allow",
+                              "priority": 3000,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Management-Endpoint",
+                            "properties": {
+                              "description": "Allow management endpoint for API management",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "3443",
+                              "sourceAddressPrefix": "ApiManagement",
+                              "destinationAddressPrefix": "VirtualNetwork",
+                              "access": "Allow",
+                              "priority": 3010,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Azure-Infrastructure-Load-Balancer",
+                            "properties": {
+                              "description": "Allow Azure Infrastructure Load Balancer",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "6390",
+                              "sourceAddressPrefix": "AzureLoadBalancer",
+                              "destinationAddressPrefix": "VirtualNetwork",
+                              "access": "Allow",
+                              "priority": 3020,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "AllowAzureTrafficManager",
+                            "properties": {
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "AzureTrafficManager",
+                              "destinationAddressPrefix": "VirtualNetwork",
+                              "access": "Allow",
+                              "priority": 3030,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Azure-SQL-Access",
+                            "properties": {
+                              "description": "Access to Azure SQL",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "1433",
+                              "sourceAddressPrefix": "VirtualNetwork",
+                              "destinationAddressPrefix": "Sql",
+                              "access": "Allow",
+                              "priority": 3000,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Azure-Storage-Access",
+                            "properties": {
+                              "description": "Access to Azure Storage",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "VirtualNetwork",
+                              "destinationAddressPrefix": "Storage",
+                              "access": "Allow",
+                              "priority": 3010,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Azure-KeyVault-Access",
+                            "properties": {
+                              "description": "Access to Azure Key Vault",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "VirtualNetwork",
+                              "destinationAddressPrefix": "AzureKeyVault",
+                              "access": "Allow",
+                              "priority": 3020,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Azure-EventHub-Access",
+                            "properties": {
+                              "description": "Access to Azure Event Hub",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "5671-5672",
+                              "sourceAddressPrefix": "VirtualNetwork",
+                              "destinationAddressPrefix": "EventHub",
+                              "access": "Allow",
+                              "priority": 3030,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Internet-Dependency-Access",
+                            "properties": {
+                              "description": "Access to dependencies hosted on Internet",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "VirtualNetwork",
+                              "destinationAddressPrefix": "Internet",
+                              "access": "Allow",
+                              "priority": 3040,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "AllowMonitor",
+                            "properties": {
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRanges": [
+                                "1886",
+                                "443"
+                              ],
+                              "sourceAddressPrefix": "AzureMonitor",
+                              "destinationAddressPrefix": "VirtualNetwork",
+                              "access": "Allow",
+                              "priority": 3050,
+                              "direction": "Outbound"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+                      "type": "Microsoft.Network/networkWatchers/flowLogs",
+                      "apiVersion": "2023-05-01",
+                      "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                        "storageId": "[parameters('storageAccountId')]",
+                        "enabled": true,
+                        "retentionPolicy": {
+                          "days": "[parameters('flowLogRetentionDays')]",
+                          "enabled": true
+                        },
+                        "format": {
+                          "type": "JSON",
+                          "version": 2
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "id": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+                    },
+                    "flowLogId": {
+                      "type": "string",
+                      "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2022-09-01",
+              "name": "[format('depl-aigw-rt-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))]",
+              "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+              "resourceGroup": "[variables('vnetResourceGroupName')]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[format('rt-{0}', parameters('name'))]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.37.4.10188",
+                      "templateHash": "2797859577521149130"
+                    }
+                  },
+                  "parameters": {
+                    "location": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "type": "object"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/routeTables",
+                      "apiVersion": "2023-11-01",
+                      "name": "[parameters('name')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[union(parameters('tags'), createObject('azd-service-name', parameters('name')))]",
+                      "properties": {
+                        "routes": [
+                          {
+                            "name": "apim-management",
+                            "properties": {
+                              "addressPrefix": "ApiManagement",
+                              "nextHopType": "Internet"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "id": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/routeTables', parameters('name'))]"
+                    },
+                    "name": {
+                      "type": "string",
+                      "value": "[parameters('name')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2022-09-01",
+              "name": "[format('depl-apimAiGW-{0}', variables('uniqueDetermenistic'))]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[format('snt-{0}-apim', parameters('name'))]"
+                  },
+                  "virtualNetworkName": {
+                    "value": "[variables('vnetNameFull')]"
+                  },
+                  "addressPrefix": {
+                    "value": "[variables('apimSubnetSettings').cidr]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "serviceEndpoints": {
+                    "value": "[variables('apimSubnetSettings').serviceEndpoints]"
+                  },
+                  "delegations": {
+                    "value": "[variables('apimSubnetSettings').delegations]"
+                  },
+                  "routeTableId": {
+                    "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-rt-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))), '2022-09-01').outputs.id.value]"
+                  },
+                  "nsgId": {
+                    "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-apim-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))), '2022-09-01').outputs.id.value]"
+                  },
+                  "centralDnsZoneByPolicyInHub": {
+                    "value": "[parameters('centralDnsZoneByPolicyInHub')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.37.4.10188",
+                      "templateHash": "11159352104430896347"
+                    }
+                  },
+                  "parameters": {
+                    "nsgId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Specifies the id of an NSG that should be connected to new subnet"
+                      }
+                    },
+                    "name": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the name of the new subnet"
+                      }
+                    },
+                    "addressPrefix": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the address prefix used for new subnet"
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the location where new subnet is deployed. Defaults to resourceGroup.location"
+                      }
+                    },
+                    "serviceEndpoints": {
+                      "type": "array",
+                      "defaultValue": [],
+                      "metadata": {
+                        "description": "Specifies an array of service endpoints that should be enabled on the new subnet"
+                      }
+                    },
+                    "delegations": {
+                      "type": "array",
+                      "metadata": {
+                        "description": "Specifies an array of delegations that should be enabled on the new subnet"
+                      }
+                    },
+                    "virtualNetworkName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the name of a virtual network used for deploying new subnet"
+                      }
+                    },
+                    "privateEndpointNetworkPolicies": {
+                      "type": "string",
+                      "defaultValue": "Disabled",
+                      "metadata": {
+                        "description": "Specifies a boolean to control if private endpoint network policies should be enabled or not"
+                      }
+                    },
+                    "privateLinkServiceNetworkPolicies": {
+                      "type": "string",
+                      "defaultValue": "Enabled",
+                      "metadata": {
+                        "description": "Specifies a boolean to control if private link network policies should be enabled or not"
+                      }
+                    },
+                    "centralDnsZoneByPolicyInHub": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead."
+                      }
+                    },
+                    "routeTableId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "natGatewayId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "allowDefaultOutboundAccess": {
+                      "type": "bool",
+                      "defaultValue": false
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/virtualNetworks/subnets",
+                      "apiVersion": "2023-05-01",
+                      "name": "[format('{0}/{1}', parameters('virtualNetworkName'), parameters('name'))]",
+                      "properties": {
+                        "copy": [
+                          {
+                            "name": "serviceEndpoints",
+                            "count": "[length(parameters('serviceEndpoints'))]",
+                            "input": {
+                              "service": "[parameters('serviceEndpoints')[copyIndex('serviceEndpoints')]]",
+                              "locations": [
+                                "[parameters('location')]"
+                              ]
+                            }
+                          },
+                          {
+                            "name": "delegations",
+                            "count": "[length(parameters('delegations'))]",
+                            "input": {
+                              "properties": {
+                                "serviceName": "[parameters('delegations')[copyIndex('delegations')]]"
+                              },
+                              "name": "[format('{0}-del-{1}', toLower(split(split(parameters('delegations')[copyIndex('delegations')], '.')[0], '/')[0]), substring(uniqueString(parameters('name')), 0, 12))]"
+                            }
+                          }
+                        ],
+                        "addressPrefix": "[parameters('addressPrefix')]",
+                        "defaultOutboundAccess": "[parameters('allowDefaultOutboundAccess')]",
+                        "privateEndpointNetworkPolicies": "[parameters('privateEndpointNetworkPolicies')]",
+                        "privateLinkServiceNetworkPolicies": "[parameters('privateLinkServiceNetworkPolicies')]",
+                        "routeTable": "[if(not(empty(parameters('routeTableId'))), createObject('id', parameters('routeTableId')), null())]",
+                        "networkSecurityGroup": {
+                          "id": "[parameters('nsgId')]"
+                        },
+                        "natGateway": "[if(not(empty(parameters('natGatewayId'))), createObject('id', parameters('natGatewayId')), null())]"
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "subnetId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', split(format('{0}/{1}', parameters('virtualNetworkName'), parameters('name')), '/')[0], split(format('{0}/{1}', parameters('virtualNetworkName'), parameters('name')), '/')[1])]"
+                    },
+                    "name": {
+                      "type": "string",
+                      "value": "[format('{0}/{1}', parameters('virtualNetworkName'), parameters('name'))]"
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-apim-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic')))]",
+                "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-rt-{0}-{1}', parameters('name'), variables('uniqueDetermenistic')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2022-09-01",
+              "name": "[format('depl-aigw-func-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))]",
+              "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+              "resourceGroup": "[variables('vnetResourceGroupName')]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[format('nsg-{0}-function-app', parameters('name'))]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.37.4.10188",
+                      "templateHash": "1938726950514727954"
+                    }
+                  },
+                  "parameters": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "type": "object"
+                    },
+                    "enableFlowLogs": {
+                      "type": "bool",
+                      "defaultValue": true
+                    },
+                    "storageAccountId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "networkWatcherName": {
+                      "type": "string",
+                      "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+                    },
+                    "networkWatcherResourceGroup": {
+                      "type": "string",
+                      "defaultValue": "NetworkWatcherRG"
+                    },
+                    "flowLogRetentionDays": {
+                      "type": "int",
+                      "defaultValue": 30
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/networkSecurityGroups",
+                      "apiVersion": "2020-06-01",
+                      "name": "[parameters('name')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "securityRules": [
+                          {
+                            "name": "Allow-HTTP-HTTPS",
+                            "properties": {
+                              "description": "Allow HTTP/HTTPS traffic to Function App",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRanges": [
+                                "80",
+                                "443"
+                              ],
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "*",
+                              "access": "Allow",
+                              "priority": 100,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-AzureLoadBalancer",
+                            "properties": {
+                              "description": "Allow Azure Load Balancer inbound traffic",
+                              "protocol": "*",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "*",
+                              "sourceAddressPrefix": "AzureLoadBalancer",
+                              "destinationAddressPrefix": "*",
+                              "access": "Allow",
+                              "priority": 110,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-AppService-Management",
+                            "properties": {
+                              "description": "Allow Function App management traffic",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "454",
+                              "sourceAddressPrefix": "AppService",
+                              "destinationAddressPrefix": "*",
+                              "access": "Allow",
+                              "priority": 120,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Deny-All-Inbound",
+                            "properties": {
+                              "description": "Deny all other inbound traffic",
+                              "protocol": "*",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "*",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "*",
+                              "access": "Deny",
+                              "priority": 4096,
+                              "direction": "Inbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-SQL",
+                            "properties": {
+                              "description": "Allow access to Azure SQL",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "1433",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "Sql",
+                              "access": "Allow",
+                              "priority": 100,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-Storage",
+                            "properties": {
+                              "description": "Allow access to Azure Storage",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "Storage",
+                              "access": "Allow",
+                              "priority": 110,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-AAD",
+                            "properties": {
+                              "description": "Allow access to Azure Active Directory",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "AzureActiveDirectory",
+                              "access": "Allow",
+                              "priority": 120,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-AppInsights-AzureMonitor",
+                            "properties": {
+                              "description": "Allow access to Application Insights",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRanges": [
+                                "1886",
+                                "443"
+                              ],
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "AzureMonitor",
+                              "access": "Allow",
+                              "priority": 130,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-EventHub",
+                            "properties": {
+                              "description": "Allow access to Event Hub",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "EventHub",
+                              "access": "Allow",
+                              "priority": 140,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-KeyVault",
+                            "properties": {
+                              "description": "Allow access to Key Vault",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "AzureKeyVault",
+                              "access": "Allow",
+                              "priority": 150,
+                              "direction": "Outbound"
+                            }
+                          },
+                          {
+                            "name": "Allow-Internet",
+                            "properties": {
+                              "description": "Allow general outbound internet access for dependencies",
+                              "protocol": "Tcp",
+                              "sourcePortRange": "*",
+                              "destinationPortRange": "443",
+                              "sourceAddressPrefix": "*",
+                              "destinationAddressPrefix": "Internet",
+                              "access": "Allow",
+                              "priority": 160,
+                              "direction": "Outbound"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+                      "type": "Microsoft.Network/networkWatchers/flowLogs",
+                      "apiVersion": "2023-05-01",
+                      "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+                        "storageId": "[parameters('storageAccountId')]",
+                        "enabled": true,
+                        "retentionPolicy": {
+                          "days": "[parameters('flowLogRetentionDays')]",
+                          "enabled": true
+                        },
+                        "format": {
+                          "type": "JSON",
+                          "version": 2
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "id": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+                    },
+                    "flowLogId": {
+                      "type": "string",
+                      "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2022-09-01",
+              "name": "[format('depl-subnetFunctionApp-{0}', variables('uniqueDetermenistic'))]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[format('snt-{0}-function-app', parameters('name'))]"
+                  },
+                  "virtualNetworkName": {
+                    "value": "[variables('vnetNameFull')]"
+                  },
+                  "addressPrefix": {
+                    "value": "[variables('functionAppSubnetSettings').cidr]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "serviceEndpoints": {
+                    "value": "[variables('functionAppSubnetSettings').serviceEndpoints]"
+                  },
+                  "delegations": {
+                    "value": "[variables('functionAppSubnetSettings').delegations]"
+                  },
+                  "nsgId": {
+                    "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-func-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic'))), '2022-09-01').outputs.id.value]"
+                  },
+                  "centralDnsZoneByPolicyInHub": {
+                    "value": "[parameters('centralDnsZoneByPolicyInHub')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.37.4.10188",
+                      "templateHash": "11159352104430896347"
+                    }
+                  },
+                  "parameters": {
+                    "nsgId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Specifies the id of an NSG that should be connected to new subnet"
+                      }
+                    },
+                    "name": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the name of the new subnet"
+                      }
+                    },
+                    "addressPrefix": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the address prefix used for new subnet"
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the location where new subnet is deployed. Defaults to resourceGroup.location"
+                      }
+                    },
+                    "serviceEndpoints": {
+                      "type": "array",
+                      "defaultValue": [],
+                      "metadata": {
+                        "description": "Specifies an array of service endpoints that should be enabled on the new subnet"
+                      }
+                    },
+                    "delegations": {
+                      "type": "array",
+                      "metadata": {
+                        "description": "Specifies an array of delegations that should be enabled on the new subnet"
+                      }
+                    },
+                    "virtualNetworkName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Specifies the name of a virtual network used for deploying new subnet"
+                      }
+                    },
+                    "privateEndpointNetworkPolicies": {
+                      "type": "string",
+                      "defaultValue": "Disabled",
+                      "metadata": {
+                        "description": "Specifies a boolean to control if private endpoint network policies should be enabled or not"
+                      }
+                    },
+                    "privateLinkServiceNetworkPolicies": {
+                      "type": "string",
+                      "defaultValue": "Enabled",
+                      "metadata": {
+                        "description": "Specifies a boolean to control if private link network policies should be enabled or not"
+                      }
+                    },
+                    "centralDnsZoneByPolicyInHub": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead."
+                      }
+                    },
+                    "routeTableId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "natGatewayId": {
+                      "type": "string",
+                      "defaultValue": ""
+                    },
+                    "allowDefaultOutboundAccess": {
+                      "type": "bool",
+                      "defaultValue": false
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/virtualNetworks/subnets",
+                      "apiVersion": "2023-05-01",
+                      "name": "[format('{0}/{1}', parameters('virtualNetworkName'), parameters('name'))]",
+                      "properties": {
+                        "copy": [
+                          {
+                            "name": "serviceEndpoints",
+                            "count": "[length(parameters('serviceEndpoints'))]",
+                            "input": {
+                              "service": "[parameters('serviceEndpoints')[copyIndex('serviceEndpoints')]]",
+                              "locations": [
+                                "[parameters('location')]"
+                              ]
+                            }
+                          },
+                          {
+                            "name": "delegations",
+                            "count": "[length(parameters('delegations'))]",
+                            "input": {
+                              "properties": {
+                                "serviceName": "[parameters('delegations')[copyIndex('delegations')]]"
+                              },
+                              "name": "[format('{0}-del-{1}', toLower(split(split(parameters('delegations')[copyIndex('delegations')], '.')[0], '/')[0]), substring(uniqueString(parameters('name')), 0, 12))]"
+                            }
+                          }
+                        ],
+                        "addressPrefix": "[parameters('addressPrefix')]",
+                        "defaultOutboundAccess": "[parameters('allowDefaultOutboundAccess')]",
+                        "privateEndpointNetworkPolicies": "[parameters('privateEndpointNetworkPolicies')]",
+                        "privateLinkServiceNetworkPolicies": "[parameters('privateLinkServiceNetworkPolicies')]",
+                        "routeTable": "[if(not(empty(parameters('routeTableId'))), createObject('id', parameters('routeTableId')), null())]",
+                        "networkSecurityGroup": {
+                          "id": "[parameters('nsgId')]"
+                        },
+                        "natGateway": "[if(not(empty(parameters('natGatewayId'))), createObject('id', parameters('natGatewayId')), null())]"
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "subnetId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', split(format('{0}/{1}', parameters('virtualNetworkName'), parameters('name')), '/')[0], split(format('{0}/{1}', parameters('virtualNetworkName'), parameters('name')), '/')[1])]"
+                    },
+                    "name": {
+                      "type": "string",
+                      "value": "[format('{0}/{1}', parameters('virtualNetworkName'), parameters('name'))]"
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('depl-aigw-func-nsg-{0}-{1}', parameters('name'), variables('uniqueDetermenistic')))]",
+                "[resourceId('Microsoft.Resources/deployments', format('depl-apimAiGW-{0}', variables('uniqueDetermenistic')))]"
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('{0}depl{1}', variables('vnetNameFull'), variables('uniqueDetermenistic')))]"
+      ]
+    }
+  ]
+}

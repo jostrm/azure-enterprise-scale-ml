@@ -1,0 +1,137 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "12817082973016655369"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "vnetCidr": {
+      "type": "string"
+    },
+    "resolverSubnetCidr": {
+      "type": "string"
+    },
+    "vpnClientCidr": {
+      "type": "string"
+    },
+    "namePrefix": {
+      "type": "string"
+    },
+    "locationShort": {
+      "type": "string"
+    },
+    "scalesetNumber": {
+      "type": "string"
+    },
+    "costCenter": {
+      "type": "string"
+    },
+    "enableBastion": {
+      "type": "bool"
+    }
+  },
+  "variables": {
+    "tags": {
+      "CostCenter": "[parameters('costCenter')]",
+      "Purpose": "AIFactoryConnectivity"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', parameters('vnetName'), 'snet-dns-private-resolver')]",
+      "properties": {
+        "addressPrefix": "[parameters('resolverSubnetCidr')]",
+        "delegations": [
+          {
+            "name": "Microsoft.Network.dnsResolvers",
+            "properties": {
+              "serviceName": "Microsoft.Network/dnsResolvers"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/dnsResolvers",
+      "apiVersion": "2025-05-01",
+      "name": "[format('dnspr-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/dnsResolvers/inboundEndpoints",
+      "apiVersion": "2025-05-01",
+      "name": "[format('{0}/{1}', format('dnspr-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')), format('inbound-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "privateIpAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'snet-dns-private-resolver')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/dnsResolvers', format('dnspr-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'snet-dns-private-resolver')]"
+      ]
+    },
+    {
+      "condition": "[parameters('enableBastion')]",
+      "type": "Microsoft.Network/bastionHosts",
+      "apiVersion": "2024-05-01",
+      "name": "[format('bastion-{0}-{1}-dev-{2}', parameters('namePrefix'), parameters('locationShort'), parameters('scalesetNumber'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Developer"
+      },
+      "properties": {
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/ipGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('ipg-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]",
+        "Purpose": "AIFactoryAccessInventory"
+      },
+      "properties": {
+        "ipAddresses": [
+          "[parameters('vnetCidr')]",
+          "[parameters('vpnClientCidr')]"
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "dnsResolverInboundIp": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/dnsResolvers/inboundEndpoints', format('dnspr-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber')), format('inbound-aifactory-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber'))), '2025-05-01').ipConfigurations[0].privateIpAddress]"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "source": "https://learn.microsoft.com/azure/bastion/bastion-sku-comparison#regional-availability",
+  "retrieved": "2026-10-25",
+  "note": "Bastion Developer regions (EUAP canary regions excluded). Refresh by hand from the source page; the portal region list is the intersection with the v1.24 CLI region table.",
+  "regions": [
+    "australiacentral", "australiaeast", "australiasoutheast", "brazilsouth", "canadacentral", "canadaeast",
+    "centralindia", "centralus", "eastasia", "eastus2", "francecentral", "germanywestcentral", "italynorth",
+    "japaneast", "japanwest", "koreacentral", "koreasouth", "mexicocentral", "northcentralus", "northeurope",
+    "norwayeast", "southafricanorth", "southeastasia", "southindia", "spaincentral", "swedencentral",
+    "switzerlandnorth", "uaenorth", "uksouth", "ukwest", "westcentralus", "westeurope", "westus"
+  ]
+}
