@@ -3429,8 +3429,9 @@ and <code>REVOKE DELETE &lt;factory key&gt;</code> when the deletion is done or 
 become real Python/JSON booleans, never strings. <code>False</code> keeps the named
 resources; <code>True</code> includes them. The subnet choice does not approve a shared
 group. Inspect exact resource IDs and both delete/retain lists.</p>
-<p><strong>Modern layout 2 is required; single-writer selective project deletion is
-blocked.</strong> The selected source must support <code>selective-project-resources-v1</code>,
+<p><strong>Modern layout 2 is required.</strong> Blob and single-writer factories both support
+selective project deletion; a single-writer factory needs its deletion permission
+granted first (<code>authorize-deletion</code>). The selected source must support <code>selective-project-resources-v1</code>,
 with an exact registered placement per environment. This is the selective
 lifecycle path, <strong>not necessarily GitHub Actions or whole-factory pipelines</strong>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">if</span> <span class="n">catalog</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layout_version"</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
@@ -3853,8 +3854,9 @@ with <code>mode:"revoke"</code> and <code>REVOKE DELETE &lt;factory key&gt;</cod
 <p>Use unique environments in any order. Both independent choices must be JSON
 booleans, not strings: <code>false</code> keeps the named resources; <code>true</code> includes them
 for deletion. Subnet permission does not approve shared-group deletion.</p>
-<p><strong>Modern layout 2 is required; single-writer selective project deletion is
-blocked.</strong> The selected source needs <code>selective-project-resources-v1</code> and
+<p><strong>Modern layout 2 is required.</strong> Blob and single-writer factories both support
+it; grant a single-writer factory's deletion permission first (<code>authorize-deletion</code>).
+The selected source needs <code>selective-project-resources-v1</code> and
 one exact registered placement per chosen environment. Ordinary project
 deletion uses the selective lifecycle path; do not assume GitHub Actions
 or the whole-factory ordered-pipeline path.</p>
@@ -4224,9 +4226,11 @@ both project deletion flags must be actual booleans.</p>
 <p>The API baseline is <code>d52463f</code>. Its frozen accelerator pin
 <code>3e9102ee07c959d91e5ac508432bd1545d258a15</code> is not changed by this guide and
 does not provide the named ordered-pipeline runtime. Published source advertises
-<code>factory_deletion_pipeline_coordination_modes: ["blob"]</code>; generic single-writer
-whole-owned-group support is not this named contract or selective project
-deletion. The API checks the selected immutable source and enrolled mode.
+<code>factory_deletion_pipeline_coordination_modes: ["blob", "single-writer"]</code>: a
+single-writer factory runs the same ordered pipeline (project workers first, then
+common teardown) under one repository deletion-cohort claim instead of Blob leases,
+and supports selective project deletion. The API checks the selected immutable
+source and enrolled mode.
 No client publication, optional preflight or offline test approves execution.</p>
 <h3 id="whole-factory-plan-and-retention-contract">Whole-factory plan and retention contract<a class="headerlink" href="#whole-factory-plan-and-retention-contract" title="Permanent link">&para;</a></h3>
 <p><code>deletion_retention_policy</code> must equal <code>deletion_plan.retention_policy</code>:</p>
