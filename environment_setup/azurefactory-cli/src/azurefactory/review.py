@@ -355,6 +355,12 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
         if operation != OPERATION:
             raise ConfigError("Run claim receipt operation does not match.")
         validate_claim_preview(request, preview)
+    elif purpose == "authorize-deletion-confirm":
+        from .authorization import OPERATION, validate_preview as validate_authorization_preview
+
+        if operation != OPERATION:
+            raise ConfigError("Deletion authorization receipt operation does not match.")
+        validate_authorization_preview(request, preview)
     elif purpose == "creation-workflow-start":
         if operation != "creation-workflow" or type(preview.get("contract_version")) is not int or preview["contract_version"] != 1:
             raise ConfigError("Expected a registered creation workflow contract.")

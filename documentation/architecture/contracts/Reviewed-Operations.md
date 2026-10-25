@@ -6,6 +6,7 @@ sources:
   - environment_setup/azurefactory-cli/src/azurefactory/review.py
   - environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py
   - environment_setup/azurefactory-cli/src/azurefactory/run_claims.py
+  - environment_setup/azurefactory-cli/src/azurefactory/authorization.py
   - bootstrap/lib/provider_repository_state.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/signing.py
@@ -15,6 +16,7 @@ tests:
   - environment_setup/azurefactory-cli/tests/test_reviews.py
   - environment_setup/azurefactory-cli/tests/test_factory_deletion.py
   - environment_setup/azurefactory-cli/tests/test_run_claims.py
+  - environment_setup/azurefactory-cli/tests/test_authorization.py
   - environment_setup/unit-tests/test-bicep/unit/test_single_writer_coordination.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_signing.py
@@ -25,7 +27,7 @@ graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/review.py::function:write_receipt
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::class:OperationStore
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::function:OperationStore.approve
-reviewed_source: 'effdb843 + d03bc189 deletion review; f6fa41f5 retained run-claim release 2026-10-19; native identity boundary observed 2026-10-11; deletion reviewed 2026-10-19'
+reviewed_source: 'effdb843 + d03bc189 deletion review; f6fa41f5 retained run-claim release 2026-10-19; authorize-deletion client 2026-10-25; native identity boundary observed 2026-10-11; deletion reviewed 2026-10-19'
 ---
 # Reviewed operations
 
@@ -61,6 +63,20 @@ non-force `ProviderState` CAS that sets `active` to null, keeps every record and
 never retried. The service lives in the API (`run_claim_reconciliation.py`); the
 helpers are unchanged, and a contract test proves their readers accept the audit
 record, reject the released run and let a fresh run acquire.
+
+## Deletion permission (single-writer)
+
+Deletion under single-writer coordination needs the enrollment's `allow_delete=true`;
+new enrollments disallow it and no deletion confirmation grants it. The Factory API's
+`authorize-deletion` prepare/confirm (azurefactory `authorize-deletion`, SDK
+`authorize_deletion_prepare`/`_confirm`, mode `allow` or `revoke`) is the reviewed
+way to change it: a `provider-state` review with `azure_writes: false`, the scopes,
+enrollment revision and coordination hash before/after, the bindings, and the exact
+phrase `ALLOW DELETE <factory key>` or `REVOKE DELETE <factory key>`. Confirmation makes
+one CAS and adds `deletion-authorizations/<factory_id>/<confirmation_id>.json`; it is
+never retried. The client checks (`authorization.py`) refuse any other review and
+report a missing route without fallback. The server is implemented in the API; the
+permission alone does not lift the named whole-factory single-writer limitation.
 
 ## Native identity-only boundary
 

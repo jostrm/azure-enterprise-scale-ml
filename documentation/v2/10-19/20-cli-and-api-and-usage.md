@@ -62,7 +62,8 @@ function Write-NewText([string]$Path, [string]$Text) {
 function Invoke-FactoryJson([string[]]$Arguments, [string]$Name) {
     $Path = Join-Path $ReviewDir $Name
     if (Test-Path -LiteralPath $Path) { throw "Refusing to overwrite $Path" }
-    $Raw = & $Python -m azurefactory @Arguments
+    # Deletion previews read Azure for minutes; the CLI default is 30 s.
+    $Raw = & $Python -m azurefactory --timeout 1800 @Arguments
     $Code = $LASTEXITCODE
     Write-NewText $Path ($Raw -join "`n")
     if ($Code -ne 0) {
@@ -144,6 +145,28 @@ $Preview = Invoke-FactoryJson (@('draft', 'remove', '--folder', $Folder,
     '--factory-id', $FactoryId, '--kind', $Kind, '--expected-revision', $Revision,
     '--save-receipt', $ReceiptPath) + $TargetArgs) 'preview.json'
 $Preview | ConvertTo-Json -Depth 100
+```
+
+### Grant deletion permission first (C, D and E)
+
+Under single-writer coordination, the factory's enrollment in the provider
+repository must permit deletion (`allow_delete=true`) before C, D or E can
+execute; new enrollments disallow it. Granting it is its own reviewed change of
+the provider state (`authorize-deletion`): it never changes Azure, deletes
+nothing and lifts none of the other blockers below. Prepare it, let an
+authorized operator review the scopes, bindings and audit record, then confirm
+once with the exact phrase `ALLOW DELETE <factory key>`. Start setup again
+before preparing the deletion itself. Revoke the permission the same way with
+`--mode revoke` and `REVOKE DELETE <factory key>` when the deletion is done or
+cancelled.
+
+```powershell
+$AuthorizationReceipt = Join-Path $ReviewDir 'authorize-deletion.receipt.json'
+$Authorization = Invoke-FactoryJson @('authorize-deletion', 'prepare', '--folder', $Folder,
+    '--factory-id', $FactoryId, '--mode', 'allow', '--save-receipt', $AuthorizationReceipt) 'authorize-preview.json'
+$Authorization | ConvertTo-Json -Depth 100
+# STOP. After approval, in an interactive terminal (it asks for the exact phrase); never retried:
+& $Python -m azurefactory authorize-deletion confirm --receipt $AuthorizationReceipt
 ```
 
 ### C. Delete project resources in selected environments
@@ -507,7 +530,8 @@ api_url = required("Approved real API base URL (HTTPS or approved loopback HTTP)
 api_key = os.environ.get("AIFACTORY_API_KEY") or getpass.getpass("API key for that host: ")
 if not api_key:
     raise ValueError("An authenticated API key is required.")
-client = AzureFactoryClient(base_url=api_url, api_key=api_key)
+# Deletion previews read Azure for minutes; the SDK default is 30 s.
+client = AzureFactoryClient(base_url=api_url, api_key=api_key, timeout=1800)
 del api_key
 folder = required("Exact registered factory folder on the API host: ")
 review_base = pathlib.Path(required("Existing private review parent outside Git/temp: ")).expanduser()
@@ -617,6 +641,38 @@ if kind == "project":
 body = catalog_requests.draft_remove_request(**selection)
 save_review(body, client.draft_remove_prepare(**selection),
             "catalog-confirm", "draft-remove-" + kind, "configuration")
+```
+
+### Grant deletion permission first (C, D and E)
+
+Under single-writer coordination, the factory's enrollment in the provider
+repository must permit deletion (`allow_delete=true`) before C, D or E can
+execute; new enrollments disallow it. Granting it is its own reviewed change of
+the provider state: it never changes Azure, deletes nothing and lifts none of
+the other blockers below. Review the preview, obtain approval, then confirm once
+with the exact phrase `ALLOW DELETE <factory key>`. Start setup again before
+preparing the deletion itself. Revoke it the same way with `"mode": "revoke"`
+and `REVOKE DELETE <factory key>` when the deletion is done or cancelled.
+
+```python
+from azurefactory.authorization import validate_authorization
+from azurefactory.authorization import validate_preview as validate_authorization_preview
+
+authorization_request = {"contract_version": 1, "folder": folder, "factory_id": factory_id, "mode": "allow"}
+authorization = client.authorize_deletion_prepare(authorization_request)
+show(save_json("authorize-preview.json", authorization))
+validate_authorization_preview(authorization_request, authorization)
+print("STOP. Obtain approval for this deletion permission; nothing was changed.")
+
+def confirm_deletion_permission():
+    phrase = input("Type the exact phrase " + json.dumps(authorization["confirmation_phrase"]) + ": ")
+    if phrase != authorization["confirmation_phrase"]:
+        raise ValueError("The phrase does not match; nothing was confirmed.")
+    result = client.authorize_deletion_confirm(
+        folder=folder, confirmation_id=authorization["confirmation_id"],
+        preview_hash=authorization["preview_hash"], confirmation_phrase=phrase)
+    show(save_json("authorize-result.json", result))
+    validate_authorization(result, {"folder": folder, "preview": authorization})
 ```
 
 ### C. Delete project resources in explicit environments
@@ -1095,6 +1151,38 @@ jq -n --arg folder "$folder" --arg factory "$factory_id" --arg revision "$revisi
     action:("delete-draft-" + $kind)}
    + (if $scale == "" then {} else {scale_set_id:$scale} end)
    + (if $project == "" then {} else {project_id:$project} end)' > "$request_path"
+```
+
+### Grant deletion permission first (C, D and E)
+
+Under single-writer coordination, the factory's enrollment in the provider
+repository must permit deletion (`allow_delete=true`) before C, D or E can
+execute; new enrollments disallow it. Granting it is its own reviewed change of
+the provider state: it never changes Azure, deletes nothing and lifts none of
+the other blockers below. A 404/405 without the operation's own detail means
+the API lacks the `authorize-deletion` routes; there is no fallback. After
+approval, confirm once with the exact phrase `ALLOW DELETE <factory key>`, then
+run setup again before building the deletion request. Revoke it the same way
+with `mode:"revoke"` and `REVOKE DELETE <factory key>`.
+
+```bash
+jq -n --arg folder "$folder" --arg factory "$factory_id" \
+  '{contract_version:1, folder:$folder, factory_id:$factory, mode:"allow"}' > "$review_dir/authorize-request.json"
+post_json "$review_dir/authorize-preview.json" /api/v1/operations/authorize-deletion/prepare \
+  "$review_dir/authorize-request.json"
+jq . "$review_dir/authorize-preview.json"
+jq -e --arg factory "$factory_id" '.operation_mode == "provider-state" and .azure_writes == false
+  and .factory_id == $factory and .mode == "allow" and (.blockers | length == 0)
+  and (.capabilities | index("authorize-deletion-v1") != null)' "$review_dir/authorize-preview.json" >/dev/null
+# STOP. After approval, type the exact phrase and POST it once; never retry an uncertain result.
+read -r -p 'Exact confirmation phrase from the preview: ' phrase
+jq -e --arg phrase "$phrase" '.confirmation_phrase == $phrase' "$review_dir/authorize-preview.json" >/dev/null
+jq --arg folder "$folder" --arg phrase "$phrase" \
+  '{contract_version:1, folder:$folder, confirmation_id, preview_hash, confirmation_phrase:$phrase}' \
+  "$review_dir/authorize-preview.json" > "$review_dir/authorize-confirm.json"
+post_json "$review_dir/authorize-result.json" /api/v1/operations/authorize-deletion/confirm \
+  "$review_dir/authorize-confirm.json"
+jq . "$review_dir/authorize-result.json"
 ```
 
 ### C. Delete project resources in selected environments

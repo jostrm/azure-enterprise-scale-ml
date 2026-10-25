@@ -360,3 +360,24 @@ def test_legacy_start_invalid_result_does_not_retry_submission(server):
     with pytest.raises(FailureError, match="legacy execution"):
         AzureFactoryClient(server, "k").project_deployment_start("demo", "confirmation")
     assert len(Handler.records) == 1
+
+
+@pytest.mark.parametrize("action", ["prepare", "confirm"])
+@pytest.mark.parametrize(("status", "detail", "missing_route"), [
+    (404, "Not Found", True), (405, "Method Not Allowed", True),
+    (404, "Deletion authorization blocked: no enrollment of this saved factory exists.", False),
+])
+def test_authorize_deletion_missing_route_is_explicit_and_never_falls_back(server, action, status, detail,
+                                                                          missing_route):
+    Handler.responses[("POST", f"/api/v1/operations/authorize-deletion/{action}")] = (status, {"detail": detail}, {})
+    api = AzureFactoryClient(server, "test-key")
+    with pytest.raises(APIError) as error:
+        if action == "prepare":
+            api.authorize_deletion_prepare({"contract_version": 1, "folder": r"C:\factory",
+                                            "factory_id": "11d7fc57-56ee-46d6-919c-3a3d4c8cbb4b", "mode": "revoke"})
+        else:
+            api.authorize_deletion_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                           preview_hash="c" * 64, confirmation_phrase="REVOKE DELETE ai-aif-130")
+    assert error.value.status == status
+    assert ("requires an API supporting the authorize-deletion routes" in str(error.value)) is missing_route
+    assert [record["path"] for record in Handler.records] == [f"/api/v1/operations/authorize-deletion/{action}"]

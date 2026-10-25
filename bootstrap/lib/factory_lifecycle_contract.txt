@@ -687,6 +687,8 @@ Enrollment example (ARM IDs must be lowercase):
 
     Every writable scope must bind the exact target object shown above.
     Deletion additionally requires allow_delete=true and scope_kind=aifactory-owned.
+    After enrollment, the Factory API's reviewed authorize-deletion operation
+    (authorize-deletion-v1) grants or revokes allow_delete; never edit it by hand.
     External hubs/shared dependencies are lock-only; never enroll them as a
     writable factory-owned target. Prefix/name resemblance cannot change this.
   }
