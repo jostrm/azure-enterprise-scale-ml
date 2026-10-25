@@ -73,8 +73,11 @@ new enrollments disallow it and no deletion confirmation grants it. The Factory 
 way to change it: a `provider-state` review with `azure_writes: false`, the scopes,
 enrollment revision and coordination hash before/after, the bindings, and the exact
 phrase `ALLOW DELETE <factory key>` or `REVOKE DELETE <factory key>`. Confirmation makes
-one CAS and adds `deletion-authorizations/<factory_id>/<confirmation_id>.json`; it is
-never retried. The client checks (`authorization.py`) refuse any other review and
+one CAS (revision + 1) that changes only `allow_delete` of the bound `aifactory-owned`
+scopes and adds `deletion-authorizations/<factory_id>/<confirmation_id>.json`, then
+re-pins the saved `ado`/`gha` bindings; it is never retried. A failed binding save is
+repaired by a later binding-only review (no scopes, the original audit record, same
+head). Blocked reviews (`can_execute: false`) may carry null provider fields. The client checks (`authorization.py`) refuse any other review and
 report a missing route without fallback. The server is implemented in the API; the
 permission alone does not lift the named whole-factory single-writer limitation.
 
