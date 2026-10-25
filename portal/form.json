@@ -111,12 +111,12 @@
             "type": "Microsoft.Common.DropDown",
             "label": "AI Search region",
             "defaultValue": "Same as the AI Factory region",
-            "toolTip": "Pick another region only if AI Search Standard has no capacity in the main region. There is no automatic retry.",
+            "toolTip": "Pick another region only if AI Search has no capacity in the main region. There is no automatic retry.",
             "constraints": {
               "allowedValues": [
                 {
                   "label": "Same as the AI Factory region",
-                  "value": ""
+                  "value": "same-as-factory-region"
                 },
                 {
                   "label": "eastus2",

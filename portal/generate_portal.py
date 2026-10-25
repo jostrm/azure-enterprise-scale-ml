@@ -32,6 +32,7 @@ BICEP = "environment_setup/aifactory/bicep"
 RELEASE = "v1.25"
 REGION_PAGE = "documentation/regions/aifactory-v125-region-availability.md"
 BASTION_REGIONS = "portal/data/bastion-developer-regions.json"
+SAME_REGION = "same-as-factory-region"  # form sentinel; main.bicep maps it (and "") to location
 DEFAULT_PROJECT_RESOURCES = ["foundry", "foundry-capability-host", "ai-search", "cosmos-db", "application-insights"]
 
 # Values only known at deployment time. main.bicep replaces every __P_<name>__ token.
@@ -901,8 +902,8 @@ def build_form(plan: dict) -> dict:
     services = [
         {"name": "aiSearchLocation", "type": "Microsoft.Common.DropDown", "label": "AI Search region",
          "defaultValue": "Same as the AI Factory region",
-         "toolTip": "Pick another region only if AI Search Standard has no capacity in the main region. There is no automatic retry.",
-         "constraints": {"allowedValues": [{"label": "Same as the AI Factory region", "value": ""}]
+         "toolTip": "Pick another region only if AI Search has no capacity in the main region. There is no automatic retry.",
+         "constraints": {"allowedValues": [{"label": "Same as the AI Factory region", "value": SAME_REGION}]
                          + [{"label": region, "value": region} for region in regions]}},
         toggle("enableApplicationInsights", "Project Application Insights", True,
                "Workspace-based. Not private-only, because AMPLS is not enabled in Simple Mode."),
