@@ -162,3 +162,65 @@ def test_temporary_executor_role_is_removed_and_other_projects_are_not_touched(m
     created_roles = [args[args.index("--role") + 1] for args in calls if args[:3] == ("role", "assignment", "create")]
     assert created_roles.count(ACCESS.DATA_OWNER) == 1
     assert all(role in (ACCESS.DATA_OWNER, ACCESS.READER) for role in created_roles)
+
+
+
+class _Response:
+    headers = {"x-ms-acl": "user::rwx"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return b""
+
+
+def _lake(monkeypatch, outcomes, sleeps):
+    from email.message import Message
+    from urllib.error import HTTPError
+
+    def urlopen(request, timeout):
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, int):
+            headers = Message()
+            if outcome == 503:
+                headers["Retry-After"] = "7"
+            raise HTTPError(request.full_url, outcome, "error", headers, None)
+        return _Response()
+
+    monkeypatch.setattr(ACCESS, "urlopen", urlopen)
+    monkeypatch.setattr(ACCESS.time, "sleep", sleeps.append)
+    cli = lambda *args: {"accessToken": "t", "expires_on": "9999999999", "tenant": "tenant"}
+    return ACCESS.Lake({"subscription_id": "s", "tenant_id": "tenant", "storage_account": "sa", "filesystem": "lake3"}, cli)
+
+
+def test_transient_storage_errors_are_retried_with_backoff_and_retry_after(monkeypatch):
+    # Spider run 2395 lost step 102 (and the whole pipeline) to one HTTP 500 InternalError from Storage.
+    sleeps = []
+    lake = _lake(monkeypatch, [500, 503, "ok"], sleeps)
+    assert lake.acl("") == {"x-ms-acl": "user::rwx"}
+    assert len(sleeps) == 2 and sleeps[1] == 7
+
+
+@pytest.mark.parametrize("code", [403, 404, 409, 412])
+def test_definite_storage_answers_are_not_retried(monkeypatch, code):
+    from urllib.error import HTTPError
+
+    sleeps = []
+    lake = _lake(monkeypatch, [code, "ok"], sleeps)
+    with pytest.raises(HTTPError):
+        lake.acl("")
+    assert sleeps == []
+
+
+def test_a_persistent_storage_outage_still_fails_after_a_bounded_number_of_attempts(monkeypatch):
+    from urllib.error import HTTPError
+
+    sleeps = []
+    lake = _lake(monkeypatch, [500] * 10, sleeps)
+    with pytest.raises(HTTPError):
+        lake.acl("")
+    assert len(sleeps) == ACCESS.STORAGE_ATTEMPTS - 1

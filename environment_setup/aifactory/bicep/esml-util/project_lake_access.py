@@ -110,6 +110,10 @@ def merge_acl(current, grants, *, directory, defaults):
     return ",".join(f"{key}:{permission}" for key, permission in sorted(wanted.items()))
 
 
+STORAGE_ATTEMPTS = 5
+TRANSIENT_STORAGE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
+
+
 class Lake:
     def __init__(self, config, cli_runner=None):
         self.config = config
@@ -133,9 +137,18 @@ class Lake:
             "Authorization": "Bearer " + self.token["accessToken"],
             "x-ms-version": "2023-11-03", **(headers or {}),
         })
-        with urlopen(request, timeout=90) as response:
-            content = response.read()
-            return dict(response.headers), json.loads(content) if content else None
+        # Storage occasionally answers 500/503 (or throttles); a retry is safe here because writes are conditional
+        # (If-None-Match/If-Match) and ACL updates are idempotent. Definite answers (403, 404, 409, 412) are not retried.
+        for attempt in range(STORAGE_ATTEMPTS):
+            try:
+                with urlopen(request, timeout=90) as response:
+                    content = response.read()
+                    return dict(response.headers), json.loads(content) if content else None
+            except HTTPError as error:
+                if error.code not in TRANSIENT_STORAGE_STATUS or attempt + 1 == STORAGE_ATTEMPTS:
+                    raise
+                delay = error.headers.get("Retry-After") if error.headers else None
+                time.sleep(int(delay) if delay and str(delay).isdigit() else min(60, 5 * 2 ** attempt))
 
     def acl(self, path):
         return self.request("HEAD", path, {"action": "getAccessControl"})[0]
