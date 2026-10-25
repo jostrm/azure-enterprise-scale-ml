@@ -1,8 +1,6 @@
 # Enterprise Scale AI Factory - submodule
 ![Header](documentation/v2/10-19/images/header.png)
 
-## Executive summary
-
 <p align="center">
 <b>Private, WAF-aligned AI landing zones on Azure, used since 2019.</b><br>
 Governed Microsoft Foundry, Azure Machine Learning and AI Search projects for every team, isolated across Dev, Stage and Prod.
