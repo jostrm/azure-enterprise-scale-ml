@@ -72,8 +72,9 @@ and ended (see section 4). Format:
 - [ ] Report and ask before deleting, Scenario 4 (est. ~5 min)
 ```
 
-The GOAL line always comes first. The status line under it gives the current time, done/total, time elapsed since the first
-step started, and the sum of the remaining estimates. Add one line under the
+The GOAL line always comes first. The status line under it gives the current
+time, done/total, time elapsed since the first step started, and the sum of the
+remaining estimates. Add one line under the
 list only for a blocker or a decision the user must make; nothing else.
 
 ## 4. Keep timing from now on
