@@ -212,6 +212,25 @@ def test_redeploy_can_skip_the_common_vnet_put(form, main_template):
     assert form_outputs(form)["commonVnetExists"] == "[equals(steps('basics').commonVnetExists, 'true')]"
 
 
+def test_every_stage_uses_the_common_subnet_the_network_stage_creates(committed):
+    # The project job applies variables.json (subnetCommon "snet-dev-esml-cmn-001") while the common job, dispatched
+    # without the JSON override, creates and uses common_subnet_name. Observed: CannotChangeSubnetOnExistingPrivateEndpoint
+    # on the common ACR endpoint in 02-core-infrastructure.
+    stages = committed["stages"]
+    created = stages["common-12-networkCommon"]["constants"]["common_subnet_name"]
+    checked = 0
+    for key, stage in stages.items():
+        values = {**stage["constants"], **stage["templated"]}
+        if "common_subnet_name" not in values or key == "common-12-networkCommon":
+            continue
+        override = values.get("subnetCommon", "")
+        resolved = override.replace("<network_env>", values.get("network_env", "")) if override else values["common_subnet_name"]
+        assert resolved == created, (key, resolved)
+        assert not values.get("subnetCommonScoring") and not values.get("subnetCommonPowerbiGw"), key
+        checked += 1
+    assert checked >= 4
+
+
 def test_main_does_not_inline_stage_templates(main_template):
     for resource in linked_deployments(main_template):
         assert "template" not in resource["properties"]

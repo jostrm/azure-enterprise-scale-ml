@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "4077669162599265503"
+      "templateHash": "14704205224977656015"
     }
   },
   "functions": [
@@ -1350,9 +1350,9 @@
             "DEBUG_project_service_principal_AppID_seeding_kv_name": "",
             "DEBUG_project_service_principal_OID_seeding_kv_name": "",
             "DEBUG_project_service_principal_Secret_seeding_kv_name": "",
-            "DEBUG_subnetCommon": "snet-dev-esml-cmn-001",
-            "DEBUG_subnetCommonPowerbiGw": "snet-esml-cmn-pbi-001",
-            "DEBUG_subnetCommonScoring": "snet-<network_env>esml-cmn-001-scoring",
+            "DEBUG_subnetCommon": "",
+            "DEBUG_subnetCommonPowerbiGw": "",
+            "DEBUG_subnetCommonScoring": "",
             "DEBUG_subnetProjACA": "snt-prj<xxx>-aca",
             "DEBUG_subnetProjAKS": "snt-prj<xxx>-aks",
             "DEBUG_subnetProjDatabricksPrivate": "snt-prj<xxx>-dbxpriv",
@@ -1696,7 +1696,7 @@
             "skuStorageAccountStageProd": "Standard_LRS",
             "storageAccount1001Exists": false,
             "storageAccount2001Exists": false,
-            "subnetCommon": "snet-dev-esml-cmn-001",
+            "subnetCommon": "",
             "updateCommonACR": true,
             "updateKeyvaultRbac": false,
             "useCommonACR": true,
@@ -2769,8 +2769,8 @@
             "projectSuffix": "-rg",
             "resolvedManagedIdentityNames": {},
             "resourceSuffix": "-001",
-            "subnetCommon": "snet-dev-esml-cmn-001",
-            "subnetCommonScoring": "snet-<network_env>esml-cmn-001-scoring",
+            "subnetCommon": "",
+            "subnetCommonScoring": "",
             "useAdGroups": true,
             "useCommonACR": true,
             "vnetNameBase": "vnt-esmlcmn"
@@ -3775,7 +3775,7 @@
             "projectSuffix": "-rg",
             "resolvedManagedIdentityNames": {},
             "resourceSuffix": "-001",
-            "subnetCommon": "snet-dev-esml-cmn-001",
+            "subnetCommon": "",
             "updateAIFoundry": false,
             "useAVMFoundry": false,
             "useAdGroups": true,
@@ -4053,7 +4053,7 @@
             "projectSuffix": "-rg",
             "resolvedManagedIdentityNames": {},
             "resourceSuffix": "-001",
-            "subnetCommon": "snet-dev-esml-cmn-001",
+            "subnetCommon": "",
             "updateAIFoundry": false,
             "useAVMFoundry": false,
             "useAdGroups": true,
