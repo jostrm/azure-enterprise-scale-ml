@@ -771,6 +771,19 @@ def _retained_subnet_unchanged(old, new, old_parent, new_parent, *, additions):
     return old == new
 
 
+def _drop_parent_etag_rollover(previous, current, old_parent, new_parent):
+    """Network RP stamps the parent VNet etag on every embedded peering and rolls it on a child write.
+    Drop a peering's etag only when it is exactly that parent etag on both sides; anything else still differs."""
+    if not isinstance(previous, list) or not isinstance(current, list) or len(previous) != len(current):
+        return
+    for left, right in zip(previous, current):
+        if (isinstance(left, dict) and isinstance(right, dict) and left.get("id") == right.get("id")
+                and old_parent.get("etag") and new_parent.get("etag")
+                and left.get("etag") == old_parent["etag"] and right.get("etag") == new_parent["etag"]):
+            left.pop("etag")
+            right.pop("etag")
+
+
 def verify_common_network(plan, *, before, after, expected_resources=None, endpoint_scope=None):
     """Post-deploy native GET proof; retain evidence and do not roll back on failure."""
     require(digest(before) == plan["snapshot_sha256"], "network-before-evidence-mismatch")
@@ -795,6 +808,8 @@ def verify_common_network(plan, *, before, after, expected_resources=None, endpo
         new.pop("etag", None)
         old_subnets = {resource_id(s["id"]): s for s in old["properties"].pop("subnets")}
         new_subnets = {resource_id(s["id"]): s for s in new["properties"].pop("subnets")}
+        _drop_parent_etag_rollover(old["properties"].get("virtualNetworkPeerings"),
+                                   new["properties"].get("virtualNetworkPeerings"), old_parent, new_parent)
         require(old == new and all(_retained_subnet_unchanged(v, new_subnets.get(k), old_parent, new_parent,
                                                             additions=added) for k, v in old_subnets.items()),
                 "retained-vnet-configuration-changed")
