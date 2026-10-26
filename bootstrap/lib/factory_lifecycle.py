@@ -1391,8 +1391,12 @@ class Cloud:
         return template
 
 
-def resource_references(body):
-    """Resource IDs are dependencies, including provider-owned external links."""
+def resource_references(body, tolerant=False):
+    """Resource IDs are dependencies, including provider-owned external links.
+
+    tolerant (the resource-closure walk only): a malformed ID-looking string is skipped instead of stopping the run;
+    ownership checks keep the strict default.
+    """
     result = set()
 
     def visit(value):
@@ -1403,6 +1407,11 @@ def resource_references(body):
             for item in value:
                 visit(item)
         elif isinstance(value, str) and value.lower().startswith("/subscriptions/"):
+            if tolerant and not ("%" not in value and not any(part in (".", "..") for part in value.split("/"))
+                                 and (RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
+                                      or SUBSCRIPTION_RESOURCE_ID.fullmatch(value)
+                                      or re.fullmatch(r"/subscriptions/" + GUID, value, re.I))):
+                return
             require("%" not in value and not any(part in (".", "..") for part in value.split("/")),
                     "invalid-resource-reference")
             require(RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
@@ -1537,12 +1546,20 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 "provider-resource-kind-unclassified")
         return "readonly" if reads else "operation"
 
+    def classify(kind):
+        """resource_kind, or "unclassified" when the provider cannot classify the kind (tolerant walk, aif-136):
+        such a kind is recorded, never listed or read, instead of stopping the run."""
+        try:
+            return resource_kind(kind)
+        except Blocked:
+            return "unclassified"
+
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
         stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
         fallback = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)), reverse=True)
-        if not stable and not fallback and parent_api and resource_kind(kind) != "operation":
+        if not stable and not fallback and parent_api and classify(kind) != "operation":
             return parent_api
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
@@ -1572,7 +1589,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 # A schema child without a read operation (none at all, or write-only) is a provider endpoint,
                 # not an inventoriable child: record it, never list it. Actual references still classify strictly.
                 yield "metadata", key + "/" + tail, full_type, None
-            elif resource_kind(full_type) != "resource":
+            elif classify(full_type) != "resource":
                 yield "metadata", key + "/" + tail, full_type, None
             else:
                 yield "collection", resource_id + "/" + tail, version(full_type), singleton.get(full_type)
@@ -1715,21 +1732,28 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
         closure["resources"][key] = {"type": kind, "api_version": api, "body_hash": resource_digest(body, kind),
                                     "etag": resource_etag(body, headers, kind)}
-        references = resource_references(body)
+        references = resource_references(body, tolerant=True)
         closure["references"][key] = sorted(references - {key})
         for reference in sorted(references):
             match = RG_ID.match(reference)
             if (reference == key or reference in versions or not match
                     or match.group().lower() not in scope_ids or RG_ID.fullmatch(reference)):
                 continue
-            referenced_kind = resource_type_from_id(reference)
+            try:
+                referenced_kind = resource_type_from_id(reference)
+            except Blocked:
+                continue  # a malformed in-scope reference stays recorded, never read (tolerant walk)
             if referenced_kind in inline:
                 parent = reference.rsplit("/", 2)[0]
                 closure["inline"][reference] = {"parent_id": parent}
                 if parent in versions:
                     continue
                 reference, referenced_kind = parent, resource_type_from_id(parent)
-            require(resource_kind(referenced_kind) in ("resource", "readonly"), "resource-reference-is-operation")
+            if classify(referenced_kind) not in ("resource", "readonly"):
+                # Tolerant walk (aif-136 COMMON stopped with provider-resource-kind-unclassified): a reference to a
+                # kind the provider does not expose as a readable resource stays recorded in closure["references"]
+                # but is never read or walked.
+                continue
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
             versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
             enqueue(reference)
