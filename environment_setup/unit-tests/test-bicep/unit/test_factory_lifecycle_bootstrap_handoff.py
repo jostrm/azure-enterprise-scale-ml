@@ -448,7 +448,7 @@ def test_a_kind_filter_required_child_is_recorded_not_listed(monkeypatch):
     assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
 
 
-def test_an_actual_reference_to_an_unreadable_kind_still_fails_closed():
+def test_an_actual_reference_to_an_unreadable_kind_is_recorded_not_read():
     class UnreadableChildCloud(MetadataCloud):
         def provider_schema(self, namespace):
             result = super().provider_schema(namespace)
@@ -457,9 +457,12 @@ def test_an_actual_reference_to_an_unreadable_kind_still_fails_closed():
             return result
 
     cloud = UnreadableChildCloud()
-    cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": NSG + "/updatePolicies/default"}
-    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
-        fl.collect_resource_closure(cloud, [GROUP])
+    reference = NSG + "/updatePolicies/default"
+    cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": reference}
+    # Tolerant walk (aif-136): recorded on its owner, never read, and the run continues.
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert reference.lower() in closure["references"][NSG.lower()]
+    assert reference.lower() not in bodies and reference.lower() not in closure["resources"]
 
 
 @pytest.mark.parametrize("reference", [
@@ -467,11 +470,11 @@ def test_an_actual_reference_to_an_unreadable_kind_still_fails_closed():
     GROUP + "/providers/Unknown.Provider/resources/foreign",
     NSG + "/malformed-resource-id",
 ])
-def test_unknown_actual_resource_references_fail_closed(reference):
+def test_unknown_actual_resource_references_are_recorded_not_read(reference):
     cloud = MetadataCloud()
     cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": reference}
-    with pytest.raises(fl.Blocked):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert reference.lower() not in bodies and reference.lower() not in closure["resources"]
 
 
 @pytest.mark.parametrize("change", ["Delete", "Deploy", "Unsupported"])
@@ -1037,12 +1040,12 @@ def test_inline_configuration_changes_change_parent_and_closure_fingerprints():
     assert fl.digest(before) != fl.digest(after)
 
 
-def test_unknown_inline_looking_reference_still_fails_closed():
+def test_unknown_inline_looking_reference_is_recorded_not_read():
     cloud = GatewayCloud()
     unknown = GATEWAY + "/unknownChildren/default"
     cloud.bodies[GATEWAY.lower()]["properties"]["unknownChildren"] = [{"id": unknown}]
-    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert unknown.lower() in closure["references"][GATEWAY.lower()] and unknown.lower() not in bodies
 
 
 def test_external_inline_reference_is_retained_without_reading_or_owning_parent():
@@ -1246,8 +1249,8 @@ def test_dns_apex_preservation_and_external_scope_do_not_grant_writes_or_ownersh
     assert external.lower() in closure["references"][DNS_ZONE.lower()]
     assert external.lower() not in bodies and external.lower() not in cloud.reads
     cloud.bodies[DNS_ZONE.lower()]["properties"]["unknown"] = DNS_ZONE + "/unknown/ordinary"
-    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert (DNS_ZONE + "/unknown/ordinary").lower() not in bodies
 
 
 def test_dns_apex_is_url_encoded_only_at_the_get_transport_boundary():
