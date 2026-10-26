@@ -2555,3 +2555,21 @@ def test_closure_walk_falls_back_to_older_stable_api_versions_before_giving_up()
     entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
     assert cloud.tried == ["2025-11-01", "2025-05-01"]
     assert entry["api_version"] == "2025-05-01" and entry["unsupported"] is None and entry["ids"] == []
+
+
+def test_vnet_peering_fingerprint_ignores_the_parent_vnet_etag_and_sync_level():
+    # aif-138 COMMON (2026-10-26) deployed, then stopped with bootstrap-preserved-resource-changed-during-deployment:
+    # the preserved hub peering's etag is the parent VNet's, which rolls when COMMON adds subnets and endpoints.
+    peering = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.Network/virtualNetworks/vnet"
+               "/virtualNetworkPeerings/aif-hub")
+    body = {"id": peering, "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings", "etag": 'W/"before"',
+            "properties": {"peeringState": "Connected", "peeringSyncLevel": "FullyInSync",
+                           "allowVirtualNetworkAccess": True, "remoteVirtualNetwork": {"id": "/hub"}}}
+    later = copy.deepcopy(body)
+    later["etag"] = 'W/"after"'
+    later["properties"]["peeringSyncLevel"] = "LocalNotInSync"
+    kind = "microsoft.network/virtualnetworks/virtualnetworkpeerings"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_etag(body, {}, kind) is None
+    later["properties"]["allowVirtualNetworkAccess"] = False
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
