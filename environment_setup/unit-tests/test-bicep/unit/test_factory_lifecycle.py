@@ -2489,3 +2489,69 @@ def test_other_http_errors_on_reads_still_stop_at_once(throttled_reads, status):
     with pytest.raises(fl.Blocked, match="^remote-request-failed-" + str(status) + "$"):
         cloud.request("GET", THROTTLED_URL, fl.ARM)
     assert server.methods == ["GET"] and throttled_reads.sleeps == []
+
+
+class UnlistableChildCloud(ClosureCloud):
+    """aif-135 COMMON (2026-10-26): ACR's provider schema advertises registries/privateEndpointConnectionProxies,
+    but ARM answers its list with 404 at every api-version. The walk must record it, not stop the run."""
+
+    failure = "unsupported-child-inventory-endpoint"
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"].append({"resourceType": "networkSecurityGroups/privateEndpointConnectionProxies",
+                                        "apiVersions": ["2025-11-01"]})
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            raise fl.Blocked(self.failure, error_diagnostic={
+                "resource_type": "microsoft.network/networksecuritygroups/privateendpointconnectionproxies",
+                "api_version": api_version, "status": 404, "error_code": None})
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_records_a_child_collection_arm_will_not_list_and_continues():
+    cloud = UnlistableChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["items"] == [] and entry["body_hash"] == fl.digest([])
+    assert entry["unsupported"] == "not-listable-404"
+    # Everything else is still walked and recorded exactly.
+    assert RULE.lower() in closure["resources"] and NSG.lower() in closure["resources"]
+    assert closure == fl.collect_resource_closure(UnlistableChildCloud(), [GROUP])[0]
+
+
+def test_closure_walk_records_other_child_read_failures_and_continues():
+    # Throttling and transport retries already happen inside Cloud.request; what is left is recorded, not fatal.
+    cloud = UnlistableChildCloud()
+    cloud.failure = "remote-request-failed-403"
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["unsupported"] == "unreadable-remote-request-failed-403"
+    assert RULE.lower() in closure["resources"]
+
+
+class OlderVersionChildCloud(UnlistableChildCloud):
+    """The newest advertised api-version is not served yet; an older stable one lists the children."""
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"][-1]["apiVersions"] = ["2026-01-01-preview", "2025-11-01", "2025-05-01", "2024-01-01"]
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            self.tried = getattr(self, "tried", []) + [api_version]
+            if api_version != "2025-05-01":
+                return super().collection(path, api_version, extension)
+            return [], None
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_falls_back_to_older_stable_api_versions_before_giving_up():
+    cloud = OlderVersionChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert cloud.tried == ["2025-11-01", "2025-05-01"]
+    assert entry["api_version"] == "2025-05-01" and entry["unsupported"] is None and entry["ids"] == []
