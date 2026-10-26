@@ -1,11 +1,13 @@
 # Enterprise Scale AI Factory - submodule
 ![Header](documentation/v2/10-19/images/header.png)
 
+![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+
 <p align="center">
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
 Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources for full-stack development for every team, isolated across Dev, Stage and Prod environment. Reusable "Use Case Templates via "agent-factory" and "ml-factory" compatible with the already automated setup of the landingzones by the Azure factory.
 </p>
-![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+
 <table>
 <tr>
 <td width="50%" rowspan="2" valign="top">
