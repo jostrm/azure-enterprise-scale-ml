@@ -462,6 +462,12 @@ def project_dynamic_env(env: dict[str, str]) -> dict[str, str]:
         # 99_check_acr_role_assignments on a new registry
         "skipACRAssignments": "false", "existingAcrPushUserPrincipals": "", "existingAcrPushSPPrincipals": "",
     }
+    if env.get("BYO_subnets") != "true":
+        # Portal correction, not a replay: the project job applies variables.json (subnetCommon
+        # "snet-dev-esml-cmn-001"), but the common job is dispatched without the JSON override and creates and
+        # uses common_subnet_name. Empty values make every stage fall back to that subnet, as the common job does
+        # (observed: CannotChangeSubnetOnExistingPrivateEndpoint on the common ACR endpoint in 02).
+        dynamic.update({"subnetCommon": "", "subnetCommonScoring": "", "subnetCommonPowerbiGw": ""})
     return dynamic
 
 
