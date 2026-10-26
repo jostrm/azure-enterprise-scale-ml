@@ -2171,11 +2171,19 @@ def test_closure_walk_falls_back_from_an_unserved_schema_api_version(workers):
 ])
 def test_closure_walk_never_falls_back_for_other_400_answers(body, kind, code):
     cloud = ApiRolloutCloud(kinds=(kind,), body=lambda api: body)
-    with pytest.raises(fl.Blocked) as raised:
-        fl.collect_resource_closure(cloud, [GROUP])
-    assert raised.value.code == code
     target = NSG.lower() if kind == "networksecuritygroups" else RULES
-    assert [api for _, path, api in cloud.reads if path == target] == [UNSERVED_API]
+    if kind == "networksecuritygroups":
+        # A resource GET is not a child list: it still stops the walk, without an api-version fallback.
+        with pytest.raises(fl.Blocked) as raised:
+            fl.collect_resource_closure(cloud, [GROUP])
+        assert raised.value.code == code
+        assert [api for _, path, api in cloud.reads if path == target] == [UNSERVED_API]
+        return
+    # A child list is tolerant: served() does not treat another 400 as an unserved version, but the walk's
+    # generic fallback tries the schema's older stable version, which lists the rules.
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    assert closure["collections"][RULES]["api_version"] == "2024-05-01"
+    assert [api for _, path, api in cloud.reads if path == target] == [UNSERVED_API, "2024-05-01"]
 
 
 def test_pinned_resource_api_versions_never_fall_back():
@@ -2189,12 +2197,11 @@ def test_pinned_resource_api_versions_never_fall_back():
 def test_pinned_extension_api_versions_never_fall_back():
     api = dict(fl.EXTENSION_COLLECTIONS)["Microsoft.Insights/diagnosticSettings"]
     cloud = ApiRolloutCloud(unserved=(api,), kinds=())
-    with pytest.raises(fl.Blocked) as raised:
-        fl.collect_resource_closure(cloud, [GROUP])
-    assert raised.value.code == "unsupported-child-inventory-endpoint" and type(raised.value) is fl.Blocked
-    assert raised.value.error_diagnostic["api_version"] == api
-    assert [read for read in cloud.reads if read[1].endswith("/diagnosticsettings")] == [
-        ("collection", NSG.lower() + "/providers/microsoft.insights/diagnosticsettings", api)]
+    # Never retried at another version; recorded as not listable instead of stopping the walk.
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/providers/microsoft.insights/diagnosticsettings"]
+    assert entry["api_version"] == api and entry["ids"] == [] and entry["unsupported"] == "not-listable-400"
+    assert {read[2] for read in cloud.reads if read[1].endswith("/diagnosticsettings")} == {api}
 
 
 @pytest.mark.parametrize("unserved,served", [
@@ -2208,15 +2215,12 @@ def test_api_version_fallback_is_bounded(unserved, served):
         closure, _ = fl.collect_resource_closure(cloud, [GROUP])
         assert closure["collections"][RULES]["api_version"] == "2024-05-01"
     else:
-        with pytest.raises(fl.Blocked) as raised:
-            fl.collect_resource_closure(cloud, [GROUP])
-        # Exhausted: the existing fail-closed code, naming the collection and the last version tried.
-        assert raised.value.code == "unsupported-child-inventory-endpoint" and type(raised.value) is fl.Blocked
-        assert raised.value.error_diagnostic == {
-            "resource_type": "microsoft.network/networksecuritygroups/securityrules", "api_version": "2026-07-01",
-            "status": 400, "error_code": "NoRegisteredProviderFound"}
+        # served() stops after two fallbacks; the walk's generic older-version fallback then reaches the
+        # served 2024-05-01, so the rules are still listed instead of the run stopping.
+        closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+        assert closure["collections"][RULES]["api_version"] == "2024-05-01"
     tried = [api for kind, path, api in cloud.reads if path == RULES]
-    assert tried == sorted(unserved, reverse=True) + (["2024-05-01"] if served else [])
+    assert tried == sorted(unserved, reverse=True) + ["2024-05-01"]
 
 
 def test_what_if_accepts_empty_202_polls_before_final_changes():
@@ -2661,3 +2665,69 @@ def test_other_http_errors_on_reads_still_stop_at_once(throttled_reads, status):
     with pytest.raises(fl.Blocked, match="^remote-request-failed-" + str(status) + "$"):
         cloud.request("GET", THROTTLED_URL, fl.ARM)
     assert server.methods == ["GET"] and throttled_reads.sleeps == []
+
+
+class UnlistableChildCloud(ClosureCloud):
+    """aif-135 COMMON (2026-10-26): ACR's provider schema advertises registries/privateEndpointConnectionProxies,
+    but ARM answers its list with 404 at every api-version. The walk must record it, not stop the run."""
+
+    failure = "unsupported-child-inventory-endpoint"
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"].append({"resourceType": "networkSecurityGroups/privateEndpointConnectionProxies",
+                                        "apiVersions": ["2025-11-01"]})
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            raise fl.Blocked(self.failure, error_diagnostic={
+                "resource_type": "microsoft.network/networksecuritygroups/privateendpointconnectionproxies",
+                "api_version": api_version, "status": 404, "error_code": None})
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_records_a_child_collection_arm_will_not_list_and_continues():
+    cloud = UnlistableChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["items"] == [] and entry["body_hash"] == fl.digest([])
+    assert entry["unsupported"] == "not-listable-404"
+    # Everything else is still walked and recorded exactly.
+    assert RULE.lower() in closure["resources"] and NSG.lower() in closure["resources"]
+    assert closure == fl.collect_resource_closure(UnlistableChildCloud(), [GROUP])[0]
+
+
+def test_closure_walk_records_other_child_read_failures_and_continues():
+    # Throttling and transport retries already happen inside Cloud.request; what is left is recorded, not fatal.
+    cloud = UnlistableChildCloud()
+    cloud.failure = "remote-request-failed-403"
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["unsupported"] == "unreadable-remote-request-failed-403"
+    assert RULE.lower() in closure["resources"]
+
+
+class OlderVersionChildCloud(UnlistableChildCloud):
+    """The newest advertised api-version is not served yet; an older stable one lists the children."""
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"][-1]["apiVersions"] = ["2026-01-01-preview", "2025-11-01", "2025-05-01", "2024-01-01"]
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            self.tried = getattr(self, "tried", []) + [api_version]
+            if api_version != "2025-05-01":
+                return super().collection(path, api_version, extension)
+            return [], None
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_falls_back_to_older_stable_api_versions_before_giving_up():
+    cloud = OlderVersionChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert cloud.tried == ["2025-11-01", "2025-05-01"]
+    assert entry["api_version"] == "2025-05-01" and entry["unsupported"] is None and entry["ids"] == []

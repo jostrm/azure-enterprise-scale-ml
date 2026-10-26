@@ -1681,14 +1681,51 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 read_children_ahead(resource_id, kind)
                 read_extensions_ahead(resource_id)
 
+    def older_stable_versions(path, api):
+        """At most two older stable api-versions the provider schema lists for a child collection, newest first."""
+        try:
+            namespace, relative = collection_resource_type(path).split("/", 1)
+        except ValueError:
+            return []
+        available = schemas.get(namespace, {}).get(relative, [])
+        return sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
+                      reverse=True)[:2]
+
     def add_collection(path, api, extension=False, single=None, kind=None):
         if single:
             api, (status, headers, body) = served(
                 lambda value: reader.get(collection_read(path, value, single=single)), api, kind)
             rows, unsupported = ([] if status == 404 else [body]), None
         else:
-            api, (rows, unsupported) = served(
-                lambda value: reader.get(collection_read(path, value, extension)), api, kind)
+            # Tolerant child inventory: Cloud.request already waits out throttling (Retry-After) and retries
+            # transport errors, and served() falls back from a version the region does not serve. A list that
+            # still fails is retried at the schema's next older stable api-versions, then recorded
+            # (not-listable / unreadable) so one child type never stops the run.
+            # aif-135: ACR registries/privateEndpointConnectionProxies answers 404 at every api-version.
+            # Documented pinned children (Search sharedPrivateLinkResources) stay strict: a failed list there
+            # never means an empty list.
+            pinned = collection_resource_type(path) == "microsoft.search/services/sharedprivatelinkresources"
+            try:
+                api, (rows, unsupported) = served(
+                    lambda value: reader.get(collection_read(path, value, extension)), api, kind)
+            except Blocked as error:
+                if pinned:
+                    raise
+                failure = error
+                # Continue below the last version served() already tried.
+                tried = (getattr(error, "error_diagnostic", None) or {}).get("api_version") or api
+                for candidate in [] if extension else older_stable_versions(path, tried):
+                    try:
+                        rows, unsupported = reader.get(collection_read(path, candidate, extension))
+                        api = candidate
+                        break
+                    except Blocked as later:
+                        failure = later
+                else:
+                    status = (getattr(failure, "error_diagnostic", None) or {}).get("status")
+                    rows, unsupported = [], ("not-listable-" + str(status)
+                                             if failure.code == "unsupported-child-inventory-endpoint"
+                                             and status in (400, 404, 405) else "unreadable-" + failure.code)
         rows = [fingerprint_body(row) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
