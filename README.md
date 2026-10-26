@@ -13,6 +13,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 <td width="50%" rowspan="2" valign="top">
 <a href="./documentation/v2/10-19/10-factory-onion-architecture.md"><img src="./documentation/v2/10-19/images/10-factory-onion-architecture.gif" width="100%" alt="AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, with the time spent in each layer"></a><br>
 <sub><b>Architecture</b> · five layers, one direction, time per layer</sub>
+![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 </td>
 <td width="50%" valign="top">
 <a href="./documentation/v2/30-39/37-mlops.md"><img src="./documentation/v2/10-19/images/concepts/mlops.gif" width="100%" alt="MLOps: versioned data, training, evaluation, registration, approved release and monitoring"></a><br>
