@@ -10,6 +10,11 @@
     const apply = () => document.documentElement.setAttribute("data-theme", explicit ? param : system.matches ? "dark" : "light");
     apply();
     if (!explicit) system.addEventListener("change", apply);
+    // Color theme: a choice saved in the fragment, then the embedding app's scoutPalette, then Gray and Blue.
+    const palettes = ["gray-blue", "purple"];
+    const palette = [new URLSearchParams((window.location.hash || "").slice(1)).get("palette"),
+      new URLSearchParams(window.location.search).get("scoutPalette")].find((value) => palettes.includes(value));
+    document.documentElement.setAttribute("data-palette", palette || "gray-blue");
   })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,6 +39,13 @@
       <span id="auth-status" role="status">Not signed in</span>
       <button id="sign-in" type="button" disabled>Sign in with Microsoft</button>
       <button id="sign-out" class="secondary" type="button" hidden>Clear session</button>
+      <div class="theme-control">
+        <label for="color-theme">Color theme</label>
+        <select id="color-theme">
+          <option value="gray-blue">Gray and Blue</option>
+          <option value="purple">Purple</option>
+        </select>
+      </div>
     </div>
   </header>
   <main>

@@ -16,6 +16,8 @@
     history.replaceState(null, "", location.pathname + location.hash);
   }
   const initialFragment = new URLSearchParams(location.hash.slice(1));
+  // Color themes; Gray and Blue is the default. index.html applies the same choice before first paint.
+  const PALETTES = ["gray-blue", "purple"];
   const state = {
     config: null,
     token: null,
@@ -24,6 +26,8 @@
     sessionVersion: 0,
     scopeKey: initialFragment.get("scope") || "",
     audience: initialFragment.get("view") === "platform" ? "platform" : "project",
+    palette: [initialFragment.get("palette"), callbackParams.get("scoutPalette")]
+      .find((value) => PALETTES.includes(value)) || "gray-blue",
     busy: false,
     proposalBusy: false,
     proposalMessage: "",
@@ -127,7 +131,7 @@
     }
 
     constructor({channel, random, timers, timeoutMs = 120000}) {
-      Object.assign(this, {channel, random, timers, timeoutMs, pending: null, onTheme: null});
+      Object.assign(this, {channel, random, timers, timeoutMs, pending: null, onTheme: null, onPalette: null});
       channel.addEventListener("message", (event) => this.receive(event?.data));
     }
 
@@ -151,6 +155,7 @@
       if (!data || typeof data !== "object" || data.version !== 1 || typeof data.type !== "string") return;
       if (data.type === HOST_PROTOCOL + ".theme") {
         if (["light", "dark"].includes(data.theme)) this.onTheme?.(data.theme);
+        if (PALETTES.includes(data.palette)) this.onPalette?.(data.palette);
         return;
       }
       if (!this.pending || data.requestId !== this.pending.requestId) return;
@@ -213,6 +218,7 @@
   }) : null;
   if (hostBridge) {
     hostBridge.onTheme = (theme) => document.documentElement?.setAttribute("data-theme", theme);
+    hostBridge.onPalette = (palette) => { if (applyPalette(palette)) saveSelection(); };
   }
   const skillShortcuts = [
     ["create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj", "Create private AI Factory", "factory.create"],
@@ -250,15 +256,34 @@
     return accepted ? {scopeKey, sessionVersion, valid} : null;
   }
 
-  function renderShortcuts() {
-    const questions = [
-      ["Private bootstrap architecture", "For the active scope, explain the documented private AI Factory bootstrap architecture, including the hub, VPN, networking and default project. Distinguish guidance from live deployment evidence."],
+  // Explanation view tiles: each audience has its own read-only example questions. Selecting one fills the input only.
+  const questionTiles = {
+    platform: [
+      ["Core team responsibilities", "For the active scope, explain the documented core (platform) team responsibilities: shared networking, RBAC, governance, common resources, approvals and support, and the handoffs to project teams. Do not assume access beyond my grants."],
       ["Onboarding", "For the active scope, what are the documented onboarding prerequisites and approved steps for a new use case? Identify platform and project responsibilities without executing anything."],
+      ["Set up a Factory: private bootstrap", "For the active scope, explain how to set up an AI Factory from the documented private bootstrap architecture, including the hub, VPN, networking, the default project and the order of steps. Distinguish guidance from live deployment evidence and execute nothing."],
+      ["Update a Factory: releases and history", "For the active scope, explain the documented path to update an AI Factory and summarize release notes and breaking changes, distinguishing current guidance from history. Do not infer the installed version without live evidence."],
+      ["Dashboards, FinOps, health models", "For the active scope, explain the documented platform dashboards, FinOps cost views and health models: what each shows, where it lives and which signals need live telemetry. Distinguish estimates from actual charges; unknown cost is not zero."],
+      ["AI gateways: APIM, Kong, …", "For the active scope, compare the documented AI gateway options, such as Azure API Management and Kong: when to use each, governance, quota and networking implications, and what is configured here versus only documented."],
+      ["Tools and walkthrough videos", "For the active scope, explain the documented platform tools (Wizard UI, API, CLI, Python SDK, Azure DevOps pipelines and GitHub Actions workflows), what each is for, and list the documented tool walkthrough videos. Cite sources and never invent links."],
+      ["Docs, dual knowledge graphs, Factory MCP", "For the active scope, explain where the AI Factory documentation lives, how the dual knowledge graph (structural graph and architecture vault) is used, and what the Factory MCP exposes. Distinguish documented capability from what is deployed here."],
+    ],
+    project: [
       ["Project team responsibilities", "For the active scope, explain the project team's self-service responsibilities, permissions and handoffs to the platform team. Do not assume access beyond my grants."],
-      ["Updates and release history", "For the active scope, summarize documented updates and release notes, distinguishing current guidance from history. Do not infer the installed version without live evidence."],
+      ["ML Factory: use case templates", "For the active scope, explain the documented batch, online and streaming ML template types and onboarding prerequisites. Distinguish training submission from a deployed model endpoint."],
+      ["Agent Factory: use case templates", "For the active scope, how many documented Agent Factory use case templates are there, and what does each one do? Count only from the documented template catalog and say so if it is unavailable; do not guess."],
       ["Default project idle costs", "For the active scope, explain default-project idle Azure costs, assumptions and missing billing evidence. Distinguish estimates from actual charges; unknown cost is not zero."],
-      ["ML template types", "For the active scope, explain the documented batch, online and streaming ML template types and onboarding prerequisites. Distinguish training submission from a deployed model endpoint."],
-    ];
+      ["Tutorial videos: use case templates", "For the active scope, list the documented walkthrough videos for the ML and Agent Factory use case templates and what each covers. Cite sources, never invent links, and say plainly if none are documented."],
+      ["Ops: DataOps, MLOps, GenAIOps", "For the active scope, explain how DataOps, MLOps and GenAIOps are supported for project teams: the documented templates, pipelines, responsibilities and handoffs. Distinguish guidance from live evidence."],
+      ["Dev to Stage to Production: CI/CD", "For the active scope, explain the documented CI/CD path that promotes a use case from Dev to Stage to Production: Azure DevOps or GitHub Actions pipelines, approvals, gates and environment promotion. Execute nothing."],
+      ["Dashboards: usage, cost, FinOps, health", "For the active scope, explain the project dashboards for usage, cost, FinOps and health models: what each shows and which signals need live telemetry or billing evidence. Distinguish estimates from actual charges; unknown cost is not zero."],
+    ],
+  };
+  let tileAudience = null;
+
+  function renderQuestionTiles() {
+    tileAudience = state.audience;
+    const questions = questionTiles[tileAudience];
     ui("question-examples").replaceChildren(...questions.map(([label, question]) => {
       const button = node("button", undefined, "secondary shortcut-tile");
       button.type = "button";
@@ -272,6 +297,10 @@
       });
       return button;
     }));
+  }
+
+  function renderShortcuts() {
+    renderQuestionTiles();
     ui("action-tiles").replaceChildren(...skillShortcuts.map(([name, label, permission]) => {
       const button = node("button", undefined, "secondary shortcut-tile");
       button.type = "button";
@@ -313,8 +342,16 @@
     return Boolean(activeScope()?.permissions.includes(permission));
   }
 
+  function applyPalette(palette) {
+    if (!PALETTES.includes(palette)) return false;
+    state.palette = palette;
+    document.documentElement?.setAttribute("data-palette", palette);
+    ui("color-theme").value = palette;
+    return true;
+  }
+
   function saveSelection() {
-    const fragment = new URLSearchParams({view: state.audience});
+    const fragment = new URLSearchParams({view: state.audience, palette: state.palette});
     if (state.scopeKey) fragment.set("scope", state.scopeKey);
     history.replaceState(null, "", location.pathname + location.search + "#" + fragment);
   }
@@ -394,6 +431,7 @@
     ui("run-skill").textContent = state.skillBusy ? "Waiting for the backend…"
       : !skill ? "Choose a skill" : skill.kind === "action" ? "Prepare plan · do not execute"
         : skill.kind === "diagnostic" ? "Read Factory status" : "Read cost report";
+    if (tileAudience !== state.audience) renderQuestionTiles();
     for (const button of ui("question-examples").children) button.disabled = ui("question").disabled;
     for (const button of ui("action-tiles").children) {
       const entry = state.skills.find((item) => item.name === button.dataset.skill);
@@ -556,7 +594,8 @@
       const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
       // Carry non-secret view preferences in the state transaction, not extra browser storage.
       const scopePreference = /^[A-Za-z0-9_-]{1,80}$/.test(state.scopeKey) ? state.scopeKey : "";
-      const oauthState = base64url(crypto.getRandomValues(new Uint8Array(32))) + "." + state.audience + "." + scopePreference;
+      const oauthState = base64url(crypto.getRandomValues(new Uint8Array(32))) + "." + state.audience + "." + scopePreference
+        + "." + state.palette;
       const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
       sessionStorage.setItem(STATE_KEY, oauthState);
       sessionStorage.setItem(VERIFIER_KEY, verifier);
@@ -585,9 +624,10 @@
       throw new Error("Microsoft did not complete sign-in. Confirm registration approval, API consent and the exact SPA redirect URI.");
     }
     const preferences = expected.split(".");
-    if (preferences.length === 3 && ["platform", "project"].includes(preferences[1])) {
+    if ([3, 4].includes(preferences.length) && ["platform", "project"].includes(preferences[1])) {
       state.audience = preferences[1];
       if (/^[A-Za-z0-9_-]{1,80}$/.test(preferences[2])) state.scopeKey = preferences[2];
+      applyPalette(preferences[3]);
     }
     const response = await fetch(
       "https://login.microsoftonline.com/" + state.config.tenant_id + "/oauth2/v2.0/token",
@@ -1279,7 +1319,11 @@
     }
   }
 
+  applyPalette(state.palette);
   renderShortcuts();
+  ui("color-theme").addEventListener("change", () => {
+    if (applyPalette(ui("color-theme").value)) saveSelection();
+  });
   ui("sign-in").addEventListener("click", () => { void signIn(); });
   ui("sign-out").addEventListener("click", () => clearSession());
   ui("question-form").addEventListener("submit", (event) => { void ask(event); });

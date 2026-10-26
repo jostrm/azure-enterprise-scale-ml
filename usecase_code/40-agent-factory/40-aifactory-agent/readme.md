@@ -486,11 +486,19 @@ currency separation, forecast double-counting and unavailable data.
 
 ## Private application deployment
 
-The web interface follows the light/dark palette from the MAUI Config Wizard's
-`ThemePaletteCatalog`: purple primary actions, lavender selected surfaces and
-the same semantic status colors. The system theme is respected unless
-`?scoutTheme=light` or `?scoutTheme=dark` explicitly selects a mode. Error red
-is reserved for actual errors, not normal action buttons.
+The web interface follows the palettes in the MAUI Config Wizard's
+`ThemePaletteCatalog`. A **Color theme** selector below **Sign in** chooses
+**Gray and Blue** (the default; its dark values are the app's `GrayAndBlue`
+palette) or **Purple** (purple primary actions, lavender selected surfaces).
+Both palettes keep the same semantic status colors and work in light and dark
+mode. The system mode is respected unless `?scoutTheme=light` or
+`?scoutTheme=dark` explicitly selects one. The color theme comes from the
+page's own choice (kept in the URL fragment as `palette=`, and carried through
+sign-in in the OAuth state, never in browser storage), then the embedding app's
+`?scoutPalette=gray-blue|purple`, then Gray and Blue. The embedded app can
+change it live with the `esaif.agentChat.theme` message's optional `palette`
+field; unknown values are ignored. Error red is reserved for actual errors,
+not normal action buttons.
 
 Answers render Markdown headings, emphasis, nested lists, tables, blockquotes
 and code, with evidence markers linked to the corresponding source entries.
@@ -952,7 +960,13 @@ named skills. These are agent capabilities, not shell aliases or automatic
 permissions:
 
 Example-question tiles fill and focus the question box; they never send a
-question automatically. Action shortcuts select the existing scoped form,
+question automatically. The **Explanation view** selects the tiles: eight for
+the platform team (core team responsibilities, onboarding, setting up and
+updating a Factory, dashboards and FinOps, AI gateways, tools and walkthrough
+videos, docs, dual knowledge graphs and the Factory MCP) and eight for project
+teams (responsibilities, ML and Agent Factory use case templates, idle costs,
+template walkthrough videos, DataOps/MLOps/GenAIOps, Dev to Production CI/CD
+and dashboards). The view changes explanations, never permissions. Action shortcuts select the existing scoped form,
 not an execution endpoint. An accessible **Are you sure?** dialog, with Cancel
 as the default, is required before preparing a plan, approving its hash,
 executing, continuing or cancelling. The dialog shows the exact target,
