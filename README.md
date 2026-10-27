@@ -231,7 +231,6 @@ There are **3 AIFactory AI landingzones: Dev, Stage, Production**, depicted in t
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
-</details>
 ## AI Factory template architectures (optional)
 These are the two 2 architectures, template architectures (ESML, GenAI) optionally automated partly or fully (IaC) as AI Factory projects (AI Landingzone with 1 or both) for a use case, team, or business unit, on its own Azure Subscription.
 - **ESML**: Enterprise Scale Machine Learning
@@ -251,9 +250,10 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 
 ![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 
+</details>
 
 ## Architeture with FABRIC flavour
-You can optionally setup the ESML project type with Microsoft Fabric, as below:
+You can optionally setup an arhcitecture with Microsoft Fabric, as below:
 
 ![ESML flavour](./documentation/v2/10-19/images/11-services-highlevel-esml_fabric.png)
 
