@@ -790,6 +790,67 @@ def test_native_vad_never_creates_or_cancels_responses_implicitly():
     run(scenario)
 
 
+def test_native_response_cap_leaves_room_for_model_native_audio_tokens():
+    # Model-native audio counts toward the cap: 1024 tokens cut a one-minute spoken answer short.
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("Explain setup")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        assert harness.upstream.of("response.create")[0]["response"]["max_output_tokens"] == 4096
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_answer_cut_by_the_output_cap_keeps_playing_and_is_published_as_truncated(caplog):
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("Tell me about the ML templates")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.upstream.push({"type": "response.audio.delta", "response_id": "r1",
+                               "delta": base64.b64encode(PCM).decode()})
+        await harness.until(lambda: harness.channel.audio)
+        harness.response(text="Templates [S1] cover", status="incomplete",
+                         status_details={"type": "incomplete", "reason": "max_output_tokens"},
+                         usage={"output_tokens": 4096})
+        await harness.until(lambda: harness.channel.of("answer"))
+        answer = harness.channel.of("answer")[0]
+        assert answer["spoken_truncated"] is True and answer["spoken"] == "Templates [S1] cover"
+        assert not harness.channel.of("interrupted"), "audio already relayed must keep playing"
+        assert not harness.channel.of("error")
+        assert harness.channel.states()[-1] == "listening"
+        messages = "\n".join(record.getMessage() for record in caplog.records)
+        assert "status=incomplete reason=max_output_tokens output_tokens=4096" in messages
+        assert "Templates" not in messages
+        await harness.finish()
+    caplog.set_level(logging.INFO)
+    run(scenario)
+
+
+@pytest.mark.parametrize("status, details", [
+    ("incomplete", {"type": "incomplete", "reason": "content_filter"}),
+    ("cancelled", {"type": "cancelled", "reason": "turn_detected"}),
+    ("incomplete", None),
+])
+def test_native_response_that_did_not_complete_logs_its_bounded_reason_and_stops(caplog, status, details):
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("Explain setup")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(text="Partial [S1]", status=status, status_details=details)
+        await harness.until(lambda: harness.channel.of("error"))
+        assert harness.channel.of("error")[-1]["code"] == "voice_error"
+        assert harness.channel.of("interrupted") and not harness.channel.of("answer")
+        reason = (details or {}).get("reason", "unknown")
+        messages = "\n".join(record.getMessage() for record in caplog.records)
+        assert f"status={status} reason={reason}" in messages
+        assert "Partial" not in messages
+        await harness.finish()
+    caplog.set_level(logging.INFO)
+    run(scenario)
+
+
 def test_native_tool_output_and_continuation_are_bounded_and_cancel_safe():
     async def scenario():
         harness = await NativeHarness().start()

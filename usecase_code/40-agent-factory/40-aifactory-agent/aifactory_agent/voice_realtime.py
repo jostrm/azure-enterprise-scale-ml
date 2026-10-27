@@ -22,6 +22,8 @@ from .voice import BENIGN_UPSTREAM_ERRORS, LOGGER, VoiceAnswerError, VoiceSessio
 
 MAX_CALLS_PER_RESPONSE = 8
 MAX_TRANSCRIPT_CHARS = 32768
+# Model-native audio tokens count toward the cap, not just the transcript.
+MAX_OUTPUT_TOKENS = 4096
 # Keep tombstones rather than evicting IDs that a delayed event could otherwise rebind.
 MAX_HISTORY_RECORDS = 1024
 
@@ -184,7 +186,7 @@ class RealtimeVoiceSession(VoiceSession):
         self._native_text = ""
         self._response_active = True
         self._current_response = None
-        await self._send_native({"type": "response.create", "response": {"max_output_tokens": 1024}})
+        await self._send_native({"type": "response.create", "response": {"max_output_tokens": MAX_OUTPUT_TOKENS}})
 
     async def _handle_upstream(self, event):
         if not isinstance(event, dict) or self._history_failed or self._ended.is_set():
@@ -527,13 +529,24 @@ class RealtimeVoiceSession(VoiceSession):
         turn = request.turn
         self._response_active = False
         self._current_response = None
-        if response.get("status") != "completed":
+        status = response.get("status")
+        details = response.get("status_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        usage = response.get("usage") or {}
+        calls = [item for item in output if item.get("type") == "function_call"]
+        # A reply cut by the output cap is still a reply: what was relayed keeps playing and is validated as usual.
+        truncated = status == "incomplete" and reason == "max_output_tokens" and not calls
+        if status != "completed":
+            output_tokens = usage.get("output_tokens")
+            LOGGER.warning("voice_response_not_completed session=%s turn=%d status=%s reason=%s output_tokens=%d",
+                           self.session_id, turn, status, _diagnostic_label(reason),
+                           output_tokens if isinstance(output_tokens, int) else -1)
+        if status != "completed" and not truncated:
             await self._fail_turn(turn, "voice_error", "The native voice response did not complete.")
-            if response.get("status") == "failed":
+            if status == "failed":
                 await self._fatal("voice_unavailable", "Native voice is unavailable. Typing still works.")
                 await self.end("voice_unavailable")
             return
-        calls = [item for item in output if item.get("type") == "function_call"]
         if calls:
             self._tool_rounds += 1
             if self._tool_rounds >= self._max_tool_rounds or len(calls) > MAX_CALLS_PER_RESPONSE:
@@ -550,7 +563,6 @@ class RealtimeVoiceSession(VoiceSession):
             await self._fail_turn(turn, "voice_error", "Voice output exceeded its limit.")
             return
         try:
-            usage = response.get("usage") or {}
             result = self._context.finish(text, identifier, {
                 "input_tokens": usage.get("input_tokens", 0), "output_tokens": usage.get("output_tokens", 0)})
         except PermissionError:
@@ -564,7 +576,7 @@ class RealtimeVoiceSession(VoiceSession):
             self._turn_timer.cancel()
         validation = result.pop("citation_validation", "passed")
         await self._publish(turn, self.channel.send_json({
-            **result, "type": "answer", "spoken": text, "spoken_truncated": False,
+            **result, "type": "answer", "spoken": text, "spoken_truncated": truncated,
             "citation_validation": validation, "audio_provisional": True}), grounded=True)
         if self._live_turn(turn):
             await self._set_state("listening")

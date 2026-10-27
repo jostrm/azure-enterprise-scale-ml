@@ -672,7 +672,7 @@ reuse the current text session rather than acquiring a separate token.
 | `turn_detection` | `azure_semantic_vad` | Also `azure_semantic_vad_multilingual`, `server_vad`; `silence_duration_ms` 500. |
 | `max_session_seconds` / `idle_timeout_seconds` | `900` / `120` | Session bounds. |
 | `max_concurrent_sessions` | `4` | Per application replica. |
-| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 1024 output tokens. Deadline covers native preparation, tools and response. |
+| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 4096 output tokens (model-native audio counts toward the cap; an answer cut by it keeps playing and is published with `spoken_truncated: true`). Deadline covers native preparation, tools and response. |
 | `greeting` | "Factory Agent online. How can I help?" | Shell speaks it; native displays it without a separate synthesis request. `null` disables it. |
 | `default_language` / `language_profiles` | `en-US` / `{}` | Optional server-owned BCP-47 locale profiles; each specifies `voice_name`, optional `voice_type`, optional `greeting`. The default must be a configured profile. |
 | `allowed_origins` | `[]` | Extra browser origins; same-origin is always allowed. |
@@ -1169,4 +1169,4 @@ replay/concurrency, corpus changes/deletions, failure-safe manifests and portabi
 ```
 
 See `deployment-status.json` for observed deployment/evaluation evidence and the
-explicit separation between demonstrated, unexercised and blocked capabilities.
+explicit separation between demonstrated, unexercised and blocked capabilities.
