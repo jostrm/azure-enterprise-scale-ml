@@ -206,7 +206,8 @@ python deploy.py --config config.local.json --environment <internal-environment-
 python deploy.py --config config.local.json --environment <internal-environment-name> --apply    # after review
 ```
 
-The deployment adds one **revision** of the same app. With voice enabled it also assigns the Voice Live roles
+The deployment adds one **revision** of the same app; once it is ready it takes all traffic and the previous
+revision is deactivated, so only one revision runs. With voice enabled it also assigns the Voice Live roles
 (see below) from a separate, opt-in template; turning voice off later does not remove them.
 
 ## Use it
@@ -278,7 +279,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | Latency | Measure warmed English/Swedish end-of-speech to first audible reply after approved deployment. Server `aifactory.voice.first_audio.duration` measures first relayed frame, not speaker playback; readiness/Search/network/tool latency remains. Grounding before native speech is measured as `aifactory.voice.grounding.duration`. Native tool calls start while the model is still streaming and run in parallel. Offline tests cannot promise sub-second replies. |
 | Knowledge | Refresh stages a complete isolated generation before atomic promotion. Each text/native turn pins a complete committed snapshot; failed, blocked or stale refreshes can use the last success with a dated freshness warning. No unverified or partially written fallback is served. |
 | Turn voice off | Set `voice.enabled` to `false` (operator flow) or the flag to `false`; the app keeps running as a text chat. Nothing is deleted. |
-| Roll back | Retain earlier revisions and serving state. A revision using a legacy manifest/index contract may be incompatible with a newly promoted generation; review code, configuration and saved state together rather than blindly switching traffic or overwriting the manifest. |
+| Roll back | Earlier revisions stay listed as inactive; reactivate the known-good one with `az containerapp revision activate`, which retires the current one. A revision using a legacy manifest/index contract may be incompatible with a newly promoted generation; review code, configuration and saved state together rather than blindly reactivating a revision or overwriting the manifest. |
 
 ## Troubleshooting
 

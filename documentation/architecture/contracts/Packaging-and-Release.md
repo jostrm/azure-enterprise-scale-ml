@@ -9,11 +9,13 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/deploy.py
   - usecase_code/40-agent-factory/40-aifactory-agent/readme.md
   - usecase_code/40-agent-factory/40-aifactory-agent/infra/voice-roles.bicep
+  - usecase_code/40-agent-factory/40-aifactory-agent/infra/application.bicep
 tests:
   - environment_setup/azurefactory-cli/tests/test_enrollment_packaging.py
   - esml-v2/tests/test_esml_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_skill_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_packaging.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_application_revisions.py
 graph_symbols:
   - esml-v2/esml_build.py::function:_source
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
@@ -35,6 +37,8 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice obser
 The agent's cloud source snapshot is immutable. Refreshing retrieval against it does not fetch new local edits; first package/deploy an approved updated snapshot, then separately authorize ingestion. Ingestion may embed documents and mutate owned retrieval resources; inference is another operation.
 
 Live voice adds the pinned `websockets` wheel to the locked, offline-installable application dependencies, and an opt-in `infra/voice-roles.bicep` template that `deploy.py` applies only when `voice.enabled` is true (Cognitive Services User and Foundry User on the project Foundry account; never removed by turning voice off). `identity.bicep` keeps the project-scoped runtime role only. A pipeline-created app carries the tag `aifactory-integration: live-voice`; an app deployed by hand does not and is never replaced by the pipeline step.
+
+`infra/application.bicep` runs the agent Container App in `Single` revision mode: each deploy creates one new revision, which takes all traffic once ready, and the previous one is deactivated (kept for rollback, no replicas). Until 2026-10-27 it used `Multiple` mode with `minReplicas: 1`, so every earlier revision kept an idle replica running and billed; on project001 Dev 18 such revisions cost about $7 a day before they were deactivated.
 
 The SDK, Agent Factory operator and grounded application have different dependency/runtime requirements. Do not share environments based on similar directory names. Installed packages should be tested through their declared public surfaces, not accidental source-path imports.
 

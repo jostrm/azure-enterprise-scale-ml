@@ -42,7 +42,7 @@ resource application 'Microsoft.App/containerApps@2025-01-01' = {
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
-      activeRevisionsMode: 'Multiple'
+      activeRevisionsMode: 'Single'
       ingress: {
         external: true
         targetPort: 8080

@@ -1117,8 +1117,10 @@ Closing a progress feed does not cancel a job.
 - Refresh the approved corpus after documentation/release changes. Rebuild the
   immutable bundle after application or dependency changes.
 - Keep the previous agent version, bundle hash and Container Apps revision.
-  Revert `agent_version` and shift traffic to the known-good revision for an
-  application rollback. This does not roll back a Factory operation.
+  The app runs one active revision: a deploy retires the previous one once the
+  new one is ready, so no idle replicas keep billing. For an application
+  rollback, revert `agent_version` and reactivate the known-good revision with
+  `az containerapp revision activate`. This does not roll back a Factory operation.
 - Application Insights integration can be configured using
   `azure.application_insights_connection_string`. Capture health, retrieval/tool
   errors, latency and model token usage without prompt bodies or credentials.
