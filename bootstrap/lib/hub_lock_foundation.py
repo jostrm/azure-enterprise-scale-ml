@@ -26,6 +26,12 @@ import factory_enrollment as enrollment
 CONTRACT_VERSION = 1
 SOURCE_FILES = ("bootstrap/lib/hub_lock_foundation.py", "bootstrap/lib/factory_enrollment.py")
 CONTAINER = "hub-locks"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py). A reviewed plan stays executable this long.
+REVIEW_SECONDS = 1800
+ATOMIC_REPLACE_ATTEMPTS = 40            # x 0.05 s while Windows releases a sharing lock
+PROVISIONING_POLLS = 240                # x 5 s = 20 min
+PROVIDER_REGISTRATION_POLLS = 240       # x 5 s = 20 min
+RBAC_PROPAGATION_ATTEMPTS = 50          # x 5 s = ~4 min of blob-data role replication
 canonical = enrollment.canonical
 digest = enrollment.digest
 
@@ -356,7 +362,7 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
                   if private_required else ["provider-runner-access-unverified:" + container_id],
                   "automatic_network_changes": False}
     plan = {"contract_version": CONTRACT_VERSION, "stage": "hub-lock-foundation", "plan_id": str(uuid4()),
-            "prepared_at": time.time(), "expires_at": time.time() + 900, "source": source,
+            "prepared_at": time.time(), "expires_at": time.time() + REVIEW_SECONDS, "source": source,
             "inputs": {"tenant_id": tenant, "hub_resource_group_id": rg, "location": location, "bootstrap_public_ipv4": ip},
             "target": target, "principal_id": principal, "coordination": coords, "coordination_mode": "connectivity-hub",
             "hub_resource_group_id": rg, "observations": observations, "effects": effects,
@@ -418,18 +424,18 @@ def _persist(path, value, retry_sleep=time.sleep):
         stream.flush()
         os.fsync(stream.fileno())
     # Retry only the atomic local rename while Windows releases a sharing lock.
-    for attempt in range(20):
+    for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
         try:
             os.replace(sibling, path)
             return
         except PermissionError:
-            if attempt == 19:
+            if attempt == ATOMIC_REPLACE_ATTEMPTS - 1:
                 raise
             retry_sleep(0.05)
 
 
 def _wait(runtime, identifier, api, sleep):
-    for _ in range(120):
+    for _ in range(PROVISIONING_POLLS):
         status, _, value = runtime.arm("GET", identifier, api, allowed=(200, 404))
         state = value.get("properties", {}).get("provisioningState", "Succeeded") if status == 200 else "Creating"
         require(state not in ("Failed", "Canceled"), "foundation-provisioning-failed:" + identifier)
@@ -521,7 +527,7 @@ def execute(plan, *, state_dir, expected_plan_hash, acknowledge_initialization_g
                     persist()
                     require(time.time() < plan["expires_at"], "foundation-review-expired")
                     runtime.arm("POST", effect["id"] + "/register", effect["api"], allowed=(200, 202))
-                for attempt in range(120):
+                for attempt in range(PROVIDER_REGISTRATION_POLLS):
                     require(time.time() < plan["expires_at"], "foundation-review-expired")
                     _, _, provider = runtime.arm("GET", effect["id"], effect["api"])
                     if provider.get("registrationState") == "Registered":
@@ -563,12 +569,12 @@ def execute(plan, *, state_dir, expected_plan_hash, acknowledge_initialization_g
             receipt.pop("pending_effect", None)
             persist()
         # Only retry authenticated READs for RBAC propagation, never uncertain writes.
-        for attempt in range(25):
+        for attempt in range(RBAC_PROPAGATION_ATTEMPTS):
             try:
                 runtime.blob("HEAD", allowed=(200,))
                 break
             except enrollment.EnrollmentError as exc:
-                if exc.code != "remote-request-failed-403" or attempt == 24:
+                if exc.code != "remote-request-failed-403" or attempt == RBAC_PROPAGATION_ATTEMPTS - 1:
                     raise
                 sleep(5)
         _, headers, _ = runtime.blob("PUT", remote, data=receipt,

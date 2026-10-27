@@ -19,7 +19,7 @@ stages:
   jobs:
     - deployment: CrossChargingReport
       displayName: Generate Cross-Charging Report
-      timeoutInMinutes: 60
+      timeoutInMinutes: 120
       pool:
         vmImage: windows-2022
       environment: Dev  
@@ -46,7 +46,7 @@ stages:
   jobs:
     - deployment: CrossChargingReport
       displayName: Generate Cross-Charging Report
-      timeoutInMinutes: 60
+      timeoutInMinutes: 120
       pool:
         vmImage: windows-2022
       environment: Test  
@@ -73,7 +73,7 @@ stages:
   jobs:
     - deployment: CrossChargingReport
       displayName: Generate Cross-Charging Report
-      timeoutInMinutes: 60
+      timeoutInMinutes: 120
       pool:
         vmImage: windows-2022
       environment: Prod  

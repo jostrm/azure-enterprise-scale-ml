@@ -47,6 +47,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_agent_steps_run_last.py",
         "unit/test_all_scaleset_dispatcher.py",
         "unit/test_apim_gateway_workflows.py",
+        "unit/test_byo_common_subnet.py",
         "unit/test_factory_chat_agent_flag.py",
         "unit/test_github_json_bootstrap.py",
         "unit/test_github_manual_inputs.py",
@@ -143,6 +144,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_selective_project_deletion.py",
         "unit/test_simple_bootstrap.py",
         "unit/test_single_writer_coordination.py",
+        "unit/test_single_writer_deletion.py",
         "unit/test_single_writer_repository.py",
     )),
     Tier(5, "capacity", "Preflight and capacity: capacity preflight, regional and SKU fallback, "

@@ -356,6 +356,30 @@ def test_post_deployment_native_probe_checks_all_retained_configuration(compiled
         net.verify_common_network(planned, before=before, after=changed, expected_resources=expected)
 
 
+def test_retained_peering_parent_etag_rollover_preserves_every_other_property(compiled):
+    """aif-133, 2026-10-26: an external-hub spoke's peering carries the VNet etag, and Network RP rolls both
+    when the stage adds subnets. Accept only that exact rollover, never an independent peering change."""
+    state, intent = initial(), desired()
+    peering = state[VNET]["properties"]["virtualNetworkPeerings"][0]
+    assert peering["etag"] == state[VNET]["etag"]
+    before = inventory(state, intent)
+    planned = plan(state, intent)
+    state, _ = apply_native_arm(state, planned, compiled)
+    state[VNET]["etag"] = 'W/"parent-child-write"'
+    state[VNET]["properties"]["virtualNetworkPeerings"][0]["etag"] = state[VNET]["etag"]
+    expected = net.expected_resource_bodies(compiled, planned)
+    assert net.verify_common_network(planned, before=before, after=inventory(state, intent),
+                                     expected_resources=expected)["preserved"] is True
+    for change in ({"etag": 'W/"independent-peering-write"'},
+                   {"properties": {**peering["properties"], "allowForwardedTraffic": False}},
+                   {"properties": {**peering["properties"], "peeringState": "Disconnected"}}):
+        changed = copy.deepcopy(state)
+        changed[VNET]["properties"]["virtualNetworkPeerings"][0].update(copy.deepcopy(change))
+        with pytest.raises(net.PreservationError, match="retained-vnet-configuration-changed"):
+            net.verify_common_network(planned, before=before, after=inventory(changed, intent),
+                                      expected_resources=expected)
+
+
 def test_existing_nsg_allows_only_planned_service_managed_reverse_associations(compiled):
     state, intent = initial(), desired()
     nsg_id = NSG + "nsg-snet-one"

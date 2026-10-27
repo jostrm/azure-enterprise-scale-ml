@@ -1986,6 +1986,67 @@ def test_collection_top_level_error_code_is_diagnostic_settings_specific():
     assert cloud.collection(path, "2022-06-01", extension=True) == ([], "ScopeNotSupported")
 
 
+WORKSPACE = GROUP + "/providers/Microsoft.OperationalInsights/workspaces/la-cmn-reviewed-001"
+
+
+@pytest.mark.parametrize("path,api,status,body,expected_type,expected_code", [
+    # aif-130 bootstrap operator teardown (2026-10-25) stopped with this code and nothing else.
+    (WORKSPACE + "/dataSources", "2020-08-01", 400,
+     {"error": {"code": "KindNotSpecified", "message": "Must specify a valid kind filter."}},
+     "microsoft.operationalinsights/workspaces/datasources", "KindNotSpecified"),
+    (WORKSPACE + "/linkedServices", "2023-09-01", 404, None,
+     "microsoft.operationalinsights/workspaces/linkedservices", None),
+    (RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings", "2021-05-01-preview", 405,
+     {"error": {"code": "AuthorizationFailed"}},
+     "microsoft.network/publicipaddresses/providers/microsoft.insights/diagnosticsettings", "AuthorizationFailed"),
+    (GROUP + "/providers/Microsoft.Authorization/locks", "2016-09-01", 404, {"error": {"code": "Not Found!"}},
+     "microsoft.authorization/locks", None),
+])
+def test_unsupported_child_inventory_endpoint_names_the_failed_collection(
+        path, api, status, body, expected_type, expected_code):
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=Mock())
+    cloud.request = Mock(return_value=(status, {}, body))
+    with pytest.raises(fl.Blocked) as raised:
+        cloud.collection(path, api, extension="/providers/microsoft.insights/" in path.lower())
+    error = raised.value
+    assert error.code == str(error) == "unsupported-child-inventory-endpoint"
+    detail = {"resource_type": expected_type, "api_version": api, "status": status, "error_code": expected_code}
+    assert error.error_diagnostic == detail
+    assert fl.failure_fields(error, "unused") == {"error_code": error.code, "error_diagnostic": detail}
+    text = json.dumps(fl.failure_fields(error, "unused")).lower()
+    assert SUB not in text and "/resourcegroups/" not in text and "reviewed" not in text
+    assert "kind filter" not in text
+
+
+@pytest.mark.parametrize("detail", [
+    None, {},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400, "error_code": "KindNotSpecified", "message": "private"},
+    {"resource_type": GROUP + "/providers/microsoft.operationalinsights/workspaces/datasources",
+     "api_version": "2020-08-01", "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/la-cmn-ws/datasources",
+     "api_version": "2020-08-01", "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "latest",
+     "status": 400, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 500, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": True, "error_code": None},
+    {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+     "status": 400, "error_code": "Kind filter: secret value"},
+])
+def test_child_inventory_diagnostic_is_closed_and_revalidated(detail):
+    error = fl.Blocked("unsupported-child-inventory-endpoint")
+    error.error_diagnostic = detail
+    assert fl.failure_fields(error, "unused") == {"error_code": error.code}
+    good = {"resource_type": "microsoft.operationalinsights/workspaces/datasources", "api_version": "2020-08-01",
+            "status": 400, "error_code": "KindNotSpecified"}
+    assert fl.safe_instance_diagnostic("unsupported-child-inventory-endpoint", good) == good
+    assert fl.safe_instance_diagnostic("bootstrap-resource-instance-changed", good) is None
+
+
 def test_what_if_accepts_empty_202_polls_before_final_changes():
     document, _ = scoped_manifest()
     location = fl.ARM + f"/subscriptions/{SUB}/providers/Microsoft.Resources/operationresults/reviewed"
@@ -2035,7 +2096,7 @@ def test_what_if_perpetually_pending_is_bounded():
     with pytest.raises(fl.Blocked, match="arm-what-if-incomplete"):
         fl.evaluate_what_if(cloud, document, {"id": "factory", "scope": "subscription"},
                            {"properties": {}}, sleep=Mock())
-    assert opener.open.call_count == 121
+    assert opener.open.call_count == 1 + fl.WHAT_IF_POLLS == 241
 
 
 def test_foundry_ownership_uses_actual_canonical_tags_project_parameter():
@@ -2375,6 +2436,16 @@ def test_throttled_arm_reads_wait_for_retry_after_and_retry(throttled_reads, cap
     assert "synthetic-private-token" not in json.dumps(events)
 
 
+def test_throttled_read_event_names_the_azure_host_behind_a_proxy(throttled_reads, capsys, monkeypatch):
+    # Behind an HTTPS proxy urllib points request.host at the proxy; the event still names the Azure host.
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:9")
+    cloud, _ = throttled_reads.cloud((429, "1"), (200, None))
+    assert cloud.request("GET", THROTTLED_URL, fl.ARM)[0] == 200
+    [event] = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
+    assert event["host"] == "management.azure.com" and event["path"] == GROUP
+
+
 def test_a_throttled_head_is_repeated_too(throttled_reads):
     cloud, server = throttled_reads.cloud((429, "3"), (200, None))
     assert cloud.request("HEAD", THROTTLED_URL, fl.ARM)[0] == 200
@@ -2397,11 +2468,12 @@ def test_throttled_reads_stop_at_the_attempt_bound(throttled_reads):
 
 
 def test_throttled_reads_never_wait_past_the_read_window(throttled_reads):
-    # 60 s waits fit twice in the 180 s window after the first throttled answer; a third would reach its end.
-    cloud, server = throttled_reads.cloud((429, "60"), (429, "60"), (429, "60"), (200, None))
+    # 60 s waits fit five times in the 360 s window after the first throttled answer; a sixth would reach its end.
+    cloud, server = throttled_reads.cloud(*[(429, "60")] * 6, (200, None))
     with pytest.raises(fl.Blocked, match="^remote-request-failed-429$"):
         cloud.request("GET", THROTTLED_URL, fl.ARM)
-    assert len(server.methods) == 3 and throttled_reads.sleeps == [60, 60]
+    assert fl.READ_TRANSPORT_RETRY_WINDOW_SECONDS == 360
+    assert len(server.methods) == 6 and throttled_reads.sleeps == [60] * 5
 
 
 @pytest.mark.parametrize("method", ["PUT", "POST", "PATCH", "DELETE"])
@@ -2418,3 +2490,125 @@ def test_other_http_errors_on_reads_still_stop_at_once(throttled_reads, status):
     with pytest.raises(fl.Blocked, match="^remote-request-failed-" + str(status) + "$"):
         cloud.request("GET", THROTTLED_URL, fl.ARM)
     assert server.methods == ["GET"] and throttled_reads.sleeps == []
+
+
+class UnlistableChildCloud(ClosureCloud):
+    """aif-135 COMMON (2026-10-26): ACR's provider schema advertises registries/privateEndpointConnectionProxies,
+    but ARM answers its list with 404 at every api-version. The walk must record it, not stop the run."""
+
+    failure = "unsupported-child-inventory-endpoint"
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"].append({"resourceType": "networkSecurityGroups/privateEndpointConnectionProxies",
+                                        "apiVersions": ["2025-11-01"]})
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            raise fl.Blocked(self.failure, error_diagnostic={
+                "resource_type": "microsoft.network/networksecuritygroups/privateendpointconnectionproxies",
+                "api_version": api_version, "status": 404, "error_code": None})
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_records_a_child_collection_arm_will_not_list_and_continues():
+    cloud = UnlistableChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["items"] == [] and entry["body_hash"] == fl.digest([])
+    assert entry["unsupported"] == "not-listable-404"
+    # Everything else is still walked and recorded exactly.
+    assert RULE.lower() in closure["resources"] and NSG.lower() in closure["resources"]
+    assert closure == fl.collect_resource_closure(UnlistableChildCloud(), [GROUP])[0]
+
+
+def test_closure_walk_records_other_child_read_failures_and_continues():
+    # Throttling and transport retries already happen inside Cloud.request; what is left is recorded, not fatal.
+    cloud = UnlistableChildCloud()
+    cloud.failure = "remote-request-failed-403"
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert entry["ids"] == [] and entry["unsupported"] == "unreadable-remote-request-failed-403"
+    assert RULE.lower() in closure["resources"]
+
+
+class OlderVersionChildCloud(UnlistableChildCloud):
+    """The newest advertised api-version is not served yet; an older stable one lists the children."""
+
+    def provider_schema(self, namespace):
+        schema = super().provider_schema(namespace)
+        schema["resourceTypes"][-1]["apiVersions"] = ["2026-01-01-preview", "2025-11-01", "2025-05-01", "2024-01-01"]
+        return schema
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/privateendpointconnectionproxies"):
+            self.tried = getattr(self, "tried", []) + [api_version]
+            if api_version != "2025-05-01":
+                return super().collection(path, api_version, extension)
+            return [], None
+        return super().collection(path, api_version, extension)
+
+
+def test_closure_walk_falls_back_to_older_stable_api_versions_before_giving_up():
+    cloud = OlderVersionChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][NSG.lower() + "/privateendpointconnectionproxies"]
+    assert cloud.tried == ["2025-11-01", "2025-05-01"]
+    assert entry["api_version"] == "2025-05-01" and entry["unsupported"] is None and entry["ids"] == []
+
+
+def test_vnet_peering_fingerprint_ignores_the_parent_vnet_etag_and_sync_level():
+    # aif-138 COMMON (2026-10-26) deployed, then stopped with bootstrap-preserved-resource-changed-during-deployment:
+    # the preserved hub peering's etag is the parent VNet's, which rolls when COMMON adds subnets and endpoints.
+    peering = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.Network/virtualNetworks/vnet"
+               "/virtualNetworkPeerings/aif-hub")
+    body = {"id": peering, "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings", "etag": 'W/"before"',
+            "properties": {"peeringState": "Connected", "peeringSyncLevel": "FullyInSync",
+                           "allowVirtualNetworkAccess": True, "remoteVirtualNetwork": {"id": "/hub"}}}
+    later = copy.deepcopy(body)
+    later["etag"] = 'W/"after"'
+    later["properties"]["peeringSyncLevel"] = "LocalNotInSync"
+    kind = "microsoft.network/virtualnetworks/virtualnetworkpeerings"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_etag(body, {}, kind) is None
+    later["properties"]["allowVirtualNetworkAccess"] = False
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+def test_acr_system_scope_map_fingerprint_ignores_its_synthesized_creation_date():
+    # aif-138 COMMON retry (2026-10-27) was blocked with bootstrap-resource-instance-changed: ACR answers every GET of
+    # its built-in _repositories_* scope maps with a new creationDate, so two reads minutes apart never agreed.
+    scope_map = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.ContainerRegistry/registries/acr"
+                 "/scopeMaps/_repositories_pull")
+    body = {"id": scope_map, "type": "Microsoft.ContainerRegistry/registries/scopeMaps",
+            "properties": {"actions": ["repositories/*/content/read"], "provisioningState": "Succeeded",
+                           "creationDate": "2026-10-25T00:30:59.0052368+00:00"}}
+    later = copy.deepcopy(body)
+    later["properties"]["creationDate"] = "2026-10-25T00:16:04.5282132+00:00"
+    kind = "microsoft.containerregistry/registries/scopemaps"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    later["properties"]["actions"].append("repositories/*/content/write")
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+def test_vnet_tagged_traffic_consumer_fingerprint_keeps_only_its_identity():
+    # aif-138 (2026-10-27): Network RP maintains a VNet's taggedTrafficConsumers child for Key Vault; its etag has the
+    # parent VNet's form and its ACLed subnets follow vault network rules, so COMMON and PROJECT change it after review.
+    consumer = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.Network/virtualNetworks/vnet"
+                "/taggedTrafficConsumers/Microsoft.KeyVault.swedencentral")
+    body = {"id": consumer, "type": "Microsoft.Network/virtualNetworks/taggedTrafficConsumers", "etag": 'W/"before"',
+            "properties": {"owner": "Microsoft.KeyVault", "virtualNetworkResourceGuid": "guid",
+                           "acledSubnets": [{"name": "a", "subnetTrafficTag": 1}], "acledSubscriptions": [],
+                           "primaryLocations": ["swedencentral"], "provisioningState": "Succeeded",
+                           "virtualNetworkAcled": False, "vnetTrafficTag": 1}}
+    later = copy.deepcopy(body)
+    later["etag"] = 'W/"after"'
+    later["properties"].update(acledSubnets=[{"name": "a", "subnetTrafficTag": 1}, {"name": "b", "subnetTrafficTag": 2}],
+                               acledSubscriptions=["s"], provisioningState="Updating", vnetTrafficTag=2,
+                               virtualNetworkAcled=True, primaryLocations=["swedencentral", "swedensouth"])
+    kind = "microsoft.network/virtualnetworks/taggedtrafficconsumers"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_etag(body, {}, kind) is None
+    later["properties"]["owner"] = "Microsoft.Storage"
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)

@@ -91,7 +91,7 @@ aif_delete() {
   local -a options=(
     --subscription "$dev_test_prod_sub_id"
     --resource-group "$projectResourceGroup"
-    --timeout-seconds "${AIF_DELETE_TIMEOUT_SECONDS:-1800}"
+    --timeout-seconds "${AIF_DELETE_TIMEOUT_SECONDS:-3600}"
     --poll-seconds "${AIF_DELETE_POLL_SECONDS:-15}"
   )
   if [ -n "${AIF_DELETE_REPORT_DIR:-}" ]; then

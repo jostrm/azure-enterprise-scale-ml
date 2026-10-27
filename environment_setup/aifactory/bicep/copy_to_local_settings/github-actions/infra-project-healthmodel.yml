@@ -121,7 +121,7 @@ jobs:
     name: Azure Monitor health model (${{ inputs.mode }}, ${{ inputs.scope }})
     environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:

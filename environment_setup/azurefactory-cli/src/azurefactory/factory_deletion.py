@@ -125,7 +125,27 @@ def validate_teardown_plan(plan: Any, factory_id: str, scales: dict[str, Any], t
                 invalid("an unlink entry is not this factory's own link inside a configured connectivity hub")
     if seen != set(scales) or deleted != reviewed:
         invalid("teardown stages must cover every reviewed deletion exactly once")
+    evidence = plan.get("bootstrap_evidence")
+    if (not isinstance(evidence, list) or any(not isinstance(row, dict) for row in evidence)
+            or sorted(str(row.get("scale_set_id")) for row in evidence) != sorted(scales)
+            or any(not _uuid(row.get("workflow_id")) or not _hash(row.get("record_hash")) for row in evidence)):
+        invalid("every scale set needs exactly one bootstrap evidence record")
     return plan
+
+
+def is_already_absent_teardown(plan: Any) -> bool:
+    """A bootstrap teardown whose recorded groups are all gone (404): nothing left to unlink or delete.
+
+    Only this shape may review an empty deletion manifest; validate_teardown_plan still checks it in full.
+    """
+    stages = plan.get("stages") if isinstance(plan, dict) else None
+    return (isinstance(stages, list) and bool(stages) and plan.get("contract") == TEARDOWN_CONTRACT
+            and plan.get("executor") == "operator" and plan.get("retained_resources") == []
+            and all(isinstance(stage, dict) and (
+                stage.get("kind") == "unlink-hub" and stage.get("links") == []
+                or stage.get("kind") == "operator-teardown"
+                and stage.get("resource_group_ids") == [] and stage.get("delete") == [])
+                    for stage in stages))
 
 
 def describe_teardown_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -442,7 +462,9 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
             invalid("invalid or duplicate scale-set identity")
         scales[scale["id"]] = scale
     targets = preview.get("deletion_targets")
-    if not isinstance(targets, list) or not targets:
+    if not isinstance(targets, list) or not targets and not (
+            contract == TEARDOWN_CONTRACT and preview.get("retained_resources") == []
+            and is_already_absent_teardown(preview.get("deletion_plan"))):
         invalid("empty deletion manifest")
     groups, deleted, retained, covered = set(), set(), set(), set()
     for target in targets:
@@ -484,7 +506,7 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
             invalid("the acknowledged whole-group runtime cannot execute selective retention")
         deleted.update(members["delete"])
         retained.update(members["retain"])
-    if covered != set(scales):
+    if targets and covered != set(scales):
         invalid("the manifest does not cover every scale set of the whole factory")
     plan = (validate_teardown_plan(preview.get("deletion_plan"), request["factory_id"], scales, targets)
             if contract == TEARDOWN_CONTRACT else

@@ -379,16 +379,102 @@ def test_resource_closure_excludes_proven_action_metadata_not_actual_dependencie
     assert external.lower() not in closure["resources"]
 
 
+@pytest.mark.parametrize("child,operations", [
+    # aif-130 COMMON (2026-10-25): registries/agentPoolsOperationResults, registries/privateLinkResources,
+    # workspaces/metadata and workspaces/purgeLakeData have no operations; registries/updatePolicies,
+    # workspaces/api and storageAccounts/services are write-only. None is a readable child resource, yet the
+    # walk classified every schema child and stopped a succeeded COMMON with provider-resource-kind-unclassified.
+    ("networkSecurityGroups/privateLinkResources", ()),
+    ("networkSecurityGroups/updatePolicies", ("write",)),
+])
+def test_unreadable_provider_schema_children_are_metadata_not_a_closure_stop(child, operations):
+    class UnreadableChildCloud(MetadataCloud):
+        listed = []
+
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": child, "apiVersions": ["2024-05-01"]})
+            return result
+
+        def provider_operations(self, namespace):
+            return super().provider_operations(namespace) + [
+                namespace.lower() + "/" + child.lower() + "/" + action for action in operations]
+
+        def collection(self, path, api_version, extension=False):
+            self.listed.append(path.lower())
+            return super().collection(path, api_version, extension=extension)
+
+    cloud = UnreadableChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    path = NSG.lower() + "/" + child.split("/", 1)[1].lower()
+    assert closure["collections"][path] == {"non_resource_metadata": "microsoft.network/" + child.lower()}
+    assert path not in cloud.listed
+    assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
+
+
+def test_kind_filter_required_children_are_audited_from_live_evidence():
+    # aif-130 (2026-10-25, read-only az rest): GET workspaces/{ws}/dataSources?api-version=2020-08-01
+    # answers 400 KindNotSpecified "Must specify a valid kind filter": the list has no unfiltered form.
+    assert fl.FILTER_REQUIRED_CHILDREN == {"microsoft.operationalinsights/workspaces/datasources": "KindNotSpecified"}
+
+
+def test_a_kind_filter_required_child_is_recorded_not_listed(monkeypatch):
+    monkeypatch.setattr(fl, "FILTER_REQUIRED_CHILDREN", {
+        **fl.FILTER_REQUIRED_CHILDREN, "microsoft.network/networksecuritygroups/datasources": "KindNotSpecified"})
+
+    class FilteredChildCloud(MetadataCloud):
+        listed = []
+
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": "networkSecurityGroups/dataSources",
+                                            "apiVersions": ["2024-05-01"]})
+            return result
+
+        def provider_operations(self, namespace):
+            return super().provider_operations(namespace) + [
+                namespace.lower() + "/networksecuritygroups/datasources/" + action
+                for action in ("read", "write", "delete")]
+
+        def collection(self, path, api_version, extension=False):
+            self.listed.append(path.lower())
+            return super().collection(path, api_version, extension=extension)
+
+    cloud = FilteredChildCloud()
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    path = NSG.lower() + "/datasources"
+    assert closure["collections"][path] == {"non_resource_metadata": "microsoft.network/networksecuritygroups/datasources"}
+    assert path not in cloud.listed
+    assert set(closure["resources"]) == {NSG.lower(), RULE.lower()}
+
+
+def test_an_actual_reference_to_an_unreadable_kind_is_recorded_not_read():
+    class UnreadableChildCloud(MetadataCloud):
+        def provider_schema(self, namespace):
+            result = super().provider_schema(namespace)
+            result["resourceTypes"].append({"resourceType": "networkSecurityGroups/updatePolicies",
+                                            "apiVersions": ["2024-05-01"]})
+            return result
+
+    cloud = UnreadableChildCloud()
+    reference = NSG + "/updatePolicies/default"
+    cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": reference}
+    # Tolerant walk (aif-136): recorded on its owner, never read, and the run continues.
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert reference.lower() in closure["references"][NSG.lower()]
+    assert reference.lower() not in bodies and reference.lower() not in closure["resources"]
+
+
 @pytest.mark.parametrize("reference", [
     NSG + "/listDnsForwardingRulesets/not-a-resource",
     GROUP + "/providers/Unknown.Provider/resources/foreign",
     NSG + "/malformed-resource-id",
 ])
-def test_unknown_actual_resource_references_fail_closed(reference):
+def test_unknown_actual_resource_references_are_recorded_not_read(reference):
     cloud = MetadataCloud()
     cloud.bodies[NSG.lower()]["properties"]["actualDependency"] = {"id": reference}
-    with pytest.raises(fl.Blocked):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert reference.lower() not in bodies and reference.lower() not in closure["resources"]
 
 
 @pytest.mark.parametrize("change", ["Delete", "Deploy", "Unsupported"])
@@ -954,12 +1040,12 @@ def test_inline_configuration_changes_change_parent_and_closure_fingerprints():
     assert fl.digest(before) != fl.digest(after)
 
 
-def test_unknown_inline_looking_reference_still_fails_closed():
+def test_unknown_inline_looking_reference_is_recorded_not_read():
     cloud = GatewayCloud()
     unknown = GATEWAY + "/unknownChildren/default"
     cloud.bodies[GATEWAY.lower()]["properties"]["unknownChildren"] = [{"id": unknown}]
-    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert unknown.lower() in closure["references"][GATEWAY.lower()] and unknown.lower() not in bodies
 
 
 def test_external_inline_reference_is_retained_without_reading_or_owning_parent():
@@ -1163,8 +1249,8 @@ def test_dns_apex_preservation_and_external_scope_do_not_grant_writes_or_ownersh
     assert external.lower() in closure["references"][DNS_ZONE.lower()]
     assert external.lower() not in bodies and external.lower() not in cloud.reads
     cloud.bodies[DNS_ZONE.lower()]["properties"]["unknown"] = DNS_ZONE + "/unknown/ordinary"
-    with pytest.raises(fl.Blocked, match="provider-resource-kind-unclassified"):
-        fl.collect_resource_closure(cloud, [GROUP])
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert (DNS_ZONE + "/unknown/ordinary").lower() not in bodies
 
 
 def test_dns_apex_is_url_encoded_only_at_the_get_transport_boundary():

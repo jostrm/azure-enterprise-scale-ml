@@ -583,7 +583,7 @@ Pressing Ctrl+C stops the local observer; it does not cancel the GitHub run.
 Resume with the last event cursor when continuing the same stream.
 The default overall watch deadline is 300 seconds. `--timeout` after `watch`
 changes that deadline; the global `--timeout` before `workflow` controls individual
-HTTP requests. Read-only reconnects are bounded by `--max-retries` (default 3).
+HTTP requests. Read-only reconnects are bounded by `--max-retries` (default 6).
 Timeouts stop observation, not the workflow.
 
 | CLI exit code | Meaning |

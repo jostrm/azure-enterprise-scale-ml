@@ -13,6 +13,10 @@ from urllib.parse import quote, unquote, urlsplit
 
 CONTRACT = "ordered-project-pipelines-v1"
 HUB_CONTRACT = "factory-owned-access-hub-v1"
+# Not doubled 2026-10-27 (pinned in test_time_budgets.py): x 15 s = 6 h, GitHub's 360-minute job maximum, and the
+# longest reviewed teardown request, equal to factory_lifecycle.MANIFEST_MAX_LIFETIME_SECONDS.
+PROVIDER_RUN_POLLS = 1440
+TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS = 3600
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
 # Reusable VPN/hub/connectivity platform types. Only a factory's own bootstrap-built VPN gateway,
@@ -340,7 +344,6 @@ def assert_connectivity_group_allowed(document, identifier, body):
 
 def validate_route(document):
     route = document["route"]
-    fl.require(not fl.single_writer(document), "factory-delete-blob-coordination-required")
     fl.require(fl.guid(document["identity"].get("deployment_object_id")), "bound-deployment-principal-required")
     fl.require(route.get("scoped_contract") == 1
                and isinstance(route.get("auth_namespace"), str)
@@ -390,7 +393,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
     connectivity_groups(document, {})
     projects = normalize_projects(document, registered_projects)
     cloud.verify_identity()
-    fl.BlobLocks(cloud, document).verify_enrollment()
+    reader = fl.deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
     hub, links = access_hub(document), shared_hub_links(document)
@@ -417,8 +420,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
         proof = {"ownership_source": "tags", "owner": owner}
         if not owner and key in records:
             evidence = records[key]
-            owner = fl.verified_receipt_owner(fl.BlobLocks(cloud, document),
-                                             evidence.get("ownership_evidence"), key, fl.resource_digest(body), cache)
+            owner = fl.verified_receipt_owner(reader, evidence.get("ownership_evidence"), key,
+                                             fl.resource_digest(body), cache)
             fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
             proof = {**evidence, "owner": owner}
         if hub_covers(hub, key):
@@ -696,7 +699,10 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
-        assert_connectivity_group_allowed(document, row["id"], body)
+        # Bootstrap teardown deletes only the bootstrap record's own groups, so it has no shared
+        # connectivity groups to protect (and its document carries none).
+        if document["deletion"]["inventory_mode"] != TEARDOWN_CONTRACT:
+            assert_connectivity_group_allowed(document, row["id"], body)
         fl.assert_deletion_group_allowed(document, row["id"], body)
         if fresh:
             fresh(row, body)
@@ -749,7 +755,7 @@ def run_worker(envelope, source_root, expected_run, expected_hash, cloud=None, s
         fl.require(fl.sys.platform.startswith("linux"), "linux-scoped-worker-required")
     cloud = cloud or fl.Cloud(document, expected_object_id=document["identity"]["deployment_object_id"])
     cloud.verify_identity(require_default=True)
-    locks = fl.BlobLocks(cloud, document)
+    locks = (fl._RepositoryDeletionWorker if fl.single_writer(document) else fl.BlobLocks)(cloud, document)
     locks.held = dict(context)
     locks.verify_enrollment()
     locks.execution_claim = fl._ExecutionClaim(document, locks.read_claim())
@@ -796,7 +802,7 @@ def resume_dispatch(cloud, locks, document, receipt, persist, sleep=time.sleep):
     route = document["route"]
     fl.require(remote.get("kind") == route["kind"] and type(remote.get("run_id")) is int
                and remote["run_id"] > 0, "factory-delete-run-identity-unverified")
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         if route["kind"] == "gha":
             repo = urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
@@ -894,9 +900,16 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         fl.require(not (set(document["deletion"]["bodies"]) & (deletes - own)),
                    "factory-delete-overlapping-closure-requires-one-manifest")
     require_unique_hub_links(documents)
+    # Single-writer: one repository CAS reserves the cohort; its worker and receipts live in the state ref.
+    repository = fl.single_writer(first)
+    fl.require(all(fl.single_writer(document) == repository for document in documents),
+               "cohort-coordination-mode-mismatch")
     clouds = [cloud_factory(document) for document in documents]
-    members = [(lock_factory or fl.BlobLocks)(cloud, document) for cloud, document in zip(clouds, documents)]
-    union = fl._CohortLeases(members)
+    members = [(lock_factory or (fl._RepositoryDeletionMember if repository else fl.BlobLocks))(cloud, document)
+               for cloud, document in zip(clouds, documents)]
+    union = (fl._RepositoryDeletionCohort if repository else fl._CohortLeases)(members)
+    scopes = {scope.lower() for document in documents
+              for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
     # Same aggregate identity as the generic cohort, so catalog verification is shared.
     cohort_hash = fl.digest(sorted(document["manifest_hash"] for document in documents))
     claimed, claim_attempted = set(), False
@@ -930,8 +943,11 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         for locks, receipt in zip(members, aggregate["children"]):
             receipt["locks_retained"] = sorted(locks.held)
             receipt["lock_retained"] = bool(locks.held)
-            if receipt["run_id"] in claimed:
+            if not repository and receipt["run_id"] in claimed:
                 locks.store_receipt(receipt)
+        if repository:
+            union.persist(aggregate["children"], aggregate)
+        for receipt in aggregate["children"]:
             fl.write_receipt(execution_root / (receipt["run_id"] + ".receipt.json"), receipt)
         fl.write_receipt(receipt_path, aggregate)
 
@@ -955,10 +971,13 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                     verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
                 return aggregate
             context = aggregate.get("lease_context")
-            fl.require(isinstance(context, dict) and set(context) == set(union.owners)
+            fl.require(isinstance(context, dict) and set(context) == scopes
                        and all(fl.guid(value) for value in context.values()),
                        "factory-delete-retained-leases-required")
-            union.held = dict(context)
+            if repository:
+                union.resume(context)
+            else:
+                union.held = dict(context)
             claim_attempted = True
             for locks, document, receipt in zip(members, documents, aggregate["children"]):
                 locks.held = {scope.lower(): context[scope.lower()] for scope in
@@ -1024,6 +1043,15 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         union.assert_held()
         for cloud, document in zip(clouds, documents):
             verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
+        if repository:
+            # The repository claim is released only against durable succeeded receipts.
+            for receipt in aggregate["children"]:
+                receipt["status"] = "succeeded"
+            aggregate["status"] = "succeeded"
+            persist()
+            union.release()
+            persist()
+            return aggregate
         # Store completion while leases still exist; the final receipt is only
         # successful after every lease is durably observed released.
         persist()
@@ -1038,14 +1066,26 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         aggregate.update(fl.failure_fields(error, "unexpected-factory-delete-failure"))
         if not claim_attempted:
             try:
-                union.release()
-            except (fl.Blocked, OSError):
+                if repository:
+                    # The aborted reservation stores these receipts as its terminal records.
+                    for receipt in aggregate["children"]:
+                        receipt["status"] = aggregate["status"]
+                    union.abort(aggregate["children"], aggregate)
+                else:
+                    union.release()
+            except BaseException:
                 aggregate["status"] = "reconciliation-required"
         # Keep active durable claims available to an already-running worker.
         for receipt in aggregate["children"]:
             if receipt["run_id"] not in claimed:
                 receipt["status"] = aggregate["status"]
-        persist()
+        try:
+            persist()
+        except BaseException:
+            # Durable storage refused the write; local evidence still names every retained scope.
+            for receipt in aggregate["children"]:
+                fl.write_receipt(execution_root / (receipt["run_id"] + ".receipt.json"), receipt)
+            fl.write_receipt(receipt_path, aggregate)
     finally:
         for cloud in clouds:
             cloud.tokens.clear()
@@ -1140,7 +1180,7 @@ def validate_teardown_request(document):
                            for value in document["protected_resource_ids"]),
                "bootstrap-teardown-request-invalid")
     prepared, expires = fl.timestamp(document.get("prepared_at")), fl.timestamp(document.get("expires_at"))
-    fl.require(0 < expires - prepared <= 3600, "bootstrap-teardown-request-invalid")
+    fl.require(0 < expires - prepared <= TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS, "bootstrap-teardown-request-invalid")
 
 
 def _hub_inventory(cloud, hub_scopes, code):
@@ -1217,10 +1257,33 @@ def teardown_owner(document, closure, bodies, key):
     return teardown_owner(document, closure, bodies, parent)[0], "parent"
 
 
+def absent_groups(cloud, scopes):
+    """Recorded groups already deleted (for example by `az group delete`): ARM answers 404
+    ResourceGroupNotFound on the exact group id. Any other status or 404 body is not proof of absence."""
+    absent = []
+    for scope in scopes:
+        status, _, body = cloud.arm("GET", scope, fl.RG_API, allowed=(200, 404))
+        if status == 404:
+            error = body.get("error") if isinstance(body, dict) else None
+            fl.require(isinstance(error, dict) and error.get("code") == "ResourceGroupNotFound",
+                       "bootstrap-teardown-group-absence-unverified")
+            absent.append(scope)
+    return absent
+
+
+def _recorded_vnets(document, absent):
+    """The bootstrap-recorded VNets of groups proven absent: their hub links are still this factory's own."""
+    return {value for value in document["bootstrap_record"]["resources"]
+            if fl.arm_scope(value) in absent and fl.resource_type_from_id(value) == VNET_TYPE
+            and value.count("/") == 8}
+
+
 def freeze_teardown(cloud, document):
     validate_teardown_request(document)
     cloud.verify_identity()
-    scopes = document["scopes"]
+    # Idempotent: a recorded group that is already gone has nothing left to delete; it is recorded, not read.
+    absent = absent_groups(cloud, document["scopes"])
+    scopes = [scope for scope in document["scopes"] if scope not in absent]
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
     fl.verify_deletion_identity(document, bodies)
     record = document["bootstrap_record"]
@@ -1265,6 +1328,7 @@ def freeze_teardown(cloud, document):
         item["delete_via_parent"] = max(parents, key=len)
     factory_vnets ={key for key in bodies if not fl.RG_ID.fullmatch(key)
                      and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    factory_vnets |= _recorded_vnets(document, absent)
     links, hub_vnets = _hub_links(cloud, document, factory_vnets)
     # This factory's own side of each hub peering goes in the same unlink stage.
     links += [{"id": entries[key]["id"], "type": PEERING_TYPE, "api_version": entries[key]["api_version"],
@@ -1278,7 +1342,7 @@ def freeze_teardown(cloud, document):
             "closure_hash": fl.digest(closure), "bodies": bodies,
             "hub_links": sorted(links, key=lambda row: row["id"].lower()),
             "factory_virtual_networks": sorted(factory_vnets), "hub_virtual_networks": sorted(hub_vnets),
-            "request_hash": fl.digest(_request(document))}
+            "absent_resource_groups": absent, "request_hash": fl.digest(_request(document))}
     validate_teardown({**document, "deletion": data}, check_hash=False)
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
@@ -1301,9 +1365,12 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                "bootstrap-teardown-inventory-unbound")
     validate_flags(data.get("flags"))
     groups, resources = data["resource_groups"], data["resources"]
+    absent = data.get("absent_resource_groups", [])
     entries = {row["id"].lower(): row for row in groups + resources}
-    fl.require({row["id"].lower() for row in groups} == set(document["scopes"])
-               and len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
+    fl.require(_sorted_ids(absent, fl.RG_ID, allow_empty=True) and set(absent) <= set(document["scopes"])
+               and {row["id"].lower() for row in groups} == set(document["scopes"]) - set(absent)
+               and len(entries) == len(groups + resources) and set(entries) == set(data["bodies"])
+               and not any(fl.arm_scope(key) in absent for key in entries),
                "bootstrap-teardown-inventory-unbound")
     record = document["bootstrap_record"]
     proof = {"resource_ids": record["resources"]}
@@ -1329,6 +1396,7 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                            "factory-delete-service-cascade-unreviewed")
     vnets ={key for key in entries if not fl.RG_ID.fullmatch(key)
              and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    vnets |= _recorded_vnets(document, absent)
     links = data.get("hub_links")
     fl.require(data.get("factory_virtual_networks") == sorted(vnets)
                and _sorted_ids(data.get("hub_virtual_networks"), fl.NESTED_ID, allow_empty=True)
@@ -1381,7 +1449,8 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
     receipt = {"schema": 1, "contract": TEARDOWN_CONTRACT, "run_id": document["run_id"],
                "manifest_hash": document["manifest_hash"], "source_commit": document["source"]["commit"],
                "target": document["target"], "status": "running", "mutation_started": False,
-               "deleted_hub_links": [], "deleted_resources": [], "observed_absent": []}
+               "deleted_hub_links": [], "deleted_resources": [], "observed_absent": [],
+               "absent_resource_groups": data.get("absent_resource_groups", [])}
 
     def persist():
         receipt["updated_at"] = fl.utc_now()
@@ -1391,8 +1460,11 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
     try:
         persist()
         cloud.verify_identity()
+        absent = receipt["absent_resource_groups"]
+        fl.require(absent_groups(cloud, absent) == absent, "bootstrap-teardown-absent-group-reappeared")
         for scope in document["scopes"]:
-            cloud.assert_no_active_deployments(scope)
+            if scope not in absent:
+                cloud.assert_no_active_deployments(scope)
         receipt["observed_absent"] = observed_absent(cloud, document)
         fl.verify_project_inventory(cloud, document, receipt["observed_absent"])
         verify_permissions(cloud, data, receipt["observed_absent"])

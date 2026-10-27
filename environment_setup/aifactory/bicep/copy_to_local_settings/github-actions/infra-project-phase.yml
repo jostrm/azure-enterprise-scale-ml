@@ -752,6 +752,11 @@ jobs:
           NETWORK_ENV="${{ env.network_env }}"
           if [ "${{ env.BYO_subnets }}" != "true" ]; then
             echo "subnetProjLogicapp=" >> "$GITHUB_ENV"
+            # BYO_subnets guard, as in ADO job-2-genai-services: 00_Apply_JSON_Config_Override writes the
+            # variables.json BYO examples (snet-dev-esml-cmn-001). Clear them so 02/06/09 use common_subnet_name.
+            echo "subnetCommon=" >> "$GITHUB_ENV"
+            echo "subnetCommonScoring=" >> "$GITHUB_ENV"
+            echo "subnetCommonPowerbiGw=" >> "$GITHUB_ENV"
           fi
           VNET_RG="${{ env.vnetResourceGroup_param }}"
           VNET_NAME="${{ env.vnetNameFull_param }}"
@@ -1619,14 +1624,14 @@ jobs:
 
       - name: 18_Delete_Service_If_Not_Enabled_And_Exists
         if: inputs.phase == 'infra' && (env.enableDeleteForDisabledResources == 'true')
-        timeout-minutes: 180
+        timeout-minutes: 360
         shell: pwsh
         env:
           # Legacy GHA services-only retention: RG, Key Vault, Storage, App Insights,
           # dashboards, VMs, ACR, general identities and common networking.
           # Service private endpoints/bot identities are not foundation; full teardown overrides.
           AIF_DELETE_PRESERVE_FOUNDATION: 'true'
-          AIF_DELETE_TIMEOUT_SECONDS: '1800'
+          AIF_DELETE_TIMEOUT_SECONDS: '3600'
           AIF_DELETE_POLL_SECONDS: '15'
           AIF_DELETE_REPORT_DIR: ${{ runner.temp }}/aifactory-deletion-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
         run: |

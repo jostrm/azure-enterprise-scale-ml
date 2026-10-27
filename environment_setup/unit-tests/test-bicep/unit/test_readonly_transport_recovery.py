@@ -88,7 +88,7 @@ def test_read_retries_proven_errno101_after_60_seconds(clock, capsys, method):
     response = Response(body=b"" if method == "HEAD" else b'{"ok":true}')
     cloud, opener = cloud_with()
     def send(request, timeout):
-        assert timeout <= 60
+        assert timeout <= fl.REMOTE_SOCKET_TIMEOUT_SECONDS == 120
         if opener.open.call_count == 1:
             clock.now += 60
             raise URLError(OSError(errno.ENETUNREACH, "Network is unreachable"))
@@ -129,14 +129,14 @@ def test_specific_transient_read_errors_retry(clock, failure):
 
 
 def test_read_exhaustion_keeps_stable_error_code(clock, capsys):
-    cloud, opener = cloud_with(*[URLError(OSError(errno.ENETUNREACH, "unreachable")) for _ in range(3)])
+    cloud, opener = cloud_with(*[URLError(OSError(errno.ENETUNREACH, "unreachable")) for _ in range(6)])
     with pytest.raises(fl.Blocked, match="^remote-request-unverified$"):
         cloud.request("GET", ARM_URL, fl.ARM)
-    assert opener.open.call_count == 3
-    assert clock.sleeps == [0.25, 0.5]
+    assert opener.open.call_count == 6
+    assert clock.sleeps == [0.25, 0.5, 1, 2, 4]
     entries = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
-    assert [row["attempt"] for row in entries] == [1, 2, 3]
-    assert [row["retrying"] for row in entries] == [True, True, False]
+    assert [row["attempt"] for row in entries] == [1, 2, 3, 4, 5, 6]
+    assert [row["retrying"] for row in entries] == [True, True, True, True, True, False]
 
 
 @pytest.mark.parametrize("failure", [
@@ -387,6 +387,9 @@ class Snapshots:
                 raw = raw[:-1] + b',"schema":1}'
             elif self.corrupt == "oversize":
                 raw = b" " * (ps.MAX_BYTES + 1)
+            elif self.corrupt == "large":
+                value["records"]["closure"] = {"bytes": "x" * (9 * 1024 * 1024)}
+                raw = ps.canonical(value)
             if self.advances:
                 self.head += 1
                 self.advances -= 1
@@ -407,11 +410,11 @@ def test_provider_snapshot_one_ref_advance_returns_only_latest_coherent_state(ki
 
 
 @pytest.mark.parametrize("kind", ["gha", "ado"])
-def test_provider_snapshot_continual_ref_advance_blocks_after_three_attempts(kind):
+def test_provider_snapshot_continual_ref_advance_blocks_after_bounded_attempts(kind):
     fake = Snapshots(kind, advances=10)
     with pytest.raises(fl.Blocked, match="^single-writer-state-changed$"):
         fake.store.read()
-    assert fake.private_reads == 3 and fake.head == 4
+    assert fake.private_reads == ps.STATE_READ_ATTEMPTS == 6 and fake.head == 7
     assert all(method == "GET" for method, _, _ in fake.calls)
 
 
@@ -485,3 +488,21 @@ def test_provider_write_transport_failure_is_one_attempt_and_latches_write_faile
     with pytest.raises(fl.Blocked, match="^single-writer-write-reconciliation-required$"):
         fake.store.replace(f"{fake.head:040x}", fake.store.empty())
     assert len(mutations) == 1
+
+
+@pytest.mark.parametrize("kind", ["gha", "ado"])
+def test_provider_state_above_the_old_8_mib_limit_is_read(kind):
+    # aif-134 COMMON (2026-10-27): bootstrap_final_closure made state.json 6.4 MB; its base64 blob response
+    # (~8.7 MB) exceeded the 8 MiB transport cap and every later state read failed with
+    # single-writer-provider-response-too-large. PROJECT closures grow it further.
+    fake = Snapshots(kind, corrupt="large")
+    head, value = fake.store.read()
+    assert len(value["records"]["closure"]["bytes"]) == 9 * 1024 * 1024
+
+
+def test_state_transport_caps_fit_the_base64_of_the_largest_state():
+    fe = load("factory_enrollment")
+    assert ps.MAX_BYTES >= 32 * 1024 * 1024
+    largest_blob_response = 4 * ((ps.MAX_BYTES + 2) // 3) + 64 * 1024
+    assert fl.STATE_RESPONSE_MAX >= largest_blob_response
+    assert fe.STATE_RESPONSE_MAX >= largest_blob_response

@@ -43,6 +43,8 @@ from uuid import uuid4
 
 CONTRACT = 1
 SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
+# Reviewed inventories a single-writer repository cohort may delete; never legacy leaf lists.
+SINGLE_WRITER_DELETION_INVENTORIES = ["arm-provider-closure-v1", "ordered-project-pipelines-v1", SELECTIVE_PROJECT_DELETE]
 PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
 # ARM back-references name a dependent (deleted first), never a dependency of this resource.
 REVERSE_LINKS = {
@@ -55,20 +57,41 @@ REVERSE_LINKS = {
                                                   "applicationGatewayIPConfigurations"),
 }
 MAX_DOCUMENT = 8 * 1024 * 1024
-RECEIPT_REPLACE_ATTEMPTS = 20
+# A provider state read returns state.json (provider_repository_state.MAX_BYTES, 32 MiB) as a base64 blob.
+STATE_RESPONSE_MAX = 48 * 1024 * 1024
+# Time budgets this helper defines itself; doubled 2026-10-27 after aif-138 COMMON ran out of time (pinned in
+# test_time_budgets.py, documented in pink docs/operations/Timeouts-and-limits.md).
+RECEIPT_REPLACE_ATTEMPTS = 40
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
-READ_TRANSPORT_ATTEMPTS = 3
-READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5)
+READ_TRANSPORT_ATTEMPTS = 6
+READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5, 1, 2, 4)
 # Windows getaddrinfo "no data record": a resolver hiccup for an ARM host that always resolves.
 WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
-READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
+READ_TRANSPORT_RETRY_WINDOW_SECONDS = 360
 # ARM answers a burst of reads with 429 and an overloaded front end with 503, both with Retry-After. A throttled
 # GET/HEAD is sent again within the same window; writes and every other status still stop at once.
-THROTTLED_READ_ATTEMPTS = 8
+THROTTLED_READ_ATTEMPTS = 16
 THROTTLED_READ_DEFAULT_DELAY_SECONDS = 5
 THROTTLED_READ_MAX_DELAY_SECONDS = 60
-REMOTE_SOCKET_TIMEOUT_SECONDS = 60
+REMOTE_SOCKET_TIMEOUT_SECONDS = 120
+# Workload-identity and provider (GitHub/ADO) requests outside Cloud.request.
+SIDE_REQUEST_TIMEOUT_SECONDS = 120
+# One az/gh/git command.
+LOCAL_COMMAND_TIMEOUT_SECONDS = 240
+# Polling deadlines, as poll counts: x 5 s unless noted.
+LEAF_DELETE_POLLS = 240                 # 20 min
+RESOURCE_GROUP_DELETE_POLLS = 2880      # 4 h: whole resource groups routinely outlast the leaf budget
+WHAT_IF_POLLS = 240                     # 20 min
+FOUNDRY_READINESS_POLLS = 360           # 30 min
+ARM_DEPLOYMENT_POLLS = 2880             # 4 h
+GITHUB_DISPATCH_DISCOVERY_POLLS = 120   # x 2 s = 4 min
+# Not doubled: x 15 s = 6 h, GitHub's 360-minute job maximum; a longer wait would only hang the end-to-end run.
+PROVIDER_RUN_POLLS = 1440
+# Not doubled: the longest reviewed manifest lifetime, equal to pink BOOTSTRAP_FROZEN_SECONDS (raised 30 -> 60 min).
+MANIFEST_MAX_LIFETIME_SECONDS = 3600
+# Not doubled: a token is refreshed when it has less than this left; ARM checks a token when the request arrives.
+TOKEN_MIN_REMAINING_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
 RESOURCE_CLOSURE_READ_WORKERS = 8
 # The peer cut the TLS session (EOF without close_notify, or close_notify): a transport drop like a reset,
@@ -138,6 +161,10 @@ UNSUPPORTED_COLLECTION_CODES = {
     "DiagnosticSettingsNotSupported", "ResourceTypeNotSupported", "UnsupportedResourceType",
     "ResourceTypeNotSupportedForDiagnosticSettings", "ScopeNotSupported",
 }
+# Schema children whose ARM list has no unfiltered form, by the error code the unfiltered list answers.
+# Audited from live evidence only: aif-130 (2026-10-25) GET workspaces/{ws}/dataSources answered
+# 400 KindNotSpecified. They live and die with their parent and are recorded, never listed.
+FILTER_REQUIRED_CHILDREN = {"microsoft.operationalinsights/workspaces/datasources": "KindNotSpecified"}
 MANAGED_GROUP_PARENT_TYPES = {
     "microsoft.containerservice/managedclusters", "microsoft.databricks/workspaces",
     "microsoft.synapse/workspaces", "microsoft.solutions/applications",
@@ -152,7 +179,35 @@ ADO_FILES = {
 }
 
 
+CHILD_INVENTORY_TYPE = re.compile(
+    r"[a-z0-9.]{1,64}(?:/[a-z0-9]{1,80}){1,6}(?:/providers/[a-z0-9.]{1,64}(?:/[a-z0-9]{1,80}){1,6})?")
+ARM_ERROR_CODE = re.compile(r"[A-Za-z][A-Za-z0-9_.]{0,127}")
+
+
+def collection_resource_type(path):
+    """The provider/type path of an ARM child collection, without subscription, group or resource names."""
+    chunks = path.lower().split("/providers/")[1:]
+    # Every scope before the last provider segment ends with a name; the collection itself does not.
+    return "/providers/".join(resource_type_from_id(chunk + ("/entry" if index == len(chunks) - 1 else ""))
+                              for index, chunk in enumerate(chunks))
+
+
+def child_inventory_diagnostic(value):
+    if type(value) is not dict or set(value) != {"resource_type", "api_version", "status", "error_code"}:
+        return None
+    kind, api, status, error_code = (value[key] for key in ("resource_type", "api_version", "status", "error_code"))
+    if (type(kind) is not str or not CHILD_INVENTORY_TYPE.fullmatch(kind)
+            or type(api) is not str or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", api)
+            or type(status) is not int or status not in (400, 404, 405)
+            or error_code is not None and (type(error_code) is not str
+                                           or not ARM_ERROR_CODE.fullmatch(error_code))):
+        return None
+    return {"resource_type": kind, "api_version": api, "status": status, "error_code": error_code}
+
+
 def safe_instance_diagnostic(code, value):
+    if code == "unsupported-child-inventory-endpoint":
+        return child_inventory_diagnostic(value)
     if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
             or type(value) is not dict
             or set(value) != {"resource_id", "failed_comparisons"}):
@@ -227,6 +282,17 @@ VOLATILE_FIELDS = {
     "microsoft.network/networkinterfaces": (
         ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
         ("properties", "dnsSettings", "internalDomainNameSuffix")),
+    # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
+    # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
+    "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
+    # ACR synthesizes its built-in _repositories_* scope maps on every GET with a new creationDate (aif-138, 2026-10-27).
+    "microsoft.containerregistry/registries/scopemaps": (("properties", "creationDate"),),
+    # Network RP maintains a VNet's taggedTrafficConsumers (Key Vault network rules); its etag is the VNet's form and
+    # its ACL state follows the vaults (aif-138, 2026-10-27). Owner and VNet identity still count.
+    "microsoft.network/virtualnetworks/taggedtrafficconsumers": (
+        ("etag",), ("properties", "acledSubnets"), ("properties", "acledSubscriptions"),
+        ("properties", "primaryLocations"), ("properties", "provisioningState"),
+        ("properties", "virtualNetworkAcled"), ("properties", "vnetTrafficTag")),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
 # The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them
@@ -384,6 +450,15 @@ def coordination(cloud, document):
     return RepositoryCoordination(cloud, document) if single_writer(document) else BlobLocks(cloud, document)
 
 
+def deletion_reader(cloud, document):
+    """Enrollment-verified read-only coordination for a deletion freeze; never a claim."""
+    reader = coordination(cloud, document)
+    reader.verify_enrollment()
+    if single_writer(document):
+        require(reader.state()[1]["active"] is None, "single-writer-repository-active-claim")
+    return reader
+
+
 def validate_manifest(document, now=None):
     _validate_manifest(document)
     now = time.time() if now is None else now
@@ -403,7 +478,7 @@ def _validate_manifest(document):
     require(type(document.get("manifest_revision")) is int and document["manifest_revision"] > 0,
             "invalid-manifest-revision")
     created, expires = timestamp(document.get("prepared_at")), timestamp(document.get("expires_at"))
-    require(0 < expires - created <= 3600, "manifest-expired-or-invalid-lifetime")
+    require(0 < expires - created <= MANIFEST_MAX_LIFETIME_SECONDS, "manifest-expired-or-invalid-lifetime")
     for name in ("target", "identity", "route", "source", "config", "locks"):
         require(isinstance(document.get(name), dict), "missing-" + name)
     target, source, route = document["target"], document["source"], document["route"]
@@ -445,8 +520,10 @@ def _validate_manifest(document):
                 and set(locks) <= {"provider", "coordination_mode", "repository", "state_ref", "coordination_hash",
                                    "revision", "scopes", "common_dependencies"}, "invalid-single-writer-coordinates")
         if document["operation"] == "delete":
-            require("deployment" not in document and "deletion_scope" not in document
-                    and document.get("deletion", {}).get("inventory_mode") == "arm-provider-closure-v1",
+            # Whole owned groups, the ordered factory pipeline or one selected project; never legacy leaves.
+            mode = document.get("deletion", {}).get("inventory_mode")
+            require("deployment" not in document and mode in SINGLE_WRITER_DELETION_INVENTORIES
+                    and ("deletion_scope" in document) == (mode == SELECTIVE_PROJECT_DELETE),
                     "single-writer-whole-owned-groups-required")
         else:
             require("deployment" in document, "single-writer-scoped-deployment-required")
@@ -766,6 +843,7 @@ def capabilities():
         "single_writer": "provider-repository-cas-v1",
         "single_writer_operations": ["create-factory", "create-scaleset", "deploy-project", "delete"],
         "single_writer_deletion": "provider-repository-cas-cohort-v1",
+        "single_writer_deletion_inventories": list(SINGLE_WRITER_DELETION_INVENTORIES),
         "project_routes": ["ado", "gha"],
         "project_environments": ["dev", "stage", "prod"],
         "persona_access": "persona-groups-v1",
@@ -785,7 +863,7 @@ def capabilities():
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_group_protection": "case-insensitive-name-globs-v1",
         "factory_deletion_connectivity_retention": "whole-connectivity-resource-groups-v1",
-        "factory_deletion_pipeline_coordination_modes": ["blob"],
+        "factory_deletion_pipeline_coordination_modes": ["blob", "single-writer"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
         "factory_deletion_shared_hub_links": "shared-hub-spoke-links-v1",
         "bootstrap_operator_teardown": "bootstrap-operator-teardown-v1",
@@ -845,8 +923,8 @@ class ThrottledReadHandler(BaseHandler):
         response.read()
         response.close()
         print(json.dumps({
-            "event": "remote-request-throttled", "method": request.get_method(), "host": request.host,
-            "path": urlsplit(request.full_url).path, "status": code, "attempt": attempt, "delay_seconds": delay,
+            "event": "remote-request-throttled", "method": request.get_method(),
+            "host": urlsplit(request.full_url).netloc, "path": urlsplit(request.full_url).path, "status": code, "attempt": attempt, "delay_seconds": delay,
         }, sort_keys=True), file=sys.stderr, flush=True)
         self._sleep(delay)
         request.aifactory_throttled, request.aifactory_throttled_since = attempt, since
@@ -966,7 +1044,7 @@ class Cloud:
             command[0] = executable
         try:
             result = self.runner(command, cwd=cwd, input=data, shell=False, text=True, encoding="utf-8",
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=LOCAL_COMMAND_TIMEOUT_SECONDS)
         except (OSError, subprocess.SubprocessError):
             raise Blocked("command-unavailable-or-timed-out") from None
         require(result.returncode == 0, "command-failed")
@@ -980,7 +1058,7 @@ class Cloud:
     def _token(self, audience):
         require(not single_writer(self.document) or audience.rstrip("/") != "https://storage.azure.com",
                 "single-writer-storage-access-forbidden")
-        if self.token_expiries.get(audience, 0) <= time.time() + 60:
+        if self.token_expiries.get(audience, 0) <= time.time() + TOKEN_MIN_REMAINING_SECONDS:
             self.tokens.pop(audience, None)
         if audience not in self.tokens:
             target = self.document["target"]
@@ -997,7 +1075,7 @@ class Cloud:
                 require(str(claims.get("tid", "")).lower() == target["tenant_id"].lower()
                         and str(claims.get("oid", "")).lower() == self.expected_object_id.lower(),
                         "authenticated-identity-mismatch")
-                require(float(claims.get("exp", 0)) > time.time() + 60, "authentication-expiring")
+                require(float(claims.get("exp", 0)) > time.time() + TOKEN_MIN_REMAINING_SECONDS, "authentication-expiring")
             except Blocked:
                 raise
             except (KeyError, ValueError, IndexError, TypeError):
@@ -1008,7 +1086,7 @@ class Cloud:
 
     def identity_json(self, request):
         try:
-            with self.opener.open(request, timeout=60) as response:
+            with self.opener.open(request, timeout=SIDE_REQUEST_TIMEOUT_SECONDS) as response:
                 require(response.code == 200, "workload-identity-request-failed")
                 raw = response.read(1024 * 1024 + 1)
             require(len(raw) <= 1024 * 1024, "workload-identity-response-too-large")
@@ -1173,16 +1251,16 @@ class Cloud:
                    "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"}
         try:
             response = self.opener.open(Request(url, method=method, data=canonical(body) if body is not None else None,
-                                                headers=headers), timeout=60)
+                                                headers=headers), timeout=SIDE_REQUEST_TIMEOUT_SECONDS)
         except HTTPError as error:
             response = error
         except (URLError, OSError, TimeoutError):
             raise Blocked("single-writer-provider-write-or-read-uncertain") from None
         with response:
             status = response.code
-            raw, incoming = response.read(MAX_DOCUMENT + 1), dict(response.headers)
+            raw, incoming = response.read(STATE_RESPONSE_MAX + 1), dict(response.headers)
         require(status in allowed, "single-writer-provider-request-failed-" + str(status))
-        require(len(raw) <= MAX_DOCUMENT, "single-writer-provider-response-too-large")
+        require(len(raw) <= STATE_RESPONSE_MAX, "single-writer-provider-response-too-large")
         try:
             return status, incoming, json.loads(raw) if raw else None
         except (ValueError, UnicodeError):
@@ -1304,8 +1382,12 @@ class Cloud:
                         and path.lower().endswith("/providers/microsoft.insights/diagnosticsettings")):
                     error = body
                 code = error.get("code") if isinstance(error, dict) else None
-                require(extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
-                        and not ("error" in body and "code" in body), "unsupported-child-inventory-endpoint")
+                if not (extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
+                        and not ("error" in body and "code" in body)):
+                    raise Blocked("unsupported-child-inventory-endpoint", error_diagnostic={
+                        "resource_type": collection_resource_type(path), "api_version": api_version,
+                        "status": status, "error_code": code if isinstance(code, str)
+                        and ARM_ERROR_CODE.fullmatch(code) else None})
                 return [], code
             # This Key Vault ARM collection returns a JSON-encoded array,
             # rather than the normal ARM ListResult envelope.
@@ -1341,8 +1423,12 @@ class Cloud:
         return template
 
 
-def resource_references(body):
-    """Resource IDs are dependencies, including provider-owned external links."""
+def resource_references(body, tolerant=False):
+    """Resource IDs are dependencies, including provider-owned external links.
+
+    tolerant (the resource-closure walk only): a malformed ID-looking string is skipped instead of stopping the run;
+    ownership checks keep the strict default.
+    """
     result = set()
 
     def visit(value):
@@ -1353,6 +1439,11 @@ def resource_references(body):
             for item in value:
                 visit(item)
         elif isinstance(value, str) and value.lower().startswith("/subscriptions/"):
+            if tolerant and not ("%" not in value and not any(part in (".", "..") for part in value.split("/"))
+                                 and (RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
+                                      or SUBSCRIPTION_RESOURCE_ID.fullmatch(value)
+                                      or re.fullmatch(r"/subscriptions/" + GUID, value, re.I))):
+                return
             require("%" not in value and not any(part in (".", "..") for part in value.split("/")),
                     "invalid-resource-reference")
             require(RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
@@ -1487,12 +1578,20 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 "provider-resource-kind-unclassified")
         return "readonly" if reads else "operation"
 
+    def classify(kind):
+        """resource_kind, or "unclassified" when the provider cannot classify the kind (tolerant walk, aif-136):
+        such a kind is recorded, never listed or read, instead of stopping the run."""
+        try:
+            return resource_kind(kind)
+        except Blocked:
+            return "unclassified"
+
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
         stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
         fallback = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)), reverse=True)
-        if not stable and not fallback and parent_api and resource_kind(kind) != "operation":
+        if not stable and not fallback and parent_api and classify(kind) != "operation":
             return parent_api
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
@@ -1514,7 +1613,15 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 continue
             if full_type in inline:
                 yield "inline", key + "/" + tail, None, None
-            elif resource_kind(full_type) != "resource":
+            elif full_type in FILTER_REQUIRED_CHILDREN:
+                # No unfiltered list exists (see FILTER_REQUIRED_CHILDREN): record it, never list it.
+                yield "metadata", key + "/" + tail, full_type, None
+            elif (full_type + "/read" not in operations[namespace]
+                  and "supportstags" not in resource_capabilities.get(full_type, set())):
+                # A schema child without a read operation (none at all, or write-only) is a provider endpoint,
+                # not an inventoriable child: record it, never list it. Actual references still classify strictly.
+                yield "metadata", key + "/" + tail, full_type, None
+            elif classify(full_type) != "resource":
                 yield "metadata", key + "/" + tail, full_type, None
             else:
                 yield "collection", resource_id + "/" + tail, version(full_type), singleton.get(full_type)
@@ -1557,12 +1664,43 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 read_children_ahead(resource_id, kind)
                 read_extensions_ahead(resource_id)
 
+    def older_stable_versions(path, api):
+        """At most two older stable api-versions the provider schema lists for a child collection, newest first."""
+        try:
+            namespace, relative = collection_resource_type(path).split("/", 1)
+        except ValueError:
+            return []
+        available = schemas.get(namespace, {}).get(relative, [])
+        return sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
+                      reverse=True)[:2]
+
     def add_collection(path, api, extension=False, single=None):
         if single:
             status, headers, body = reader.get(collection_read(path, api, single=single))
             rows, unsupported = ([] if status == 404 else [body]), None
         else:
-            rows, unsupported = reader.get(collection_read(path, api, extension))
+            # Tolerant child inventory: Cloud.request already waits out throttling (Retry-After) and retries
+            # transport errors. A list that still fails is retried at the schema's next older stable
+            # api-versions, then recorded (not-listable / unreadable) so one child type never stops the run.
+            # aif-135: ACR registries/privateEndpointConnectionProxies answers 404 at every api-version.
+            # Documented pinned children (Search sharedPrivateLinkResources) stay strict: a failed list there
+            # never means an empty list.
+            pinned = collection_resource_type(path) == "microsoft.search/services/sharedprivatelinkresources"
+            candidates = [api, *([] if extension or pinned else older_stable_versions(path, api))]
+            for index, candidate in enumerate(candidates):
+                try:
+                    rows, unsupported = reader.get(collection_read(path, candidate, extension))
+                    api = candidate
+                    break
+                except Blocked as error:
+                    if pinned:
+                        raise
+                    if index + 1 < len(candidates):
+                        continue
+                    status = (getattr(error, "error_diagnostic", None) or {}).get("status")
+                    rows, unsupported = [], ("not-listable-" + str(status)
+                                             if error.code == "unsupported-child-inventory-endpoint"
+                                             and status in (400, 404, 405) else "unreadable-" + error.code)
         rows = [fingerprint_body(row) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
@@ -1626,21 +1764,28 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
         closure["resources"][key] = {"type": kind, "api_version": api, "body_hash": resource_digest(body, kind),
                                     "etag": resource_etag(body, headers, kind)}
-        references = resource_references(body)
+        references = resource_references(body, tolerant=True)
         closure["references"][key] = sorted(references - {key})
         for reference in sorted(references):
             match = RG_ID.match(reference)
             if (reference == key or reference in versions or not match
                     or match.group().lower() not in scope_ids or RG_ID.fullmatch(reference)):
                 continue
-            referenced_kind = resource_type_from_id(reference)
+            try:
+                referenced_kind = resource_type_from_id(reference)
+            except Blocked:
+                continue  # a malformed in-scope reference stays recorded, never read (tolerant walk)
             if referenced_kind in inline:
                 parent = reference.rsplit("/", 2)[0]
                 closure["inline"][reference] = {"parent_id": parent}
                 if parent in versions:
                     continue
                 reference, referenced_kind = parent, resource_type_from_id(parent)
-            require(resource_kind(referenced_kind) in ("resource", "readonly"), "resource-reference-is-operation")
+            if classify(referenced_kind) not in ("resource", "readonly"):
+                # Tolerant walk (aif-136 COMMON stopped with provider-resource-kind-unclassified): a reference to a
+                # kind the provider does not expose as a readable resource stays recorded in closure["references"]
+                # but is never read or walked.
+                continue
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
             versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
             enqueue(reference)
@@ -1768,10 +1913,7 @@ def inherited_new_resource_owner(resource_id, bodies):
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; untaggable owners need real receipts."""
     cloud.verify_identity()
-    reader = coordination(cloud, document)
-    reader.verify_enrollment()
-    if single_writer(document):
-        require(reader.state()[1]["active"] is None, "single-writer-repository-active-claim")
+    deletion_reader(cloud, document)
     scopes = document["locks"]["scopes"]
     closure, bodies = collect_resource_closure(cloud, scopes)
     verify_deletion_identity(document, bodies)
@@ -1972,7 +2114,7 @@ def project_owner(cloud, document, body, records, cache):
     record = records.get(key, {})
     if record.get("ownership_source") == "deployment-receipt":
         evidence = record.get("ownership_evidence")
-        verified = verified_receipt_owner(BlobLocks(cloud, document), evidence, key, resource_digest(body), cache)
+        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache)
         require(verified == record.get("owner"), "project-receipt-owner-mismatch")
         return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
     return {"owner": {}, "ownership_source": "retained-unowned"}
@@ -2000,7 +2142,7 @@ def verify_project_permissions(cloud, data):
 def freeze_project_deletion(cloud, document, ownership_records):
     options = project_deletion_policy(document)
     cloud.verify_identity()
-    BlobLocks(cloud, document).verify_enrollment()
+    deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     closure, bodies = collect_resource_closure(cloud, scopes)
 
@@ -2156,7 +2298,7 @@ def verify_project_inventory(cloud, document, removed=()):
         if item.get("ownership_source") == "tags":
             verify_ownership(bodies[key], item["owner"])
         elif item.get("ownership_source") == "deployment-receipt":
-            require(verified_receipt_owner(BlobLocks(cloud, document), item["ownership_evidence"], key,
+            require(verified_receipt_owner(coordination(cloud, document), item["ownership_evidence"], key,
                     item["body_hash"], cache) == item["owner"], "project-ownership-receipt-changed")
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
@@ -2810,8 +2952,8 @@ def delete_resources(cloud, locks, document, receipt, persist, sleep=time.sleep)
 
 
 def wait_absent(cloud, locks, resource_id, api_version, sleep):
-    # Whole resource groups routinely outlast the ten-minute leaf budget.
-    for _ in range(1440 if RG_ID.fullmatch(resource_id) else 120):
+    # Whole resource groups routinely outlast the 20-minute leaf budget.
+    for _ in range(RESOURCE_GROUP_DELETE_POLLS if RG_ID.fullmatch(resource_id) else LEAF_DELETE_POLLS):
         locks.assert_held()
         status, _, _ = cloud.arm("GET", resource_id, api_version, allowed=(200, 404))
         if status == 404:
@@ -2873,7 +3015,7 @@ def ado_project(cloud, locks, document, source_root, receipt, persist, sleep=tim
     receipt["remote_run"] = {"kind": "ado", "pipeline_id": pipeline, "run_id": run["id"]}
     receipt.pop("pending_dispatch", None)
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = request("GET", f"/pipelines/{pipeline}/runs/{run['id']}?api-version=7.1")
         version = (result.get("resources", {}).get("repositories", {}).get("self", {}).get("version"))
@@ -3090,7 +3232,7 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
         location = next((value for key, value in headers.items() if key.lower() == "location"), "")
         require(location.startswith(ARM + "/subscriptions/" + document["target"]["subscription_id"] + "/"),
                 "untrusted-what-if-poll-url")
-        for _ in range(120):
+        for _ in range(WHAT_IF_POLLS):
             sleep(5)
             poll_status, _, response = cloud.request("GET", location, ARM, allowed=(200, 202))
             state = response.get("status") if isinstance(response, dict) else None
@@ -3534,7 +3676,7 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
     locks.authorize(document)
     cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
     result = wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
-        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=1440,
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=ARM_DEPLOYMENT_POLLS,
         read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM), document=document)
     outputs = result.get("properties", {}).get("outputs", {}).get("foundationOutputs", {}).get("value", {})
     require(isinstance(outputs.get("miProjectName"), str) and isinstance(outputs.get("projectResourceGroupName"), str)
@@ -4339,7 +4481,7 @@ def verify_foundry_phase_changes(current, expected, preceding, observations=None
 
 
 def wait_foundry_resource(cloud, locks, identifier, ready, sleep, *, api_version=FOUNDRY_API,
-                         attempts=180, read=None, document=None):
+                         attempts=FOUNDRY_READINESS_POLLS, read=None, document=None):
     for attempt in range(attempts):
         locks.assert_held()
         if document is not None:
@@ -4696,7 +4838,7 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
         wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
             lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
-            sleep, attempts=1440, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
+            sleep, attempts=ARM_DEPLOYMENT_POLLS, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
             document=document)
         for step in document["deployment"]["steps"]:
             if step["id"] not in phase["step_ids"]:
@@ -5454,7 +5596,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
             receipt["mutation_started"] = True
             persist()
             cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
-            for _ in range(1440):
+            for _ in range(ARM_DEPLOYMENT_POLLS):
                 locks.assert_held()
                 _, _, state = cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM)
                 provisioned = state.get("properties", {}).get("provisioningState")
@@ -5693,7 +5835,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
                               else route["runner"]["labels"], separators=(",", ":")),
     }})
     run_id = None
-    for _ in range(60):
+    for _ in range(GITHUB_DISPATCH_DISCOVERY_POLLS):
         runs = github("GET", "/actions/workflows/factory-lifecycle.yml/runs?event=workflow_dispatch&per_page=100")
         matches = [row for row in runs.get("workflow_runs", []) if row.get("display_title") ==
                    "factory-lifecycle [" + document["run_id"] + "]"]
@@ -5707,7 +5849,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     require(run_id is not None, "scoped-github-dispatch-unverified")
     receipt["remote_run"] = {"kind": "gha", "run_id": run_id}
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = github("GET", "/actions/runs/" + str(run_id))
         require(result.get("head_sha") == route["commit"], "scoped-github-run-commit-mismatch")
@@ -5791,7 +5933,7 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
     receipt["remote_run"] = {"kind": "ado", "pipeline_id": pipeline, "run_id": run["id"]}
     receipt.pop("pending_dispatch", None)
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = request("GET", f"/pipelines/{pipeline}/runs/{run['id']}?api-version=7.1")
         if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
@@ -5846,6 +5988,18 @@ class _RepositoryDeletionMember(RepositoryCoordination):
     def claim_run(self):
         self.cohort.claim_runs()
         self.authorize(self.document)
+
+
+class _RepositoryDeletionWorker(RepositoryCoordination):
+    """A scoped deletion worker writes only inside its parent's single-writer deletion cohort."""
+
+    def _active(self, value):
+        active = value["active"]
+        require(self.held and isinstance(active, dict) and active.get("kind") == "deletion-cohort"
+                and self.document["manifest_hash"] in active.get("manifests", [])
+                and active.get("owner_hash") == digest({key: item for key, item in active.items() if key != "owner_hash"})
+                and all(active.get("context", {}).get(scope) == lease for scope, lease in self.held.items()),
+                "single-writer-active-claim-changed")
 
 
 class _RepositoryDeletionCohort:
@@ -5925,6 +6079,23 @@ class _RepositoryDeletionCohort:
         _, value = self._state()
         self._active(value)
 
+    def resume(self, context):
+        """Re-adopt this cohort's own retained reservation for an interrupted execution."""
+        _, value = self._state()
+        active = value["active"]
+        scopes = {scope.lower() for member in self.members for scope in
+                  member.settings["scopes"] + member.settings["common_dependencies"]}
+        require(isinstance(active, dict) and active.get("kind") == "deletion-cohort"
+                and active.get("cohort_hash") == self.cohort_hash
+                and active.get("owner_hash") == digest({key: item for key, item in active.items() if key != "owner_hash"})
+                and isinstance(context, dict) and set(context) == scopes
+                and all(active["context"].get(scope) == lease for scope, lease in context.items()),
+                "single-writer-active-claim-changed")
+        self.active, self.held, self.claimed = active, dict(context), True
+        for member in self.members:
+            member.held = {scope.lower(): context[scope.lower()] for scope in
+                           member.settings["scopes"] + member.settings["common_dependencies"]}
+
     def claim_runs(self):
         if self.claimed:
             return
@@ -5999,8 +6170,9 @@ class _RepositoryDeletionCohort:
             document = member.document
             name = "runs/" + document["run_id"]
             receipt = value["records"].get(name + ".json", {})
-            expected = {row["id"].lower() for row in document["deletion"]["resource_groups"] +
-                        document["deletion"]["resources"]}
+            rows = [row for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]
+                    if row["delete"]]
+            expected = {row["id"].lower() for row in rows}
             deleted = receipt.get("deleted_resources", [])
             require(receipt.get("status") == "succeeded" and receipt.get("operation") == "delete"
                     and receipt == child and receipt.get("run_id") == document["run_id"]
@@ -6016,7 +6188,7 @@ class _RepositoryDeletionCohort:
                     and len(deleted) == len(expected) and {key.lower() for key in deleted} == expected,
                     "single-writer-deletion-receipt-incomplete")
             member.cloud.verify_identity()
-            for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]:
+            for row in rows:
                 status, _, _ = member.cloud.arm("GET", row["id"], row.get("api_version", RG_API),
                                                allowed=(200, 404))
                 require(status == 404, "single-writer-terminal-deletion-unverified")

@@ -133,9 +133,12 @@ preview are both required. A blocked preview remains blocked; do not change
 coordination settings, run separate deletions or use another route to bypass it.
 
 The factory's existing enrollment must also explicitly permit deletion
-(`allow_delete=true`). A confirmation prompt does not grant that permission.
-New enrollment defaults to disallowing deletion; have an authorized operator
-review that governance setting rather than bypassing it.
+(`allow_delete=true`); new enrollment defaults to disallowing it. A deletion
+confirmation prompt does not grant it: an authorized operator reviews and
+grants it separately with `azurefactory authorize-deletion --mode allow`, and
+revokes it the same way with `--mode revoke` (see
+[Grant or revoke a factory's deletion permission](#grant-or-revoke-a-factorys-deletion-permission)).
+Granting it does not lift the single-writer runtime limitation above.
 
 First select the exact factory UUID and current `source_revision` from
 `azurefactory catalog list --folder $env:FACTORY_FOLDER`, then prepare:
@@ -281,6 +284,63 @@ timeout or an "uncertain" result is an unknown outcome: run `prepare` again to
 read the current claim. The next deployment or deletion plans from live Azure
 state; it does not resume the failed run. SDK: `reconcile_run_claim_prepare` and
 `reconcile_run_claim_confirm`.
+
+### Grant or revoke a factory's deletion permission
+
+Deletion under single-writer coordination requires the factory's enrollment in
+the provider repository (`refs/heads/aifactory-state/single-writer-v1`) to
+permit deletion (`allow_delete=true`). New enrollments disallow it, and no
+deletion review or confirmation prompt grants it. An authorized operator grants
+it as its own reviewed change, and revokes it the same way when the deletion is
+done or cancelled. Never edit the enrollment or that ref by hand.
+
+```powershell
+azurefactory authorize-deletion prepare --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --mode allow `
+  --save-receipt .\authorize-deletion.receipt.json
+```
+
+Use `--mode revoke` to remove the permission. Preparation writes nothing; the
+review expires after 10 minutes. The API changes only `allow_delete` of the
+`aifactory-owned` scopes named in this factory's saved bindings. The review
+shows the provider repository, state ref and reviewed head, the scopes that
+change, the enrollment revision and coordination hash before and after, the
+saved bindings (`ado`/`gha`) it re-pins, warnings, blockers and the audit record.
+Blockers (`can_execute: false`) include an active run claim (run
+`reconcile-run-claim` first), queued or running workflow runs, a running local
+job, another factory's scopes or bindings, nothing to change and Blob
+coordination (not supported yet); a review blocked before reading the provider
+shows null repository, head and revisions. The CLI refuses a review that is not
+`provider-state`, does not state `azure_writes: false`, lacks
+`authorize-deletion-v1`, changes the folder, factory or mode, or whose phrase is
+not exactly `ALLOW DELETE <factory key>` (`--mode allow`) or
+`REVOKE DELETE <factory key>` (`--mode revoke`); the factory key is the factory
+prefix without its trailing dash, for example `aif-130`. A blocked review is
+reported and never saved as approvable. Then, after a human
+approves it:
+
+```powershell
+azurefactory authorize-deletion confirm --receipt .\authorize-deletion.receipt.json
+```
+
+Confirmation requires the exact phrase (or, without a terminal, `--yes` together
+with `--confirmation-phrase`). The API repeats every check, requires the state
+to be unchanged since the review and makes one compare-and-swap of the state
+ref (enrollment revision + 1) that adds
+`deletion-authorizations/<factory id>/<confirmation id>.json`, then re-pins the
+saved bindings to the new enrollment; the result status is `authorized` or
+`revoked`. If only that local binding save failed, the next prepare offers a
+binding repair alone: no scopes, the original audit record, and a result whose
+`head` equals `previous_head`. It never changes Azure or pipelines and is never
+retried: after a timeout or an unexpected result, prepare again to read the
+current permission. The permission alone deletes nothing and lifts no
+other blocker; named whole-factory deletion under single-writer coordination is
+still pending (see
+[Delete a whole factory's Azure resources](#delete-a-whole-factorys-azure-resources)).
+An API without the `authorize-deletion` routes (404/405 without the operation's
+own detail) is reported as requiring them; there is no fallback. SDK:
+`authorize_deletion_prepare` and `authorize_deletion_confirm`, with the same
+client checks in `azurefactory.authorization`.
 
 ### Shell-first registered onboarding
 
@@ -474,9 +534,9 @@ azurefactory --timeout 180 preflight --request-json .\preflight-request.json --s
 azurefactory --timeout 180 bootstrap workflow prepare --preflight --request-json .\workflow-request.json
 ```
 
-Cloud checks can exceed 30 seconds, so both preflight forms default to a
-180-second request timeout; health, doctor and all other commands retain their
-30-second default. An explicit global `--timeout` **before the command**, even
+Cloud checks can exceed 60 seconds, so both preflight forms default to a
+360-second request timeout; health, doctor and all other commands retain their
+60-second default. An explicit global `--timeout` **before the command**, even
 `--timeout 30`, always takes precedence. Preflight never automatically retries.
 Timeout or Ctrl+C exits
 nonzero without implying readiness and does not create/approve a workflow.
@@ -795,6 +855,7 @@ These supported methods return a prepare preview only:
 | `project_delete_prepare(folder, factory_id, project_id, *, environments, include_project_subnets, include_keyvault_and_resource_group, expected_revision, scale_set_id=None, version_ref=None)` | `delete-project` |
 | `scaleset_delete_prepare(folder, factory_id, scale_set_id, *, expected_revision, version_ref=None)` | `delete-scale-set` |
 | `draft_remove_prepare(folder, factory_id, *, kind, expected_revision, scale_set_id=None, project_id=None)` | `delete-draft-factory`, `delete-draft-scale-set`, `delete-draft-project` |
+| `authorize_deletion_prepare(body)` | none: the named `authorize-deletion` provider-state operation (`mode` `allow` or `revoke`); confirm with `authorize_deletion_confirm` |
 
 CLI and SDK use shared request builders. Project helpers require nonempty
 `placements` **or** `environments`, never both; omitted scale IDs stay omitted on

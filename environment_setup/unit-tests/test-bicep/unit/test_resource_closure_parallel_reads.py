@@ -253,6 +253,14 @@ def test_one_failed_read_aborts_the_whole_closure_with_the_serial_error(name, fa
     key = failing_reads()[name]
     serial, parallel = InventoryCloud(), InventoryCloud(workers=8)
     serial.failures[key] = parallel.failures[key] = failure
+    if key[0] == "collection" and isinstance(failure, fl.Blocked):
+        # A collection that still fails after Cloud.request's own retries is recorded, not fatal (tolerant
+        # inventory); serial and parallel walks record exactly the same closure.
+        expected, actual = collect(serial), collect(parallel)
+        assert actual == expected
+        assert expected[0]["collections"][key[1]]["unsupported"] == "unreadable-remote-request-failed-503"
+        assert not read_threads()
+        return
     with pytest.raises(type(failure)) as expected:
         collect(serial)
     with pytest.raises(type(failure)) as actual:

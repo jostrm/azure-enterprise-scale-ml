@@ -33,6 +33,9 @@ project_environment = importlib.util.module_from_spec(_environment_spec)
 _environment_spec.loader.exec_module(project_environment)
 GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ADO_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
+REQUEST_TIMEOUT_SECONDS = 120
+DISPATCH_DISCOVERY_POLLS = 120          # x 2 s = 4 min
 ADO_MCP_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-azure-mcp.yaml"
 ADO_CONFIG_STEP = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/jobs/job-0-reviewed-project-config.yaml"
 FILES = {
@@ -345,7 +348,7 @@ class Deployment:
             headers={"Authorization": "Bearer " + token["accessToken"], "Content-Type": "application/json"},
         )
         try:
-            with self.opener.open(request, timeout=60) as response:
+            with self.opener.open(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
                 raw = response.read(8 * 1024 * 1024 + 1)
             if len(raw) > 8 * 1024 * 1024:
                 raise ValueError("Azure DevOps response exceeds the supported size.")
@@ -537,7 +540,7 @@ class Deployment:
             "--raw-field", "runner_selection=from-config",
         ])
         run_id = None
-        for _ in range(60):
+        for _ in range(DISPATCH_DISCOVERY_POLLS):
             runs = self.read_json(["gh", "run", "list", "--repo", self.repository, "--workflow", "infra-project.yml",
                                   "--branch", "main", "--event", "workflow_dispatch", "--limit", "100",
                                   "--json", "databaseId,displayTitle,headSha,event"])

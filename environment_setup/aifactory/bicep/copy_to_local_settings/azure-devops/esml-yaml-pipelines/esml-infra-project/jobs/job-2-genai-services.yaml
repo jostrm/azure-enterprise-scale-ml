@@ -1938,7 +1938,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
-  timeoutInMinutes: 180
+  timeoutInMinutes: 360
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1946,7 +1946,7 @@ steps:
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh'
   env:
-    AIF_DELETE_TIMEOUT_SECONDS: '1800'
+    AIF_DELETE_TIMEOUT_SECONDS: '3600'
     AIF_DELETE_POLL_SECONDS: '15'
     AIF_DELETE_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-deletion-reports/$(System.JobId)-$(System.JobAttempt)
     dev_test_prod_sub_id: $(dev_test_prod_sub_id)

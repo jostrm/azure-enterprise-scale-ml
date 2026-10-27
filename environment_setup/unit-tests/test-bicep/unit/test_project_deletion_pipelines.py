@@ -73,21 +73,21 @@ def context(platform, phase="infra", success=True, **values):
 @pytest.mark.parametrize("platform", ["gha", "ado"])
 def test_shared_deletion_has_explicit_budget_and_per_attempt_reports(platform):
     step = deletion(platform)
-    assert int(step["timeout-minutes" if platform == "gha" else "timeoutInMinutes"]) >= 120
+    assert int(step["timeout-minutes" if platform == "gha" else "timeoutInMinutes"]) == 360
     assert step.get("continue-on-error", step.get("continueOnError", "false")) == "false"
-    assert step["env"]["AIF_DELETE_TIMEOUT_SECONDS"] == "1800"
+    assert step["env"]["AIF_DELETE_TIMEOUT_SECONDS"] == "3600"
     assert step["env"]["AIF_DELETE_POLL_SECONDS"] == "15"
     report_dir = step["env"][REPORT]
     if platform == "gha":
         assert all(token in report_dir for token in ("runner.temp", "github.run_id", "github.run_attempt", "inputs.phase"))
-        assert int(load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]["timeout-minutes"]) >= 150
+        assert int(load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]["timeout-minutes"]) == 360
         inherited = load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]["env"]
     else:
         assert all(token in report_dir for token in ("Build.ArtifactStagingDirectory", "System.JobId", "System.JobAttempt"))
         inherited = {}
         jobs = [item for item in objects(load_pipeline(ADO_PROJECT)) if item.get("deployment") == "ESGenAI_Services"]
         assert len(jobs) == 3
-        assert all(int(job["timeoutInMinutes"]) >= 150 for job in jobs)
+        assert all(int(job["timeoutInMinutes"]) == 360 for job in jobs)
         assert step["inputs"]["scriptType"] == "bash"
         assert step["inputs"]["scriptLocation"] == "scriptPath"
     for flag in ("deleteAllForProject", "deleteAllServicesForProject", "enableDeleteForDisabledResources", "deleteKeyvaultAlso"):

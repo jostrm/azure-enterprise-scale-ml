@@ -26,6 +26,14 @@ EXIT_BLOCKED = 3
 EXIT_TIMEOUT = 4
 EXIT_FAILURE = 5
 
+# Client-side time budgets (doubled 2026-10-27; pinned in tests/test_time_budgets.py).
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 60.0
+PREFLIGHT_REQUEST_TIMEOUT_SECONDS = 360.0
+COST_REQUEST_TIMEOUT_SECONDS = 600.0
+WATCH_TIMEOUT_SECONDS = 600.0
+WATCH_MAX_RETRIES = 6
+POLL_TIMEOUT_SECONDS = 1200.0
+
 REQUIRED_OPENAPI_PATHS = {
     "/health": {"get"},
     "/api/v1/schema": {"get"},
@@ -149,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-url", default=os.getenv(API_URL_ENV), help=f"API base URL (env {API_URL_ENV}, default loopback:8765).")
     parser.add_argument("--api-key", default=os.getenv(API_KEY_ENV), help=f"API key value (env {API_KEY_ENV}); never logged or stored.")
     parser.add_argument("--timeout", type=positive_float,
-                        help="Per-request timeout seconds (default 180 for preflight, 30 otherwise).")
+                        help="Per-request timeout seconds (default 360 for preflight, 600 for costs, 60 otherwise).")
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
@@ -198,6 +206,24 @@ def build_parser() -> argparse.ArgumentParser:
                                help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
     claim_confirm.add_argument("--confirmation-phrase",
                                help="Exact server phrase from the reviewed receipt; required without a terminal.")
+    authorize_help = ("Grant (--mode allow) or revoke (--mode revoke) a factory's deletion permission after review; "
+                      "only the provider state changes, an audit record is added and Azure is never changed.")
+    authorize = sub.add_parser("authorize-deletion", help=authorize_help, description=authorize_help)
+    authorize_sub = authorize.add_subparsers(dest="authorize_command", required=True)
+    authorize_prepare = add_simple(authorize_sub, "prepare", cmd_authorize_deletion_prepare,
+                                   help="Review the deletion permission change; never changes anything.")
+    for field in ("folder", "factory-id", "save-receipt"):
+        authorize_prepare.add_argument("--" + field, required=True)
+    authorize_prepare.add_argument("--mode", required=True,
+                                   help="allow grants deletion permission; revoke removes it.")
+    authorize_confirm = add_simple(authorize_sub, "confirm", cmd_authorize_deletion_confirm,
+                                   help="Show the saved review, then require its exact confirmation phrase.")
+    authorize_confirm.add_argument("--receipt", required=True,
+                                   help="Unexpired receipt from authorize-deletion prepare.")
+    authorize_confirm.add_argument("--yes", action="store_true",
+                                   help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    authorize_confirm.add_argument("--confirmation-phrase",
+                                   help="Exact server phrase from the reviewed receipt; required without a terminal.")
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -208,9 +234,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "watch":
             command.add_argument("--after", help="Opaque event cursor from an earlier observation.")
             command.add_argument("--follow", action=argparse.BooleanOptionalAction, default=True)
-            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=300.0,
-                                 help="Overall observation deadline seconds (default 300); does not cancel the workflow.")
-            command.add_argument("--max-retries", type=int, default=3, help="Maximum read-only reconnects (default 3).")
+            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=WATCH_TIMEOUT_SECONDS,
+                                 help="Overall observation deadline seconds (default 600); does not cancel the workflow.")
+            command.add_argument("--max-retries", type=int, default=WATCH_MAX_RETRIES,
+                                 help="Maximum read-only reconnects (default 6).")
             command.add_argument("--backoff-initial", type=positive_float, default=0.5)
             command.add_argument("--backoff-max", type=positive_float, default=8.0)
     api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
@@ -608,7 +635,7 @@ def add_receipt_and_yes(parser):
 
 
 def add_poll_args(parser):
-    parser.add_argument("--poll-timeout", type=positive_float, default=600.0)
+    parser.add_argument("--poll-timeout", type=positive_float, default=POLL_TIMEOUT_SECONDS)
     parser.add_argument("--poll-interval", type=positive_float, default=5.0)
 
 
@@ -645,7 +672,7 @@ def positive_float(value: str) -> float:
     return result
 
 
-def client(args, *, default_timeout: float = 30.0) -> AzureFactoryClient:
+def client(args, *, default_timeout: float = DEFAULT_REQUEST_TIMEOUT_SECONDS) -> AzureFactoryClient:
     timeout = args.timeout if args.timeout is not None else default_timeout
     return AzureFactoryClient(args.api_url, args.api_key, timeout)
 
@@ -659,7 +686,7 @@ def cmd_preflight(args):
         raise ConfigError("Preflight cannot use --save-receipt or --whole-workflow; it grants no approval.")
     if args.save_report and os.path.lexists(args.save_report):
         raise ConfigError("Refusing to overwrite an existing preflight report or receipt.")
-    api = client(args, default_timeout=180.0)
+    api = client(args, default_timeout=PREFLIGHT_REQUEST_TIMEOUT_SECONDS)
     report = redact_secrets(api.preflight(read_json_file(args.request_json)), api.api_key)
     if args.save_report:
         try:
@@ -836,6 +863,59 @@ def cmd_reconcile_run_claim_confirm(args):
     return emit(result)
 
 
+def _authorization_review(preview):
+    from .authorization import describe
+
+    print("Change this factory's deletion permission?", file=sys.stderr)
+    print("Review the enrollment, scopes and bindings below. Nothing has been changed by this command.",
+          file=sys.stderr)
+    _print_json(describe(preview), file=sys.stderr, flush=True)
+
+
+def cmd_authorize_deletion_prepare(args):
+    from .authorization import OPERATION, PURPOSE, validate_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing deletion authorization receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder, "factory_id": args.factory_id, "mode": args.mode}
+    preview = redact_secrets(api.authorize_deletion_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    validate_preview(request, preview)
+    _authorization_review(preview)
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation=OPERATION,
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new deletion authorization receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_authorize_deletion_confirm(args):
+    from .authorization import OPERATION_MODE, PURPOSE, validate_authorization
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode=OPERATION_MODE)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid deletion authorization receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Deletion authorization receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _authorization_review(preview)
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "authorization", "a deletion permission change")
+    try:
+        result = redact_secrets(api.authorize_deletion_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Deletion authorization timed out; its outcome is unknown. Prepare again to read the "
+                             "current permission before any further action. No retry was attempted.") from None
+    validate_authorization(result, receipt)
+    return emit(result)
+
+
 def cmd_delete_aifactory_status(args):
     from .factory_deletion import validate_job
 
@@ -933,7 +1013,7 @@ def cmd_resource_group_costs(args):
         body["aifactory_folder"] = args.folder
     if args.refresh:
         body["refresh"] = True
-    api = client(args, default_timeout=300.0)
+    api = client(args, default_timeout=COST_REQUEST_TIMEOUT_SECONDS)
     result = redact_secrets(api.resource_group_costs(body), api.api_key)
     return emit(result, EXIT_OK if result.get("status") in {"available", "empty"} else EXIT_BLOCKED)
 
