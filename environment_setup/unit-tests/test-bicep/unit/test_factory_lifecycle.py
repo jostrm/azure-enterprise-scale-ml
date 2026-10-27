@@ -2612,3 +2612,24 @@ def test_vnet_tagged_traffic_consumer_fingerprint_keeps_only_its_identity():
     assert fl.resource_etag(body, {}, kind) is None
     later["properties"]["owner"] = "Microsoft.Storage"
     assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+def test_private_dns_zone_fingerprint_ignores_record_set_and_link_counters():
+    # aif-137 (2026-10-27): COMMON's private endpoints add A records to the prerequisite zones, so a zone's
+    # numberOfRecordSets moves after review. Its etag, settings and tags still count.
+    zone = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.Network/privateDnsZones"
+            "/privatelink.azurecr.io")
+    body = {"id": zone, "type": "Microsoft.Network/privateDnsZones", "etag": "663b1372", "location": "global",
+            "tags": {"aifactory.factory_id": "aif-137"},
+            "properties": {"maxNumberOfRecordSets": 25000, "numberOfRecordSets": 1,
+                           "maxNumberOfVirtualNetworkLinks": 1000, "numberOfVirtualNetworkLinks": 0,
+                           "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+                           "numberOfVirtualNetworkLinksWithRegistration": 0, "provisioningState": "Succeeded"}}
+    later = copy.deepcopy(body)
+    later["properties"].update(numberOfRecordSets=3, numberOfVirtualNetworkLinks=1,
+                               numberOfVirtualNetworkLinksWithRegistration=1, provisioningState="Updating")
+    kind = "microsoft.network/privatednszones"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_etag(body, {}, kind) == "663b1372"
+    later["tags"]["aifactory.factory_id"] = "aif-138"
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)

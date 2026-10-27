@@ -128,6 +128,9 @@ DNS_SOA_PERMIT_CONTRACT = "reviewed-bootstrap-dns-soa-preservation-v1"
 CONSENT_ANCESTORS_CONTRACT = "published-ancestor-consent-v1"
 DNS_SOA_ZONE_ID = re.compile(RG_ID.pattern + r"/providers/Microsoft.Network/privateDnsZones/" + DNS_ZONE_NAME, re.I)
 DNS_RECORD_TYPES = ("a", "aaaa", "cname", "mx", "ptr", "soa", "srv", "txt")
+# Azure writes this metadata on every A/AAAA record set a private endpoint's DNS zone group creates.
+PRIVATE_ENDPOINT_RECORD_CREATOR = re.compile(
+    r"created by private endpoint (?P<name>[A-Za-z0-9._-]{1,80}) with resource guid (?P<guid>" + GUID + r")", re.I)
 NON_RESOURCE_METADATA = {"microsoft.compute/virtualmachines/metricdefinitions"}
 TAG_KEYS = {"factory_id": "aifactory.factory_id", "scaleset_id": "aifactory.scaleset_id",
             "project_id": "aifactory.project_id"}
@@ -293,6 +296,11 @@ VOLATILE_FIELDS = {
         ("etag",), ("properties", "acledSubnets"), ("properties", "acledSubscriptions"),
         ("properties", "primaryLocations"), ("properties", "provisioningState"),
         ("properties", "virtualNetworkAcled"), ("properties", "vnetTrafficTag")),
+    # A private DNS zone's counters follow its record sets and links: COMMON's private endpoints add A records to the
+    # prerequisite zones (aif-137, 2026-10-27). The zone's etag, settings and tags still count.
+    "microsoft.network/privatednszones": (
+        ("properties", "numberOfRecordSets"), ("properties", "numberOfVirtualNetworkLinks"),
+        ("properties", "numberOfVirtualNetworkLinksWithRegistration"), ("properties", "provisioningState")),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
 # The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them
@@ -5156,8 +5164,36 @@ def validate_dns_soa_preservation_permit(document):
     return permit
 
 
+def private_endpoint_record_owner(item):
+    """The private endpoint whose DNS zone group Azure names as this A/AAAA record set's creator, else None."""
+    properties = item.get("properties") if isinstance(item, dict) and isinstance(item.get("properties"), dict) else {}
+    metadata = properties.get("metadata") if isinstance(properties.get("metadata"), dict) else {}
+    creator = metadata.get("creator")
+    match = PRIVATE_ENDPOINT_RECORD_CREATOR.fullmatch(creator) if isinstance(creator, str) else None
+    return {"name": match["name"].lower(), "resource_guid": match["guid"].lower()} if match else None
+
+
+def dns_private_endpoint_records(closure, parent):
+    """Every A/AAAA record set in the zone that a private endpoint created, by record id: the accepted evidence."""
+    return {row["id"].lower(): owner for kind in ("a", "aaaa")
+            for row in closure["collections"][parent + "/" + kind]["items"]
+            if (owner := private_endpoint_record_owner(row))}
+
+
+def own_private_endpoint_names(closure, proof):
+    """Names of the private endpoints that live in this factory's reviewed bootstrap groups."""
+    return {key.rsplit("/", 1)[1] for key, row in closure["resources"].items()
+            if isinstance(row, dict) and row.get("type") == "microsoft.network/privateendpoints"
+            and arm_scope(key) in proof["groups"]}
+
+
 def dns_record_set_inventory(closure, parent):
-    """Fingerprint all eight independently collected private-DNS record-set types."""
+    """Fingerprint all eight independently collected private-DNS record-set types.
+
+    The A/AAAA record sets a private endpoint's DNS zone group created stay out of the fingerprint: COMMON adds
+    them to the prerequisite zones after review (aif-137, 2026-10-27). verify_dns_soa_preservation checks that
+    each such endpoint is this factory's own; every other record change still changes the fingerprint.
+    """
     require(isinstance(closure, dict) and isinstance(closure.get("collections"), dict)
             and isinstance(closure.get("resources"), dict), "dns-soa-record-set-inventory-required")
     collections, resources = {}, {}
@@ -5181,21 +5217,35 @@ def dns_record_set_inventory(closure, parent):
                 and row.get("type") == "microsoft.network/privatednszones/" + kind
                 and hash_value(row.get("body_hash")) for row in rows.values()),
                 "dns-soa-record-set-inventory-incomplete")
+        owned = {row["id"].lower() for row in entry["items"]
+                 if kind in ("a", "aaaa") and private_endpoint_record_owner(row)}
+        if owned:
+            kept = [row for row in entry["items"] if row["id"].lower() not in owned]
+            entry = {**entry, "ids": [key for key in entry["ids"] if key not in owned],
+                     "items": kept, "body_hash": digest(kept)}
+            rows = {key: row for key, row in rows.items() if key not in owned}
         collections[path], resources = entry, {**resources, **rows}
     require(collections[parent + "/soa"]["ids"] == [parent + "/soa/@"], "dns-soa-exact-apices-required")
     return {"collections": collections, "resources": resources}
 
 
 def verify_dns_soa_preservation(document, closure):
+    """Returns, per zone, the A/AAAA record sets this factory's own private endpoints created; anything else blocks."""
     proof = document["deployment"]["bootstrap_foundation"]
     permit = validate_dns_soa_preservation_permit(document)
+    endpoints, accepted = own_private_endpoint_names(closure, proof), {}
     for parent, entry in permit["proposal"]["parents"].items():
         require(digest(dns_record_set_inventory(closure, parent)) == entry["record_set_inventory_hash"],
                 "dns-soa-record-set-inventory-changed")
+        records = dns_private_endpoint_records(closure, parent)
+        require(all(owner["name"] in endpoints for owner in records.values()),
+                "dns-soa-foreign-private-endpoint-record")
         for identifier in (parent, parent + "/soa/@"):
             metadata = closure["resources"].get(identifier)
             require(isinstance(metadata, dict) and all(metadata.get(field) == proof["resources"][identifier][field]
                     for field in ("type", "api_version", "body_hash", "etag")), "dns-soa-preserved-instance-changed")
+        accepted[parent] = records
+    return accepted
 
 
 def validate_exact_bootstrap(document):
@@ -5356,9 +5406,10 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     proof = document["deployment"].get("bootstrap_foundation", {})
     if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
         return set()
+    accepted = {}
     if has_dns_soa_permit(proof):
         validate_exact_bootstrap(document)
-        verify_dns_soa_preservation(document, closure)
+        accepted = verify_dns_soa_preservation(document, closure)
     preserved = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
     if not preserved:
         return preserved
@@ -5374,8 +5425,10 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     expected = {key for key in proof["resources"] if any(key == parent or key.startswith(parent + "/")
                                                        for parent in preserved)}
     require(expected <= set(resources), "bootstrap-preserved-resource-missing-after-deployment")
-    protected = {key for key in resources if any(key == parent or key.startswith(parent + "/")
-                                               for parent in preserved)}
+    # The endpoint record sets verify_dns_soa_preservation accepted are evidence, not unreviewed descendants.
+    owned_records = {key for records in accepted.values() for key in records}
+    protected = {key for key in resources if key not in owned_records
+                 and any(key == parent or key.startswith(parent + "/") for parent in preserved)}
     require(protected <= set(proof["resources"]), "bootstrap-preserved-descendant-unreviewed")
     if bodies is not None:
         require(set(bodies) == set(resources) | set(groups), "bootstrap-final-closure-body-incomplete")
