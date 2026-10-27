@@ -268,6 +268,12 @@ VOLATILE_FIELDS = {
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
     # ACR synthesizes its built-in _repositories_* scope maps on every GET with a new creationDate (aif-138, 2026-10-27).
     "microsoft.containerregistry/registries/scopemaps": (("properties", "creationDate"),),
+    # Network RP maintains a VNet's taggedTrafficConsumers (Key Vault network rules); its etag is the VNet's form and
+    # its ACL state follows the vaults (aif-138, 2026-10-27). Owner and VNet identity still count.
+    "microsoft.network/virtualnetworks/taggedtrafficconsumers": (
+        ("etag",), ("properties", "acledSubnets"), ("properties", "acledSubscriptions"),
+        ("properties", "primaryLocations"), ("properties", "provisioningState"),
+        ("properties", "virtualNetworkAcled"), ("properties", "vnetTrafficTag")),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
 # The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them

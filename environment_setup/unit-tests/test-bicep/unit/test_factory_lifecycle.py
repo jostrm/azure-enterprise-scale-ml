@@ -2589,3 +2589,25 @@ def test_acr_system_scope_map_fingerprint_ignores_its_synthesized_creation_date(
     assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
     later["properties"]["actions"].append("repositories/*/content/write")
     assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+def test_vnet_tagged_traffic_consumer_fingerprint_keeps_only_its_identity():
+    # aif-138 (2026-10-27): Network RP maintains a VNet's taggedTrafficConsumers child for Key Vault; its etag has the
+    # parent VNet's form and its ACLed subnets follow vault network rules, so COMMON and PROJECT change it after review.
+    consumer = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.Network/virtualNetworks/vnet"
+                "/taggedTrafficConsumers/Microsoft.KeyVault.swedencentral")
+    body = {"id": consumer, "type": "Microsoft.Network/virtualNetworks/taggedTrafficConsumers", "etag": 'W/"before"',
+            "properties": {"owner": "Microsoft.KeyVault", "virtualNetworkResourceGuid": "guid",
+                           "acledSubnets": [{"name": "a", "subnetTrafficTag": 1}], "acledSubscriptions": [],
+                           "primaryLocations": ["swedencentral"], "provisioningState": "Succeeded",
+                           "virtualNetworkAcled": False, "vnetTrafficTag": 1}}
+    later = copy.deepcopy(body)
+    later["etag"] = 'W/"after"'
+    later["properties"].update(acledSubnets=[{"name": "a", "subnetTrafficTag": 1}, {"name": "b", "subnetTrafficTag": 2}],
+                               acledSubscriptions=["s"], provisioningState="Updating", vnetTrafficTag=2,
+                               virtualNetworkAcled=True, primaryLocations=["swedencentral", "swedensouth"])
+    kind = "microsoft.network/virtualnetworks/taggedtrafficconsumers"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_etag(body, {}, kind) is None
+    later["properties"]["owner"] = "Microsoft.Storage"
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
