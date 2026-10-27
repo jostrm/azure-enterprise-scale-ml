@@ -19,7 +19,8 @@ MODE = "single-writer"
 PROTOCOL = "aifactory-single-writer-v1"
 WARNING = "Bypassing lock, due to issues, dont do parallell updates on same AI Factory"
 HUB_WARNING = "Do not make concurrent changes to a shared hub, including from other repositories; repository claims do not provide global exclusion."
-MAX_BYTES = 8 * 1024 * 1024
+# aif-134 (2026-10-27): bootstrap_final_closure alone made state.json 6.4 MB; PROJECT closures add more.
+MAX_BYTES = 32 * 1024 * 1024
 STATE_READ_ATTEMPTS = 3
 
 

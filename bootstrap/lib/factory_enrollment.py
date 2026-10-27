@@ -110,6 +110,8 @@ IDENTITY_API = "2023-01-31"
 STORAGE_API = "2023-05-01"
 ROLE_API = "2022-04-01"
 MAX_BYTES = 8 * 1024 * 1024
+# A provider state read returns state.json (up to 32 MiB) as a base64 blob.
+STATE_RESPONSE_MAX = 48 * 1024 * 1024
 NAME = r"[A-Za-z0-9_.-]{1,128}"
 RG = re.compile(r"/subscriptions/([a-f0-9-]{36})/resourcegroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 OPTIONS = {
@@ -156,7 +158,7 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def parse_json(raw):
+def parse_json(raw, limit=MAX_BYTES):
     def pairs(items):
         result = {}
         for key, value in items:
@@ -164,7 +166,7 @@ def parse_json(raw):
             result[key] = value
         return result
     try:
-        require(len(raw) <= MAX_BYTES, "document-too-large")
+        require(len(raw) <= limit, "document-too-large")
         return json.loads(raw, object_pairs_hook=pairs,
                           parse_constant=lambda _: (_ for _ in ()).throw(EnrollmentError("nonfinite-json")))
     except (ValueError, TypeError, UnicodeError):
@@ -844,7 +846,7 @@ class Cloud:
                 raise EnrollmentError("common-storage-private-routing-dns-or-entra-access-required:" + exc.code) from None
             raise
 
-    def gh(self, method, endpoint, body=None, allowed=(200,)):
+    def gh(self, method, endpoint, body=None, allowed=(200,), limit=MAX_BYTES):
         require(method in ("GET", "POST") or (
             method == "PATCH" and _single_writer(self.request_config)
             and endpoint == "repos/" + urlsplit(self.request_config["route"]["repository"]).path.strip("/").removesuffix(".git")
@@ -871,12 +873,12 @@ class Cloud:
         require(result.returncode == 0 or status == 404, "github-authentication-or-command-failed")
         headers = {k.lower(): v.strip() for line in header.splitlines()[1:] if ":" in line
                    for k, v in [line.split(":", 1)]}
-        return status, headers, parse_json(text) if text.strip() else None
+        return status, headers, parse_json(text, limit) if text.strip() else None
 
     def state_request(self, kind, method, endpoint, body, allowed):
         require(_single_writer(self.request_config), "single-writer-not-selected")
         if kind == "gha":
-            return self.gh(method, endpoint, body, allowed)
+            return self.gh(method, endpoint, body, allowed, limit=STATE_RESPONSE_MAX)
         return self.http(method, endpoint, ADO_AUDIENCE, data=body,
                          tenant=self.request_config["ado_tenant_id"], allowed=allowed)
 

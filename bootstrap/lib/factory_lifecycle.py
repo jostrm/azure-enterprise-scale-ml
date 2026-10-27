@@ -57,6 +57,8 @@ REVERSE_LINKS = {
                                                   "applicationGatewayIPConfigurations"),
 }
 MAX_DOCUMENT = 8 * 1024 * 1024
+# A provider state read returns state.json (provider_repository_state.MAX_BYTES, 32 MiB) as a base64 blob.
+STATE_RESPONSE_MAX = 48 * 1024 * 1024
 RECEIPT_REPLACE_ATTEMPTS = 20
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
 READ_TRANSPORT_ATTEMPTS = 3
@@ -1229,9 +1231,9 @@ class Cloud:
             raise Blocked("single-writer-provider-write-or-read-uncertain") from None
         with response:
             status = response.code
-            raw, incoming = response.read(MAX_DOCUMENT + 1), dict(response.headers)
+            raw, incoming = response.read(STATE_RESPONSE_MAX + 1), dict(response.headers)
         require(status in allowed, "single-writer-provider-request-failed-" + str(status))
-        require(len(raw) <= MAX_DOCUMENT, "single-writer-provider-response-too-large")
+        require(len(raw) <= STATE_RESPONSE_MAX, "single-writer-provider-response-too-large")
         try:
             return status, incoming, json.loads(raw) if raw else None
         except (ValueError, UnicodeError):

@@ -387,6 +387,9 @@ class Snapshots:
                 raw = raw[:-1] + b',"schema":1}'
             elif self.corrupt == "oversize":
                 raw = b" " * (ps.MAX_BYTES + 1)
+            elif self.corrupt == "large":
+                value["records"]["closure"] = {"bytes": "x" * (9 * 1024 * 1024)}
+                raw = ps.canonical(value)
             if self.advances:
                 self.head += 1
                 self.advances -= 1
@@ -485,3 +488,21 @@ def test_provider_write_transport_failure_is_one_attempt_and_latches_write_faile
     with pytest.raises(fl.Blocked, match="^single-writer-write-reconciliation-required$"):
         fake.store.replace(f"{fake.head:040x}", fake.store.empty())
     assert len(mutations) == 1
+
+
+@pytest.mark.parametrize("kind", ["gha", "ado"])
+def test_provider_state_above_the_old_8_mib_limit_is_read(kind):
+    # aif-134 COMMON (2026-10-27): bootstrap_final_closure made state.json 6.4 MB; its base64 blob response
+    # (~8.7 MB) exceeded the 8 MiB transport cap and every later state read failed with
+    # single-writer-provider-response-too-large. PROJECT closures grow it further.
+    fake = Snapshots(kind, corrupt="large")
+    head, value = fake.store.read()
+    assert len(value["records"]["closure"]["bytes"]) == 9 * 1024 * 1024
+
+
+def test_state_transport_caps_fit_the_base64_of_the_largest_state():
+    fe = load("factory_enrollment")
+    assert ps.MAX_BYTES >= 32 * 1024 * 1024
+    largest_blob_response = 4 * ((ps.MAX_BYTES + 2) // 3) + 64 * 1024
+    assert fl.STATE_RESPONSE_MAX >= largest_blob_response
+    assert fe.STATE_RESPONSE_MAX >= largest_blob_response
