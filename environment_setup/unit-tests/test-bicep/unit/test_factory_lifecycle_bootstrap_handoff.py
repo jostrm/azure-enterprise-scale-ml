@@ -1422,6 +1422,93 @@ def test_dns_soa_collection_items_drift_cannot_reuse_consent(dns_consent, reseal
         fl.verify_dns_soa_preservation(case.document, closure)
 
 
+PRIVATE_ENDPOINT = GROUP + "/providers/Microsoft.Network/privateEndpoints/pend-acr-cmnsdc-containerreg-to-vnt-esmlcmn"
+FOREIGN_ENDPOINT = GROUP.replace("/reviewed", "/foreign") + "/providers/Microsoft.Network/privateEndpoints/pend-foreign"
+ENDPOINT_GUID = "c6ed2d61-7dbb-48f0-9e8a-45afd641c84d"
+
+
+def endpoint_a_record(zone, name, endpoint, creator=True):
+    """An A record set as a private endpoint's DNS zone group writes it (aif-137 privatelink.azurecr.io, 2026-10-27)."""
+    record = {"id": zone + "/A/" + name, "type": "Microsoft.Network/privateDnsZones/A", "etag": '"a-' + name + '"',
+              "properties": {"ttl": 10, "fqdn": name + ".privatelink.adf.azure.com.", "isAutoRegistered": False,
+                             "aRecords": [{"ipv4Address": "10.138.0.7"}]}}
+    if creator:
+        record["properties"]["metadata"] = {"creator": "created by private endpoint " + endpoint.rsplit("/", 1)[1]
+                                            + " with resource guid " + ENDPOINT_GUID}
+    return record
+
+
+def with_endpoint_records(case, records, endpoints=(PRIVATE_ENDPOINT,)):
+    """The fixture closure after COMMON: the endpoints exist and their A records sit in the preserved zone."""
+    closure = copy.deepcopy(case.closure)
+    for endpoint in endpoints:
+        closure["resources"][endpoint.lower()] = {"type": "microsoft.network/privateendpoints", "api_version": "2024-05-01",
+                                                  "body_hash": fl.digest({"id": endpoint}), "etag": None}
+    entry = closure["collections"][case.zone + "/a"]
+    items = entry["items"] + [fl.fingerprint_body(record) for record in records]
+    entry.update(ids=sorted(row["id"].lower() for row in items), items=items, body_hash=fl.digest(items))
+    for record in records:
+        closure["resources"][record["id"].lower()] = {"type": "microsoft.network/privatednszones/a",
+                                                      "api_version": entry["api_version"],
+                                                      "body_hash": fl.resource_digest(record), "etag": record["etag"]}
+    return closure
+
+
+def test_dns_soa_accepts_a_records_of_this_factorys_private_endpoints_as_evidence(dns_consent):
+    # aif-137 (2026-10-27): COMMON's private endpoints wrote their A records into the prerequisite zones and the final
+    # closure stopped with dns-soa-record-set-inventory-changed. Azure names the endpoint in each record's metadata:
+    # records of this factory's own endpoints are evidence, not a changed zone, and not unreviewed descendants.
+    case = dns_consent
+    records = [endpoint_a_record(case.zone, "acrcommon35xnlsdc001dev", PRIVATE_ENDPOINT),
+               endpoint_a_record(case.zone, "acrcommon35xnlsdc001dev.swedencentral.data", PRIVATE_ENDPOINT)]
+    closure = with_endpoint_records(case, records)
+    inventory = fl.dns_record_set_inventory(closure, case.zone)
+    assert fl.digest(inventory) == case.proposal["parents"][case.zone]["record_set_inventory_hash"]
+    assert inventory["collections"][case.zone + "/a"]["ids"] == [] and set(inventory["resources"]) == {case.soa}
+    owner = {"name": PRIVATE_ENDPOINT.rsplit("/", 1)[1].lower(), "resource_guid": ENDPOINT_GUID}
+    expected = {record["id"].lower(): owner for record in records}
+    assert fl.dns_private_endpoint_records(closure, case.zone) == expected
+    assert fl.verify_dns_soa_preservation(case.document, closure) == {case.zone: expected}
+    assert case.zone in fl.verify_bootstrap_final_closure(case.document, closure)
+    assert closure["collections"][case.zone + "/a"]["ids"] == sorted(expected)
+
+
+@pytest.mark.parametrize("field,value", [("serialNumber", 2), ("email", "someone.example.com"), ("ttl", 42)])
+def test_dns_soa_record_change_still_blocks_beside_endpoint_records(dns_consent, field, value):
+    case = dns_consent
+    closure = with_endpoint_records(case, [endpoint_a_record(case.zone, "acrcommon", PRIVATE_ENDPOINT)])
+    entry = closure["collections"][case.zone + "/soa"]
+    properties = entry["items"][0]["properties"]
+    (properties.setdefault("soaRecord", {}) if field != "ttl" else properties)[field] = value
+    entry["body_hash"] = fl.digest(entry["items"])
+    closure["resources"][case.soa]["body_hash"] = fl.resource_digest(entry["items"][0])
+    with pytest.raises(fl.Blocked, match="dns-soa-record-set-inventory-changed"):
+        fl.verify_dns_soa_preservation(case.document, closure)
+
+
+@pytest.mark.parametrize("placement", ["absent", "outside-reviewed-groups"])
+def test_dns_soa_a_record_of_a_foreign_private_endpoint_blocks(dns_consent, placement):
+    case = dns_consent
+    endpoints = (PRIVATE_ENDPOINT,) if placement == "absent" else (PRIVATE_ENDPOINT, FOREIGN_ENDPOINT)
+    closure = with_endpoint_records(case, [endpoint_a_record(case.zone, "acrcommon", FOREIGN_ENDPOINT)], endpoints)
+    with pytest.raises(fl.Blocked, match="dns-soa-foreign-private-endpoint-record"):
+        fl.verify_dns_soa_preservation(case.document, closure)
+
+
+@pytest.mark.parametrize("creator", [None, "created by someone else",
+                                     "created by private endpoint pend-x with resource guid not-a-guid"])
+def test_dns_soa_hand_made_a_record_still_blocks(dns_consent, creator):
+    case = dns_consent
+    record = endpoint_a_record(case.zone, "manual", PRIVATE_ENDPOINT, creator=False)
+    if creator:
+        record["properties"]["metadata"] = {"creator": creator}
+    closure = with_endpoint_records(case, [record])
+    assert fl.dns_private_endpoint_records(closure, case.zone) == {}
+    for verify in (fl.verify_dns_soa_preservation, fl.verify_bootstrap_final_closure):
+        with pytest.raises(fl.Blocked, match="dns-soa-record-set-inventory-changed"):
+            verify(case.document, closure)
+
+
 def test_dns_soa_consent_preserves_exact_present_instance_without_historical_authority(dns_consent):
     case = dns_consent
     snapshot = fl.bootstrap_ownership_snapshot(case.cloud, case.document)
