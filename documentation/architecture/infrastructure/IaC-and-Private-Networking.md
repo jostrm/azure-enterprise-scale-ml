@@ -266,6 +266,24 @@ so it needs its own decision.
 parameter names each provider passes to every GenAI phase template. Its `KNOWN_GAPS`
 lists the remaining reviewed differences, and closing one must remove its entry.
 
+Common subnet without BYO subnets (2026-10-27): the `subnetCommon*` values in
+`variables.json` and `variables.yaml` (`snet-dev-esml-cmn-001`, ...) are BYO examples.
+The common route ignores them unless `BYO_subnets` is true (`13-rgLevel.bicep`
+`defaultSubnet`). 02, 06 and 09 take no `BYO_subnets` parameter and use any non-empty
+`subnetCommon`, so the pipelines must clear it. ADO's `job-2-genai-services` already did. The
+GHA project job env guarded only the GitHub-variable route. `00_Apply_JSON_Config_Override`
+then wrote the JSON examples to `GITHUB_ENV`, and nothing cleared them. So on Simple Mode
+(the CLI dispatches the project with `config_file=aifactory/variables.json`, the common
+without it), 02 tried to move the common ACR private endpoint to a subnet that does not
+exist (`CannotChangeSubnetOnExistingPrivateEndpoint`), and 06/09 referenced it as an existing
+subnet. `00_Resolve_Network_Env_Placeholders` now clears `subnetCommon`, `subnetCommonScoring`
+and `subnetCommonPowerbiGw` when the effective `BYO_subnets` (after the JSON override) is not
+true, next to the existing `subnetProjLogicapp` clear. `unit/test_byo_common_subnet.py`
+replays job env, override and that step offline for dev, stage and prod. With
+`BYO_subnets=false` the project and common jobs resolve the same `common_subnet_name`, and
+BYO values still pass through. A JSON `BYO_subnets` overrides `BYO_SUBNETS`, as every
+override does. This proves the source contract, not a live deployment.
+
 Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
 finish before Web App/Function integration. Function also depends on Web App,
 and the batch Container Apps module (v1.24: environment module) waits for both.
