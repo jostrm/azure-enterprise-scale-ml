@@ -213,9 +213,9 @@ def test_redeploy_can_skip_the_common_vnet_put(form, main_template):
 
 
 def test_every_stage_uses_the_common_subnet_the_network_stage_creates(committed):
-    # The project job applies variables.json (subnetCommon "snet-dev-esml-cmn-001") while the common job, dispatched
-    # without the JSON override, creates and uses common_subnet_name. Observed: CannotChangeSubnetOnExistingPrivateEndpoint
-    # on the common ACR endpoint in 02-core-infrastructure.
+    # The project job applies variables.json (subnetCommon "snet-dev-esml-cmn-001"), and its BYO_subnets guard in
+    # 00_Resolve_Network_Env_Placeholders clears it, so it uses common_subnet_name as the common job does. Observed
+    # before that guard: CannotChangeSubnetOnExistingPrivateEndpoint on the common ACR endpoint in 02-core-infrastructure.
     stages = committed["stages"]
     created = stages["common-12-networkCommon"]["constants"]["common_subnet_name"]
     checked = 0
@@ -229,6 +229,29 @@ def test_every_stage_uses_the_common_subnet_the_network_stage_creates(committed)
         assert not values.get("subnetCommonScoring") and not values.get("subnetCommonPowerbiGw"), key
         checked += 1
     assert checked >= 4
+
+
+def test_byo_subnet_guard_is_replayed_from_the_project_workflow():
+    text = (ROOT / GENERATOR.WORKFLOWS / "infra-project-phase.yml").read_text(encoding="utf-8-sig")
+    assert {"subnetCommon", "subnetCommonScoring", "subnetCommonPowerbiGw"} <= set(GENERATOR.byo_subnet_clears(text))
+    unguarded = text.replace('echo "subnetCommon=" >> "$GITHUB_ENV"', "")
+    assert "subnetCommon" not in GENERATOR.byo_subnet_clears(unguarded)
+
+
+def test_common_subnet_check_compares_project_and_common_resolution():
+    common = {"BYO_subnets": "false", "subnetCommon": "", "common_subnet_name": "snet-esml-cmn-001", "network_env": "dev"}
+    GENERATOR.check_common_subnet(common, common)
+    with pytest.raises(SystemExit, match="snet-dev-esml-cmn-001"):
+        GENERATOR.check_common_subnet(common, {**common, "subnetCommon": "snet-dev-esml-cmn-001"})
+    byo = {**common, "BYO_subnets": "true", "subnetCommon": "snet-<network_env>-customer"}
+    GENERATOR.check_common_subnet(byo, byo)
+
+
+def test_generation_fails_when_the_source_does_not_clear_the_byo_examples(monkeypatch):
+    # A source without the workflow guard must stop generation, not publish a package that fails in 02.
+    monkeypatch.setattr(GENERATOR, "byo_subnet_clears", lambda text: [])
+    with pytest.raises(SystemExit, match="common subnet"):
+        GENERATOR.build_variant(ROOT)
 
 
 def test_main_does_not_inline_stage_templates(main_template):

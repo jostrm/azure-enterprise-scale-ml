@@ -436,7 +436,30 @@ def resolved_environment(raw_env: dict[str, str], variables: dict, github: dict,
     return env
 
 
-def project_dynamic_env(env: dict[str, str]) -> dict[str, str]:
+def byo_subnet_clears(project_text: str) -> list[str]:
+    """Names 00_Resolve_Network_Env_Placeholders clears in GITHUB_ENV when BYO_subnets is not true."""
+    _, start = job_env(project_text, "deploy-project")
+    step = next(item for item in steps(project_text, start) if item["name"] == "00_Resolve_Network_Env_Placeholders")
+    guard = re.search(r'if \[ "\$\{\{ env\.BYO_subnets \}\}" != "true" \]; then\n(.*?)\n\s*fi\n',
+                      "\n".join(step["body"]) + "\n", re.S)
+    return re.findall(r'^\s*echo "(\w+)=" >> "\$GITHUB_ENV"\s*$', guard[1], re.M) if guard else []
+
+
+def check_common_subnet(common_env: dict[str, str], project_env: dict[str, str]) -> None:
+    """Fail generation when project stages would use another common subnet than the common stages."""
+    def resolve(name: str, network_env: str) -> str:
+        return name.replace("<network_env>", network_env)
+    # 13-rgLevel defaultSubnet; 02 commonSubnetName and 06/09 commonSubnetPends.
+    common = (resolve(common_env["subnetCommon"], common_env.get("network_env", ""))
+              if common_env.get("BYO_subnets") == "true" else common_env["common_subnet_name"])
+    project = (resolve(project_env["subnetCommon"], project_env.get("network_env", ""))
+               if project_env.get("subnetCommon") else project_env["common_subnet_name"])
+    if project != common:
+        raise SystemExit(f"Project stages use common subnet '{project}', but the common stages use '{common}'. "
+                         "The source workflow no longer clears the variables.json BYO examples; fix the source.")
+
+
+def project_dynamic_env(env: dict[str, str], byo_clears: list[str]) -> dict[str, str]:
     """GITHUB_ENV writes of the project workflow, replayed for a greenfield Simple Mode run."""
     dynamic = {
         # 00_Initialize_Derived_Variables
@@ -463,11 +486,8 @@ def project_dynamic_env(env: dict[str, str]) -> dict[str, str]:
         "skipACRAssignments": "false", "existingAcrPushUserPrincipals": "", "existingAcrPushSPPrincipals": "",
     }
     if env.get("BYO_subnets") != "true":
-        # Portal correction, not a replay: the project job applies variables.json (subnetCommon
-        # "snet-dev-esml-cmn-001"), but the common job is dispatched without the JSON override and creates and
-        # uses common_subnet_name. Empty values make every stage fall back to that subnet, as the common job does
-        # (observed: CannotChangeSubnetOnExistingPrivateEndpoint on the common ACR endpoint in 02).
-        dynamic.update({"subnetCommon": "", "subnetCommonScoring": "", "subnetCommonPowerbiGw": ""})
+        # 00_Resolve_Network_Env_Placeholders BYO_subnets guard (subnetProjLogicapp, subnetCommon*), read from the source.
+        dynamic.update({name: "" for name in byo_clears})
     return dynamic
 
 
@@ -801,6 +821,7 @@ def build_variant(root: Path, selection: list[str] | None = None, overrides: dic
     inputs = {"deploy_dev": "true", "deploy_stage": "false", "deploy_prod": "false"}
     env = resolved_environment(raw, variables, github, inputs, json_override=False)
     env["network_env"] = env["network_env"] or "dev"  # Initialize derived variables
+    common_env = env
     for call in calls:
         if should_run(call["if"], env, inputs, github):
             stages[f"common-{call['template']}"] = pipeline_stage(root, call, env, github, inputs, "common")
@@ -813,12 +834,14 @@ def build_variant(root: Path, selection: list[str] | None = None, overrides: dic
 
     project_text = (workflows / "infra-project-phase.yml").read_text(encoding="utf-8-sig")
     raw, calls = stage_calls(project_text, "deploy-project")
+    byo_clears = byo_subnet_clears(project_text)
     for phase in ("infra", "foundry"):
         inputs = {"environment": "dev", "phase": phase, "deployment_id": "", "config_hash": "",
                   "config_file": "aifactory/variables.json", "use_self_hosted": "false", "runner_label": "",
                   "config_secret": "AIFACTORY_CONFIG_JSON"}
         env = resolved_environment(raw, variables, github, inputs, json_override=True)
-        env.update(project_dynamic_env(env))
+        env.update(project_dynamic_env(env, byo_clears))
+        check_common_subnet(common_env, env)
         seen: dict[str, int] = {}
         for call in calls:
             if (call["template"] == "03-cognitive-services" and phase == "infra"
