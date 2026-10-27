@@ -19,6 +19,9 @@ TEMPLATE = "bootstrap/lib/all-factories-dashboard.bicep"
 SOURCE_FILES = ("bootstrap/lib/all_factories_dashboard.py", TEMPLATE, *foundation.SOURCE_FILES)
 DASHBOARD_API = "2020-09-01-preview"
 DEPLOYMENT_API = "2022-09-01"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py). A reviewed plan stays executable this long.
+REVIEW_SECONDS = 1800
+BICEP_BUILD_TIMEOUT_SECONDS = 240
 ordinary = foundation.ordinary
 require = foundation.require
 digest = enrollment.digest
@@ -58,7 +61,7 @@ def compile_template(path):
     bicep = shutil.which("bicep")
     require(bicep is not None, "existing-bicep-cli-required")
     result = subprocess.run([bicep, "build", str(path), "--stdout"], capture_output=True,
-                            text=True, check=False, timeout=120)
+                            text=True, check=False, timeout=BICEP_BUILD_TIMEOUT_SECONDS)
     require(result.returncode == 0, "dashboard-bicep-compilation-failed:" + result.stderr)
     return enrollment.parse_json(result.stdout)
 
@@ -132,7 +135,7 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, selected
                            "parameters": {key: {"value": value} for key, value in parameters.items()}}}
     plan = {
         "contract_version": CONTRACT_VERSION, "stage": STAGE, "plan_id": str(uuid4()),
-        "prepared_at": time.time(), "expires_at": time.time() + 900, "source": source,
+        "prepared_at": time.time(), "expires_at": time.time() + REVIEW_SECONDS, "source": source,
         "inputs": {"tenant_id": tenant, "hub_resource_group_id": rg, "location": location,
                    "selected_subscription_ids": subscriptions},
         "target": target, "principal_id": principal, "coordination": coordinates,

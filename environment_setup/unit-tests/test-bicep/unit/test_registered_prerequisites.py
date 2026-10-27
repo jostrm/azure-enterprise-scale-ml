@@ -73,7 +73,7 @@ def graph_transport(monkeypatch):
 
     def open_request(request, **kwargs):
         state.calls.append(request)
-        assert kwargs["timeout"] == 90
+        assert kwargs["timeout"] == core.GRAPH_REQUEST_TIMEOUT_SECONDS == 180
         if state.status == 401:
             raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
         response = io.BytesIO(b"{}")
@@ -117,7 +117,7 @@ def test_canonical_graph_resource_still_propagates_401_without_retry(graph_trans
     assert len(state.commands) == 1 and len(state.calls) == 1
 
 
-@pytest.mark.parametrize("elapsed", [3479, 3480, 3599, 3601])
+@pytest.mark.parametrize("elapsed", [3359, 3360, 3599, 3601])
 @pytest.mark.parametrize("audience", [core.GRAPH, "00000003-0000-0000-c000-000000000000"])
 def test_graph_token_cache_refreshes_before_each_request(graph_transport, elapsed, audience):
     state = graph_transport
@@ -130,12 +130,12 @@ def test_graph_token_cache_refreshes_before_each_request(graph_transport, elapse
     state.expiry = state.now + 3600
     cloud.read_only = False
     cloud.graph("POST", "groups", {"displayName": "reviewed"})
-    assert len(state.issued) == 2 + (elapsed >= 3480)
-    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3480)
+    assert len(state.issued) == 2 + (elapsed >= 3600 - core.enrollment.TOKEN_MIN_REMAINING_SECONDS)
+    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3600 - core.enrollment.TOKEN_MIN_REMAINING_SECONDS)
     assert len(state.calls) == 2 and state.calls[-1].method == "POST"
     assert cloud.operator_id == MEMBER
     cloud.graph("GET", "groups")
-    assert len(state.issued) == 2 + (elapsed >= 3480)
+    assert len(state.issued) == 2 + (elapsed >= 3600 - core.enrollment.TOKEN_MIN_REMAINING_SECONDS)
     assert all(not any("header." in arg or "secret-must-not-leak" in arg for arg in argv)
                for argv in state.commands)
 
@@ -1144,7 +1144,7 @@ def test_a_group_graph_never_shows_stays_uncertain_after_a_bounded_wait(workspac
     assert result["status"] == "uncertain" and result["error"] == code, result
     assert result["bindings"]["team_group_id"] == GROUP
     assert len(graph_posts(runtime, "groups")) == 1
-    assert 0 < sum(waits) <= 180
+    assert 0 < sum(waits) <= 360
 
 
 @pytest.mark.parametrize("include_member_fields", [False, True])
@@ -1771,7 +1771,7 @@ def test_gateway_route_failed_write_or_verification_is_durable_uncertain_no_retr
     assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
     assert len([write for write in runtime.writes if write[0] == "arm" and write[2] == identifier]) == 1
     if failure == "timeout":
-        assert len(sleeps) == len([item for item in polls if item == "get"]) == 240
+        assert len(sleeps) == len([item for item in polls if item == "get"]) == core.RESOURCE_PROVISIONING_POLLS == 480
         assert "provisioning-uncertain" in result["error"]
     before_retry = copy.deepcopy(runtime.writes)
     with pytest.raises((core.PrerequisiteError, FileExistsError)):

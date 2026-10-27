@@ -84,7 +84,7 @@ variables:
 jobs:
   - job: HealthModel
     displayName: Azure Monitor health model ${{ parameters.mode }} (${{ parameters.scope }})
-    timeoutInMinutes: 60
+    timeoutInMinutes: 120
     pool:
       ${{ if eq(parameters.runnerSelection, 'self-hosted') }}:
         name: ${{ parameters.selfHostedPool }}

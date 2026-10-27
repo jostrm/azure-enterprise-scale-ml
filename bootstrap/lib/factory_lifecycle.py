@@ -59,20 +59,39 @@ REVERSE_LINKS = {
 MAX_DOCUMENT = 8 * 1024 * 1024
 # A provider state read returns state.json (provider_repository_state.MAX_BYTES, 32 MiB) as a base64 blob.
 STATE_RESPONSE_MAX = 48 * 1024 * 1024
-RECEIPT_REPLACE_ATTEMPTS = 20
+# Time budgets this helper defines itself; doubled 2026-10-27 after aif-138 COMMON ran out of time (pinned in
+# test_time_budgets.py, documented in pink docs/operations/Timeouts-and-limits.md).
+RECEIPT_REPLACE_ATTEMPTS = 40
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
-READ_TRANSPORT_ATTEMPTS = 3
-READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5)
+READ_TRANSPORT_ATTEMPTS = 6
+READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5, 1, 2, 4)
 # Windows getaddrinfo "no data record": a resolver hiccup for an ARM host that always resolves.
 WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
-READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
+READ_TRANSPORT_RETRY_WINDOW_SECONDS = 360
 # ARM answers a burst of reads with 429 and an overloaded front end with 503, both with Retry-After. A throttled
 # GET/HEAD is sent again within the same window; writes and every other status still stop at once.
-THROTTLED_READ_ATTEMPTS = 8
+THROTTLED_READ_ATTEMPTS = 16
 THROTTLED_READ_DEFAULT_DELAY_SECONDS = 5
 THROTTLED_READ_MAX_DELAY_SECONDS = 60
-REMOTE_SOCKET_TIMEOUT_SECONDS = 60
+REMOTE_SOCKET_TIMEOUT_SECONDS = 120
+# Workload-identity and provider (GitHub/ADO) requests outside Cloud.request.
+SIDE_REQUEST_TIMEOUT_SECONDS = 120
+# One az/gh/git command.
+LOCAL_COMMAND_TIMEOUT_SECONDS = 240
+# Polling deadlines, as poll counts: x 5 s unless noted.
+LEAF_DELETE_POLLS = 240                 # 20 min
+RESOURCE_GROUP_DELETE_POLLS = 2880      # 4 h: whole resource groups routinely outlast the leaf budget
+WHAT_IF_POLLS = 240                     # 20 min
+FOUNDRY_READINESS_POLLS = 360           # 30 min
+ARM_DEPLOYMENT_POLLS = 2880             # 4 h
+GITHUB_DISPATCH_DISCOVERY_POLLS = 120   # x 2 s = 4 min
+# Not doubled: x 15 s = 6 h, GitHub's 360-minute job maximum; a longer wait would only hang the end-to-end run.
+PROVIDER_RUN_POLLS = 1440
+# Not doubled: the longest reviewed manifest lifetime, equal to pink BOOTSTRAP_FROZEN_SECONDS (raised 30 -> 60 min).
+MANIFEST_MAX_LIFETIME_SECONDS = 3600
+# Not doubled: a token is refreshed when it has less than this left; ARM checks a token when the request arrives.
+TOKEN_MIN_REMAINING_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
 RESOURCE_CLOSURE_READ_WORKERS = 8
 # The peer cut the TLS session (EOF without close_notify, or close_notify): a transport drop like a reset,
@@ -496,7 +515,7 @@ def _validate_manifest(document):
     require(type(document.get("manifest_revision")) is int and document["manifest_revision"] > 0,
             "invalid-manifest-revision")
     created, expires = timestamp(document.get("prepared_at")), timestamp(document.get("expires_at"))
-    require(0 < expires - created <= 3600, "manifest-expired-or-invalid-lifetime")
+    require(0 < expires - created <= MANIFEST_MAX_LIFETIME_SECONDS, "manifest-expired-or-invalid-lifetime")
     for name in ("target", "identity", "route", "source", "config", "locks"):
         require(isinstance(document.get(name), dict), "missing-" + name)
     target, source, route = document["target"], document["source"], document["route"]
@@ -1062,7 +1081,7 @@ class Cloud:
             command[0] = executable
         try:
             result = self.runner(command, cwd=cwd, input=data, shell=False, text=True, encoding="utf-8",
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=LOCAL_COMMAND_TIMEOUT_SECONDS)
         except (OSError, subprocess.SubprocessError):
             raise Blocked("command-unavailable-or-timed-out") from None
         require(result.returncode == 0, "command-failed")
@@ -1076,7 +1095,7 @@ class Cloud:
     def _token(self, audience):
         require(not single_writer(self.document) or audience.rstrip("/") != "https://storage.azure.com",
                 "single-writer-storage-access-forbidden")
-        if self.token_expiries.get(audience, 0) <= time.time() + 60:
+        if self.token_expiries.get(audience, 0) <= time.time() + TOKEN_MIN_REMAINING_SECONDS:
             self.tokens.pop(audience, None)
         if audience not in self.tokens:
             target = self.document["target"]
@@ -1093,7 +1112,7 @@ class Cloud:
                 require(str(claims.get("tid", "")).lower() == target["tenant_id"].lower()
                         and str(claims.get("oid", "")).lower() == self.expected_object_id.lower(),
                         "authenticated-identity-mismatch")
-                require(float(claims.get("exp", 0)) > time.time() + 60, "authentication-expiring")
+                require(float(claims.get("exp", 0)) > time.time() + TOKEN_MIN_REMAINING_SECONDS, "authentication-expiring")
             except Blocked:
                 raise
             except (KeyError, ValueError, IndexError, TypeError):
@@ -1104,7 +1123,7 @@ class Cloud:
 
     def identity_json(self, request):
         try:
-            with self.opener.open(request, timeout=60) as response:
+            with self.opener.open(request, timeout=SIDE_REQUEST_TIMEOUT_SECONDS) as response:
                 require(response.code == 200, "workload-identity-request-failed")
                 raw = response.read(1024 * 1024 + 1)
             require(len(raw) <= 1024 * 1024, "workload-identity-response-too-large")
@@ -1271,7 +1290,7 @@ class Cloud:
                    "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"}
         try:
             response = self.opener.open(Request(url, method=method, data=canonical(body) if body is not None else None,
-                                                headers=headers), timeout=60)
+                                                headers=headers), timeout=SIDE_REQUEST_TIMEOUT_SECONDS)
         except HTTPError as error:
             response = error
         except (URLError, OSError, TimeoutError):
@@ -3011,8 +3030,8 @@ def delete_resources(cloud, locks, document, receipt, persist, sleep=time.sleep)
 
 
 def wait_absent(cloud, locks, resource_id, api_version, sleep):
-    # Whole resource groups routinely outlast the ten-minute leaf budget.
-    for _ in range(1440 if RG_ID.fullmatch(resource_id) else 120):
+    # Whole resource groups routinely outlast the 20-minute leaf budget.
+    for _ in range(RESOURCE_GROUP_DELETE_POLLS if RG_ID.fullmatch(resource_id) else LEAF_DELETE_POLLS):
         locks.assert_held()
         status, _, _ = cloud.arm("GET", resource_id, api_version, allowed=(200, 404))
         if status == 404:
@@ -3074,7 +3093,7 @@ def ado_project(cloud, locks, document, source_root, receipt, persist, sleep=tim
     receipt["remote_run"] = {"kind": "ado", "pipeline_id": pipeline, "run_id": run["id"]}
     receipt.pop("pending_dispatch", None)
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = request("GET", f"/pipelines/{pipeline}/runs/{run['id']}?api-version=7.1")
         version = (result.get("resources", {}).get("repositories", {}).get("self", {}).get("version"))
@@ -3291,7 +3310,7 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
         location = next((value for key, value in headers.items() if key.lower() == "location"), "")
         require(location.startswith(ARM + "/subscriptions/" + document["target"]["subscription_id"] + "/"),
                 "untrusted-what-if-poll-url")
-        for _ in range(120):
+        for _ in range(WHAT_IF_POLLS):
             sleep(5)
             poll_status, _, response = cloud.request("GET", location, ARM, allowed=(200, 202))
             state = response.get("status") if isinstance(response, dict) else None
@@ -3735,7 +3754,7 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
     locks.authorize(document)
     cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
     result = wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
-        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=1440,
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=ARM_DEPLOYMENT_POLLS,
         read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM), document=document)
     outputs = result.get("properties", {}).get("outputs", {}).get("foundationOutputs", {}).get("value", {})
     require(isinstance(outputs.get("miProjectName"), str) and isinstance(outputs.get("projectResourceGroupName"), str)
@@ -4540,7 +4559,7 @@ def verify_foundry_phase_changes(current, expected, preceding, observations=None
 
 
 def wait_foundry_resource(cloud, locks, identifier, ready, sleep, *, api_version=FOUNDRY_API,
-                         attempts=180, read=None, document=None):
+                         attempts=FOUNDRY_READINESS_POLLS, read=None, document=None):
     for attempt in range(attempts):
         locks.assert_held()
         if document is not None:
@@ -4897,7 +4916,7 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
         wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
             lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
-            sleep, attempts=1440, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
+            sleep, attempts=ARM_DEPLOYMENT_POLLS, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
             document=document)
         for step in document["deployment"]["steps"]:
             if step["id"] not in phase["step_ids"]:
@@ -5655,7 +5674,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
             receipt["mutation_started"] = True
             persist()
             cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
-            for _ in range(1440):
+            for _ in range(ARM_DEPLOYMENT_POLLS):
                 locks.assert_held()
                 _, _, state = cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM)
                 provisioned = state.get("properties", {}).get("provisioningState")
@@ -5894,7 +5913,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
                               else route["runner"]["labels"], separators=(",", ":")),
     }})
     run_id = None
-    for _ in range(60):
+    for _ in range(GITHUB_DISPATCH_DISCOVERY_POLLS):
         runs = github("GET", "/actions/workflows/factory-lifecycle.yml/runs?event=workflow_dispatch&per_page=100")
         matches = [row for row in runs.get("workflow_runs", []) if row.get("display_title") ==
                    "factory-lifecycle [" + document["run_id"] + "]"]
@@ -5908,7 +5927,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     require(run_id is not None, "scoped-github-dispatch-unverified")
     receipt["remote_run"] = {"kind": "gha", "run_id": run_id}
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = github("GET", "/actions/runs/" + str(run_id))
         require(result.get("head_sha") == route["commit"], "scoped-github-run-commit-mismatch")
@@ -5992,7 +6011,7 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
     receipt["remote_run"] = {"kind": "ado", "pipeline_id": pipeline, "run_id": run["id"]}
     receipt.pop("pending_dispatch", None)
     persist()
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         result = request("GET", f"/pipelines/{pipeline}/runs/{run['id']}?api-version=7.1")
         if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":

@@ -691,7 +691,7 @@ def arguments(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--subscription", required=True)
     parser.add_argument("--resource-group", required=True)
-    parser.add_argument("--timeout-seconds", default=1800, type=bounded_seconds(86400))
+    parser.add_argument("--timeout-seconds", default=3600, type=bounded_seconds(86400))
     parser.add_argument("--poll-seconds", default=15, type=bounded_seconds(300))
     parser.add_argument("--report-dir")
     commands = parser.add_subparsers(dest="action", required=True)

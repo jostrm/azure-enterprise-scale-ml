@@ -2272,7 +2272,7 @@ def test_what_if_perpetually_pending_is_bounded():
     with pytest.raises(fl.Blocked, match="arm-what-if-incomplete"):
         fl.evaluate_what_if(cloud, document, {"id": "factory", "scope": "subscription"},
                            {"properties": {}}, sleep=Mock())
-    assert opener.open.call_count == 121
+    assert opener.open.call_count == 1 + fl.WHAT_IF_POLLS == 241
 
 
 def test_foundry_ownership_uses_actual_canonical_tags_project_parameter():
@@ -2644,11 +2644,12 @@ def test_throttled_reads_stop_at_the_attempt_bound(throttled_reads):
 
 
 def test_throttled_reads_never_wait_past_the_read_window(throttled_reads):
-    # 60 s waits fit twice in the 180 s window after the first throttled answer; a third would reach its end.
-    cloud, server = throttled_reads.cloud((429, "60"), (429, "60"), (429, "60"), (200, None))
+    # 60 s waits fit five times in the 360 s window after the first throttled answer; a sixth would reach its end.
+    cloud, server = throttled_reads.cloud(*[(429, "60")] * 6, (200, None))
     with pytest.raises(fl.Blocked, match="^remote-request-failed-429$"):
         cloud.request("GET", THROTTLED_URL, fl.ARM)
-    assert len(server.methods) == 3 and throttled_reads.sleeps == [60, 60]
+    assert fl.READ_TRANSPORT_RETRY_WINDOW_SECONDS == 360
+    assert len(server.methods) == 6 and throttled_reads.sleeps == [60] * 5
 
 
 @pytest.mark.parametrize("method", ["PUT", "POST", "PATCH", "DELETE"])

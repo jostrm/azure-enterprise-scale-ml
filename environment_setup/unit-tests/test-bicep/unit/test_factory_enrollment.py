@@ -1259,7 +1259,7 @@ def token_transport(monkeypatch):
 
     def open_request(request, **kwargs):
         state.calls.append(request)
-        assert kwargs["timeout"] == 90
+        assert kwargs["timeout"] == en.REQUEST_TIMEOUT_SECONDS == 180
         if state.status == 401:
             raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
         return Response(state.status, {})
@@ -1276,7 +1276,7 @@ TOKEN_ROUTES = [
 
 
 @pytest.mark.parametrize("audience,tenant,url,method", TOKEN_ROUTES)
-@pytest.mark.parametrize("elapsed", [3479, 3480, 3599, 3601])
+@pytest.mark.parametrize("elapsed", [3359, 3360, 3599, 3601])
 def test_token_cache_refreshes_before_each_request_with_lifetime_budget(token_transport, audience, tenant, url,
                                                                       method, elapsed):
     state = token_transport
@@ -1290,12 +1290,12 @@ def test_token_cache_refreshes_before_each_request_with_lifetime_budget(token_tr
     cloud.read_only = False
     cloud.serialized_provisioning = True
     cloud.http(method, url, audience, tenant=tenant, data={"reviewed": True})
-    assert len(state.issued) == issued + (elapsed >= 3480)
-    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3480)
+    assert len(state.issued) == issued + (elapsed >= 3600 - en.TOKEN_MIN_REMAINING_SECONDS)
+    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3600 - en.TOKEN_MIN_REMAINING_SECONDS)
     assert len(state.calls) == 2 and state.calls[-1].method == method
     assert cloud.operator_id == OPERATOR
     cloud.http("GET", url, audience, tenant=tenant)
-    assert len(state.issued) == issued + (elapsed >= 3480)
+    assert len(state.issued) == issued + (elapsed >= 3600 - en.TOKEN_MIN_REMAINING_SECONDS)
     assert all(not any("header." in arg or "secret-must-not-leak" in arg for arg in argv)
                for argv in state.commands)
 
@@ -1484,7 +1484,7 @@ def test_default_cli_runner_resolves_windows_command_extension(monkeypatch):
     assert cloud.az("account", "list", "--all") == {}
     assert calls[0][0] == [command, "account", "list", "--all", "--only-show-errors", "--output", "json"]
     assert calls[0][1]["shell"] is False
-    assert calls[0][1]["timeout"] == 120
+    assert calls[0][1]["timeout"] == en.COMMAND_TIMEOUT_SECONDS == 240
 
 
 def test_default_cli_runner_reports_missing_executable(monkeypatch):

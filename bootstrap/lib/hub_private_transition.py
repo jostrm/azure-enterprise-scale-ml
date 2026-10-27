@@ -52,6 +52,15 @@ NETWORK_API = "2024-05-01"
 DNS_API = "2024-06-01"
 COMPUTE_API = "2024-03-01"
 PROBE = "bootstrap/templates/hub_private_probe.py"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py). A reviewed plan stays executable this long.
+REVIEW_SECONDS = 1800
+ATOMIC_REPLACE_ATTEMPTS = 20            # linear backoff, ~4.75 s in total
+DNS_LINK_READINESS_SECONDS = 240
+PROBE_RUN_COMMAND_MAX_SECONDS = 1200    # managed Run Command: our timeout (its default is 90 min)
+PROBE_POLLS = 300                       # x 4 s = 20 min, so polling outlasts the run command
+# Not time budgets, not doubled: a size bound on listed foundation proofs and the allowed attestation clock skew.
+FOUNDATION_PROOF_PAGES = 20
+ATTESTATION_CLOCK_SKEW_SECONDS = 30
 SOURCE_FILES = ("bootstrap/lib/hub_private_transition.py", "bootstrap/lib/hub_lock_foundation.py",
                 "bootstrap/lib/factory_enrollment.py", PROBE)
 REGISTRY = "private-transition/writers.json"
@@ -131,12 +140,12 @@ def _persist(path, value):
         os.fsync(stream.fileno())
     # Windows indexers can briefly open the previous receipt without delete
     # sharing. Retry only this local atomic rename, never a remote mutation.
-    for attempt in range(10):
+    for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
         try:
             os.replace(sibling, path)
             return
         except PermissionError:
-            if attempt == 9:
+            if attempt == ATOMIC_REPLACE_ATTEMPTS - 1:
                 raise
             Event().wait(0.025 * (attempt + 1))
 
@@ -251,7 +260,7 @@ def _wait_dns_link(plan, state, runtime, effect, observed, persist):
     entry = readiness.get(identifier)
     if entry is None:
         entry = {"effect_hash": digest(effect), "configuration": _dns_link_configuration(observed["value"]),
-                 "started_at": time.time(), "deadline": min(plan["expires_at"], time.time() + 120),
+                 "started_at": time.time(), "deadline": min(plan["expires_at"], time.time() + DNS_LINK_READINESS_SECONDS),
                  "provisioning_state": None, "link_state": None}
         readiness[identifier] = entry
         persist()
@@ -550,7 +559,7 @@ class Cloud(foundation.Cloud):
     def foundation_proofs(self):
         prefix = "bootstrap/foundation/"
         marker, seen, proofs = "", set(), []
-        for _ in range(20):
+        for _ in range(FOUNDATION_PROOF_PAGES):
             query = "?restype=container&comp=list&prefix=" + quote(prefix, safe="") + "&maxresults=100"
             if marker:
                 query += "&marker=" + quote(marker, safe="")
@@ -709,7 +718,8 @@ class Cloud(foundation.Cloud):
             command = "set -eu\npython3 -c " + "'" + python.replace("'", "'\"'\"'") + "'"
         body = {"location": request["vm_location"], "properties": {"source": {"script": command},
                 "asyncExecution": False,
-                "timeoutInSeconds": min(600, max(1, int(request["expires_at"] - request["issued_at"])))}}
+                "timeoutInSeconds": min(PROBE_RUN_COMMAND_MAX_SECONDS,
+                                         max(1, int(request["expires_at"] - request["issued_at"])))}}
         if not resume:
             require(_read(self, identifier, COMPUTE_API)["value"] is None, "probe-operation-already-exists")
             vm = _read(self, writer["vm_id"].lower(), COMPUTE_API)["value"]
@@ -719,7 +729,7 @@ class Cloud(foundation.Cloud):
             require(request["issued_at"] <= time.time() < request["expires_at"], "probe-request-expired")
             self.arm("PUT", identifier, COMPUTE_API, data=body, headers={"If-None-Match": "*"},
                      allowed=(200, 201, 202))
-        for _ in range(150):
+        for _ in range(PROBE_POLLS):
             status, _, operation = self.arm("GET", identifier + "?$expand=instanceView", COMPUTE_API, allowed=(200, 404))
             if status == 200:
                 require(operation.get("id", "").lower() == identifier.lower(), "run-command-identity-mismatch")
@@ -894,7 +904,7 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, context, expected_
         if not any(acl.get(k) for k in ("ipRules", "virtualNetworkRules", "resourceAccessRules")):
             desired_network["publicNetworkAccess"] = "Disabled"
     plan = {"contract_version": CONTRACT_VERSION, "stage": "hub-private-" + phase, "plan_id": str(uuid4()),
-            "source": source, "prepared_at": time.time(), "expires_at": time.time() + 900,
+            "source": source, "prepared_at": time.time(), "expires_at": time.time() + REVIEW_SECONDS,
             "target": target, "principal_id": principal, "hub_resource_group_id": hub, "coordination": coordinates,
             "context": copy.deepcopy(context), "observations": observations, "effects": effects,
             "registries": registries, "writers": writers, "writer_attestations": writer_attestations,
@@ -966,7 +976,7 @@ def _verify_result(result, request, *, historical=False):
     for key in ("nonce", "plan_hash", "writer_id", "tenant_id", "principal_id", "source_commit",
                 "source_sha256", "operation_id", "phase", "runner_id", "repository"):
         require(result.get(key) == request[key], "runner-attestation-mismatch:" + key)
-    require(request["issued_at"] <= result.get("at", 0) <= min(time.time() + 30, request["expires_at"])
+    require(request["issued_at"] <= result.get("at", 0) <= min(time.time() + ATTESTATION_CLOCK_SKEW_SECONDS, request["expires_at"])
             and (historical or time.time() < request["expires_at"])
             and result.get("addresses") == [request["private_ip"]], "runner-attestation-stale-or-wrong-ip")
 

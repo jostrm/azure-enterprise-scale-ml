@@ -98,7 +98,7 @@ stages:
       # so deploying/maintaining the private network is pointless.
       condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -137,7 +137,7 @@ stages:
       condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 240  # Increased timeout to accommodate retries
+      timeoutInMinutes: 360  # Increased timeout to accommodate retries
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -182,7 +182,7 @@ stages:
       condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded', 'SucceededWithIssues'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
-      timeoutInMinutes: 240
+      timeoutInMinutes: 360
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -239,7 +239,7 @@ stages:
       # so deploying/maintaining the private network is pointless.
       condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
-      timeoutInMinutes: 240
+      timeoutInMinutes: 360
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -278,7 +278,7 @@ stages:
       condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 240  # Increased timeout to accommodate retries
+      timeoutInMinutes: 360  # Increased timeout to accommodate retries
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -321,7 +321,7 @@ stages:
       condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded', 'SucceededWithIssues'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
-      timeoutInMinutes: 240
+      timeoutInMinutes: 360
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -380,7 +380,7 @@ stages:
       # so deploying/maintaining the private network is pointless.
       condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -419,7 +419,7 @@ stages:
       condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 240  # Increased timeout to accommodate retries
+      timeoutInMinutes: 360  # Increased timeout to accommodate retries
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
@@ -462,7 +462,7 @@ stages:
       condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded', 'SucceededWithIssues'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
-      timeoutInMinutes: 240
+      timeoutInMinutes: 360
       pool:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)

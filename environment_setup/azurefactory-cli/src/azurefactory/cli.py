@@ -26,6 +26,14 @@ EXIT_BLOCKED = 3
 EXIT_TIMEOUT = 4
 EXIT_FAILURE = 5
 
+# Client-side time budgets (doubled 2026-10-27; pinned in tests/test_time_budgets.py).
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 60.0
+PREFLIGHT_REQUEST_TIMEOUT_SECONDS = 360.0
+COST_REQUEST_TIMEOUT_SECONDS = 600.0
+WATCH_TIMEOUT_SECONDS = 600.0
+WATCH_MAX_RETRIES = 6
+POLL_TIMEOUT_SECONDS = 1200.0
+
 REQUIRED_OPENAPI_PATHS = {
     "/health": {"get"},
     "/api/v1/schema": {"get"},
@@ -149,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-url", default=os.getenv(API_URL_ENV), help=f"API base URL (env {API_URL_ENV}, default loopback:8765).")
     parser.add_argument("--api-key", default=os.getenv(API_KEY_ENV), help=f"API key value (env {API_KEY_ENV}); never logged or stored.")
     parser.add_argument("--timeout", type=positive_float,
-                        help="Per-request timeout seconds (default 180 for preflight, 30 otherwise).")
+                        help="Per-request timeout seconds (default 360 for preflight, 600 for costs, 60 otherwise).")
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
@@ -226,9 +234,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "watch":
             command.add_argument("--after", help="Opaque event cursor from an earlier observation.")
             command.add_argument("--follow", action=argparse.BooleanOptionalAction, default=True)
-            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=300.0,
-                                 help="Overall observation deadline seconds (default 300); does not cancel the workflow.")
-            command.add_argument("--max-retries", type=int, default=3, help="Maximum read-only reconnects (default 3).")
+            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=WATCH_TIMEOUT_SECONDS,
+                                 help="Overall observation deadline seconds (default 600); does not cancel the workflow.")
+            command.add_argument("--max-retries", type=int, default=WATCH_MAX_RETRIES,
+                                 help="Maximum read-only reconnects (default 6).")
             command.add_argument("--backoff-initial", type=positive_float, default=0.5)
             command.add_argument("--backoff-max", type=positive_float, default=8.0)
     api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
@@ -626,7 +635,7 @@ def add_receipt_and_yes(parser):
 
 
 def add_poll_args(parser):
-    parser.add_argument("--poll-timeout", type=positive_float, default=600.0)
+    parser.add_argument("--poll-timeout", type=positive_float, default=POLL_TIMEOUT_SECONDS)
     parser.add_argument("--poll-interval", type=positive_float, default=5.0)
 
 
@@ -663,7 +672,7 @@ def positive_float(value: str) -> float:
     return result
 
 
-def client(args, *, default_timeout: float = 30.0) -> AzureFactoryClient:
+def client(args, *, default_timeout: float = DEFAULT_REQUEST_TIMEOUT_SECONDS) -> AzureFactoryClient:
     timeout = args.timeout if args.timeout is not None else default_timeout
     return AzureFactoryClient(args.api_url, args.api_key, timeout)
 
@@ -677,7 +686,7 @@ def cmd_preflight(args):
         raise ConfigError("Preflight cannot use --save-receipt or --whole-workflow; it grants no approval.")
     if args.save_report and os.path.lexists(args.save_report):
         raise ConfigError("Refusing to overwrite an existing preflight report or receipt.")
-    api = client(args, default_timeout=180.0)
+    api = client(args, default_timeout=PREFLIGHT_REQUEST_TIMEOUT_SECONDS)
     report = redact_secrets(api.preflight(read_json_file(args.request_json)), api.api_key)
     if args.save_report:
         try:
@@ -1004,7 +1013,7 @@ def cmd_resource_group_costs(args):
         body["aifactory_folder"] = args.folder
     if args.refresh:
         body["refresh"] = True
-    api = client(args, default_timeout=300.0)
+    api = client(args, default_timeout=COST_REQUEST_TIMEOUT_SECONDS)
     result = redact_secrets(api.resource_group_costs(body), api.api_key)
     return emit(result, EXIT_OK if result.get("status") in {"available", "empty"} else EXIT_BLOCKED)
 

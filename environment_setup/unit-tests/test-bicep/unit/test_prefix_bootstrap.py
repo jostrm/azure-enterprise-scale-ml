@@ -163,7 +163,7 @@ def test_minimum_preflight_expiring_during_discovery_never_enables_writes(worksp
     prepare = core.prepare
     def slow_prepare(**kwargs):
         result = prepare(**kwargs)
-        clock[0] += 901
+        clock[0] += core.REVIEW_SECONDS + 1
         return result
     monkeypatch.setattr(core, "prepare", slow_prepare)
     with pytest.raises(core.PrerequisiteError, match="prerequisite-review-expired"):

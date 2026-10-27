@@ -103,7 +103,7 @@ jobs:
     - job: Dashboards_${{ runner }}
       displayName: Dashboard-only ${{ parameters.mode }} (${{ runner }})
       dependsOn: Configure
-      timeoutInMinutes: 60
+      timeoutInMinutes: 120
       ${{ if eq(runner, 'self_hosted') }}:
         condition: and(succeeded(), eq(dependencies.Configure.outputs['resolve.use_self_hosted'], 'true'))
         pool:

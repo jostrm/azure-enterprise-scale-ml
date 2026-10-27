@@ -22,6 +22,9 @@ PROFILE = "preserve-v1"
 API_VERSION = "2023-11-01"
 ENTRYPOINT = "environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep"
 HELPER = "bootstrap/lib/common_network_preservation.py"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
+BICEP_BUILD_TIMEOUT_SECONDS = 240
+NETWORK_DEPLOYMENT_POLLS = 360          # x 5 s = 30 min
 ROOT = Path(__file__).resolve().parents[2]
 _LOADED_HELPER_SHA256 = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
@@ -240,7 +243,8 @@ def _compile_capability(source_root, *, expected_payload_sha256=None, bicep=None
     compiler = bicep or shutil.which("bicep")
     require(compiler, "standalone-bicep-required-for-preservation-proof")
     result = subprocess.run([str(compiler), "build", str(Path(source_root) / ENTRYPOINT),
-                             "--no-restore", "--stdout"], capture_output=True, text=True, timeout=120)
+                             "--no-restore", "--stdout"], capture_output=True, text=True,
+                             timeout=BICEP_BUILD_TIMEOUT_SECONDS)
     require(result.returncode == 0, "preservation-template-compile-failed:" + result.stderr[-2000:])
     template = json.loads(result.stdout)
     capability = validate_compiled_capability(template)
@@ -864,7 +868,8 @@ def prepare_common_network(*, source_root, desired, inventory, expected_payload_
 
 
 def execute_common_network(prepared, *, cloud, source_root, inventory_collector, assert_lease,
-                           bicep=None, poll_interval=5, max_polls=180, sleeper=time.sleep, journal=None):
+                           bicep=None, poll_interval=5, max_polls=NETWORK_DEPLOYMENT_POLLS, sleeper=time.sleep,
+                           journal=None):
     """Native ARM executor; no auth, shell deployment, deletion, RG or MI creation.
 
     The coordinator owns the durable intent/journal and hub lease. Its collector

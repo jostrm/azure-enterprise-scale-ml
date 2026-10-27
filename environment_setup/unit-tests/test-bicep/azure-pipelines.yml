@@ -37,19 +37,19 @@ jobs:
         UnitLinux:
           testPhase: unit
           imageName: ubuntu-22.04
-          jobTimeoutMinutes: 30
+          jobTimeoutMinutes: 60
         UnitWindows:
           testPhase: unit
           imageName: windows-2022
-          jobTimeoutMinutes: 50
+          jobTimeoutMinutes: 100
         Syntax:
           testPhase: syntax
           imageName: ubuntu-22.04
-          jobTimeoutMinutes: 30
+          jobTimeoutMinutes: 60
         Bicep:
           testPhase: bicep
           imageName: ubuntu-22.04
-          jobTimeoutMinutes: 30
+          jobTimeoutMinutes: 60
     steps:
       - checkout: self
         persistCredentials: false
