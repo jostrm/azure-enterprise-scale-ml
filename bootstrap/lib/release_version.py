@@ -14,6 +14,8 @@ CONTRACT = "AIFACTORY_VERSION_CONTRACT=1"
 DEFAULT_VERSION = "124"
 SOURCE_URL = "https://github.com/jostrm/azure-enterprise-scale-ml"
 STATE_PATH = Path("aifactory/config-wizard/aifactory-version.json")
+# Doubled 2026-10-27 (pinned in test_time_budgets.py): one git read of the published source.
+GIT_READ_TIMEOUT_SECONDS = 90
 
 
 def normalize(value):
@@ -166,7 +168,7 @@ def main():
 
     def read(argv):
         result = subprocess.run(["git", *argv], capture_output=True, text=True, check=True,
-                                timeout=45, encoding="utf-8", errors="replace",
+                                timeout=GIT_READ_TIMEOUT_SECONDS, encoding="utf-8", errors="replace",
                                 env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"})
         return result.stdout.strip()
 

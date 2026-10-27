@@ -126,7 +126,7 @@ def test_github_runs_all_checks_on_push_and_pull_requests_without_azure_permissi
     }
     assert job["timeout-minutes"] == "${{ matrix.timeout_minutes }}"
     for row in matrix:
-        assert row["timeout_minutes"] == (50 if row["os"] == "windows-2022" else 30)
+        assert row["timeout_minutes"] == (100 if row["os"] == "windows-2022" else 60)
     assert job["defaults"]["run"]["shell"] == "bash"
     assert job["env"]["LIVE_AZURE"] == "0"
     assert "environment" not in job
@@ -191,7 +191,7 @@ def test_ado_runs_same_phases_without_service_connections_and_publishes_results(
             if value["testPhase"] == "unit"} == {"ubuntu-22.04", "windows-2022"}
     assert job["timeoutInMinutes"] == "$(jobTimeoutMinutes)"
     for row in job["strategy"]["matrix"].values():
-        assert row["jobTimeoutMinutes"] == (50 if row["imageName"] == "windows-2022" else 30)
+        assert row["jobTimeoutMinutes"] == (100 if row["imageName"] == "windows-2022" else 60)
     steps = job["steps"]
     assert steps[0]["persistCredentials"] is False
     tasks = {step["task"] for step in steps if "task" in step}

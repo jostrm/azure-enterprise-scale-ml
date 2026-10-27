@@ -21,7 +21,8 @@ WARNING = "Bypassing lock, due to issues, dont do parallell updates on same AI F
 HUB_WARNING = "Do not make concurrent changes to a shared hub, including from other repositories; repository claims do not provide global exclusion."
 # aif-134 (2026-10-27): bootstrap_final_closure alone made state.json 6.4 MB; PROJECT closures add more.
 MAX_BYTES = 32 * 1024 * 1024
-STATE_READ_ATTEMPTS = 3
+# Doubled 2026-10-27 (pinned in test_time_budgets.py): restarts of a moving-ref snapshot read.
+STATE_READ_ATTEMPTS = 6
 
 
 def canonical(value):

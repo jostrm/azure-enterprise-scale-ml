@@ -88,7 +88,7 @@ def test_read_retries_proven_errno101_after_60_seconds(clock, capsys, method):
     response = Response(body=b"" if method == "HEAD" else b'{"ok":true}')
     cloud, opener = cloud_with()
     def send(request, timeout):
-        assert timeout <= 60
+        assert timeout <= fl.REMOTE_SOCKET_TIMEOUT_SECONDS == 120
         if opener.open.call_count == 1:
             clock.now += 60
             raise URLError(OSError(errno.ENETUNREACH, "Network is unreachable"))
@@ -129,14 +129,14 @@ def test_specific_transient_read_errors_retry(clock, failure):
 
 
 def test_read_exhaustion_keeps_stable_error_code(clock, capsys):
-    cloud, opener = cloud_with(*[URLError(OSError(errno.ENETUNREACH, "unreachable")) for _ in range(3)])
+    cloud, opener = cloud_with(*[URLError(OSError(errno.ENETUNREACH, "unreachable")) for _ in range(6)])
     with pytest.raises(fl.Blocked, match="^remote-request-unverified$"):
         cloud.request("GET", ARM_URL, fl.ARM)
-    assert opener.open.call_count == 3
-    assert clock.sleeps == [0.25, 0.5]
+    assert opener.open.call_count == 6
+    assert clock.sleeps == [0.25, 0.5, 1, 2, 4]
     entries = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
-    assert [row["attempt"] for row in entries] == [1, 2, 3]
-    assert [row["retrying"] for row in entries] == [True, True, False]
+    assert [row["attempt"] for row in entries] == [1, 2, 3, 4, 5, 6]
+    assert [row["retrying"] for row in entries] == [True, True, True, True, True, False]
 
 
 @pytest.mark.parametrize("failure", [
@@ -410,11 +410,11 @@ def test_provider_snapshot_one_ref_advance_returns_only_latest_coherent_state(ki
 
 
 @pytest.mark.parametrize("kind", ["gha", "ado"])
-def test_provider_snapshot_continual_ref_advance_blocks_after_three_attempts(kind):
+def test_provider_snapshot_continual_ref_advance_blocks_after_bounded_attempts(kind):
     fake = Snapshots(kind, advances=10)
     with pytest.raises(fl.Blocked, match="^single-writer-state-changed$"):
         fake.store.read()
-    assert fake.private_reads == 3 and fake.head == 4
+    assert fake.private_reads == ps.STATE_READ_ATTEMPTS == 6 and fake.head == 7
     assert all(method == "GET" for method, _, _ in fake.calls)
 
 

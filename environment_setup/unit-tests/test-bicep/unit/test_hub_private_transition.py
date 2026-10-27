@@ -783,7 +783,8 @@ def test_foundation_permanent_atomic_replace_failure_propagates_and_preserves_ev
     with pytest.raises(PermissionError) as caught:
         core.foundation._persist(path, {"status": "new-durable-evidence"}, retry_sleep=sleeps.append)
     assert caught.value is failure
-    assert len(calls) == 20 and sleeps == [0.05] * 19
+    assert len(calls) == core.foundation.ATOMIC_REPLACE_ATTEMPTS == 40
+    assert sleeps == [0.05] * (core.foundation.ATOMIC_REPLACE_ATTEMPTS - 1)
     assert path.read_bytes() == before
     staged = list(tmp_path.glob("*.writing"))
     assert len(staged) == 1 and json.loads(staged[0].read_bytes()) == {"status": "new-durable-evidence"}
@@ -1380,7 +1381,7 @@ def test_dns_link_readiness_wait_is_bounded_across_recovery_without_probes(tmp_p
     assert failed["status"] == "uncertain" and failed["error"] == "dns-link-readiness-timeout", failed
     link = runtime.created_link
     deadline = failed["dns_link_readiness"][link]["deadline"]
-    assert sum(sleeps) == 120 and deadline <= prepared["expires_at"]
+    assert sum(sleeps) == core.DNS_LINK_READINESS_SECONDS == 240 and deadline <= prepared["expires_at"]
     count = len(sleeps)
     result = core.recover(prepared, source_root=ROOT, expected_plan_hash=prepared["plan_hash"],
                           state_dir=tmp_path, runtime=runtime)

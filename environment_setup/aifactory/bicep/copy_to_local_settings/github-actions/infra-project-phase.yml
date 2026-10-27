@@ -1619,14 +1619,14 @@ jobs:
 
       - name: 18_Delete_Service_If_Not_Enabled_And_Exists
         if: inputs.phase == 'infra' && (env.enableDeleteForDisabledResources == 'true')
-        timeout-minutes: 180
+        timeout-minutes: 360
         shell: pwsh
         env:
           # Legacy GHA services-only retention: RG, Key Vault, Storage, App Insights,
           # dashboards, VMs, ACR, general identities and common networking.
           # Service private endpoints/bot identities are not foundation; full teardown overrides.
           AIF_DELETE_PRESERVE_FOUNDATION: 'true'
-          AIF_DELETE_TIMEOUT_SECONDS: '1800'
+          AIF_DELETE_TIMEOUT_SECONDS: '3600'
           AIF_DELETE_POLL_SECONDS: '15'
           AIF_DELETE_REPORT_DIR: ${{ runner.temp }}/aifactory-deletion-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
         run: |

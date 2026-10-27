@@ -265,7 +265,7 @@ def _frames(response, deadline: float, read_timeout: float) -> Iterator[tuple[st
 
 def watch(
     client, repository: str, run_id: int, after: str | None = None, follow: bool = True,
-    *, timeout: float = 300.0, max_retries: int = 3,
+    *, timeout: float = 600.0, max_retries: int = 6,
     backoff_initial: float = 0.5, backoff_max: float = 8.0,
 ) -> Generator[WorkflowRunEvent, None, WorkflowRunEvent | None]:
     """Yield validated SSE events, retrying observation only, never a workflow."""

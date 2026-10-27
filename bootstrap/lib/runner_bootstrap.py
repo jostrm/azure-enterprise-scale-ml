@@ -33,6 +33,10 @@ FORMATS = ("variables.yaml", "variables.yml", "variables.json", ".env")
 ENVIRONMENTS = {"dev": "dev", "stage": "test", "prod": "prod"}
 COMPUTE_API = "2024-03-01"
 DISK_API = "2024-03-02"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
+RESOURCE_PROVISIONING_POLLS = 360       # x 10 s = 60 min
+PREREQUISITES_RUN_COMMAND_SECONDS = 3600  # managed Run Command: our timeout (its default is 90 min)
+PREREQUISITES_POLLS = 360               # x 10 s = 60 min, so polling outlasts the run command
 NETWORK_API = "2023-11-01"
 TAGS_API = "2021-04-01"
 FEATURES_API = "2021-07-01"
@@ -659,7 +663,7 @@ def ensure_provider_pool(request, cloud, *, project=None):
 
 
 def wait_resource(cloud, identifier, version):
-    for _ in range(180):
+    for _ in range(RESOURCE_PROVISIONING_POLLS):
         value = get(cloud, identifier, version)
         state = (value or {}).get("properties", {}).get("provisioningState")
         if state == "Succeeded":
@@ -774,8 +778,8 @@ def prerequisites(request, cloud):
     identifier = request["vm_id"] + "/runCommands/prerequisites-" + uuid4().hex
     cloud.arm("PUT", identifier, COMPUTE_API, data={
         "location": request["location"], "properties": {"source": {"script": script}, "asyncExecution": False,
-        "timeoutInSeconds": 1800, "treatFailureAsDeploymentFailure": True}}, allowed=(200, 201, 202))
-    for _ in range(180):
+        "timeoutInSeconds": PREREQUISITES_RUN_COMMAND_SECONDS, "treatFailureAsDeploymentFailure": True}}, allowed=(200, 201, 202))
+    for _ in range(PREREQUISITES_POLLS):
         value = get(cloud, identifier + "?$expand=instanceView", COMPUTE_API)
         view = (value or {}).get("properties", {}).get("instanceView", {})
         if view.get("executionState") == "Succeeded":

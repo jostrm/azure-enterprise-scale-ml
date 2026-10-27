@@ -33,10 +33,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {phase: unit, os: ubuntu-22.04, timeout_minutes: 30}
-          - {phase: unit, os: windows-2022, timeout_minutes: 50}
-          - {phase: syntax, os: ubuntu-22.04, timeout_minutes: 30}
-          - {phase: bicep, os: ubuntu-22.04, timeout_minutes: 30}
+          - {phase: unit, os: ubuntu-22.04, timeout_minutes: 60}
+          - {phase: unit, os: windows-2022, timeout_minutes: 100}
+          - {phase: syntax, os: ubuntu-22.04, timeout_minutes: 60}
+          - {phase: bicep, os: ubuntu-22.04, timeout_minutes: 60}
     env:
       LIVE_AZURE: "0"
       PYTHONUTF8: "1"

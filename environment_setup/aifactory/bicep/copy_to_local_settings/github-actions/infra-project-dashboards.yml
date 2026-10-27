@@ -90,7 +90,7 @@ jobs:
     needs: configure
     environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
     runs-on: ${{ fromJSON(needs.configure.outputs.runs_on) }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:

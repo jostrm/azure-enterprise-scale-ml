@@ -534,9 +534,9 @@ azurefactory --timeout 180 preflight --request-json .\preflight-request.json --s
 azurefactory --timeout 180 bootstrap workflow prepare --preflight --request-json .\workflow-request.json
 ```
 
-Cloud checks can exceed 30 seconds, so both preflight forms default to a
-180-second request timeout; health, doctor and all other commands retain their
-30-second default. An explicit global `--timeout` **before the command**, even
+Cloud checks can exceed 60 seconds, so both preflight forms default to a
+360-second request timeout; health, doctor and all other commands retain their
+60-second default. An explicit global `--timeout` **before the command**, even
 `--timeout 30`, always takes precedence. Preflight never automatically retries.
 Timeout or Ctrl+C exits
 nonzero without implying readiness and does not create/approve a workflow.

@@ -46,6 +46,12 @@ import registered_personas
 
 
 CONTRACT_VERSION = 1
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py). A reviewed plan stays executable this long.
+REVIEW_SECONDS = 1800
+GRAPH_REQUEST_TIMEOUT_SECONDS = 180
+RESOURCE_PROVISIONING_POLLS = 480       # x 30 s = 4 h
+PROVIDER_REGISTRATION_POLLS = 240       # x 10 s = 40 min
+ATOMIC_REPLACE_ATTEMPTS = 40            # x 0.05 s while Windows releases a sharing lock
 NETWORK_API = "2024-05-01"
 DNS_API = "2022-07-01"
 # First private DNS link API with resolutionPolicy (NXDOMAIN fallback to public DNS).
@@ -272,7 +278,7 @@ class Cloud(enrollment.Cloud):
         try:
             response = self.opener.open(Request(GRAPH + "v1.0/" + path, method=method,
                                                data=canonical(body) if body is not None else None,
-                                               headers=headers), timeout=90)
+                                               headers=headers), timeout=GRAPH_REQUEST_TIMEOUT_SECONDS)
         except HTTPError as exc:
             response = exc
         except (URLError, OSError, TimeoutError):
@@ -373,7 +379,7 @@ class _DnsPolicyEvidence:
     MAX_DEFINITIONS = 128
     MAX_READS = 256
     MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
-    READ_SECONDS = 120
+    READ_SECONDS = 240
 
     def __init__(self, builder, subscription):
         self.builder, self.subscription = builder, subscription
@@ -1616,7 +1622,7 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                        (["/tenants/" + target["tenant_id"] + "/groups/" + group_scope] if group_scope else [])))
     plan = {"contract_version": CONTRACT_VERSION, "stage": "privileged-prerequisites",
             "execution_mode": "privileged-bootstrap", "plan_id": str(uuid4()),
-            "prepared_at": time.time(), "expires_at": time.time() + 900,
+            "prepared_at": time.time(), "expires_at": time.time() + REVIEW_SECONDS,
             "source": source, "consumer_root": str(root), "consumer_hash": consumer_hash,
             "scope": copy.deepcopy(scope), "expected_revision": expected_revision, "target": target,
             "bootstrap_config": config, "context": copy.deepcopy(context),
@@ -1686,20 +1692,20 @@ def _persist(path, value, retry_sleep=time.sleep):
         stream.write(canonical(value))
         stream.flush()
         os.fsync(stream.fileno())
-    for attempt in range(20):
+    for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
         try:
             os.replace(sibling, path)
             return
         except PermissionError:
-            if attempt == 19:
+            if attempt == ATOMIC_REPLACE_ATTEMPTS - 1:
                 raise
             retry_sleep(0.05)
 
 
 # Microsoft Graph is eventually consistent right after a write: for a while a new group can answer 404 by ID, and a
 # new group or member can be missing from filter and member-list reads (observed 2026-10-22). Reads are repeated
-# within this bound (100 s in total); a write is never repeated.
-GRAPH_VISIBILITY_DELAYS = (2, 3, 5, 5, 10, 10, 15, 15, 15, 20)
+# within this bound (200 s in total, doubled 2026-10-27); a write is never repeated.
+GRAPH_VISIBILITY_DELAYS = (2, 3, 5, 5, 10, 10, 15, 15, 15, 20, 20, 20, 20, 20, 20)
 
 
 def _graph_visible(runtime, path, ready, code, sleep):
@@ -1712,7 +1718,7 @@ def _graph_visible(runtime, path, ready, code, sleep):
 
 
 def _wait(runtime, identifier, api, assert_held, sleep):
-    for _ in range(240):
+    for _ in range(RESOURCE_PROVISIONING_POLLS):
         assert_held()
         status, _, value = runtime.arm("GET", identifier, api, allowed=(200, 404))
         state = value.get("properties", {}).get("provisioningState", "Succeeded") if status == 200 else "Creating"
@@ -1952,7 +1958,7 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                 _, _, current = runtime.arm("GET", effect["id"], effect["api"])
                 require(current.get("registrationState") == "NotRegistered", "resource-provider-state-changed")
                 runtime.arm("POST", effect["id"] + "/register", effect["api"], allowed=(200, 202))
-                for attempt in range(120):
+                for attempt in range(PROVIDER_REGISTRATION_POLLS):
                     assert_held()
                     _, _, current = runtime.arm("GET", effect["id"], effect["api"])
                     if current.get("registrationState") == "Registered":

@@ -13,6 +13,10 @@ from urllib.parse import quote, unquote, urlsplit
 
 CONTRACT = "ordered-project-pipelines-v1"
 HUB_CONTRACT = "factory-owned-access-hub-v1"
+# Not doubled 2026-10-27 (pinned in test_time_budgets.py): x 15 s = 6 h, GitHub's 360-minute job maximum, and the
+# longest reviewed teardown request, equal to factory_lifecycle.MANIFEST_MAX_LIFETIME_SECONDS.
+PROVIDER_RUN_POLLS = 1440
+TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS = 3600
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
 # Reusable VPN/hub/connectivity platform types. Only a factory's own bootstrap-built VPN gateway,
@@ -798,7 +802,7 @@ def resume_dispatch(cloud, locks, document, receipt, persist, sleep=time.sleep):
     route = document["route"]
     fl.require(remote.get("kind") == route["kind"] and type(remote.get("run_id")) is int
                and remote["run_id"] > 0, "factory-delete-run-identity-unverified")
-    for _ in range(1440):
+    for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         if route["kind"] == "gha":
             repo = urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
@@ -1176,7 +1180,7 @@ def validate_teardown_request(document):
                            for value in document["protected_resource_ids"]),
                "bootstrap-teardown-request-invalid")
     prepared, expires = fl.timestamp(document.get("prepared_at")), fl.timestamp(document.get("expires_at"))
-    fl.require(0 < expires - prepared <= 3600, "bootstrap-teardown-request-invalid")
+    fl.require(0 < expires - prepared <= TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS, "bootstrap-teardown-request-invalid")
 
 
 def _hub_inventory(cloud, hub_scopes, code):

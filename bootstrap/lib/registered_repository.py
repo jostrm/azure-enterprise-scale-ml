@@ -22,6 +22,10 @@ SHARED_URL = "https://github.com/jostrm/azure-enterprise-scale-ml"
 SHARED_PATH = "azure-enterprise-scale-ml"
 LOCK_REF = "refs/heads/aifactory-initializer-lock"
 DEFAULT_GITHUB_ENVIRONMENTS = ("Dev", "Stage", "Prod")
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py). A reviewed plan stays executable this long.
+REVIEW_SECONDS = 1800
+GIT_COMMAND_TIMEOUT_SECONDS = 360
+SOURCE_INVENTORY_TIMEOUT_SECONDS = 120
 require = enrollment.require
 
 
@@ -38,7 +42,7 @@ class Repository:
             env.update(environment)
         result = self.runner(["git", "-c", "core.hooksPath=NUL" if os.name == "nt" else "core.hooksPath=/dev/null",
                               "-C", str(root), *args], input=data, capture_output=True, check=False,
-                             timeout=180, shell=False, env=env)
+                             timeout=GIT_COMMAND_TIMEOUT_SECONDS, shell=False, env=env)
         if missing and result.returncode:
             return None
         require(result.returncode == 0, "repository-command-failed")
@@ -51,7 +55,7 @@ class Repository:
         request = Request("https://api.github.com/repos/jostrm/azure-enterprise-scale-ml/git/trees/" + sha + "?recursive=1",
                           headers={"Accept": "application/vnd.github+json", "User-Agent": "AI-Factory-reviewed-bootstrap"})
         try:
-            with urlopen(request, timeout=60) as response:
+            with urlopen(request, timeout=SOURCE_INVENTORY_TIMEOUT_SECONDS) as response:
                 raw = response.read(8 * 1024 * 1024 + 1)
         except (OSError, TimeoutError):
             raise enrollment.EnrollmentError("published-source-inventory-unavailable") from None
@@ -270,7 +274,7 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
     shared_sha = runtime.git(shared, "rev-parse", "HEAD", missing=True) if shared.is_dir() else None
     require(not shared.exists() or shared_sha == sha, "existing-shared-source-pin-conflict")
     plan = {"contract_version": 1, "stage": "repository-initialization", "plan_id": str(uuid4()),
-            "expires_at": time.time() + 900, "consumer_root": str(root), "scope": scope,
+            "expires_at": time.time() + REVIEW_SECONDS, "consumer_root": str(root), "scope": scope,
             "target": target, "config": config, "provider": provider, "repository": url,
             "expected_revision": expected_revision, "register_hash": register_hash,
             "existing_git": existing, "head": head, "origin": origin, "remote_id": remote.get("id") if remote else None,

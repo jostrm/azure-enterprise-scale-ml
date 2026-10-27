@@ -107,6 +107,15 @@ ADO_AUDIENCE = "499b84ac-1321-427f-aa17-267ca6975798"
 DATA_ROLE = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 RG_API = "2021-04-01"
 IDENTITY_API = "2023-01-31"
+# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
+COMMAND_TIMEOUT_SECONDS = 240
+REQUEST_TIMEOUT_SECONDS = 180
+# A cached token must outlive one request plus clock skew; az/MSAL hands out tokens until 5 min before expiry.
+TOKEN_MIN_REMAINING_SECONDS = 240
+RBAC_PROPAGATION_ATTEMPTS = 16          # x 5 s = 80 s of data-role replication
+ARM_PROVISIONING_POLLS = 60             # x 2 s = 2 min
+# Not a time budget, not doubled: allowed clock skew for a token's not-before claim.
+CLOCK_SKEW_SECONDS = 60
 STORAGE_API = "2023-05-01"
 ROLE_API = "2022-04-01"
 MAX_BYTES = 8 * 1024 * 1024
@@ -684,7 +693,7 @@ class Cloud:
     def command(self, argv, data=None):
         try:
             result = self.command_runner(argv, input=data, capture_output=True, check=False,
-                                         timeout=120, shell=False)
+                                         timeout=COMMAND_TIMEOUT_SECONDS, shell=False)
         except (OSError, subprocess.SubprocessError):
             raise EnrollmentError("command-unavailable-or-failed") from None
         require(result.returncode == 0, "authenticated-cli-command-failed")
@@ -720,8 +729,8 @@ class Cloud:
         tenant = guid(tenant or target["tenant_id"])
         key = (audience, tenant)
         cached = self.tokens.get(key)
-        # Budget for the 90-second request timeout plus clock skew, on every use.
-        if cached is None or cached["expires_at"] <= time.time() + 120:
+        # Budget for one request timeout plus clock skew, on every use.
+        if cached is None or cached["expires_at"] <= time.time() + TOKEN_MIN_REMAINING_SECONDS:
             # Match the CLI cache entry renewed by Graph's standard /.default scope.
             resource = audience.rstrip("/") if audience == "https://graph.microsoft.com/" else audience
             args = ["account", "get-access-token", "--resource", resource]
@@ -741,8 +750,8 @@ class Cloud:
                 now = time.time()
                 require(guid(claims["tid"]) == tenant
                         and type(expires_at) in (int, float) and type(not_before) in (int, float)
-                        and now + 120 < expires_at < float("inf")
-                        and 0 <= not_before <= now + 60 and not_before < expires_at,
+                        and now + TOKEN_MIN_REMAINING_SECONDS < expires_at < float("inf")
+                        and 0 <= not_before <= now + CLOCK_SKEW_SECONDS and not_before < expires_at,
                         "token-tenant-or-lifetime-mismatch")
                 audiences = {audience.rstrip("/")}
                 if audience == ARM + "/":
@@ -757,7 +766,7 @@ class Cloud:
             except (KeyError, IndexError, ValueError, TypeError):
                 raise EnrollmentError("invalid-authenticated-token") from None
             cached = {"token": token, "expires_at": expires_at, "not_before": not_before, "oid": oid}
-        require(cached["not_before"] <= time.time() + 60, "token-tenant-or-lifetime-mismatch")
+        require(cached["not_before"] <= time.time() + CLOCK_SKEW_SECONDS, "token-tenant-or-lifetime-mismatch")
         # Retain the original identity even when an expired token's refresh fails.
         # Different ADO tenants may legitimately have different operator object IDs.
         require(all(item["oid"] == cached["oid"] for (_, cached_tenant), item in self.tokens.items()
@@ -789,7 +798,7 @@ class Cloud:
         if body is not None and not isinstance(data, bytes):
             outgoing["Content-Type"] = "application/json"
         try:
-            response = self.opener.open(Request(url, method=method, data=body, headers=outgoing), timeout=90)
+            response = self.opener.open(Request(url, method=method, data=body, headers=outgoing), timeout=REQUEST_TIMEOUT_SECONDS)
         except HTTPError as exc:
             response = exc
         except (URLError, OSError, TimeoutError):
@@ -861,7 +870,7 @@ class Cloud:
         # HTTP status header permits distinguishing a real 404 from auth failure.
         try:
             result = self.command_runner(argv, input=canonical(body) if body is not None else None,
-                                         capture_output=True, check=False, timeout=120, shell=False)
+                                         capture_output=True, check=False, timeout=COMMAND_TIMEOUT_SECONDS, shell=False)
         except (OSError, subprocess.SubprocessError):
             raise EnrollmentError("github-authentication-or-command-failed") from None
         raw = result.stdout.decode("utf-8") if isinstance(result.stdout, bytes) else result.stdout
@@ -1701,7 +1710,7 @@ def _propagating_storage_put(cloud, blob, data, headers, allowed, retry):
     a 403 is then treated as pending replication, never as the object's absence,
     and the final attempt re-raises so a real authorization failure still surfaces.
     """
-    attempts = 8 if retry else 1
+    attempts = RBAC_PROPAGATION_ATTEMPTS if retry else 1
     for attempt in range(attempts):
         try:
             return cloud.storage("PUT", blob, data=data, headers=headers, allowed=allowed)
@@ -1714,7 +1723,7 @@ def _propagating_storage_put(cloud, blob, data, headers, allowed, retry):
 
 
 def _wait_arm(cloud, identifier, api):
-    for _ in range(30):
+    for _ in range(ARM_PROVISIONING_POLLS):
         value = _absent(cloud.arm("GET", identifier, api, allowed=(200, 404)))
         if value:
             status = value["body"].get("properties", {}).get("provisioningState", "Succeeded")
@@ -1854,13 +1863,13 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
             _propagating_storage_put(cloud, None, b"", None, (201,), operator_grant_created)
             _wait_arm(cloud, container_id, STORAGE_API)
         if _common_mode(request):
-            for attempt in range(8 if operator_grant_created else 1):
+            for attempt in range(RBAC_PROPAGATION_ATTEMPTS if operator_grant_created else 1):
                 try:
                     cloud.storage("HEAD")
                     break
                 except EnrollmentError as exc:
                     if not (operator_grant_created and exc.code.endswith(":remote-request-failed-403")
-                            and attempt < 7):
+                            and attempt < RBAC_PROPAGATION_ATTEMPTS - 1):
                         raise
                     time.sleep(5)
         provider_writes = any(x.startswith(("create-github", "create-ado")) for x in state["actions"])
