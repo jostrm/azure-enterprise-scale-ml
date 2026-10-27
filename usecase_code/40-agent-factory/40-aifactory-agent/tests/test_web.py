@@ -876,6 +876,7 @@ async function consent() {
     assert.equal(ui("sign-in").disabled, true);
     assert.equal(ui("propose").disabled, true);
     await waitFor(() => ui("setup-message").textContent.includes("tokens cannot be pasted"));
+    assert.equal(ui("setup-blocker").hidden, false, "a blocked setup stays visible");
     assert.equal(calls.length, 1);
   } else if (mode === "pkce") {
     await dispatch(ui("sign-in"), "click");
@@ -899,6 +900,11 @@ async function consent() {
     assert(!calls[0].location.includes("code"));
   } else {
     await waitFor(() => calls.some(call => call.url === "/api/operations") && !ui("scope-selector").disabled);
+    assert.notEqual(ui("setup-blocker").hidden, false, "a configured page shows no setup notice");
+    if (mode === "authenticated") {
+      await waitFor(() => ui("knowledge-status").textContent === "Ready · refresh time not reported", "short ready status");
+      assert(ui("knowledge-status").title.includes("indexed: 10"), "detail stays in the tooltip");
+    }
     assert.equal(storage.size, 0);
     assert(!current.search.includes("code"));
     assert(!calls[0].location.includes("code"));
@@ -1182,7 +1188,7 @@ async function consent() {
       await waitFor(() => ui("knowledge-status").textContent.includes(expected));
       assert(!ui("knowledge-status").textContent.includes("Knowledge ready"));
       assert(ui("knowledge-status").textContent.includes("approved operator"));
-      if (mode === "out-of-sync") assert(ui("knowledge-status").textContent.includes("Search confirms: 9"));
+      if (mode === "out-of-sync") assert(ui("knowledge-status").title.includes("Search confirms: 9"));
     } else if (mode === "cancel-disabled") {
       await waitFor(() => ui("proposed-plans").textContent.includes("Configuration writes are disabled"));
       assert(!ui("proposed-plans").textContent.includes("Approve this exact"));
@@ -1272,7 +1278,8 @@ async function consent() {
         await waitFor(() => ui("answer").textContent.includes("steal"));
         if (fallbackStatus) {
           assert(ui("knowledge-status").textContent.includes("Using last successful"));
-          assert(!ui("knowledge-status").textContent.includes("corpus age: fresh"));
+          assert(/ · Last refreshed: 2001-01-0[12] \d\d:\d\d$/.test(ui("knowledge-status").textContent));
+          assert(!ui("knowledge-status").title.includes("corpus age: fresh"));
           assert(ui("request-status").textContent.includes(fallbackStatus.warning));
           assert(ui("answer-context").textContent.includes("committed-snapshot"));
           assert(ui("answer-context").textContent.includes(fallbackStatus.refreshed_at));

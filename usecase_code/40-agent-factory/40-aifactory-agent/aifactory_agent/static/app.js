@@ -342,6 +342,15 @@
     return Boolean(activeScope()?.permissions.includes(permission));
   }
 
+  // Local date and time as YYYY-MM-DD HH:MM; an unparseable value is shown as reported.
+  function formatWhen(value) {
+    const when = new Date(value);
+    if (Number.isNaN(when.getTime())) return String(value);
+    const two = (number) => String(number).padStart(2, "0");
+    return when.getFullYear() + "-" + two(when.getMonth() + 1) + "-" + two(when.getDate())
+      + " " + two(when.getHours()) + ":" + two(when.getMinutes());
+  }
+
   function applyPalette(palette) {
     if (!PALETTES.includes(palette)) return false;
     state.palette = palette;
@@ -382,6 +391,7 @@
     ui("proposed-plans").textContent = "Sign in to inspect your persisted plans.";
     ui("operation-history").textContent = "No operation history loaded.";
     ui("knowledge-status").textContent = "Sign in to inspect knowledge.";
+    ui("knowledge-status").title = "";
     ui("question").value = "";
     ui("question-count").textContent = "0 / 8000 characters";
     ui("department-name").value = "";
@@ -1258,7 +1268,12 @@
             : info.status === "ready" && !ready
             ? "Not ready — freshness, population or reconciliation is unconfirmed"
             : knowledgeLabels[info.status] || "Unknown knowledge state — readiness is not confirmed";
-          ui("knowledge-status").textContent = label + " (reported: " + info.status + ")"
+          // Show only when knowledge was refreshed; the full readiness detail stays available as a tooltip.
+          const refreshed = info.refreshed_at ? "Last refreshed: " + formatWhen(info.refreshed_at) : "";
+          ui("knowledge-status").textContent = ready && !fallback
+            ? refreshed || "Ready · refresh time not reported"
+            : label + (refreshed ? " · " + refreshed : "");
+          ui("knowledge-status").title = label + " (reported: " + info.status + ")"
             + " · corpus age: " + (fallback ? "last successful / freshness unconfirmed" : info.stale === false ? "fresh" : "stale / unknown")
             + " · indexed: " + (info.indexed_document_count ?? "unknown")
             + " · Search confirms: " + (info.search_document_count ?? "not checked")
@@ -1289,6 +1304,8 @@
       if (!response.ok) throw new Error("Public sign-in configuration is unavailable. Check the HTTP service.");
       state.config = await response.json();
       if (!configured(state.config)) {
+        // The setup notice appears only when sign-in is blocked; a configured page needs no notice.
+        ui("setup-blocker").hidden = false;
         ui("setup-heading").textContent = "Setup blocked · Entra registration approval pending";
         ui("setup-message").textContent = "Sign-in is disabled. An approved operator must configure tenant/client ID, API audience and delegated scope, and register this exact SPA redirect URI: "
           + location.origin + "/. No identity is created by this page; tokens cannot be pasted as a workaround.";
@@ -1299,10 +1316,6 @@
         }
         return;
       }
-      ui("setup-heading").textContent = hostBridge ? "Embedded in the Enterprise Scale AI Factory app" : "Entra sign-in configured";
-      ui("setup-message").textContent = hostBridge
-        ? "Chat uses the app's Azure sign-in (Login to Azure) for this Agent API only. The token stays in memory; actions still require server-side approval."
-        : "Sign in to load only your authorized factory/project/environment scopes. Live execution readiness is checked separately.";
       if (hostBridge) {
         callback.code = null;
         ui("sign-in").textContent = "Connect with app sign-in";
