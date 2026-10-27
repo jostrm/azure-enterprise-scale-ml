@@ -75,6 +75,24 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
 - [**AI Factory Configuration Wizard**](./environment_setup/install_config_wizard/readme.md) Setup in minutes, intelligent workflow-drivern setup Wizard.
 
+[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
+- See RELEASES - for Latest, recommended version.
+
+[Quickstart Documentation - Setup | Parameters](https://jostrm.github.io/azure-enterprise-scale-ml/)
+
+[Full Documentation - Concepts | Networking | Diagrams](./documentation/readme.md) 
+
+
+![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
+*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
+
+> [!TIP]
+> **Tip**: Use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a submodule repo.
+>
+
+<details>
+### Ensure only an existing factory's self-hosted runner
+
 The wizard's `scaling-mode` accepts `own-subscriptions` (`172.16.XX.0/20`, Dev/Stage/Prod `0/16/32`) or `shared-subscriptions` (default: `172.16.XX.0/18`, `0/64/128`). Each environment resolves to a network-aligned, non-overlapping VNet so the address ranges permit peering. Consecutive `61/62/63` works for `/24`, not `/18`. JSON/YAML use `scaling-mode`; environment/pipeline exports use `SCALING_MODE`. Canonical templates use the peerable shared defaults; existing user configurations are not migrated. Preflight rejects overlapping or misaligned ranges. “Up to 8 projects” is an address-budget target, not a deployment guarantee: the aligned-gap allocator's offline fixture fits nine full subnet profiles per `/18`, or two per `/20`, with four early common `/26`s and a final gateway `/27`; other reservations and fragmentation reduce capacity. Changing draft configuration never provisions subscriptions or moves deployed subnets. The separate scale-set CLI accepts a resolved `/20` through `AIF_DEV_VNET_CIDR`, not an `XX` template or a wizard-config import.
 
 **Advanced Mode's integrated VPN** can keep `GatewaySubnet` at the final `/27`.
@@ -86,21 +104,6 @@ uses free gaps; it does not execute the old append-only PowerShell path. Both ro
 require the reviewed, pinned source rather than stale consumer/API snapshots. See the
 [topology and runner details](./documentation/gh-io/docs/orchestrators/gh.md).
 Do not silently change an integrated selection to external to bypass a blocker.
-
-[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
-- See RELEASES - for Latest, recommended version.
-
-[Quickstart Documentation - Setup | Parameters](https://jostrm.github.io/azure-enterprise-scale-ml/)
-
-[Full Documentation - Concepts | Networking | Diagrams](./documentation/readme.md) 
-
-![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
-*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
-
-> [!TIP]
-> **Tip**: Use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a submodule repo.
->
-### Ensure only an existing factory's self-hosted runner
 
 The isolated `runner` action is available on `ADO-azurefactory.sh`,
 `GHA-azurefactory.sh` and both `*-create-new-aifactory-scaleset.sh` wrappers:
@@ -185,7 +188,7 @@ before self-hosted project execution; `--prepare-only` is not runner readiness.
 
 ---
 
-<details>
+
   <summary><b>This accelerator: Main purpose</b></summary>
 
 ## This accelerator: Main purpose: 
