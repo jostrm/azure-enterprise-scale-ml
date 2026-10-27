@@ -23,7 +23,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="./documentation/v2/10_index.md#38-how-to-guide-llmops--rag-chat-agent"><img src="./documentation/v2/10-19/images/concepts/dataops-rag.gif" width="100%" alt="GenAIOps: DataOps and retrieval-augmented generation with permitted, cited evidence"></a><br>
+<a href="./usecase_code/40-agent-factory/readme.md"><img src="./documentation/v2/10-19/images/concepts/dataops-rag.gif" width="100%" alt="GenAIOps: DataOps and retrieval-augmented generation with permitted, cited evidence"></a><br>
 <sub><b>GenAIOps</b> · governed knowledge, grounded answers</sub>
 </td>
 </tr>
