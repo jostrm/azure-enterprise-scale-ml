@@ -497,7 +497,8 @@ def plan_details(settings, scope_key, tool_name, request, preview):
     elif tool_name == DELETE:
         clean["target"] = _target_review(preview["target"])
         for key in ("capabilities", "folder", "deletion_scope", "preserve_entra_groups", "retain_saved_configuration",
-                    "confirmation_phrase", "preview_hash", "source_version", "deletion_targets", "inventory", "retained_resources"):
+                    "confirmation_phrase", "preview_hash", "source_version", "deletion_targets", "inventory", "retained_resources",
+                    "deletion_plan", "deletion_retention_policy"):
             clean[key] = copy.deepcopy(preview[key])
         clean["summary"] = "Delete the exact approved whole-factory Azure inventory and saved catalog configuration; preserve Entra groups."
         affected = [{"kind": "delete-resource", **copy.deepcopy(item)} for item in preview["inventory"]]

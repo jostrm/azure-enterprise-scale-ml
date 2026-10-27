@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -6,6 +8,7 @@ from uuid import uuid4
 import pytest
 from azurefactory.client import canonical_json_hash, validate_base_url
 from azurefactory.errors import RequestTimeout
+from azurefactory.factory_deletion import DELETE_FLAGS, PIPELINE_DEFINITIONS, PLAN_CONTRACT, PROJECT_ORDER
 from pydantic import ValidationError
 
 from aifactory_agent.actions import (
@@ -24,6 +27,7 @@ CONFIRMATION = "88888888-8888-4888-8888-888888888888"
 WORKFLOW = "99999999-9999-4999-8999-999999999999"
 NEW_PROJECT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 JOB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+RUN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 COMMON = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/factory-common-dev-rg"
 GROUP = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/factory-project001-dev-rg"
 HUB = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/factory-own-hub-rg"
@@ -92,19 +96,56 @@ def project_preview(request):
             "project_id": NEW_PROJECT, "target": target, "inventory": [], "deletion_targets": [], "binding": None}
 
 
+def retention_policy():
+    return {
+        "mode": "preserve-reusable-infrastructure", "required_execution_contract": PLAN_CONTRACT,
+        "execution_scope": "whole-resource-groups", "selective_retention_supported": False,
+        "limitations": ["Protected resources inside a deletable group block preparation."],
+    }
+
+
+def rehash(plan):
+    # Same digest as the API's catalog storage: indented, key-sorted UTF-8 JSON plus a newline.
+    unsigned = {key: value for key, value in plan.items() if key != "plan_hash"}
+    encoded = (json.dumps(unsigned, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    plan["plan_hash"] = hashlib.sha256(encoded).hexdigest()
+    return plan
+
+
+def deletion_plan():
+    stage = {
+        "id": f"project:{SCALE}:{PROJECT}", "kind": "project", "factory_id": FACTORY, "scale_set_id": SCALE,
+        "environment": "dev", "subscription_id": SUBSCRIPTION, "tenant_id": TENANT, "run_id": RUN,
+        "resource_group_id": GROUP, "delete": [GROUP, SEARCH, LINK], "depends_on": [],
+        "project_id": PROJECT, "project_number": "001",
+        "pipeline": {"provider": "gha", "repository": "https://github.com/example/factory", "ref": "refs/heads/main",
+                     "commit": "a" * 40, "definition": PIPELINE_DEFINITIONS["gha"], "run_scope": "environment"},
+        "inputs": dict(DELETE_FLAGS), "lifecycle_order": list(PROJECT_ORDER),
+    }
+    return rehash({
+        "contract": PLAN_CONTRACT, "factory_id": FACTORY, "source_commit": "a" * 40,
+        "policy": "all-projects-before-common", "retention_policy": retention_policy(),
+        "stages": [stage], "protected_resources": [HUB], "retained_resources": [],
+    })
+
+
 def delete_preview():
+    # Mirrors the SDK's whole-resource-group deletion contract (azurefactory.factory_deletion).
     return {
         **base_preview(), "capabilities": ["delete-aifactory-v1"], "operation_mode": "runtime", "action": "delete-factory",
         "folder": "C:\\state\\factory", "factory_id": FACTORY, "scale_set_id": None, "project_id": None,
         "preview_hash": "c" * 64, "confirmation_phrase": "DELETE factory-sweden-ai", "target": factory_target(),
         "deletion_scope": "whole-factory", "preserve_entra_groups": True, "retain_saved_configuration": False,
         "source_version": {"requested_version": "main", "branch": "main", "resolved_ref": "a" * 40},
-        "retained_resources": [], "deletion_targets": [{
+        "retained_resources": [HUB], "deletion_targets": [{
             "scale_set_id": SCALE, "factory_id": FACTORY, "project_id": None, "environment": "dev",
             "tenant_id": TENANT, "subscription_id": SUBSCRIPTION, "name": "factory-project001-dev-rg",
-            "resource_group": "factory-project001-dev-rg", "resource_id": GROUP, "delete": [SEARCH, LINK], "retain": [],
+            "resource_group": "factory-project001-dev-rg", "resource_id": GROUP,
+            "delete": [GROUP, SEARCH, LINK], "retain": [],
         }],
-        "inventory": [{"resource_id": SEARCH, "dependencies": [LINK]}, {"resource_id": LINK, "dependencies": []}],
+        "inventory": [{"resource_id": SEARCH, "dependencies": [LINK]}, {"resource_id": LINK, "dependencies": []},
+                      {"resource_id": GROUP, "dependencies": [SEARCH]}],
+        "deletion_plan": deletion_plan(), "deletion_retention_policy": retention_policy(),
     }
 
 
@@ -487,10 +528,13 @@ def test_delete_uses_named_validator_and_exact_human_phrase(setup):
     assert not any(call[0] == "catalog_confirm" for call in api.calls)
 
 
-@pytest.mark.parametrize("change", [
-    "preserve_entra", "manifest", "inventory", "hash", "phrase", "search_order", "cycle", "cross_env", "resource_groups",
+@pytest.mark.parametrize("change,code", [
+    ("preserve_entra", "unsupported_factory_contract"), ("manifest", "unsupported_factory_contract"),
+    ("inventory", "unsupported_factory_contract"), ("hash", "unsupported_factory_contract"),
+    ("phrase", "unsupported_factory_contract"), ("search_order", "unsafe_deletion_order"),
+    ("cycle", "unsafe_deletion_order"), ("cross_env", "factory_scope_mismatch"), ("resource_groups", "cross_scope_write"),
 ])
-def test_unsafe_deletion_receipts_fail_closed(setup, change):
+def test_unsafe_deletion_receipts_fail_closed(setup, change, code):
     adapter, api, store = setup
     value = delete_preview()
     if change == "preserve_entra":
@@ -508,16 +552,28 @@ def test_unsafe_deletion_receipts_fail_closed(setup, change):
     elif change == "cycle":
         value["inventory"][1]["dependencies"] = [SEARCH]
     elif change == "cross_env":
+        # A self-consistent prod receipt passes the SDK contract; the agent's own scope check must stop it.
         value["target"]["scale_sets"][0]["environment"] = "prod"
         value["deletion_targets"][0]["environment"] = "prod"
+        value["deletion_plan"]["stages"][0]["environment"] = "prod"
+        rehash(value["deletion_plan"])
     else:
         adapter.settings = adapter.settings.model_copy(update={"actions": adapter.settings.actions.model_copy(
             update={"deletion_resource_groups": {SCOPE: [GROUP, COMMON]}})})
     api.preview = value
-    with pytest.raises(ToolError):
+    with pytest.raises(ToolError) as error:
         adapter.prepare(DELETE, {})
+    assert error.value.code == code
     assert not store.backend._records
     assert not any(call[0].endswith("confirm") for call in api.calls)
+
+
+def test_the_persisted_delete_review_keeps_the_sdk_execution_plan_and_retention_policy(setup):
+    # The stored review is re-validated by the SDK before approval and execution, so it must keep these fields.
+    adapter, _, _ = setup
+    record = adapter.prepare(DELETE, {})
+    assert record["preview"]["deletion_plan"] == deletion_plan()
+    assert record["preview"]["deletion_retention_policy"] == retention_policy()
 
 
 def test_delete_needs_server_breadth_not_project_access(setup):
