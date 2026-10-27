@@ -92,7 +92,6 @@ python -m pytest environment_setup/unit-tests/test-bicep/unit/test_portal_deploy
 | `69a-Grant-NetworkContributor-For-Injection`, `69c` Cosmos role | `stages/portal-foundry-injection-rbac.json`, `stages/portal-cosmos-foundry-rbac.json` |
 | `aif_ensure_dns_private_resolver` | Resolver and inbound endpoint; the VNet DNS servers are not rewritten, because an ARM PUT of the VNet would replace its subnets |
 | VPN Gateway, Application Gateway | Optional, off by default |
-| `variables.json` `subnetCommon` (`snet-dev-esml-cmn-001`) in the project job | Empty: project stages use the common subnet that `12-networkCommon` creates, as the common job does |
 | GitHub/ADO repository, OIDC, workflow dispatch | Not part of the button |
 
 The button does not register the factory with the v1.25 Factory API. v1.24 has no such API.
