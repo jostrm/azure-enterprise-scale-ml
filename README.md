@@ -32,7 +32,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 - **One governed lifecycle.** Create a factory, add scale sets and projects, update or delete them through one reviewed API: CLI, Python SDK, wizards or an Azure Function.
 - **Private by design.** Hub-spoke or Virtual WAN, private endpoints and DNS, isolation per team, Bicep through GitHub Actions or Azure DevOps.
 - **Operating models included.** DataOps, MLOps and GenAIOps templates that run on the secure infrastructure.
-- **Subsceiption vending.**: Choose 1 team per Subscription/LZ or Multiple teams (good for a Hackathon, Sandbox)
+- **Subscription vending (auto).**: Choose 1 team per Subscription/LZ or Multiple teams (e.g.Hackathons,Sandbox)
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up</b></a> &nbsp;·&nbsp;
