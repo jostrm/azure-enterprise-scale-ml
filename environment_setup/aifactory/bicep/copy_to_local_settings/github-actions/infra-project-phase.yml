@@ -752,6 +752,11 @@ jobs:
           NETWORK_ENV="${{ env.network_env }}"
           if [ "${{ env.BYO_subnets }}" != "true" ]; then
             echo "subnetProjLogicapp=" >> "$GITHUB_ENV"
+            # BYO_subnets guard, as in ADO job-2-genai-services: 00_Apply_JSON_Config_Override writes the
+            # variables.json BYO examples (snet-dev-esml-cmn-001). Clear them so 02/06/09 use common_subnet_name.
+            echo "subnetCommon=" >> "$GITHUB_ENV"
+            echo "subnetCommonScoring=" >> "$GITHUB_ENV"
+            echo "subnetCommonPowerbiGw=" >> "$GITHUB_ENV"
           fi
           VNET_RG="${{ env.vnetResourceGroup_param }}"
           VNET_NAME="${{ env.vnetNameFull_param }}"

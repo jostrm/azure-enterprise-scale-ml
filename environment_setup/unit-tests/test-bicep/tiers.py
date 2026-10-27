@@ -47,6 +47,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_agent_steps_run_last.py",
         "unit/test_all_scaleset_dispatcher.py",
         "unit/test_apim_gateway_workflows.py",
+        "unit/test_byo_common_subnet.py",
         "unit/test_factory_chat_agent_flag.py",
         "unit/test_github_json_bootstrap.py",
         "unit/test_github_manual_inputs.py",
