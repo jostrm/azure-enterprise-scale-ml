@@ -206,7 +206,6 @@ before self-hosted project execution; `--prepare-only` is not runner readiness.
     - `Same GenAIOps/MLOps` - if data scientists chooses to work from Azure Databricks, Microsoft Fabric or Azure Machine Learning - same template can be leveraged [Read more](#iac--mlops-templates-2019-templates-for-pipelines-in-project-type-esml)
     - `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
-
 </details>
 
 ## Public links - AI Factory in CAF, WAF and customer examples
@@ -223,6 +222,7 @@ before self-hosted project execution; `--prepare-only` is not runner readiness.
 -   `AI factory` - Technical BLOG
     - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
 
+<details>
 ## AI Factory: Enterprise Scale Landing Zones Context (VWan option)
 There are **3 AIFactory AI landingzones: Dev, Stage, Production**, depicted in the image below, where AI Factory projects are deployed.
 - **AI Factory architectures**: Currently there are 2 architectures, template architectures (ESML, GenAI) that lives inside of the AIFactory landingzones. 
@@ -231,7 +231,8 @@ There are **3 AIFactory AI landingzones: Dev, Stage, Production**, depicted in t
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
-## AI Factory architectures: ESML, GenAI-1
+</details>
+## AI Factory template architectures (optional)
 These are the two 2 architectures, template architectures (ESML, GenAI) optionally automated partly or fully (IaC) as AI Factory projects (AI Landingzone with 1 or both) for a use case, team, or business unit, on its own Azure Subscription.
 - **ESML**: Enterprise Scale Machine Learning
 - **GenAI**: Enterprise Scale GenAI
@@ -250,7 +251,8 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 
 ![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 
-## ESML with FABRIC flavour
+
+## Architeture with FABRIC flavour
 You can optionally setup the ESML project type with Microsoft Fabric, as below:
 
 ![ESML flavour](./documentation/v2/10-19/images/11-services-highlevel-esml_fabric.png)
