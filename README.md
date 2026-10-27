@@ -32,6 +32,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 - **One governed lifecycle.** Create a factory, add scale sets and projects, update or delete them through one reviewed API: CLI, Python SDK, wizards or an Azure Function.
 - **Private by design.** Hub-spoke or Virtual WAN, private endpoints and DNS, isolation per team, Bicep through GitHub Actions or Azure DevOps.
 - **Operating models included.** DataOps, MLOps and GenAIOps templates that run on the secure infrastructure.
+- **Subsceiption vendig: Choose 1 team per Subscription/LZ or Multiple teams (for a Hackathon, Sandbox)
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up</b></a> &nbsp;·&nbsp;
@@ -74,18 +75,18 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up Factory</b></a> &nbsp;·&nbsp;
-<a href="./documentation/v2/20-29/26-update-AIFactory.md"><b>Update Factory</b></a> &nbsp;·&nbsp;
-<a href="./environment_setup/install_config_wizard/readme.md"><b>Configure Factory</b></a> <br>
+<a href="./documentation/v2/20-29/26-update-AIFactory.md"><b>Update</b></a> &nbsp;·&nbsp;
+<a href="./environment_setup/install_config_wizard/readme.md"><b>Configure</b></a> <br>
 <a href="./documentation/v2/10-19/10-factory-onion-architecture.md"><b>Architecture</b></a> &nbsp;·&nbsp;
 <a href="./documentation/v2/10-19/22-lifecycle-azure-function.md"><b>Lifecycle API</b></a> &nbsp;·&nbsp;
 <a href="./usecase_code/40-agent-factory/readme.md"><b>Agent Factory</b></a> &nbsp;·&nbsp;
-<a href="./usecase_code/50-ml-factory/readme.md"><b>ML Factory</b></a><br>
+<a href="./usecase_code/50-ml-factory/readme.md"><b>ML Factory</b></a><br>&nbsp;·&nbsp;
 <a href="./documentation/readme.md"><b>Documentation - Full</b></a>
 <a href="https://jostrm.github.io/azure-enterprise-scale-ml/"><b>Documentation - Quick</b></a>
 </p>
 
 ![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
-*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
+*Figure*: Each team in the AI Factory, have their own *floor* with 1-35 resources, optinally to get above architectures. Each team can own multiple floors. You may *turn ON/OFF* Azure resources to remove cost. Easy to turn on again.
 
 > [!TIP]
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a submodule repo.
