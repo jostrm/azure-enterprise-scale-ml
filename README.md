@@ -1,4 +1,4 @@
-# Enterprise Scale AI Factory - submodule
+# Enterprise Scale Azure Factory - submodule
 ![Header](documentation/v2/10-19/images/header.png)
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
@@ -48,7 +48,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 
 # Welcome
 
-Welcome to the official `Enterprise Scale AI Factory` repository.<br>
+Welcome to the official `Enterprise Scale Azure Factory` repository.<br>
 This AI landing zone, est 2019, and is WAF aligned. It has been designed and used since 2019 for Azure Public Cloud but can be leveraged in the Azure Government and Sovereign Cloud, by configuration. This is an application landingzone that works both with VWAN Hub or a traditional Hub/Spoke<br>
 
 It is an enterprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, AI Search or other services.
