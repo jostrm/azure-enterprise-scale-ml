@@ -2749,3 +2749,19 @@ def test_vnet_peering_fingerprint_ignores_the_parent_vnet_etag_and_sync_level():
     assert fl.resource_etag(body, {}, kind) is None
     later["properties"]["allowVirtualNetworkAccess"] = False
     assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+def test_acr_system_scope_map_fingerprint_ignores_its_synthesized_creation_date():
+    # aif-138 COMMON retry (2026-10-27) was blocked with bootstrap-resource-instance-changed: ACR answers every GET of
+    # its built-in _repositories_* scope maps with a new creationDate, so two reads minutes apart never agreed.
+    scope_map = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.ContainerRegistry/registries/acr"
+                 "/scopeMaps/_repositories_pull")
+    body = {"id": scope_map, "type": "Microsoft.ContainerRegistry/registries/scopeMaps",
+            "properties": {"actions": ["repositories/*/content/read"], "provisioningState": "Succeeded",
+                           "creationDate": "2026-10-25T00:30:59.0052368+00:00"}}
+    later = copy.deepcopy(body)
+    later["properties"]["creationDate"] = "2026-10-25T00:16:04.5282132+00:00"
+    kind = "microsoft.containerregistry/registries/scopemaps"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    later["properties"]["actions"].append("repositories/*/content/write")
+    assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)

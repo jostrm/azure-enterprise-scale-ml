@@ -303,6 +303,8 @@ VOLATILE_FIELDS = {
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
+    # ACR synthesizes its built-in _repositories_* scope maps on every GET with a new creationDate (aif-138, 2026-10-27).
+    "microsoft.containerregistry/registries/scopemaps": (("properties", "creationDate"),),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
 # The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them
