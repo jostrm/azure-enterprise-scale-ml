@@ -71,14 +71,6 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 - **Integration & ELT/ETL/Streaming**: Logic Apps, Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
 - **Includes two setup modes:** *Fully private AI factory* or *Standalone AI Factory* (VPN, IP whitelist, Bastion, or Hybrid access)
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
-- [**AI Factory Configuration Wizard**](./environment_setup/install_config_wizard/readme.md) Setup in minutes, intelligent workflow-drivern setup Wizard.
-
-[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
-- See RELEASES - for Latest, recommended version.
-
-[Quickstart Documentation - Setup | Parameters](https://jostrm.github.io/azure-enterprise-scale-ml/)
-
-[Full Documentation - Concepts | Networking | Diagrams](./documentation/readme.md) 
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up Factory</b></a> &nbsp;·&nbsp;
