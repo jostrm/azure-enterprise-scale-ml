@@ -65,13 +65,28 @@ The deployed features follow [Microsoft's Well-Architected Framework WAF](https:
 The *AI Factory project* can have 1 or many resources *ENABLED=True* to get a *GenAI* with *Machine Learning* baseline architecture automated in 10 minutes with resources: **AI Foundry, AI Services, AI Search, Azure Machine Learning, Databricks** + 2 Storage accounts, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access. <br>
 Via *AI Factory feature flags* you can add optional resources, re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
-The resources that can be added in packages of configs, such as **ARCHITECTURES** seen in the image below: 
+# + 35 Azure resources (on top of all platform related) for project teams
+The +35 resources a team can add via "enable" config, such as **ARCHITECTURES** seen in the image below: 
 - **AI related**: Microsoft Foundry, Azure OpenAI (standalone), Azure Machine Learning, Azure Databricks Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS (fully private, and Azure Arc enabled)
-- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis
+- **Data & Databases**: Azure Cosmos DB, Elastic search, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis, Azure Managed Redis (AMR)
 - **Integration & ELT/ETL/Streaming**: Logic Apps, Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
 - **Includes two setup modes:** *Fully private AI factory* or *Standalone AI Factory* (VPN, IP whitelist, Bastion, or Hybrid access)
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
+
+Besides above, resources for **connevity & security** is also OPTINALLY added:
+
+- **Protect**: Defender, Defender for AI, Application Gateway (WAF)
+- **Connect**: Private Endpoints, Private DNS Resolver, Private DNS Zones, Azure VPN Gateway,APIM
+- Native Azure Dashboards
+- Custom Azure Dashboards (workbooks)
+
+Besides above, optionally, automation exists for
+- Factory Agent Chat
+- Factory MCP Server
+- Factory UX: Configuration Wizard, Governance, Observability
+- Azure AI gateway (new SKU) integration
+
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up Factory</b></a> &nbsp;·&nbsp;
