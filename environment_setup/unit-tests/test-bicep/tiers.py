@@ -60,6 +60,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_release_branch_checkout.py",
         "unit/test_release_branch_names.py",
         "unit/test_release_version.py",
+        "unit/test_repository_gitlinks.py",
         "unit/test_shared_acr_update.py",
         "unit/test_workflow_run_monitor.py",
     )),
@@ -148,6 +149,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_single_writer_coordination.py",
         "unit/test_single_writer_deletion.py",
         "unit/test_single_writer_repository.py",
+        "unit/test_time_budgets.py",
     )),
     Tier(5, "capacity", "Preflight and capacity: capacity preflight, regional and SKU fallback, "
          "capacity retries, region reports, subnet scaling and peerability checks.", (

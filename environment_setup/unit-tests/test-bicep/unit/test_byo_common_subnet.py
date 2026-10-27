@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import run_ci
 from . import test_simple_bootstrap as simple
 
 
@@ -84,7 +85,7 @@ def run_step(run, env, workspace):
     github_env, github_output = workspace / "step.env", workspace / "step.output"
     github_env.unlink(missing_ok=True)
     completed = subprocess.run(
-        ["bash", "-c", script], cwd=workspace, text=True, capture_output=True, timeout=30,
+        [run_ci.find_bash(), "-c", script], cwd=workspace, text=True, capture_output=True, timeout=30,
         env={"PATH": os.environ["PATH"], **env, "GITHUB_ENV": str(github_env), "GITHUB_OUTPUT": str(github_output)})
     assert completed.returncode == 0, completed.stdout + completed.stderr
     return {**env, **read_github_env(github_env)}
