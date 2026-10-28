@@ -5257,9 +5257,30 @@ def private_endpoint_record_owner(item):
 
 def dns_private_endpoint_records(closure, parent):
     """Every A/AAAA record set in the zone that a private endpoint created, by record id: the accepted evidence."""
+    collections = closure.get("collections") if isinstance(closure, dict) else None
     return {row["id"].lower(): owner for kind in ("a", "aaaa")
-            for row in closure["collections"][parent + "/" + kind]["items"]
-            if (owner := private_endpoint_record_owner(row))}
+            for row in ((collections or {}).get(parent + "/" + kind) or {}).get("items") or []
+            if isinstance(row, dict) and isinstance(row.get("id"), str) and (owner := private_endpoint_record_owner(row))}
+
+
+def own_private_endpoint_records(document, closure):
+    """Per preserved zone, the A/AAAA record sets this factory's own private endpoints created: evidence that needs
+    no separate DNS SOA consent (Joakim, 2026-10-28: what the product proves itself is never a person's consent).
+
+    Azure names the creating endpoint in each record's metadata; only endpoints that live in this factory's
+    reviewed bootstrap groups count. Records of foreign endpoints and hand-made records stay unreviewed descendants.
+    """
+    proof = document["deployment"]["bootstrap_foundation"]
+    endpoints = own_private_endpoint_names(closure, proof)
+    accepted = {}
+    for key, row in proof["resources"].items():
+        if (isinstance(row, dict) and row.get("type") == "microsoft.network/privatednszones"
+                and row.get("disposition") == "preserve"):
+            records = {identifier: owner for identifier, owner in dns_private_endpoint_records(closure, key).items()
+                       if owner["name"] in endpoints}
+            if records:
+                accepted[key] = records
+    return accepted
 
 
 def own_private_endpoint_names(closure, proof):
@@ -5488,10 +5509,12 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     proof = document["deployment"].get("bootstrap_foundation", {})
     if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
         return set()
-    accepted = {}
     if has_dns_soa_permit(proof):
         validate_exact_bootstrap(document)
         accepted = verify_dns_soa_preservation(document, closure)
+    else:
+        # No consent: the records this factory's own private endpoints created are still evidence (2026-10-28).
+        accepted = own_private_endpoint_records(document, closure)
     preserved = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
     if not preserved:
         return preserved
