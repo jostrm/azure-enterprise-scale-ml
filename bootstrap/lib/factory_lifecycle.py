@@ -305,6 +305,13 @@ VOLATILE_FIELDS = {
     "microsoft.network/privatednszones": (
         ("properties", "numberOfRecordSets"), ("properties", "numberOfVirtualNetworkLinks"),
         ("properties", "numberOfVirtualNetworkLinksWithRegistration"), ("properties", "provisioningState")),
+    # Microsoft updates a Log Analytics table's schema (columns, standard columns, solutions) centrally and its state
+    # on its own schedule: 27 of aif-138's 697 tables moved between review and worker (2026-10-28) with every
+    # retention and plan setting unchanged. Identity, plan, retention and protection level still count.
+    "microsoft.operationalinsights/workspaces/tables": (
+        ("properties", "schema"), ("properties", "provisioningState"), ("properties", "lastPlanModifiedDate"),
+        ("properties", "resultStatistics"), ("properties", "restoredLogs"), ("properties", "searchResults"),
+        ("systemData",)),
 }
 DEFENDER_EXTENSION_PUBLISHER = "Microsoft.Azure.AzureDefenderForServers"
 # The Defender for Cloud compute baseline installs these with enableAutomaticUpgrade, so the platform upgrades them

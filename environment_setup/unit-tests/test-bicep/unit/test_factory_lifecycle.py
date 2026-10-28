@@ -2653,6 +2653,35 @@ def test_vnet_tagged_traffic_consumer_fingerprint_keeps_only_its_identity():
     assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
 
 
+def test_log_analytics_table_fingerprint_ignores_the_platform_managed_schema_and_state():
+    # aif-138 (2026-10-28): the worker refused bootstrap-resource-instance-changed on the workspace's AzureDiagnostics
+    # table; 27 of the 697 tables had moved between the review and the worker although every retention and plan
+    # setting was unchanged. Microsoft updates a table's schema (columns, standard columns, solutions) centrally and
+    # its state on its own schedule; the table's identity, plan, retention and protection level still count.
+    table = ("/subscriptions/" + SUB + "/resourceGroups/reviewed/providers/Microsoft.OperationalInsights/workspaces"
+             "/la-cmn-sdc-dev-6hc2h-001/tables/AzureDiagnostics")
+    body = {"id": table, "name": "AzureDiagnostics", "type": "Microsoft.OperationalInsights/workspaces/tables",
+            "properties": {"plan": "Analytics", "retentionInDays": 30, "retentionInDaysAsDefault": True,
+                           "totalRetentionInDays": 30, "totalRetentionInDaysAsDefault": True, "archiveRetentionInDays": 0,
+                           "protectionLevel": "General", "provisioningState": "Succeeded",
+                           "schema": {"name": "AzureDiagnostics", "tableType": "Microsoft", "tableSubType": "Any",
+                                      "columns": [{"name": "ResourceId", "type": "string"}],
+                                      "standardColumns": [{"name": "TimeGenerated", "type": "datetime"}],
+                                      "solutions": ["LogManagement"]}}}
+    later = copy.deepcopy(body)
+    later["properties"]["schema"]["columns"].append({"name": "NewDiagnosticsColumn_s", "type": "string"})
+    later["properties"]["schema"]["solutions"].append("Security")
+    later["properties"].update(provisioningState="Updating", lastPlanModifiedDate="2026-10-28T20:00:00Z",
+                               resultStatistics={"progress": 100}, restoredLogs={}, searchResults={})
+    kind = "microsoft.operationalinsights/workspaces/tables"
+    assert fl.resource_digest(body, kind) == fl.resource_digest(later, kind)
+    assert fl.resource_digest(body) == fl.resource_digest(later)
+    for field, value in (("retentionInDays", 90), ("totalRetentionInDays", 365), ("plan", "Basic"), ("protectionLevel", "Elevated")):
+        changed = copy.deepcopy(body)
+        changed["properties"][field] = value
+        assert fl.resource_digest(body, kind) != fl.resource_digest(changed, kind), field
+
+
 def test_private_dns_zone_fingerprint_ignores_record_set_and_link_counters():
     # aif-137 (2026-10-27): COMMON's private endpoints add A records to the prerequisite zones, so a zone's
     # numberOfRecordSets moves after review. Its etag, settings and tags still count.
