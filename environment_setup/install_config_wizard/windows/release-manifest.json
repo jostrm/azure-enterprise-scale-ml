@@ -1,12 +1,12 @@
 {
-  "version": "v0.47.65",
-  "source_commit": "17d1f39a2be63550389a60717c9fe33e182763a9",
-  "accelerator_commit": "7012cc924e0fa18bf7ff222e0d2b6b73378ebde6",
+  "version": "v0.47.68",
+  "source_commit": "77472a3df8dfb2da04a3d29aa027a25d2e5e939f",
+  "accelerator_commit": "5bc387cc1b4f6f17dfdd4b8f64b35ece907f5e07",
   "platform": "windows",
   "architecture": "AMD64",
   "python": "3.13.16",
   "archive": "aifactory-config-windows.zip",
-  "bytes": 44362285,
-  "sha256": "b56efdc24d5960cc463351769f67315c4a3ed9a219099816cf2392cf11d4a6f8",
-  "run_id": "40750719353"
+  "bytes": 44366791,
+  "sha256": "0e43c553a08e02e2df0259f2291082c090c7f530a57c570667f721d314eca887",
+  "run_id": "40763691647"
 }
