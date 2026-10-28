@@ -998,9 +998,15 @@ class KeepAliveHTTPSHandler(HTTPSHandler):
     and returns the connection only when the response was complete and the server keeps it
     open. Writes and proxy-tunnelled requests keep urllib's own path, and HTTP errors still
     flow through the opener's processors (HTTPError, NoRedirect).
+
+    `max_body` bounds the largest read any caller accepts: a provider state blob
+    (STATE_RESPONSE_MAX); every caller still applies its own smaller limit to what it reads.
+    aif-138 (2026-10-28): bound at MAX_DOCUMENT + 1, the pool cut the 8.9 MB /git/blobs answer
+    for a 6.4 MB state.json short, so state_request parsed a truncated body and the worker and
+    the poll both stopped with single-writer-provider-response-invalid after every state read.
     """
 
-    def __init__(self, context=None, connection_factory=HTTPSConnection, max_body=MAX_DOCUMENT + 1, max_idle=16):
+    def __init__(self, context=None, connection_factory=HTTPSConnection, max_body=STATE_RESPONSE_MAX + 1, max_idle=16):
         super().__init__(context=context)
         self._factory, self._max_body, self._max_idle = connection_factory, max_body, max_idle
         self._idle, self._lock = {}, threading.Lock()
@@ -1322,6 +1328,13 @@ class Cloud:
         try:
             return status, incoming, json.loads(raw) if raw else None
         except (ValueError, UnicodeError):
+            length = next((value for name, value in incoming.items() if name.lower() == "content-length"), None)
+            parsed = urlsplit(url)
+            print(json.dumps({
+                "event": "single-writer-provider-response-invalid", "method": method, "host": parsed.hostname,
+                "path": parsed.path, "status": status, "bytes": len(raw),
+                "content_length": int(length) if isinstance(length, str) and length.isdigit() else None,
+            }, sort_keys=True), file=sys.stderr, flush=True)
             raise Blocked("single-writer-provider-response-invalid") from None
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
