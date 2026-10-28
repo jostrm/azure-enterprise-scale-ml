@@ -4989,7 +4989,23 @@ def verify_consent_ancestors(cloud, root, source):
     if not isinstance(proof, dict) or "consent_ancestors" not in proof:
         return
     require(document["source"] == source, "consent-source-not-published-ancestor")
-    for commit in sorted(consent_sources(document) - {source["commit"]}):
+    ancestors = sorted(consent_sources(document) - {source["commit"]})
+    if ancestors:
+        # A consumer checkout is usually shallow (actions/checkout depth 1), so git cannot see the carried commit:
+        # deepen the source first, objects only, with the same safe flags as the published-ref fetch (no hooks,
+        # maintenance, FETCH_HEAD or remote-tracking ref updates). A failed deepening fails closed below.
+        try:
+            shallow = cloud.command(["git", "rev-parse", "--is-shallow-repository"], cwd=str(root)).strip() == "true"
+        except Blocked:
+            shallow = False
+        if shallow:
+            try:
+                cloud.command(["git", "-c", "core.hooksPath=" + os.devnull, "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                               "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=", "--unshallow",
+                               "origin", source["ref"]], cwd=str(root))
+            except Blocked:
+                pass
+    for commit in ancestors:
         try:
             base = cloud.command(["git", "merge-base", commit, source["commit"]], cwd=str(root))
         except Blocked:

@@ -7,6 +7,7 @@ import email.message
 import importlib.util
 import io
 import json
+import os
 import re
 import shutil
 import sys
@@ -618,6 +619,8 @@ def test_carried_consent_commits_must_be_ancestors_of_the_deploy_commit(workspac
             return fl.SOURCE_ORIGIN
         if argv[1] == "ls-remote":
             return commit + "\t" + ref
+        if argv[1:] == ["rev-parse", "--is-shallow-repository"]:
+            return "false"
         if argv[1] == "merge-base":
             asked.append(argv[2:])
             if merge_base == "missing":
@@ -634,6 +637,42 @@ def test_carried_consent_commits_must_be_ancestors_of_the_deploy_commit(workspac
         with pytest.raises(fl.Blocked, match="consent-source-not-published-ancestor"):
             fl._verify_source(cloud, workspace, document["source"], published=published)
     assert asked == [["c" * 40, commit]]
+
+
+@pytest.mark.parametrize("shallow,fetch_fails", [(True, False), (True, True), (False, False)])
+def test_carried_consent_ancestry_deepens_a_shallow_source_before_proving(workspace, shallow, fetch_fails):
+    # aif-138 (2026-10-28): actions/checkout clones the accelerator submodule with depth 1, so the worker's
+    # git merge-base could not see the carried permit's commit and refused consent-source-not-published-ancestor
+    # although pink had proven the ancestry. A shallow source is deepened first, objects only, same safe flags.
+    document = manifest()
+    commit, ref = document["source"]["commit"], document["source"]["ref"]
+    document["deployment"] = {"bootstrap_foundation": {"consent_ancestors": ["c" * 40]}}
+    calls = []
+
+    def command(argv, cwd=None):
+        calls.append(argv[1:])
+        if argv[1:] == ["rev-parse", "--is-shallow-repository"]:
+            return "true" if shallow else "false"
+        if argv[1] == "-c":
+            assert argv[1:7] == ["-c", "core.hooksPath=" + os.devnull, "-c", "maintenance.auto=false", "-c", "gc.auto=0"]
+            assert argv[7:] == ["fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=", "--unshallow",
+                                "origin", ref]
+            if fetch_fails:
+                raise fl.Blocked("command-failed")
+            return ""
+        if argv[1] == "merge-base":
+            return ("c" * 40) if not fetch_fails else ""
+        raise AssertionError(argv)
+
+    cloud = SimpleNamespace(command=command, document=document)
+    if fetch_fails:
+        with pytest.raises(fl.Blocked, match="consent-source-not-published-ancestor"):
+            fl.verify_consent_ancestors(cloud, workspace, document["source"])
+    else:
+        fl.verify_consent_ancestors(cloud, workspace, document["source"])
+    fetched = [call for call in calls if call and call[0] == "-c"]
+    assert len(fetched) == (1 if shallow else 0)
+    assert calls[-1] == ["merge-base", "c" * 40, commit]
 
 
 def test_tokens_are_bound_to_expected_object_not_only_subscription(monkeypatch):
