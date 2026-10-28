@@ -13,6 +13,8 @@ The button deploys the AI Factory v1.25 Simple Mode full bootstrap from the Azur
 
 Read [portal/README.md on the portal-125 branch](https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md) before you press it. It covers the required permissions, the Entra group, the regions, redeploying after a failure, and the post-deployment checklist.
 
+## Full deploy
+
 For terminal commands, Python or direct HTTP requests, start with
 [17. Azure Factory CLI, Config Wizard API, and usage](../10-19/17-cli-and-api-and-usage.md).
 
