@@ -241,3 +241,50 @@ def test_http_error_bodies_remain_readable_from_the_raised_error():
         build_opener(fl.NoRedirect, handler_for(server)).open(Request(URL), timeout=30)
     with raised.value as error:
         assert error.code == 409 and error.read() == b'{"error":{"code":"Conflict"}}'
+
+
+def _blob_answer(size):
+    """A GitHub /git/blobs answer whose base64 content JSON is `size` bytes: Content-Length set, as GitHub does."""
+    import base64, json
+    content = base64.b64encode(b"s" * size).decode()
+    body = json.dumps({"sha": "0b28dc89", "content": "\n".join(content[i:i + 60] for i in range(0, len(content), 60)) + "\n",
+                       "encoding": "base64"}).encode()
+
+    def answer(connection, method, selector, headers):
+        return 200, body, False
+    return answer, body
+
+
+def test_pooled_reads_return_a_large_provider_state_blob_whole():
+    """aif-138 (2026-10-28): state.json 6.4 MB -> /git/blobs answer 8.9 MB; the pool cut it at MAX_DOCUMENT + 1 and
+    state_request raised single-writer-provider-response-invalid after every state read, on the worker and the poll."""
+    answer, body = _blob_answer(7 * 1024 * 1024)
+    assert fl.MAX_DOCUMENT + 1 < len(body) <= fl.STATE_RESPONSE_MAX
+    server = Server(answer)
+    cloud = cloud_for(build_opener(fl.NoRedirect, handler_for(server)))
+    cloud.command = Mock(return_value="synthetic-github-token")
+    status, _, parsed = cloud.state_request("gha", "GET", "repos/reviewed/private/git/blobs/0b28dc89", None, (200,))
+    assert status == 200 and parsed["encoding"] == "base64" and len(parsed["content"]) > fl.MAX_DOCUMENT
+    assert fl.KeepAliveHTTPSHandler()._max_body == fl.STATE_RESPONSE_MAX + 1
+    # Ordinary documents keep their own bound: the caller's size check still fails closed above MAX_DOCUMENT.
+    with pytest.raises(fl.Blocked, match="^remote-response-too-large$"):
+        cloud.request("GET", URL, fl.ARM)
+
+
+def test_an_unparseable_provider_response_is_named_before_it_blocks(capsys):
+    import json
+    truncated = b'{"sha":"0b28dc89","content":"c3Nz'  # a body cut short of its Content-Length
+
+    def answer(connection, method, selector, headers):
+        return 200, truncated, False
+    server = Server(answer)
+    cloud = cloud_for(build_opener(fl.NoRedirect, handler_for(server)))
+    cloud.command = Mock(return_value="synthetic-github-token")
+    with pytest.raises(fl.Blocked, match="^single-writer-provider-response-invalid$"):
+        cloud.state_request("gha", "GET", "repos/reviewed/private/git/blobs/0b28dc89", None, (200,))
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    assert [e["event"] for e in events] == ["single-writer-provider-response-invalid"]
+    assert events[0]["method"] == "GET" and events[0]["host"] == "api.github.com"
+    assert events[0]["path"] == "/repos/reviewed/private/git/blobs/0b28dc89" and events[0]["status"] == 200
+    assert events[0]["bytes"] == len(truncated) and events[0]["content_length"] is None
+    assert "synthetic-github-token" not in capsys.readouterr().err
