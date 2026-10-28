@@ -6,6 +6,11 @@
 
 The button deploys the AI Factory v1.25 Simple Mode full bootstrap from the Azure portal: private networking, a dedicated hub, Dev, and project 001. It doesn't create a GitHub or Azure DevOps repository or pipelines, and it doesn't register the factory with the Factory API. Status: **proposed** until one deployment is confirmed.
 
+> [!NOTE]
+> **Deploy to Azure is meant for a quick test.** It doesn't expose all of the roughly 35 Azure resources you can choose from, or all SKU settings. It doesn't create dashboards automatically, and it leaves out other AI Factory features. For a governed factory, use the app, the CLI or the Factory API described below.
+>
+> If you want to quickly build an agent with Foundry and AI Search, train an ML model with Azure Machine Learning or Databricks, build a front end with Container Apps, or run DataOps with Data Factory, it's a simple way to get that running with private networking.
+
 Read [portal/README.md on the portal-125 branch](https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md) before you press it. It covers the required permissions, the Entra group, the regions, redeploying after a failure, and the post-deployment checklist.
 
 For terminal commands, Python or direct HTTP requests, start with
