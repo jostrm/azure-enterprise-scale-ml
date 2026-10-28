@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "17567879892503738748"
+      "templateHash": "1414656482592177963"
     }
   },
   "functions": [
@@ -5213,7 +5213,7 @@
       "searchLocation": "[if(or(empty(parameters('aiSearchLocation')), equals(parameters('aiSearchLocation'), 'same-as-factory-region')), parameters('location'), parameters('aiSearchLocation'))]",
       "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]"
     },
-    "stageName": "[format('aif-{0}-{1}', variables('prefixBare'), parameters('scalesetNumber'))]",
+    "stageName": "[format('aif-{0}-{1}-{2}', variables('prefixBare'), parameters('scalesetNumber'), variables('locationShort'))]",
     "certificateVaultParts": "[split(if(empty(parameters('appGatewayCertificateVaultId')), format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('commonResourceGroup')), parameters('appGatewayCertificateVaultId')), '/')]"
   },
   "resources": {
