@@ -292,3 +292,42 @@ def test_command_help_uses_plain_language():
     parser = build_parser()
     text = parser._subparsers._group_actions[0].choices["reconcile-run-claim"].format_help()
     assert "claim" in text and "failed run" in text
+
+
+def _stopped_dispatcher(value):
+    """aif-138 (2026-10-28): the laptop poll stopped on a provider state read while the GitHub run finished; the run
+    receipt still says running, the worker receipt is terminal, and the server finalizes the run receipt on release."""
+    value["run_receipt"] = {"status": "running", "error_code": None, "mutation_started": True}
+    value["worker_receipt"] = {"status": "succeeded", "error_code": None, "mutation_started": True}
+    value["run_receipt_finalized"] = True
+    value["effects"].append("The run receipt runs/" + RUN + ".json is completed as reconciliation-required with remote_terminal.")
+
+
+def test_a_running_run_receipt_is_accepted_only_when_the_server_finalizes_it(tmp_path, transport, capsys):
+    _stopped_dispatcher(transport.preview)
+    assert prepare(tmp_path) == 0
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert receipt["preview"]["run_receipt_finalized"] is True
+    assert receipt["preview"]["run_receipt"]["status"] == "running"
+    assert "reconciliation-required" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("change", [
+    lambda value: value.update(run_receipt_finalized=False),
+    lambda value: value.pop("run_receipt_finalized"),
+    lambda value: value.update(run_receipt_finalized="yes"),
+    lambda value: value["worker_receipt"].update(status="running"),
+    lambda value: value["worker_receipt"].update(status="failed"),
+    lambda value: value["run_receipt"].update(status="failed"),
+])
+def test_a_stopped_dispatcher_release_still_fails_closed(tmp_path, transport, change):
+    _stopped_dispatcher(transport.preview)
+    change(transport.preview)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_a_finalization_flag_on_a_terminal_run_receipt_is_incompatible(tmp_path, transport):
+    transport.preview["run_receipt_finalized"] = True
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()

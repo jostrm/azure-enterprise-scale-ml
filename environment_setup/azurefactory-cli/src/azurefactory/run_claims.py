@@ -77,10 +77,18 @@ def validate_claim_preview(request: dict[str, Any], preview: Any) -> None:
             or not _sha(claim.get("manifest_hash"), 64) or not isinstance(claim.get("scopes"), list)
             or not claim["scopes"] or any(not _text(scope) for scope in claim["scopes"])):
         invalid("the active claim is not exactly this run's claim")
-    for field in ("run_receipt", "worker_receipt"):
-        receipt = preview.get(field)
-        if not isinstance(receipt, dict) or receipt.get("status") not in TERMINAL:
-            invalid("the run and worker receipts must be terminal")
+    # A run receipt that still says running is released only when the server finalizes it: its dispatcher
+    # provably stopped before it saw the finished remote run while the worker receipt is terminal (aif-134,
+    # 2026-10-27; aif-138, 2026-10-28: the laptop poll stopped on a provider state read).
+    finalized = preview.get("run_receipt_finalized", False)
+    if type(finalized) is not bool:
+        invalid("the run receipt finalization flag must be true or false")
+    worker, run_receipt = preview.get("worker_receipt"), preview.get("run_receipt")
+    if not isinstance(worker, dict) or worker.get("status") not in TERMINAL:
+        invalid("the run and worker receipts must be terminal")
+    if not isinstance(run_receipt, dict) or run_receipt.get("status") not in (("running",) if finalized else TERMINAL):
+        invalid("the run and worker receipts must be terminal" if not finalized else
+                "a finalized release names a run receipt that still says running; the receipts do not match")
     remote = preview.get("remote_run")
     if (not isinstance(remote, dict) or remote.get("kind") not in ("gha", "ado")
             or type(remote.get("run_id")) is not int or remote.get("status") != "completed"):
