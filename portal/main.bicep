@@ -131,7 +131,8 @@ func stageParameters(stage object, t object) object =>
 
 func subnetCidr(vnet string, entry array) string => cidrSubnet(vnet, entry[0], entry[1])
 
-var stageName = 'aif-${prefixBare}-${scalesetNumber}'
+// Includes the region: subscription-scope deployment records keep their location, so a same-named run elsewhere fails.
+var stageName = 'aif-${prefixBare}-${scalesetNumber}-${locationShort}'
 
 resource bootstrapGroup 'Microsoft.Resources/resourceGroups@2024-07-01' = {
   name: bootstrapResourceGroup

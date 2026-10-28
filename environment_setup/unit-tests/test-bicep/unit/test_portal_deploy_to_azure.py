@@ -254,6 +254,15 @@ def test_generation_fails_when_the_source_does_not_clear_the_byo_examples(monkey
         GENERATOR.build_plan(ROOT)
 
 
+def test_subscription_scope_stage_names_include_the_region(main_template):
+    # Subscription-scope deployment records keep their region; a same-named run in another region fails with
+    # InvalidDeploymentLocation (observed: northeurope records blocked a swedencentral run of the same prefix and number).
+    assert "locationShort" in main_template["variables"]["stageName"]
+    for key, resource in main_template["resources"].items():
+        if resource["type"].lower() == "microsoft.resources/deployments" and "resourceGroup" not in resource:
+            assert "variables('stageName')" in resource["name"], key
+
+
 def test_main_does_not_inline_stage_templates(main_template):
     for resource in linked_deployments(main_template):
         assert "template" not in resource["properties"]
