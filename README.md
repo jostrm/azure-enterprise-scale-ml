@@ -1,4 +1,6 @@
-# Enterprise Scale Azure Factory - submodule
+# Enterprise Scale Azure Factory - submodule [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
+<sub>Deploy to Azure: AI Factory v1.25 Simple Mode full bootstrap from the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/portal-125">portal-125</a> branch (private networking, dedicated hub, Dev, project 001). Status: <b>proposed</b> until one deployment is confirmed. Read <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md">portal/README.md</a> before you press it.</sub>
+
 ![Header](documentation/v2/10-19/images/header.png)
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
