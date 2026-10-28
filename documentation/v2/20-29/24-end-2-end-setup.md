@@ -1,5 +1,13 @@
 # End-to-end setup: Azure Factory and AI projects
 
+## Quick deploy
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
+
+The button deploys the AI Factory v1.25 Simple Mode full bootstrap from the Azure portal: private networking, a dedicated hub, Dev, and project 001. It doesn't create a GitHub or Azure DevOps repository or pipelines, and it doesn't register the factory with the Factory API. Status: **proposed** until one deployment is confirmed.
+
+Read [portal/README.md on the portal-125 branch](https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md) before you press it. It covers the required permissions, the Entra group, the regions, redeploying after a failure, and the post-deployment checklist.
+
 For terminal commands, Python or direct HTTP requests, start with
 [17. Azure Factory CLI, Config Wizard API, and usage](../10-19/17-cli-and-api-and-usage.md).
 
