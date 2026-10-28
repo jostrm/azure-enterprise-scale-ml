@@ -1509,6 +1509,50 @@ def test_dns_soa_hand_made_a_record_still_blocks(dns_consent, creator):
             verify(case.document, closure)
 
 
+def without_dns_soa_consent(case):
+    """The same exact bootstrap proof before any separate DNS SOA consent: the common case of a first COMMON run."""
+    document = copy.deepcopy(case.document)
+    proof = document["deployment"]["bootstrap_foundation"]
+    proof.pop("dns_soa_baseline"), proof.pop("dns_soa_preservation_permit")
+    proof["resources"][case.soa] = {**case.closure["resources"][case.soa], "scope": GROUP.lower(),
+                                    "disposition": "preserve", "preservation": "bootstrap-prerequisite"}
+    assert not fl.has_dns_soa_permit(proof)
+    return document
+
+
+def test_own_private_endpoint_records_need_no_consent(dns_consent):
+    # Joakim (2026-10-28): a change the product can prove by itself is never a person's consent and never two
+    # 26-minute walks. COMMON's own private endpoints name themselves in every A record they write into the
+    # prerequisite zones; those records are evidence in the final closure without any DNS SOA consent.
+    case = dns_consent
+    document = without_dns_soa_consent(case)
+    records = [endpoint_a_record(case.zone, "acrcommon35xnlsdc001dev", PRIVATE_ENDPOINT),
+               endpoint_a_record(case.zone, "acrcommon35xnlsdc001dev.swedencentral.data", PRIVATE_ENDPOINT)]
+    closure = with_endpoint_records(case, records)
+    owner = {"name": PRIVATE_ENDPOINT.rsplit("/", 1)[1].lower(), "resource_guid": ENDPOINT_GUID}
+    assert fl.own_private_endpoint_records(document, closure) == {case.zone: {r["id"].lower(): owner for r in records}}
+    assert case.zone in fl.verify_bootstrap_final_closure(document, closure)
+    assert fl.own_private_endpoint_records(document, case.closure) == {}
+    assert case.zone in fl.verify_bootstrap_final_closure(document, case.closure)
+
+
+@pytest.mark.parametrize("record", ["foreign-endpoint", "hand-made", "endpoint-outside-reviewed-groups"])
+def test_records_the_product_cannot_prove_still_need_a_person_without_consent(dns_consent, record):
+    case = dns_consent
+    document = without_dns_soa_consent(case)
+    if record == "foreign-endpoint":
+        closure = with_endpoint_records(case, [endpoint_a_record(case.zone, "acrcommon", FOREIGN_ENDPOINT)])
+    elif record == "hand-made":
+        closure = with_endpoint_records(case, [endpoint_a_record(case.zone, "manual", PRIVATE_ENDPOINT, creator=False)])
+    else:
+        closure = with_endpoint_records(case, [endpoint_a_record(case.zone, "acrcommon", FOREIGN_ENDPOINT)],
+                                        (PRIVATE_ENDPOINT, FOREIGN_ENDPOINT))
+    assert fl.own_private_endpoint_records(document, closure) == {}
+    # An endpoint outside the reviewed groups already fails the closure's scope check; the record never counts.
+    with pytest.raises(fl.Blocked, match="bootstrap-preserved-descendant-unreviewed|bootstrap-final-closure-scope-mismatch"):
+        fl.verify_bootstrap_final_closure(document, closure)
+
+
 def test_dns_soa_consent_preserves_exact_present_instance_without_historical_authority(dns_consent):
     case = dns_consent
     snapshot = fl.bootstrap_ownership_snapshot(case.cloud, case.document)
