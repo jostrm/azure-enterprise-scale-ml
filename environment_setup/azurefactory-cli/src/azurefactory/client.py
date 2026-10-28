@@ -124,7 +124,7 @@ class AzureFactoryClient(SavedMonitoringClient):
 
     base_url: str | None = None
     api_key: str | None = field(default=None, repr=False)
-    timeout: float = 60.0
+    timeout: float = 90.0
 
     def __post_init__(self):
         if not isinstance(self.timeout, (int, float)) or not math.isfinite(float(self.timeout)) or self.timeout <= 0:
@@ -326,7 +326,7 @@ class AzureFactoryClient(SavedMonitoringClient):
 
     def watch_workflow_run(
         self, repository: str, run_id: int, after: str | None = None, follow: bool = True,
-        *, timeout: float = 600.0, max_retries: int = 6,
+        *, timeout: float = 900.0, max_retries: int = 9,
         backoff_initial: float = 0.5, backoff_max: float = 8.0,
     ) -> Generator[WorkflowRunEvent, None, WorkflowRunEvent | None]:
         """Yield SSE events until completion or the bounded observation deadline.

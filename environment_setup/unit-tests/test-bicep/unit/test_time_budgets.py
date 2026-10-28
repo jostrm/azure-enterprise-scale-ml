@@ -1,4 +1,5 @@
-"""Time budgets the bootstrap helpers define themselves (2026-10-27: doubled after aif-138 COMMON ran out of time).
+"""Time budgets the bootstrap helpers define themselves (2026-10-27: doubled after aif-138 COMMON ran out of time;
+2026-10-28: every review window and the network budgets keep a margin of three over their longest observed use).
 
 Each budget is a named module constant so its value is pinned here once and documented in pink
 docs/operations/Timeouts-and-limits.md. Budgets that stay unchanged on purpose are pinned too, with the reason.
@@ -54,7 +55,8 @@ fdp = load("factory_deletion_pipeline")
     (fl, "ARM_DEPLOYMENT_POLLS", 2880),
     (fl, "GITHUB_DISPATCH_DISCOVERY_POLLS", 120),
     # factory_lifecycle: unchanged on purpose
-    (fl, "MANIFEST_MAX_LIFETIME_SECONDS", 3600),   # = pink BOOTSTRAP_FROZEN_SECONDS (already doubled 30 -> 60 min)
+    (fl, "MANIFEST_MAX_LIFETIME_SECONDS", 3 * 3600),   # = pink BOOTSTRAP_FROZEN_SECONDS (three times 60 min, 2026-10-28)
+    (fl, "RECEIPT_OBSERVATION_AGE_SECONDS", 3 * 3600),
     (fl, "PROVIDER_RUN_POLLS", 1440),              # x 15 s = 6 h = GitHub's 360-minute job maximum
     (fl, "THROTTLED_READ_DEFAULT_DELAY_SECONDS", 5),
     (fl, "THROTTLED_READ_MAX_DELAY_SECONDS", 60),
@@ -92,15 +94,15 @@ fdp = load("factory_deletion_pipeline")
     (fe, "ARM_PROVISIONING_POLLS", 60),
     # the rest
     (prs, "STATE_READ_ATTEMPTS", 6),
-    (cnp, "BICEP_BUILD_TIMEOUT_SECONDS", 240),
-    (cnp, "NETWORK_DEPLOYMENT_POLLS", 360),
+    (cnp, "BICEP_BUILD_TIMEOUT_SECONDS", 360),
+    (cnp, "NETWORK_DEPLOYMENT_POLLS", 540),
     (pd, "REQUEST_TIMEOUT_SECONDS", 120),
     (pd, "DISPATCH_DISCOVERY_POLLS", 120),
     (afd, "REVIEW_SECONDS", 1800),
     (afd, "BICEP_BUILD_TIMEOUT_SECONDS", 240),
     (rv, "GIT_READ_TIMEOUT_SECONDS", 90),
     (fdp, "PROVIDER_RUN_POLLS", 1440),
-    (fdp, "TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS", 3600),
+    (fdp, "TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS", 3 * 3600),
 ])
 def test_time_budget_values(module, name, value):
     assert getattr(module, name) == value
