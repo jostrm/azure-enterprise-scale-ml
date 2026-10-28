@@ -70,6 +70,7 @@ az deployment sub create --name aif-portal-001 --location swedencentral --templa
 Press the button again with the same prefix, scale set number and region. Deployments are incremental: finished stages pass quickly and the chain continues where it stopped.
 
 - If the first run created the common VNet (`vnt-esmlcmn-<loc>-dev-<nnn>`), set **Common VNet already exists (redeploy)** to **Yes** (CLI: `commonVnetExists=true`). Stage `12-networkCommon` writes the whole VNet with only its own four subnets, and Azure refuses to delete the resolver, gateway and project subnets added later (`InUseSubnetCannotBeDeleted`). The switch mirrors the CLI's `RUN_JOB1_NETWORKING=false`.
+- A stage can fail on Azure capacity rather than on the template. Cosmos DB in a busy region can answer `ServiceUnavailable` ("high demand in <region>"; request access at https://aka.ms/cosmosdbquota). The half-created account then stays in a Failed state, and every retry fails with "is in a failed provisioning state … delete the previous instance". Delete that account (`az cosmosdb delete -g <project-rg> -n <account> --yes`) before you rerun.
 - Don't use **Redeploy** on a failed deployment's page. It reuses the stored template, which can't resolve the linked `stages/` files without the template URI.
 
 ## After deployment: verification checklist
