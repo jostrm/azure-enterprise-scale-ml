@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "10014722406590245360"
+    }
+  },
+  "parameters": {
+    "certificateVaultId": {
+      "type": "string"
+    },
+    "principalId": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "keyVaultSecretsUser": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', last(split(parameters('certificateVaultId'), '/')))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', last(split(parameters('certificateVaultId'), '/'))), parameters('principalId'), variables('keyVaultSecretsUser'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('keyVaultSecretsUser')]",
+        "principalId": "[parameters('principalId')]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ]
+}

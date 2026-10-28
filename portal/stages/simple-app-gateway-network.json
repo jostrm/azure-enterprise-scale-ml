@@ -1,0 +1,244 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "7219571070937295787"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "gatewayName": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "commonSubnetName": {
+      "type": "string",
+      "defaultValue": "snet-esml-cmn-001"
+    },
+    "vpnClientCidr": {
+      "type": "string"
+    },
+    "certificateVaultId": {
+      "type": "string"
+    },
+    "vaultDnsZoneId": {
+      "type": "string"
+    },
+    "costCenter": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[format('mi-{0}', parameters('gatewayName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('nsg-{0}', parameters('gatewayName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "PrivateHttpsIn",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefixes": [
+                "172.16.0.0/20",
+                "[parameters('vpnClientCidr')]"
+              ],
+              "destinationAddressPrefix": "172.16.2.10"
+            }
+          },
+          {
+            "name": "LoadBalancerProbes",
+            "properties": {
+              "priority": 110,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "AzureLoadBalancer",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "DenyOtherInbound",
+            "properties": {
+              "priority": 200,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "PrivateHttpsOut",
+            "properties": {
+              "priority": 100,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefixes": [
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16"
+              ]
+            }
+          },
+          {
+            "name": "AzureDnsOut",
+            "properties": {
+              "priority": 110,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "53",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzurePlatformDNS"
+            }
+          },
+          {
+            "name": "PrivateDnsOut",
+            "properties": {
+              "priority": 120,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "53",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefixes": [
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16"
+              ]
+            }
+          },
+          {
+            "name": "DenyOtherOutbound",
+            "properties": {
+              "priority": 200,
+              "direction": "Outbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', parameters('vnetName'), 'snet-application-gateway')]",
+      "properties": {
+        "addressPrefix": "172.16.2.0/24",
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('gatewayName')))]"
+        },
+        "delegations": [
+          {
+            "name": "application-gateway",
+            "properties": {
+              "serviceName": "Microsoft.Network/applicationGateways"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-{0}', parameters('gatewayName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[format('pe-{0}-certificate', parameters('gatewayName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "CostCenter": "[parameters('costCenter')]"
+      },
+      "properties": {
+        "subnet": {
+          "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')), parameters('commonSubnetName'))]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "certificate-vault",
+            "properties": {
+              "privateLinkServiceId": "[parameters('certificateVaultId')]",
+              "groupIds": [
+                "vault"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', format('pe-{0}-certificate', parameters('gatewayName')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "vault",
+            "properties": {
+              "privateDnsZoneId": "[parameters('vaultDnsZoneId')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', format('pe-{0}-certificate', parameters('gatewayName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "principalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('mi-{0}', parameters('gatewayName'))), '2023-01-31').principalId]"
+    },
+    "identityId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('mi-{0}', parameters('gatewayName')))]"
+    },
+    "subnetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'snet-application-gateway')]"
+    }
+  }
+}
