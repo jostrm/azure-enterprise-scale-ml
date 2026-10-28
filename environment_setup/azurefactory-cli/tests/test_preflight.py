@@ -281,7 +281,7 @@ def test_network_errors_are_nonzero_without_retry(tmp_path, transport, error):
 def test_preserves_default_and_explicit_timeout(tmp_path, transport, command, timeout):
     global_args = ("--timeout", str(timeout)) if timeout is not None else ()
     assert invoke(tmp_path, command=command, global_args=global_args) == 0
-    assert transport.records[0]["timeout"] == (timeout if timeout is not None else 360)
+    assert transport.records[0]["timeout"] == (timeout if timeout is not None else 540)
     assert_single_post(transport)
 
 
@@ -293,7 +293,7 @@ def test_preserves_default_and_explicit_timeout(tmp_path, transport, command, ti
 def test_other_commands_keep_standard_timeout(command, timeout):
     global_args = ["--timeout", str(timeout)] if timeout is not None else []
     args = build_parser().parse_args([*global_args, *command])
-    assert client(args).timeout == (timeout if timeout is not None else 60)
+    assert client(args).timeout == (timeout if timeout is not None else 90)
 
 
 @pytest.mark.parametrize("command", COMMANDS)

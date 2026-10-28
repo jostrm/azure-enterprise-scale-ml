@@ -16,7 +16,7 @@ HUB_CONTRACT = "factory-owned-access-hub-v1"
 # Not doubled 2026-10-27 (pinned in test_time_budgets.py): x 15 s = 6 h, GitHub's 360-minute job maximum, and the
 # longest reviewed teardown request, equal to factory_lifecycle.MANIFEST_MAX_LIFETIME_SECONDS.
 PROVIDER_RUN_POLLS = 1440
-TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS = 3600
+TEARDOWN_REQUEST_MAX_LIFETIME_SECONDS = 3 * 3600  # = factory_lifecycle.MANIFEST_MAX_LIFETIME_SECONDS (tripled 2026-10-28)
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
 # Reusable VPN/hub/connectivity platform types. Only a factory's own bootstrap-built VPN gateway,

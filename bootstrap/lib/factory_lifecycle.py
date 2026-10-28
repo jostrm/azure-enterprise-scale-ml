@@ -88,8 +88,12 @@ ARM_DEPLOYMENT_POLLS = 2880             # 4 h
 GITHUB_DISPATCH_DISCOVERY_POLLS = 120   # x 2 s = 4 min
 # Not doubled: x 15 s = 6 h, GitHub's 360-minute job maximum; a longer wait would only hang the end-to-end run.
 PROVIDER_RUN_POLLS = 1440
-# Not doubled: the longest reviewed manifest lifetime, equal to pink BOOTSTRAP_FROZEN_SECONDS (raised 30 -> 60 min).
-MANIFEST_MAX_LIFETIME_SECONDS = 3600
+# The longest reviewed manifest lifetime, equal to pink BOOTSTRAP_FROZEN_SECONDS: three hours, three times the
+# 60 minutes a COMMON review walk plus approval took on aif-138 (2026-10-28). Every window keeps a margin of
+# three over its longest observed use (Joakim, 2026-10-28), so a slow walk never expires the plan it proved.
+MANIFEST_MAX_LIFETIME_SECONDS = 3 * 3600
+# A foundry identity receipt is accepted when it was observed within this long before the manifest was prepared.
+RECEIPT_OBSERVATION_AGE_SECONDS = 3 * 3600
 # Not doubled: a token is refreshed when it has less than this left; ARM checks a token when the request arrives.
 TOKEN_MIN_REMAINING_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
@@ -3471,7 +3475,7 @@ def foundry_identity_preparation(cloud, document, known_ownership):
                 "native-foundry-identity-preparation-receipt-invalid")
         require(receipt["run_id"] != document["run_id"]
                 and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at"))
-                and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= 3600,
+                and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= RECEIPT_OBSERVATION_AGE_SECONDS,
                 "native-foundry-identity-receipt-stale-or-replayed")
         status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
         require(status == 200 and str(body.get("id", "")).lower() == identifier
@@ -3724,7 +3728,7 @@ def verify_foundry_identity_receipt(document, receipt, *, continuation=False):
     at = timestamp(proof["observed_at"])
     if continuation:
         require(receipt["run_id"] != document["run_id"]
-                and 0 <= timestamp(document["prepared_at"]) - at <= 3600,
+                and 0 <= timestamp(document["prepared_at"]) - at <= RECEIPT_OBSERVATION_AGE_SECONDS,
                 "native-foundry-identity-receipt-stale-or-replayed")
     else:
         validate_foundry_identity_stage(document)
@@ -3857,7 +3861,7 @@ def validate_foundry_identity_continuation(document):
             and identity.get("provisioning_state") in (None, "Succeeded")
             and proof.get("role_writes") == [] and proof.get("full_project_executed") is False
             and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at"))
-            and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= 3600,
+            and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= RECEIPT_OBSERVATION_AGE_SECONDS,
             "native-foundry-identity-continuation-binding-mismatch")
 
 

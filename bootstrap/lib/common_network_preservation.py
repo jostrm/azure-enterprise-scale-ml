@@ -22,9 +22,10 @@ PROFILE = "preserve-v1"
 API_VERSION = "2023-11-01"
 ENTRYPOINT = "environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep"
 HELPER = "bootstrap/lib/common_network_preservation.py"
-# Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
-BICEP_BUILD_TIMEOUT_SECONDS = 240
-NETWORK_DEPLOYMENT_POLLS = 360          # x 5 s = 30 min
+# Time budgets: three times the originals of 120 s and 180 polls (doubled 2026-10-27, tripled 2026-10-28 so every
+# window keeps a margin of three over its longest observed use; pinned in test_time_budgets.py).
+BICEP_BUILD_TIMEOUT_SECONDS = 360
+NETWORK_DEPLOYMENT_POLLS = 540          # x 5 s = 45 min
 ROOT = Path(__file__).resolve().parents[2]
 _LOADED_HELPER_SHA256 = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
