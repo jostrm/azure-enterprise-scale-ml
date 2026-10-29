@@ -98,6 +98,11 @@ RECEIPT_OBSERVATION_AGE_SECONDS = 3 * 3600
 TOKEN_MIN_REMAINING_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
 RESOURCE_CLOSURE_READ_WORKERS = 8
+# Platform-managed children whose list already carries every field the fingerprint compares: recorded from that one
+# list, never read one by one and never given their own extension reads. aif-138 (2026-10-29): 697 of a factory's
+# 883 resources were Log Analytics tables, and their per-table body plus five extension reads each made every exact
+# inventory walk (review, start and worker) take 50 minutes under ARM throttling.
+LISTED_ONLY_CHILDREN = {"microsoft.operationalinsights/workspaces/tables"}
 # The peer cut the TLS session (EOF without close_notify, or close_notify): a transport drop like a reset,
 # unlike a certificate or protocol failure, which stays permanent.
 TLS_SESSION_CUT_ERRORS = (ssl.SSLEOFError, ssl.SSLZeroReturnError)
@@ -1599,6 +1604,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         "microsoft.network/virtualnetworkgateways/ipconfigurations": ("properties", "ipConfigurations"),
     }
     terminal_extensions = {kind.lower() for kind, _ in EXTENSION_COLLECTIONS}
+    listed_bodies = {}  # LISTED_ONLY_CHILDREN rows as their parent's list returned them
     ahead = reader.pool is not None
     derived = set()  # resources whose api-version came from the provider schema, not a pin
     planned = set()  # queued resources whose child reads were already started
@@ -1757,6 +1763,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         queue.append(resource_id)
         if ahead:
             kind = resource_type_from_id(resource_id)
+            if kind in LISTED_ONLY_CHILDREN:
+                return
             reader.prefetch(arm_read(resource_id, versions[resource_id.lower()]))
             if kind not in terminal_extensions and kind != "microsoft.search/searchservices":
                 read_children_ahead(resource_id, kind)
@@ -1807,6 +1815,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                     rows, unsupported = [], ("not-listable-" + str(status)
                                              if failure.code == "unsupported-child-inventory-endpoint"
                                              and status in (400, 404, 405) else "unreadable-" + failure.code)
+        if kind in LISTED_ONLY_CHILDREN:
+            listed_bodies.update({row["id"].lower(): copy.deepcopy(row) for row in rows
+                                  if isinstance(row, dict) and isinstance(row.get("id"), str)})
         rows = [fingerprint_body(row) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
@@ -1865,6 +1876,14 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         require(len(visited) < 10000, "resource-closure-too-large")
         visited.add(key)
         kind = resource_type_from_id(resource_id)
+        if kind in LISTED_ONLY_CHILDREN and key in listed_bodies:
+            body = listed_bodies[key]
+            require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
+            bodies[key] = body
+            closure["resources"][key] = {"type": kind, "api_version": versions[key],
+                                        "body_hash": resource_digest(body, kind), "etag": resource_etag(body, {}, kind)}
+            closure["references"][key] = []
+            continue
         api, (_, headers, body) = served(lambda value: reader.get(arm_read(resource_id, value)), versions[key],
                                          kind if key in derived else None)
         versions[key] = api
