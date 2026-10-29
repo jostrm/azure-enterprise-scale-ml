@@ -220,6 +220,7 @@ def child_inventory_diagnostic(value):
 
 
 FOOTPRINT_CODE = "native-foundry-identity-preview-footprint-invalid"
+PREVIEW_INCOMPLETE_CODE = "native-foundry-identity-source-preview-incomplete"
 WHAT_IF_CHANGE_TYPES = ("Create", "Modify", "NoChange", "Delete", "Deploy", "Ignore", "Unsupported", "None")
 
 
@@ -236,7 +237,7 @@ def footprint_diagnostic(value):
     if type(value) is not dict or set(value) != {"resource_changes", "tag_updates"}:
         return None
     rows, updates = value["resource_changes"], value["tag_updates"]
-    if (type(rows) is not dict or not 1 <= len(rows) <= 32 or type(updates) is not list or len(updates) > 32
+    if (type(rows) is not dict or len(rows) > 32 or type(updates) is not list or len(updates) > 32
             or any(not _safe_resource_identifier(key) or type(kind) is not str or kind not in WHAT_IF_CHANGE_TYPES
                    for key, kind in rows.items())
             or any(not _safe_resource_identifier(item) for item in updates) or len(set(updates)) != len(updates)):
@@ -247,7 +248,7 @@ def footprint_diagnostic(value):
 def safe_instance_diagnostic(code, value):
     if code == "unsupported-child-inventory-endpoint":
         return child_inventory_diagnostic(value)
-    if code == FOOTPRINT_CODE:
+    if code in (FOOTPRINT_CODE, PREVIEW_INCOMPLETE_CODE):
         return footprint_diagnostic(value)
     if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
             or type(value) is not dict
@@ -3696,8 +3697,12 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
                                tag_updates=tag_updates)
     identities = [row["resource_id"] for row in changes
                   if resource_type_from_id(row["resource_id"]) == "microsoft.managedidentity/userassignedidentities"]
-    require(len(identities) == 1 and NESTED_ID.fullmatch(identities[0]),
-            "native-foundry-identity-source-preview-incomplete")
+    if not (len(identities) == 1 and NESTED_ID.fullmatch(identities[0])):
+        # Names every what-if row (aif-138, 2026-10-29: the continuation's preview listed no identity after the
+        # producer had created it, and the bare code said nothing about what the preview did list).
+        raise Blocked(PREVIEW_INCOMPLETE_CODE, error_diagnostic={
+            "resource_changes": {row["resource_id"]: str(provenance.get(row["resource_id"])) for row in changes},
+            "tag_updates": sorted(tag_updates)})
     identifier = identities[0]
     group = arm_scope(identifier)
     # The prerequisites create the project group with the ownership tags only and the producer applies

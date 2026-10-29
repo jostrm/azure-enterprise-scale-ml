@@ -390,6 +390,8 @@ class IdentityProducerCloud(PlanCloud):
             if self.failure == "preview-role":
                 changes.append({"resourceId": GROUP.lower() + "/providers/Microsoft.Authorization/roleAssignments/" + str(uuid.uuid4()),
                                 "changeType": "Create", "after": {}})
+            if self.failure == "no-identity":
+                changes = [row for row in changes if row["resourceId"] != UAMI]
             if self.failure in ("group-tags", "group-modify"):
                 delta = ([{"path": "tags.CostCenter", "propertyChangeType": "Create", "after": "reviewed-cost-center"}]
                          if self.failure == "group-tags" else
@@ -2076,3 +2078,10 @@ def test_identity_continuation_accepts_the_receipt_from_a_carried_published_ance
     with pytest.raises(fl.Blocked):
         fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
     assert fl.foundry_identity_preparation(cloud, document, known) is None
+
+
+def test_identity_preview_without_an_identity_row_names_the_rows_it_did_list(monkeypatch):
+    with pytest.raises(fl.Blocked) as raised:
+        prepare_identity_worker(monkeypatch, "no-identity")
+    assert raised.value.code == "native-foundry-identity-source-preview-incomplete"
+    assert raised.value.error_diagnostic == {"resource_changes": {GROUP.lower(): "Create"}, "tag_updates": []}
