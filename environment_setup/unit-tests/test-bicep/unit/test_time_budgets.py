@@ -56,7 +56,7 @@ fdp = load("factory_deletion_pipeline")
     (fl, "GITHUB_DISPATCH_DISCOVERY_POLLS", 120),
     # factory_lifecycle: unchanged on purpose
     (fl, "MANIFEST_MAX_LIFETIME_SECONDS", 3 * 3600),   # = pink BOOTSTRAP_FROZEN_SECONDS (three times 60 min, 2026-10-28)
-    (fl, "RECEIPT_OBSERVATION_AGE_SECONDS", 3 * 3600),
+    (fl, "RECEIPT_OBSERVATION_AGE_SECONDS", 12 * 3600),  # three times 3 h 28 min (aif-138, 2026-10-29); pink reads it
     (fl, "PROVIDER_RUN_POLLS", 1440),              # x 15 s = 6 h = GitHub's 360-minute job maximum
     (fl, "THROTTLED_READ_DEFAULT_DELAY_SECONDS", 5),
     (fl, "THROTTLED_READ_MAX_DELAY_SECONDS", 60),
