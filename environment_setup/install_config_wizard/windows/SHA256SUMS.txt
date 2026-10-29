@@ -1,1 +1,1 @@
-d879a3574b850330d6441bff4c486f52b34de73b652e87f5cbb2d85c5210a8b2  aifactory-config-windows.zip
+017ae85995b1c2e29315cecf6de88ad9c361aaa7e2d3eeb3a84196f462aeac78  aifactory-config-windows.zip
