@@ -3255,8 +3255,18 @@ def resolve_template_parameters(compiled_template, selected_values, parameter_so
             "unused_configuration_keys": sorted(set(selected_values) - consumed), "published_defaults": sorted(defaults)}
 
 
+def tags_only_delta(change):
+    """Whether a what-if Modify touches nothing but the resource's tags."""
+    delta = change.get("delta")
+    return (change.get("changeType") == "Modify" and isinstance(delta, list) and bool(delta)
+            and not change.get("error") and not change.get("unsupportedReason")
+            and all(isinstance(entry, dict) and isinstance(entry.get("path"), str)
+                    and (entry["path"] == "tags" or entry["path"].startswith(("tags.", "tags[")))
+                    for entry in delta))
+
+
 def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
-                     resource_payloads=None, source_changes=None, phase_receipt=None):
+                     resource_payloads=None, source_changes=None, phase_receipt=None, tag_updates=None):
     endpoint = deployment_endpoint(document, step)
     body = json.loads(canonical(payload))
     body["properties"]["whatIfSettings"] = {"resultFormat": "FullResourcePayloads"}
@@ -3299,6 +3309,12 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
         # Preservation-normalized Ignore is not evidence of a source declaration.
         source_changes.clear()
         source_changes.update({row["resourceId"].lower(): row["changeType"] for row in raw_changes})
+    if tag_updates is not None:
+        # Modify rows whose delta is tags only: {resource id: the tags the deployment writes}.
+        tag_updates.clear()
+        tag_updates.update({row["resourceId"].lower(): copy.deepcopy((row.get("after") or {}).get("tags"))
+                            for row in raw_changes if tags_only_delta(row)
+                            and isinstance((row.get("after") or {}).get("tags"), dict)})
     if resource_payloads is not None:
         for row in raw_changes:
             identifier = str(row.get("resourceId", "")).lower()
@@ -3511,10 +3527,18 @@ def validate_foundry_identity_stage(document):
             and group in {scope.lower() for scope in document["locks"]["scopes"]},
             "native-foundry-identity-stage-scope-mismatch")
     changes = stage.get("changes")
+    tags_updated = stage.get("group_tags_updated")
+    require(tags_updated in (True, False) and (
+            tags_updated is True and isinstance(stage.get("group_tags_before"), dict)
+            and isinstance(stage.get("group_tags_after"), dict)
+            and stage["group_tags_before"] != stage["group_tags_after"]
+            or tags_updated is False and "group_tags_before" not in stage and "group_tags_after" not in stage),
+            "native-foundry-identity-stage-tag-update-invalid")
+    group_change_types = ("Create", "NoChange", "Modify") if tags_updated else ("Create", "NoChange")
     require(isinstance(changes, list) and len(changes) == 2
             and {row.get("resource_id") for row in changes} == {identifier, group}
-            and all(row.get("change_type") in ("Create", "NoChange") and hash_value(row.get("after_hash"))
-                    for row in changes)
+            and all(hash_value(row.get("after_hash")) for row in changes)
+            and next(row for row in changes if row["resource_id"] == group)["change_type"] in group_change_types
             and next(row for row in changes if row["resource_id"] == identifier)["change_type"] == "Create"
             and stage.get("source_changes") == {row["resource_id"]: row["change_type"] for row in changes}
             and document["deployment"]["changes"] == changes
@@ -3539,18 +3563,24 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
     if not data or not data["agent_identity_binding"]:
         return False
     payload = foundry_identity_projection(cloud, document, source_root)
-    captured, provenance = {}, {}
+    captured, provenance, tag_updates = {}, {}, {}
     changes = evaluate_what_if(cloud, document, {"id": "foundry-identity-producer", "scope": "subscription"},
-                               payload, sleep, resource_payloads=captured, source_changes=provenance)
+                               payload, sleep, resource_payloads=captured, source_changes=provenance,
+                               tag_updates=tag_updates)
     identities = [row["resource_id"] for row in changes
                   if resource_type_from_id(row["resource_id"]) == "microsoft.managedidentity/userassignedidentities"]
     require(len(identities) == 1 and NESTED_ID.fullmatch(identities[0]),
             "native-foundry-identity-source-preview-incomplete")
     identifier = identities[0]
     group = arm_scope(identifier)
+    # The prerequisites create the project group with the ownership tags only and the producer applies
+    # tagsProject (aif-138, 2026-10-29): a Modify of this factory's own group that touches nothing but its
+    # tags is the planned tag update; any other Modify, and anything else in the footprint, still blocks.
+    group_tags_updated = provenance.get(group) == "Modify" and group in tag_updates
     require(group in {scope.lower() for scope in document["locks"]["scopes"]}
             and {row["resource_id"] for row in changes} == {group, identifier}
-            and all(provenance.get(row["resource_id"]) in ("Create", "NoChange") for row in changes),
+            and provenance.get(identifier) in ("Create", "NoChange")
+            and (provenance.get(group) in ("Create", "NoChange") or group_tags_updated),
             "native-foundry-identity-preview-footprint-invalid")
     status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
     if status == 200:
@@ -3578,11 +3608,15 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
     if status == 200:
         verify_ownership(group_body, {**{key: document["target"][key] for key in ("factory_id", "scaleset_id")},
                                       "project_id": document["target"]["project_ids"][0]})
+    require(not group_tags_updated or status == 200 and isinstance(group_body.get("tags"), dict),
+            "native-foundry-identity-group-tag-update-requires-existing-group")
     stage = {"contract": FOUNDRY_IDENTITY_CONTRACT, "approval_purpose": "identity-only",
              "continuation_requires_new_approval": True, "binding_hash": foundry_identity_context(document),
              "payload_hash": digest(payload), "resource_id": identifier, "resource_group": group,
-             "changes": changes, "source_changes": provenance,
+             "changes": changes, "source_changes": provenance, "group_tags_updated": group_tags_updated,
              "before": foundry_identity_snapshot(cloud, group)}
+    if group_tags_updated:
+        stage.update(group_tags_before=copy.deepcopy(group_body["tags"]), group_tags_after=tag_updates[group])
     require("foundry_identity_stage" not in plan or plan["foundry_identity_stage"] == stage,
             "native-foundry-identity-stage-changed")
     plan["foundry_identity_stage"] = stage
@@ -3644,6 +3678,15 @@ def verify_foundry_identity_receipt_effects(document, receipt):
     closure = receipt.get("foundry_identity_final_closure")
     observations = foundry_inventory_observations(document, closure)
     before = proof.get("before")
+    # A recorded tags-only update of the group (aif-138, 2026-10-29): the worker proved the group changed by
+    # exactly the planned tags, so the group's new hash is accepted only against that recorded evidence.
+    update = proof.get("group_tags_update")
+    tags_update_ok = (isinstance(update, dict) and set(update) == {"before", "after", "group_after_hash"}
+                      and isinstance(update["before"], dict) and isinstance(update["after"], dict)
+                      and update["before"] != update["after"] and hash_value(update["group_after_hash"])
+                      and isinstance(before, dict) and hash_value(before.get("group"))
+                      and group in observations and observations[group]["body_hash"] == update["group_after_hash"])
+    require("group_tags_update" not in proof or tags_update_ok, "native-foundry-identity-group-tag-update-invalid")
     require(isinstance(before, dict) and set(before) == {"group", "resources"}
             and isinstance(before["resources"], dict)
             and identifier not in before["resources"] and group not in before["resources"]
@@ -3653,7 +3696,7 @@ def verify_foundry_identity_receipt_effects(document, receipt):
             and set(closure["resources"]) == {identifier, *before["resources"]}
             and digest(closure) == receipt["inventory_closure_hash"]
             and all(observations[key]["body_hash"] == value for key, value in before["resources"].items())
-            and (before["group"] is None or observations[group]["body_hash"] == before["group"])
+            and (before["group"] is None or observations[group]["body_hash"] == before["group"] or tags_update_ok)
             and observations[identifier]["body_hash"] == proof["body_hash"]
             and receipt["resource_groups"][0]["body_hash"] == observations[group]["body_hash"]
             and all(receipt["ownership"][0].get(key) == closure["resources"][identifier].get(key)
@@ -3731,10 +3774,16 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
     owner["project_id"] = document["target"]["project_ids"][0]
     verify_ownership(body, owner)
     closure, bodies = collect_resource_closure(cloud, [stage["resource_group"]])
+    group_after = bodies.get(stage["resource_group"], {})
+    if stage.get("group_tags_updated"):
+        # Only the planned tags changed: the group with its previous tags is still the reviewed snapshot.
+        group_unchanged = (group_after.get("tags") == stage["group_tags_after"]
+                           and digest({**group_after, "tags": stage["group_tags_before"]}) == stage["before"]["group"])
+    else:
+        group_unchanged = stage["before"]["group"] is None or digest(group_after) == stage["before"]["group"]
     require(set(bodies) == {stage["resource_group"], stage["resource_id"], *stage["before"]["resources"]}
             and all(digest(bodies[key]) == value for key, value in stage["before"]["resources"].items())
-            and (stage["before"]["group"] is None
-                 or digest(bodies[stage["resource_group"]]) == stage["before"]["group"])
+            and group_unchanged
             and digest(bodies[stage["resource_id"]]) == digest(body),
             "native-foundry-identity-unreviewed-side-effects")
     group = bodies[stage["resource_group"]]
@@ -3752,7 +3801,11 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
             "payload_hash": stage["payload_hash"], "producer_run_id": document["run_id"],
             "producer_manifest_hash": document["manifest_hash"], "resource_id": stage["resource_id"],
             "resource_group": stage["resource_group"], "body_hash": digest(body), "identity": metadata,
-            "observed_at": utc_now(), "role_writes": [], "full_project_executed": False})
+            "observed_at": utc_now(), "role_writes": [], "full_project_executed": False,
+            **({"group_tags_update": {"before": copy.deepcopy(stage["group_tags_before"]),
+                                      "after": copy.deepcopy(stage["group_tags_after"]),
+                                      "group_after_hash": digest(group)}}
+               if stage.get("group_tags_updated") else {})})
     receipt["status"] = "succeeded"
     receipt.pop("pending_deployment", None)
     verify_foundry_identity_receipt(document, receipt)
