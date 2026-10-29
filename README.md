@@ -1,7 +1,11 @@
 # Enterprise Scale Azure Factory - submodule 
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
-<br><sub>Deploy to Azure: AI Factory v1.25 Simple Mode full bootstrap from the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/portal-125">portal-125</a> branch (private networking, dedicated hub, Dev, project 001). Status: <b>proposed</b> until one deployment is confirmed. Read <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md">portal/README.md</a> before you press it.</sub>
+> [!NOTE]
+> **Deploy to Azure - meant for a quick test:** Private networking, dedicated hub, Dev, project 001. It doesn't expose all of the roughly 35 Azure resources you can choose from, or all SKU settings. It doesn't create dashboards automatically, and it leaves out other AI Factory features. For a governed factory, use the app, the CLI or the Factory API described below.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Full set up</b></a>
+>
+> If you want to quickly build an agent with Foundry and AI Search, train an ML model with Azure Machine Learning or Databricks, build a front end with Container Apps, or run DataOps with Data Factory, it's a simple way to get that running with private networking.
+> Read <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md">portal/README.md</a> before you press it</sub>
 
 ![Header](documentation/v2/10-19/images/header.png)
 
