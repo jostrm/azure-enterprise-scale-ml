@@ -374,6 +374,10 @@ class IdentityProducerCloud(PlanCloud):
             "location": document["target"]["region"], "tags": self.owner, "etag": '"identity"',
             "properties": {"principalId": UAMI_PRINCIPAL, "clientId": UAMI_CLIENT,
                            "tenantId": document["target"]["tenant_id"]}}
+        # The prerequisites created the project group with the ownership tags only; the producer applies tagsProject.
+        self.group_after = {**self.group, "tags": {**self.owner, "CostCenter": "reviewed-cost-center"}}
+        if failure in ("group-tags", "group-modify"):
+            self.bodies[GROUP.lower()] = copy.deepcopy(self.group)
 
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         if not url.startswith(fl.ARM):
@@ -386,10 +390,18 @@ class IdentityProducerCloud(PlanCloud):
             if self.failure == "preview-role":
                 changes.append({"resourceId": GROUP.lower() + "/providers/Microsoft.Authorization/roleAssignments/" + str(uuid.uuid4()),
                                 "changeType": "Create", "after": {}})
+            if self.failure in ("group-tags", "group-modify"):
+                delta = ([{"path": "tags.CostCenter", "propertyChangeType": "Create", "after": "reviewed-cost-center"}]
+                         if self.failure == "group-tags" else
+                         [{"path": "tags.CostCenter", "propertyChangeType": "Create", "after": "reviewed-cost-center"},
+                          {"path": "properties.managedBy", "propertyChangeType": "Create", "after": "/subscriptions/other"}])
+                changes[0] = {"resourceId": GROUP.lower(), "changeType": "Modify", "before": self.group,
+                              "after": self.group_after, "delta": delta}
             return 200, {}, {"status": "Succeeded", "properties": {"changes": changes}}
         if method == "PUT":
             self.arm_writes.append((url, copy.deepcopy(data)))
-            self.bodies.update({GROUP.lower(): copy.deepcopy(self.group), UAMI: copy.deepcopy(self.identity)})
+            self.bodies.update({GROUP.lower(): copy.deepcopy(self.group_after if self.failure == "group-tags" else self.group),
+                                UAMI: copy.deepcopy(self.identity)})
             if self.failure == "lost-put":
                 raise fl.Blocked("transport-ambiguous")
             if self.failure == "wrong-tenant":
@@ -2011,3 +2023,31 @@ def offline_github_transport(cloud, source_root, *, expected_worker_status="succ
         return "{}"
     cloud.command = command
     return commands
+
+
+def test_identity_stage_accepts_a_tags_only_update_of_the_owned_existing_group(monkeypatch):
+    """aif-138 (2026-10-29): the prerequisites create the project group with the ownership tags; the producer's
+    what-if then reports the group as Modify (tagsProject adds tags) and the review blocked every PROJECT stage."""
+    document, cloud, locks = prepare_identity_worker(monkeypatch, "group-tags")
+    stage = document["deployment"]["foundry_identity_stage"]
+    assert stage["group_tags_updated"] is True and stage["group_tags_after"] == cloud.group_after["tags"]
+    assert stage["group_tags_before"] == cloud.group["tags"]
+    group_row = next(row for row in stage["changes"] if row["resource_id"] == GROUP.lower())
+    assert group_row["change_type"] == "Modify" and stage["source_changes"][GROUP.lower()] == "Modify"
+    receipt = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud=cloud, sleep=Mock())
+    assert receipt["status"] == "succeeded", json.dumps(receipt)
+    assert len(cloud.arm_writes) == 1 and cloud.bodies[GROUP.lower()]["tags"]["CostCenter"] == "reviewed-cost-center"
+    assert receipt["resource_groups"][0]["body_hash"] == fl.digest(cloud.group_after)
+    fl.verify_worker_receipt(locks, document)
+
+
+def test_identity_preview_refuses_a_change_of_the_group_beyond_its_tags(monkeypatch):
+    with pytest.raises(fl.Blocked, match="^native-foundry-identity-preview-footprint-invalid$"):
+        prepare_identity_worker(monkeypatch, "group-modify")
+
+
+def test_identity_stage_without_a_tag_update_records_none(monkeypatch):
+    document, _, _ = prepare_identity_worker(monkeypatch)
+    stage = document["deployment"]["foundry_identity_stage"]
+    assert stage["group_tags_updated"] is False and "group_tags_after" not in stage
