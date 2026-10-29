@@ -93,7 +93,9 @@ PROVIDER_RUN_POLLS = 1440
 # three over its longest observed use (Joakim, 2026-10-28), so a slow walk never expires the plan it proved.
 MANIFEST_MAX_LIFETIME_SECONDS = 3 * 3600
 # A foundry identity receipt is accepted when it was observed within this long before the manifest was prepared.
-RECEIPT_OBSERVATION_AGE_SECONDS = 3 * 3600
+# aif-138 (2026-10-29): 3 h 28 min passed between the producer's observation and the continuation review that
+# could use it (two product fixes and a re-vendoring in between); three times that longest observed use.
+RECEIPT_OBSERVATION_AGE_SECONDS = 12 * 3600
 # Not doubled: a token is refreshed when it has less than this left; ARM checks a token when the request arrives.
 TOKEN_MIN_REMAINING_SECONDS = 60
 # Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
