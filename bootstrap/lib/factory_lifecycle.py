@@ -217,9 +217,36 @@ def child_inventory_diagnostic(value):
     return {"resource_type": kind, "api_version": api, "status": status, "error_code": error_code}
 
 
+FOOTPRINT_CODE = "native-foundry-identity-preview-footprint-invalid"
+WHAT_IF_CHANGE_TYPES = ("Create", "Modify", "NoChange", "Delete", "Deploy", "Ignore", "Unsupported", "None")
+
+
+def _safe_resource_identifier(identifier):
+    pattern = (r"/subscriptions/" + GUID + r"/resourcegroups/[A-Za-z0-9_.()-]{1,90}"
+               r"(?:/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()-]+/[A-Za-z0-9_.()@-]+)+)?")
+    return (type(identifier) is str and 1 <= len(identifier) <= 2048
+            and re.fullmatch(pattern, identifier, re.I | re.A) is not None
+            and not any(part in (".", "..") for part in identifier.split("/")))
+
+
+def footprint_diagnostic(value):
+    """The what-if rows an identity preview footprint refusal names: resource ids and change types, nothing else."""
+    if type(value) is not dict or set(value) != {"resource_changes", "tag_updates"}:
+        return None
+    rows, updates = value["resource_changes"], value["tag_updates"]
+    if (type(rows) is not dict or not 1 <= len(rows) <= 32 or type(updates) is not list or len(updates) > 32
+            or any(not _safe_resource_identifier(key) or type(kind) is not str or kind not in WHAT_IF_CHANGE_TYPES
+                   for key, kind in rows.items())
+            or any(not _safe_resource_identifier(item) for item in updates) or len(set(updates)) != len(updates)):
+        return None
+    return {"resource_changes": {key: rows[key] for key in sorted(rows)}, "tag_updates": sorted(updates)}
+
+
 def safe_instance_diagnostic(code, value):
     if code == "unsupported-child-inventory-endpoint":
         return child_inventory_diagnostic(value)
+    if code == FOOTPRINT_CODE:
+        return footprint_diagnostic(value)
     if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
             or type(value) is not dict
             or set(value) != {"resource_id", "failed_comparisons"}):
@@ -3516,11 +3543,12 @@ def foundry_identity_preparation(cloud, document, known_ownership):
         require(isinstance(receipt, dict) and digest(receipt) == evidence["receipt_hash"],
                 "native-foundry-identity-receipt-hash-mismatch")
         proof = receipt.get("foundry_identity_receipt")
-        if not isinstance(proof, dict) or proof.get("request_hash") != foundry_identity_request_context(document):
+        bound = receipt_bound_document(document, receipt)
+        if not isinstance(proof, dict) or proof.get("request_hash") != foundry_identity_request_context(bound):
             continue
         require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
                 and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
-                and receipt.get("target") == document["target"] and receipt.get("source_commit") == document["source"]["commit"]
+                and receipt.get("target") == document["target"] and receipt.get("source_commit") in source_lineage(document)
                 and receipt.get("run_id") == evidence["run_id"] == proof.get("producer_run_id")
                 and receipt.get("manifest_hash") == proof.get("producer_manifest_hash")
                 and hash_value(receipt.get("manifest_hash")) and hash_value(proof.get("binding_hash"))
@@ -3674,11 +3702,15 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
     # tagsProject (aif-138, 2026-10-29): a Modify of this factory's own group that touches nothing but its
     # tags is the planned tag update; any other Modify, and anything else in the footprint, still blocks.
     group_tags_updated = provenance.get(group) == "Modify" and group in tag_updates
-    require(group in {scope.lower() for scope in document["locks"]["scopes"]}
+    if not (group in {scope.lower() for scope in document["locks"]["scopes"]}
             and {row["resource_id"] for row in changes} == {group, identifier}
             and provenance.get(identifier) in ("Create", "NoChange")
-            and (provenance.get(group) in ("Create", "NoChange") or group_tags_updated),
-            "native-foundry-identity-preview-footprint-invalid")
+            and (provenance.get(group) in ("Create", "NoChange") or group_tags_updated)):
+        # The refusal names every what-if row and the tags-only updates it saw (aif-138, 2026-10-29: a bare code
+        # cost a 56-minute walk per guess); resource ids and change types only, never bodies.
+        raise Blocked("native-foundry-identity-preview-footprint-invalid", error_diagnostic={
+            "resource_changes": {row["resource_id"]: str(provenance.get(row["resource_id"])) for row in changes},
+            "tag_updates": sorted(tag_updates)})
     status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
     if status == 200:
         require("foundry_identity_stage" not in plan, "native-foundry-identity-stage-already-materialized")
@@ -3735,7 +3767,7 @@ def verify_foundry_identity_receipt_effects(document, receipt):
     proof = receipt.get("foundry_identity_receipt", {})
     require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
             and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
-            and receipt.get("source_commit") == document["source"]["commit"]
+            and receipt.get("source_commit") in source_lineage(document)
             and receipt.get("target") == document["target"]
             and guid(receipt.get("run_id")) and hash_value(receipt.get("manifest_hash"))
             and proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
@@ -3806,8 +3838,9 @@ def verify_foundry_identity_receipt_effects(document, receipt):
 def verify_foundry_identity_receipt(document, receipt, *, continuation=False):
     verify_foundry_identity_receipt_effects(document, receipt)
     proof = receipt["foundry_identity_receipt"]
-    require(proof["binding_hash"] == foundry_identity_context(document)
-            and proof["request_hash"] == foundry_identity_request_context(document),
+    bound = receipt_bound_document(document, receipt)
+    require(proof["binding_hash"] == foundry_identity_context(bound)
+            and proof["request_hash"] == foundry_identity_request_context(bound),
             "native-foundry-identity-receipt-invalid")
     at = timestamp(proof["observed_at"])
     if continuation:
@@ -5152,6 +5185,24 @@ def consent_sources(document):
                     and commit != document["source"]["commit"] for commit in ancestors),
             "consent-ancestors-invalid")
     return {document["source"]["commit"], *ancestors}
+
+
+def source_lineage(document):
+    """The deploy commit plus the published ancestors its reviewed consents carry; only the commit before the
+    plan has an exact foundation."""
+    foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
+    if not isinstance(foundation, dict) or "consent_ancestors" not in foundation:
+        return {document["source"]["commit"]}
+    return consent_sources(document)
+
+
+def receipt_bound_document(document, receipt):
+    """The document as the receipt's own published commit saw it, so an identity produced on a carried ancestor
+    keeps its binding across a published fast-forward (aif-138, 2026-10-29); a foreign commit changes nothing."""
+    commit = receipt.get("source_commit") if isinstance(receipt, dict) else None
+    if commit == document["source"]["commit"] or commit not in source_lineage(document):
+        return document
+    return {**document, "source": {**document["source"], "commit": commit}}
 
 
 def verify_consent_ancestors(cloud, root, source):

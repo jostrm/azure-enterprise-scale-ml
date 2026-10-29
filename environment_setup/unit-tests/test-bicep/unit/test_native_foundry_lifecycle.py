@@ -2051,3 +2051,28 @@ def test_identity_stage_without_a_tag_update_records_none(monkeypatch):
     document, _, _ = prepare_identity_worker(monkeypatch)
     stage = document["deployment"]["foundry_identity_stage"]
     assert stage["group_tags_updated"] is False and "group_tags_after" not in stage
+
+
+def test_identity_preview_footprint_refusal_names_the_what_if_rows(monkeypatch):
+    with pytest.raises(fl.Blocked) as raised:
+        prepare_identity_worker(monkeypatch, "group-modify")
+    assert raised.value.code == "native-foundry-identity-preview-footprint-invalid"
+    assert raised.value.error_diagnostic == {"resource_changes": {GROUP.lower(): "Modify", UAMI: "Create"},
+                                             "tag_updates": []}
+
+
+def test_identity_continuation_accepts_the_receipt_from_a_carried_published_ancestor(monkeypatch):
+    """aif-138 (2026-10-29): the identity was produced on one published commit; the continuation reviewed on a
+    published fast-forward that carries that commit as a consent ancestor keeps the receipt's binding."""
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    produced = document["source"]["commit"]
+    document["source"]["commit"] = "c" * 40
+    document["deployment"].setdefault("bootstrap_foundation", {})["consent_ancestors"] = [produced]
+    known = document["deployment"]["known_ownership"]
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
+    # A commit the plan does not carry as an ancestor still fails closed.
+    document["deployment"]["bootstrap_foundation"]["consent_ancestors"] = ["d" * 40]
+    with pytest.raises(fl.Blocked):
+        fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
+    assert fl.foundry_identity_preparation(cloud, document, known) is None
