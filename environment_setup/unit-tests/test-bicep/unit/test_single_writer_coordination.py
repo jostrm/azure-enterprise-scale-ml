@@ -861,3 +861,22 @@ def test_real_local_git_ref_cas_rejects_sibling_contention_and_preserves_receipt
     assert git("update-ref", ps.STATE_REF, loser, first, success=False).returncode != 0
     assert git("rev-parse", ps.STATE_REF).stdout.strip() == winner
     assert json.loads(git("show", ps.STATE_REF + ":state.json").stdout)["receipts"] == ["reviewed"]
+
+
+def test_a_reader_document_without_operation_reads_state_and_the_delete_guard_still_holds():
+    """aif-138 (2026-10-29): the Factory API verifies a registered handoff with a read-only coordination document
+    that names only target, identity, locks and route. verify_enrollment_document indexed document["operation"],
+    so every PROJECT review of a registered single-writer factory stopped with KeyError (HTTP 500)."""
+    document, provider, cloud = lifecycle_setup()
+    reader = fl.coordination(cloud, {key: document[key] for key in ("target", "identity", "locks", "route")})
+    head, value = reader.state()
+    assert head == provider.head and value["active"] is None
+    assert value["enrollment"]["revision"] == document["locks"]["revision"]
+    assert all(method == "GET" for method, _, _ in provider.calls)
+    state = provider.state()
+    state["enrollment"]["scopes"][tl.GROUP.lower()]["allow_delete"] = False
+    provider.set_state(state)
+    locks = {**document["locks"], "coordination_hash": fl.digest(state["enrollment"])}
+    assert fl.coordination(cloud, {**document, "locks": locks, "operation": "create-scaleset"}).state()[1]["active"] is None
+    with pytest.raises(fl.Blocked, match="^physical-target-deletion-not-enrolled$"):
+        fl.coordination(cloud, {**document, "locks": locks, "operation": "delete"}).state()

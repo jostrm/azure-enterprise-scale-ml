@@ -2639,7 +2639,9 @@ class BlobLocks:
                 "factory_id", "scaleset_id", "environment", "tenant_id", "subscription_id", "prefix", "region", "suffix")}
             require(binding.get("target") == target and binding.get("scope_kind") == "aifactory-owned",
                     "physical-target-enrollment-mismatch")
-            require(self.document["operation"] != "delete" or binding.get("allow_delete") is True,
+            # A read-only coordination document (the Factory API's registered-handoff and receipt readers) names
+            # no operation; only a deletion manifest needs the scope's deletion enrollment.
+            require(self.document.get("operation") != "delete" or binding.get("allow_delete") is True,
                     "physical-target-deletion-not-enrolled")
             required = binding.get("common_dependencies")
             require(isinstance(required, list), "common-dependency-enrollment-required")
