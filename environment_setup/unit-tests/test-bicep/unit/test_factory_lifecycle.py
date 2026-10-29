@@ -2701,3 +2701,61 @@ def test_private_dns_zone_fingerprint_ignores_record_set_and_link_counters():
     assert fl.resource_etag(body, {}, kind) == "663b1372"
     later["tags"]["aifactory.factory_id"] = "aif-138"
     assert fl.resource_digest(body, kind) != fl.resource_digest(later, kind)
+
+
+WORKSPACE = GROUP + "/providers/Microsoft.OperationalInsights/workspaces/owned-workspace"
+
+
+class WorkspaceTablesCloud(ClosureCloud):
+    """aif-138 (2026-10-29): a workspace lists its 697 platform-managed tables in one call; reading each table and its
+    five extension collections afterwards made every exact walk take 50 minutes. Tables are inventoried from the list."""
+
+    def __init__(self):
+        super().__init__()
+        self.bodies[WORKSPACE.lower()] = {"id": WORKSPACE, "type": "Microsoft.OperationalInsights/workspaces",
+                                          "etag": '"workspace"', "properties": {"sku": {"name": "PerGB2018"}}}
+        self.tables = [{"id": WORKSPACE + "/tables/" + name, "type": "Microsoft.OperationalInsights/workspaces/tables",
+                        "name": name, "properties": {"plan": "Analytics", "retentionInDays": 30, "schema": {"name": name},
+                                                     "provisioningState": "Succeeded"}} for name in ("Heartbeat", "Usage")]
+        self.reads, self.collections = [], []
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.operationalinsights":
+            return {"resourceTypes": [{"resourceType": "workspaces", "apiVersions": ["2023-09-01"]},
+                                      {"resourceType": "workspaces/tables", "apiVersions": ["2023-09-01"]}]}
+        return super().provider_schema(namespace)
+
+    def list_resources(self, scope):
+        return super().list_resources(scope) + [copy.deepcopy(self.bodies[WORKSPACE.lower()])]
+
+    def collection(self, path, api_version, extension=False):
+        self.collections.append(path.lower())
+        if path.lower() == WORKSPACE.lower() + "/tables":
+            return [copy.deepcopy(row) for row in self.tables], None
+        return super().collection(path, api_version, extension)
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        self.reads.append(resource_id.lower())
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+def test_closure_walk_inventories_platform_managed_tables_from_their_list_without_reading_each():
+    cloud = WorkspaceTablesCloud()
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    tables = [row["id"].lower() for row in cloud.tables]
+    assert all(key in closure["resources"] and fl.hash_value(closure["resources"][key]["body_hash"]) for key in tables)
+    assert all(closure["resources"][key]["type"] == "microsoft.operationalinsights/workspaces/tables" for key in tables)
+    assert all(bodies[key]["properties"]["plan"] == "Analytics" for key in tables)
+    assert closure["collections"][WORKSPACE.lower() + "/tables"]["ids"] == sorted(tables)
+    # No table was read on its own and no extension collection of a table was listed; the workspace still was.
+    assert not any(read in tables for read in cloud.reads)
+    assert not any(any(path.startswith(key + "/") for key in tables) for path in cloud.collections)
+    assert WORKSPACE.lower() in cloud.reads
+    assert any(path.startswith(WORKSPACE.lower() + "/providers/") for path in cloud.collections)
+    # A table's volatile fields stay out of its fingerprint; a plan change still counts.
+    changed = WorkspaceTablesCloud()
+    changed.tables[0]["properties"]["schema"] = {"name": "Heartbeat", "columns": ["moved"]}
+    assert fl.collect_resource_closure(changed, [GROUP])[0]["resources"] == closure["resources"]
+    changed.tables[0]["properties"]["plan"] = "Basic"
+    assert fl.collect_resource_closure(changed, [GROUP])[0]["resources"] != closure["resources"]
+    assert closure == fl.collect_resource_closure(WorkspaceTablesCloud(), [GROUP])[0]
