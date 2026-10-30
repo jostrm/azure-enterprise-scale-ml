@@ -388,6 +388,10 @@ class IdentityProducerCloud(PlanCloud):
             changes = [{"resourceId": identifier, "changeType": "NoChange" if identifier in self.bodies else "Create",
                         "before": self.bodies.get(identifier), "after": body}
                        for identifier, body in ((GROUP.lower(), self.group), (UAMI, intent))]
+            if self.failure == "identity-modify" and UAMI in self.bodies:
+                # The projection re-applied with this review's tags differs from the producer's tags.
+                changes[1] = {**changes[1], "changeType": "Modify",
+                              "delta": [{"path": "tags.Updated", "propertyChangeType": "Modify", "before": "a", "after": "b"}]}
             if self.failure == "preview-role":
                 changes.append({"resourceId": GROUP.lower() + "/providers/Microsoft.Authorization/roleAssignments/" + str(uuid.uuid4()),
                                 "changeType": "Create", "after": {}})
@@ -701,8 +705,17 @@ def test_source_lookup_and_array_are_literal_bound_without_creating_another_iden
     assert len(cloud.arm_writes) == 1
 
 
-def continued_native_worker(monkeypatch, *, omit_cognitive=False):
+def continued_native_worker(monkeypatch, *, omit_cognitive=False, repinned=False, stale=False):
     document, producer, prior_locks, producer_receipt = completed_identity(monkeypatch)
+    if repinned:
+        produced = document["route"]["commit"]
+        document["route"]["commit"] = "e" * 40
+        document["deployment"]["known_ownership"][UAMI]["route_commit"] = produced
+    if stale:
+        aged(document, producer_receipt)
+        # The run happens a minute after the review prepared (15 h after the producer observed the identity).
+        clock = fl.time.time
+        monkeypatch.setattr(fl.time, "time", lambda: clock() + fl.RECEIPT_OBSERVATION_AGE_SECONDS + 3600 + 60)
     fl.freeze_foundry_identity_stage(producer, document, ROOT)
     prior_locks.release()
     cloud = FoundryCloud(document, producer.templates)
@@ -2092,7 +2105,12 @@ def aged(document, receipt):
     """The review is prepared past the receipt's freshness window (aif-138, 2026-10-30: the identity was produced
     the day before the continuation could run)."""
     observed = datetime.fromisoformat(receipt["foundry_identity_receipt"]["observed_at"])
-    document["prepared_at"] = (observed + timedelta(seconds=fl.RECEIPT_OBSERVATION_AGE_SECONDS + 3600)).isoformat()
+    lifetime = (datetime.fromisoformat(document["expires_at"]) - datetime.fromisoformat(document["prepared_at"])
+                if "expires_at" in document else None)
+    prepared = observed + timedelta(seconds=fl.RECEIPT_OBSERVATION_AGE_SECONDS + 3600)
+    document["prepared_at"] = prepared.isoformat()
+    if lifetime is not None:
+        document["expires_at"] = (prepared + lifetime).isoformat()
 
 
 def test_stale_receipt_with_the_same_live_identity_is_revalidated_not_refused(monkeypatch):
@@ -2212,3 +2230,35 @@ def test_the_recorded_producer_route_commit_cannot_be_swapped_after_review(monke
     document["deployment"]["foundry_identity_continuation"]["producer"] = {"route_commit": "f" * 40}
     with pytest.raises(fl.Blocked):
         fl.validate_foundry_identity_continuation(document)
+
+
+def test_existing_producer_identity_may_preview_as_modify_when_its_receipt_binds_it(monkeypatch):
+    """aif-138, 2026-10-30: the continuation re-previews the producer's projection with this review's tags, so the
+    identity the receipt already proves can show as Modify; the continuation never applies that projection."""
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    cloud.failure = "identity-modify"
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert document["deployment"]["foundry_identity_continuation"]["run_id"] == receipt["run_id"]
+    assert len(cloud.arm_writes) == 1
+
+
+def test_modify_of_an_identity_without_a_binding_receipt_is_still_refused(monkeypatch):
+    document, cloud, _, _ = completed_identity(monkeypatch)
+    cloud.failure = "identity-modify"
+    document["deployment"]["known_ownership"].pop(UAMI)
+    with pytest.raises(fl.Blocked):
+        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+
+
+def test_repinned_identity_continuation_runs_the_whole_worker(monkeypatch):
+    """aif-138, 2026-10-30: the consumer was repinned after the producer; the continuation still deploys with the
+    producer's identity (the planned templates, the what-if and the dispatch check all bind to the producer's request)."""
+    document, cloud, locks, producer = continued_native_worker(monkeypatch, repinned=True)
+    continuation = document["deployment"]["foundry_identity_continuation"]
+    assert continuation["producer"] == {"route_commit": "b" * 40} and "revalidation" not in continuation
+    locks.claim_run()
+    receipt = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud=cloud, sleep=Mock())
+    assert receipt["status"] == "succeeded", json.dumps(receipt)
+    assert receipt["foundry_identity_continuation"]["run_id"] == producer["run_id"]
+    fl.verify_worker_receipt(locks, document)
