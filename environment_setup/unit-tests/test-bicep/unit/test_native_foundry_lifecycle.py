@@ -5,6 +5,7 @@ import copy
 import json
 import uuid
 import zlib
+from datetime import datetime, timedelta
 from urllib.parse import unquote, urlsplit
 from unittest.mock import Mock
 
@@ -624,14 +625,14 @@ def test_identity_preparation_reuses_only_receipt_bound_original_run_inputs(monk
     assert len(cloud.arm_writes) == 1
 
 
-@pytest.mark.parametrize("defect", ["hash", "stale", "same-run", "missing-time", "body", "tenant"])
+@pytest.mark.parametrize("defect", ["hash", "same-run", "missing-time", "body", "tenant", "future"])
 def test_identity_preparation_rejects_untrusted_or_replayed_seed(monkeypatch, defect):
     document, cloud, _, receipt = completed_identity(monkeypatch)
     known = document["deployment"]["known_ownership"]
     if defect == "hash":
         known[UAMI]["receipt_hash"] = "a" * 64
-    elif defect == "stale":
-        document["prepared_at"] = "2099-01-01T00:00:00Z"
+    elif defect == "future":
+        document["prepared_at"] = "2000-01-01T00:00:00Z"
     elif defect == "same-run":
         document["run_id"] = receipt["run_id"]
     elif defect == "body":
@@ -647,7 +648,7 @@ def test_identity_preparation_rejects_untrusted_or_replayed_seed(monkeypatch, de
     assert len(cloud.arm_writes) == 1
 
 
-@pytest.mark.parametrize("defect", ["same-run", "config", "source", "tenant", "scope", "stale", "principal",
+@pytest.mark.parametrize("defect", ["same-run", "config", "source", "tenant", "scope", "future", "principal",
                                   "body", "receipt-hash", "missing-receipt"])
 def test_identity_continuation_rejects_replay_drift_and_unbound_success(monkeypatch, defect):
     document, cloud, _, receipt = completed_identity(monkeypatch)
@@ -661,8 +662,8 @@ def test_identity_continuation_rejects_replay_drift_and_unbound_success(monkeypa
         document["target"]["tenant_id"] = str(uuid.uuid4())
     elif defect == "scope":
         document["locks"]["scopes"].append(GROUP + "-different")
-    elif defect == "stale":
-        document["prepared_at"] = "2099-01-01T00:00:00Z"
+    elif defect == "future":
+        document["prepared_at"] = "2000-01-01T00:00:00Z"
     elif defect == "principal":
         cloud.bodies[UAMI]["properties"]["principalId"] = str(uuid.uuid4())
     elif defect == "body":
@@ -2085,3 +2086,129 @@ def test_identity_preview_without_an_identity_row_names_the_rows_it_did_list(mon
         prepare_identity_worker(monkeypatch, "no-identity")
     assert raised.value.code == "native-foundry-identity-source-preview-incomplete"
     assert raised.value.error_diagnostic == {"resource_changes": {GROUP.lower(): "Create"}, "tag_updates": []}
+
+
+def aged(document, receipt):
+    """The review is prepared past the receipt's freshness window (aif-138, 2026-10-30: the identity was produced
+    the day before the continuation could run)."""
+    observed = datetime.fromisoformat(receipt["foundry_identity_receipt"]["observed_at"])
+    document["prepared_at"] = (observed + timedelta(seconds=fl.RECEIPT_OBSERVATION_AGE_SECONDS + 3600)).isoformat()
+
+
+def test_stale_receipt_with_the_same_live_identity_is_revalidated_not_refused(monkeypatch):
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    aged(document, receipt)
+    known = document["deployment"]["known_ownership"]
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    revalidation = document["deployment"]["foundry_identity_continuation"]["revalidation"]
+    assert revalidation["receipt_observed_at"] == receipt["foundry_identity_receipt"]["observed_at"]
+    assert revalidation["compared"] == ["resource_id", "principal_id", "client_id", "tenant_id", "resource_group",
+                                        "identity_body", "resource_group_tags"]
+    fl.verify_foundry_identity_receipt(document, receipt, continuation=True, cloud=cloud)
+    fl.validate_foundry_identity_continuation(document)
+    # The next review of the same plan reproduces the same record, so confirmation sees an unchanged plan.
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+
+
+def test_fresh_receipt_records_no_revalidation(monkeypatch):
+    document, cloud, _, _ = completed_identity(monkeypatch)
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert "revalidation" not in document["deployment"]["foundry_identity_continuation"]
+
+
+@pytest.mark.parametrize("defect,field", [("principal", "principal_id"), ("client", "client_id"),
+                                           ("tenant", "tenant_id"), ("missing", "resource_id"),
+                                           ("body", "identity_body"), ("group-missing", "resource_group")])
+def test_stale_receipt_with_a_different_or_missing_live_identity_refuses_naming_the_field(monkeypatch, defect, field):
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    aged(document, receipt)
+    known = document["deployment"]["known_ownership"]
+    if defect == "principal":
+        cloud.bodies[UAMI]["properties"]["principalId"] = str(uuid.uuid4())
+    elif defect == "client":
+        cloud.bodies[UAMI]["properties"]["clientId"] = str(uuid.uuid4())
+    elif defect == "tenant":
+        cloud.bodies[UAMI]["properties"]["tenantId"] = str(uuid.uuid4())
+    elif defect == "missing":
+        cloud.bodies.pop(UAMI)
+    elif defect == "body":
+        cloud.bodies[UAMI]["etag"] = '"changed"'
+    else:
+        cloud.bodies.pop(GROUP.lower())
+    with pytest.raises(fl.Blocked) as raised:
+        fl.foundry_identity_preparation(cloud, document, known)
+    assert raised.value.code == "native-foundry-identity-revalidation-mismatch-" + field.replace("_", "-")
+    with pytest.raises(fl.Blocked) as raised:
+        fl.verify_foundry_identity_receipt(document, receipt, continuation=True, cloud=cloud)
+    assert raised.value.code == "native-foundry-identity-revalidation-mismatch-" + field.replace("_", "-")
+
+
+def test_stale_receipt_cannot_be_verified_without_a_live_cloud(monkeypatch):
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    aged(document, receipt)
+    with pytest.raises(fl.Blocked, match="^native-foundry-identity-receipt-stale-or-replayed$"):
+        fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
+
+
+def test_stale_receipt_with_changed_group_tags_refuses_naming_the_tags(monkeypatch):
+    document, cloud, locks = prepare_identity_worker(monkeypatch, "group-tags")
+    receipt = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud=cloud, sleep=Mock())
+    assert receipt["status"] == "succeeded", json.dumps(receipt)
+    following = copy.deepcopy(document)
+    following["run_id"] = str(uuid.uuid4())
+    following["deployment"].pop("foundry_identity_stage")
+    following["deployment"].setdefault("known_ownership", {})[UAMI] = {
+        "run_id": receipt["run_id"], "receipt_hash": fl.digest(receipt)}
+    aged(following, receipt)
+    assert fl.freeze_foundry_identity_stage(cloud, following, ROOT) is False
+    cloud.bodies[GROUP.lower()]["tags"]["CostCenter"] = "someone-else"
+    with pytest.raises(fl.Blocked) as raised:
+        fl.verify_foundry_identity_receipt(following, receipt, continuation=True, cloud=cloud)
+    assert raised.value.code == "native-foundry-identity-revalidation-mismatch-resource-group-tags"
+
+
+def repinned_identity(monkeypatch):
+    """aif-138 (2026-10-30): the consumer was repinned between the identity producer and its continuation, so the
+    review's route carries another consumer commit than the producer's request did."""
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    produced = document["route"]["commit"]
+    document["route"]["commit"] = "e" * 40
+    return document, cloud, receipt, document["deployment"]["known_ownership"], produced
+
+
+def test_repinned_consumer_without_the_producers_route_commit_is_not_recovered(monkeypatch):
+    document, cloud, receipt, known, _ = repinned_identity(monkeypatch)
+    assert fl.foundry_identity_preparation(cloud, document, known) is None
+    with pytest.raises(fl.Blocked, match="^native-foundry-identity-receipt-invalid$"):
+        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+
+
+def test_repinned_consumer_keeps_the_receipt_when_its_hash_proves_the_producers_route_commit(monkeypatch):
+    document, cloud, receipt, known, produced = repinned_identity(monkeypatch)
+    known[UAMI]["route_commit"] = produced
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert document["deployment"]["foundry_identity_continuation"]["producer"] == {"route_commit": produced}
+    fl.validate_foundry_identity_continuation(document)
+    fl.verify_foundry_identity_receipt(document, receipt, continuation=True, route_commit=produced)
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+
+
+@pytest.mark.parametrize("claimed", ["f" * 40, "not-a-commit", 7])
+def test_a_route_commit_the_receipt_does_not_prove_never_recovers_the_identity(monkeypatch, claimed):
+    document, cloud, receipt, known, _ = repinned_identity(monkeypatch)
+    known[UAMI]["route_commit"] = claimed
+    assert fl.foundry_identity_preparation(cloud, document, known) is None
+    with pytest.raises(fl.Blocked):
+        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+
+
+def test_the_recorded_producer_route_commit_cannot_be_swapped_after_review(monkeypatch):
+    document, cloud, receipt, known, produced = repinned_identity(monkeypatch)
+    known[UAMI]["route_commit"] = produced
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    document["deployment"]["foundry_identity_continuation"]["producer"] = {"route_commit": "f" * 40}
+    with pytest.raises(fl.Blocked):
+        fl.validate_foundry_identity_continuation(document)
