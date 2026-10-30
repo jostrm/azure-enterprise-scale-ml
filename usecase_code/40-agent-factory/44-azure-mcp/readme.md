@@ -199,3 +199,125 @@ select `tool_profile: "expanded-readonly"` and deploy the chosen agents through
 the root [run sequence](../readme.md#how-to-run-the-code). Do not deploy the whole
 catalog just to test MCP. No secret retrieval, storage-content reads, arbitrary
 CLI execution or Azure resource writes are exposed by this initial allowlist.
+
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Data:** this use case has no dataset. Agents read live, read-only resource metadata of *your* project resource group, so the **your own data** prompts target your own project and network settings.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the private Azure MCP service in usecase_code/40-agent-factory/44-azure-mcp for my scope <project001-dev>: what the group_resource_list tool returns, the Entra identity it needs, the subnets, private endpoint and DNS zone, the `enableAzureMcpServer` flag, how the connection is verified, and when to switch to `tool_profile: "expanded-readonly"`. Cite the documentation.
+
+Then, in the Factory actions panel (read-only):
+/get-aifactory-settings
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+For my project <project001-dev>, check from the settings and documentation whether the private Azure MCP is enabled and which values I must supply in the `azure_mcp` config block: infrastructure_subnet_id, private_endpoint_subnet_id, private_dns_zone_id and the digest-pinned image. Explain the subnet requirements (size, delegation) and the role it gets on my project resource group, with citations.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Provision and verify the private Azure MCP inventory tool in usecase_code/40-agent-factory/44-azure-mcp for my project.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/44-azure-mcp/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with Bicep, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Check that `enableAzureMcpServer` is true in my environment's variables and that the `azure_mcp` block is filled in; show me what is missing.
+4. Run `44-azure-mcp/deploy.py plan` (read-only) and summarize.
+5. After my approval, run `prepare-identity --apply` (Entra write). Then run `validate` (read-only ARM validation) with --repository-root <path to this checkout>.
+6. After my approval, run `deploy --apply` (do not also run the MCP-only pipeline). Then run `repair-azure-mcp-dns` without --apply and show me the plan.
+7. After my approval, run `configure-azure-mcp --apply`, then the billed `verify-azure-mcp` and confirm tool_call_verified is true.
+8. Only then tell me how to set `tool_profile: "expanded-readonly"`. Do not deploy the whole agent catalog just to test MCP.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Set up the private Azure MCP inventory tool from usecase_code/40-agent-factory/44-azure-mcp for my own project and network.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/44-azure-mcp/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with Bicep, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Fill in the `azure_mcp` block for my project: name <name>, infrastructure_subnet_id <subnet id> (IPv4 /27 or larger, delegated to Microsoft.App/environments), private_endpoint_subnet_id <subnet id>, private_dns_zone_id <privatelink.<region>.azurecontainerapps.io zone id>, and the digest-pinned image from the README (never `latest`). Validate those IDs read-only and show me the diff.
+4. Then follow the README sequence (plan, prepare-identity, validate, deploy, DNS repair, configure, verify), stopping for my approval before every --apply and before the billed verify.
+5. Finish by asking one test question through a verified agent: "List the resources in my project resource group with their types and locations."
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build an "Azure project inventory" prototype that shows what a Foundry agent sees through a read-only MCP tool.
+- A table of mock resources (name, type, location, resource ID) for one project resource group: Foundry account, AI Search, storage account, Key Vault, Container Apps environment, private endpoints.
+- Filters by type and location, and a search box.
+- A chat box where questions like "Which storage accounts are in my project?" are answered only from the table, with a "tool: group_resource_list" badge on each answer.
+- A banner: "Read-only. No secrets, storage contents or write operations."
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "Azure project inventory" prototype using my own resource list.
+Here is the output of `az resource list -g <my-project-rg> --query "[].{name:name,type:type,location:location}" -o json` (names only, no secrets): <paste JSON>.
+Group the resources by type, show counts, and answer chat questions only from this list.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.

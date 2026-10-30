@@ -140,3 +140,123 @@ python deploy.py apply --apply     # owned writes through the agent's operator c
 The JSON report lists every step, the app and scope, the customer configuration file (if any), the resolved
 model deployment and Container Apps environment, the verified Foundry Agent version, the knowledge index status
 and the application's private FQDN. It never contains secrets or command output.
+
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Data:** the voice agent answers from the AI Factory Agent's knowledge index (this repository's documentation). The **your own data** prompts adjust that corpus through `aifactoryAgentConfigFile`, and set your own voice and languages.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the AI Factory Agent live voice step in usecase_code/40-agent-factory/47-aifactory-agent-live-voice for my scope <project001-dev>: the `enableFactoryChatAgent` and `enableAIFactoryAgentLiveVoice` flags, the Entra app and reader object IDs, the Voice Live region and private endpoint requirements, `speech_shell` versus `realtime`, the roles the pipeline grants, and what the JSON report shows. Cite the documentation and tell me which flags are enabled for my project.
+
+Then, in the Factory actions panel (read-only):
+/get-aifactory-settings
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want the voice agent to speak <language, e.g. Swedish and English> with the voice <voice name> and to also answer from <describe our own documentation>. Explain, with citations, how to set aifactoryAgentVoiceName and aifactoryAgentVoiceLanguages (for example sv-SE,en-US), what a customer aifactoryAgentConfigFile may and may not override (scopes, azure, auth and voice.enabled are not allowed), and how the knowledge index is refreshed.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Turn on the AI Factory Agent with live voice for project001 Dev using usecase_code/40-agent-factory/47-aifactory-agent-live-voice.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md, usecase_code/40-agent-factory/40-aifactory-agent/readme.md (Live voice).
+
+1. Check prerequisites and report anything missing: Python 3.12, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Check the inputs: enableFactoryChatAgent, enableAIFactoryAgentLiveVoice, aifactoryAgentEntraAppId, aifactoryAgentReaderObjectIds (at most 20), the model and embedding deployments, the Container Apps environment, and Voice Live availability in my region. Report what is missing.
+3. Prefer the pipeline: prepare the variable changes for my ADO variables.yaml or GitHub Actions variables as a diff for review. Do not commit or push without my approval.
+4. For a local run of the launcher, set the flags in the shell only, then run `python deploy.py validate` (offline) and `python deploy.py plan` (Azure GET only) and summarize the plan.
+5. Only after my approval, run `python deploy.py apply --apply` (owned writes, plus billed embedding calls during ingest) and show the private FQDN and knowledge index status from the JSON report.
+6. Tell me how to open the private app over VPN and test it with: "How can a project team start using Foundry agents in an existing AI Factory?"
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Turn on the AI Factory Agent with live voice using usecase_code/40-agent-factory/47-aifactory-agent-live-voice, with my own voice, languages and knowledge corpus.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md, usecase_code/40-agent-factory/40-aifactory-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.12, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set aifactoryAgentVoiceName to <voice, e.g. en-US-Ava:DragonHDLatestNeural> and aifactoryAgentVoiceLanguages to <e.g. sv-SE,en-US>.
+3. Create a customer config file at <repo-relative path, e.g. aifactory/agent/project001-dev.json> and set aifactoryAgentConfigFile to it. In it, only adjust knowledge includes and excludes to add <my documentation globs>; do not set scopes, azure, location, auth or voice.enabled. Show me the file.
+4. Run `python deploy.py validate` and `python deploy.py plan`, and confirm my config file is merged.
+5. Only after my approval, run `python deploy.py apply --apply` (or prepare the pipeline variable diff instead), then show the knowledge index status.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a voice assistant prototype called "AI Factory Agent - live voice".
+- A large animated orb with four states: idle, listening (pulsing), thinking (rotating), speaking (waveform).
+- A push-to-talk button. Use the browser's built-in speech recognition and speech synthesis for the prototype, and mock answers about an AI Factory (for example "How can a project team start using Foundry agents?").
+- A transcript panel that shows each spoken question and answer, with citations under every answer.
+- A language selector: English (en-US), Swedish (sv-SE).
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same live-voice orb prototype for <company name> in <languages>.
+Use my own question and answer pairs as mock answers: <paste rows of question | answer | source>.
+Use my brand colors <colors> for the orb.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.

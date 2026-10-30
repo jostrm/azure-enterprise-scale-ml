@@ -409,6 +409,130 @@ knowledge-base/source/connection binding before invoking the recorded agent
 version. An answer counts as grounded only after a successful source-specific
 `knowledge_base_retrieve` call, not merely because the model says it used a source.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the RAG use case in usecase_code/40-agent-factory/45-rag-agent for my scope <project001-dev>: the two demo source bindings (project-helpdesk and common-air-passengers), what each step (configure, materialize, start, verify, deploy, ask) does, which steps write to Azure or are billed, and how an answer is proven grounded. Then tell me which prerequisites my project still lacks. Cite the documentation.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 45-rag-agent
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want a RAG agent over my own documents: <describe them, e.g. 400 internal how-to articles as UTF-8 text>. Explain, with citations, how to add a binding to rag-sources.json: shared-lake-jsonl or knowledge-json-array, the blob path layout, the SHA-256 and manifest pins, `acl: ["project001"]`, the 4 MiB and 1,000-document limits, the unique agent_name, and why a new version needs a new binding.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Run the RAG use case in usecase_code/40-agent-factory/45-rag-agent end to end with the demo source "project-helpdesk" and show me a cited answer.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/45-rag-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>. Also create <consumer>\aifactory\agent-factory\rag-sources.json from 45-rag-agent/sources.example.json only if it does not exist.
+3. Use the binding `project-helpdesk` (agent aif-rag-project). It reuses a successful 43-data run; if there is none, stop and tell me.
+4. Run `main.py plan` with --sources and --source project-helpdesk (read-only) and summarize.
+5. Then run `configure --apply`, `materialize --apply` + `poll-materialization`, `start --apply` + `poll`, `verify` and `deploy --apply` one at a time, asking me before every --apply. If a private link is pending, show me that exact one before `approve-link`.
+6. After my approval, run the billed `ask --input "What is the documented PIN reset limit within 24 hours?"` and show the answer with its successful knowledge_base_retrieve call.
+7. Optionally run the offline RAG unit tests the README lists.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Run the RAG use case in usecase_code/40-agent-factory/45-rag-agent on my own documents with a new source binding.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/45-rag-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>. Also create rag-sources.json from 45-rag-agent/sources.example.json only if it does not exist.
+3. My documents: <describe them, e.g. 200 HR policy articles as UTF-8 text>, published as <shared-lake-jsonl | knowledge-json-array> at <container>/<blob path> in <common lake | project storage>. Check that they are UTF-8 text, at most 1,000 documents and 4 MiB, and that every document has exactly `acl: ["project001"]`; report anything that does not fit.
+4. Compute the lowercase SHA-256 of the published bytes (and of _SUCCESS.json for JSONL) with the README command, and add a new binding `<my-source-key>` with a unique agent_name, dataset, version, description and provenance. Show me the diff; never reuse or edit an existing binding's hashes.
+5. Run `plan` for --source <my-source-key>, then configure, materialize, start, verify and deploy one at a time, asking me before every --apply (`configure --apply --grant-read` only for a common-lake source).
+6. After my approval, run the billed `ask` with: <my question 1>, <my question 2>, and show the citations.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "Knowledge assistant" RAG prototype.
+- A source picker with two sources: "Helpdesk articles (10 documents)" and "Air passengers 1949-1960 (12 documents)". Each source has its own assistant; never mix sources in one answer.
+- A chat that answers only from the selected source, with numbered citations that open the source document in a side panel.
+- If the answer is not in the documents, say so instead of guessing.
+- Examples: "What is the documented PIN reset limit within 24 hours?" (helpdesk) and "What was the airline passenger count in January 1949, in thousands?" (air passengers).
+Create the mock documents yourself.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "Knowledge assistant" RAG prototype for <company name>, with one source: "<my source name>".
+Let me paste or upload my documents in the browser (client-side only, plain text or Markdown), split them into chunks, use simple keyword search to retrieve the top 3 chunks, and show them as citations under a mock answer.
+Example questions: <paste questions>.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Access, freshness and supported scope
 
 This initial example serves **project-wide approved corpora**. Shared documents

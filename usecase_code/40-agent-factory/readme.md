@@ -85,6 +85,27 @@ own commands, required inputs and expected results.
 </tr>
 </table>
 
+## Run the use cases with an AI assistant
+
+Every use-case README below has a **Run this use case with an AI assistant** section with copy-paste prompts, each in two
+variants: **demo data** (the use case's own sample data) and **your own data** (replace the `<...>` placeholders).
+
+| Assistant | What its prompt does | Where to paste it |
+|---|---|---|
+| **AI Factory Agent Chat** | Explains the use case with citations, checks your scope, and uses the Factory actions panel (for example `/create-agent-oftype-for-project` or `/create-ml-model-oftype-for-project`) to *prepare* a reviewable plan. It never runs code, and a person approves every plan. | The private [AI Factory Agent](40-aifactory-agent/readme.md) web app, or **ESAIF Agent Chat** in the AI Factory app. |
+| **GitHub Copilot** and **Claude Code** | One shared prompt: the assistant reads `AGENTS.md` and the README, sets up the environment, runs the offline steps, and stops for your "yes" before every Azure write or billed call. | Copilot: VS Code Chat in *Agent* mode with this repository open. Claude Code: run `claude` in the repository root. Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. |
+| **Lovable** | Builds a front-end **prototype** of the result (chat, dashboard or form) with mock or pasted data. It cannot run this Python or reach private endpoints. | [lovable.dev](https://lovable.dev): start a new project and paste the prompt. |
+
+The coding-assistant prompts carry the same guardrails as the READMEs: plan first, ask before every `--apply`,
+`--execute` or billed call, never enable public network access or change RBAC, and never commit configuration,
+journals or data. A prompt is not an approval: you still review each command the assistant proposes. For
+Lovable, paste only data you are allowed to share with an external service.
+
+## Video walkthrough tutorial - TBA
+
+Video walkthrough tutorials, recorded by a person, will be published here soon. Each one shows how to run a
+use case's code, step by step, to achieve the result described in its README.
+
 ## Folder layout
 
 ```text

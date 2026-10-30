@@ -170,6 +170,130 @@ prerequisites; neither is a substitute for successful sign-in and a grounded
 question. Return visits normally need only the same environment/configuration
 and `ask` or `serve`, not another agent or infrastructure deployment.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+I am on the project team for scope <project001-dev>. Explain how the Enterprise Scale AI Factory Agent in usecase_code/40-agent-factory/40-aifactory-agent is set up: the Foundry, AI Search, storage and Entra prerequisites, how `ingest` builds the knowledge index from the repository documentation, and how the private web app is deployed. Then answer, with citations: "How can a project team start using Foundry agents in an existing AI Factory?" and list which prerequisites my scope is still missing.
+
+Then, in the Factory actions panel (read-only):
+/get-aifactory-health
+/get-aifactory-settings
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want this agent to also answer from our own documents: <describe them, e.g. Markdown runbooks in docs/runbooks/**/*.md of a checkout we control>. Explain, with citations, which `knowledge.repository_root`, `knowledge.includes` and `knowledge.excludes` changes in config.local.json are needed, which permissions a knowledge refresh needs (including index-definition write), how a new index generation is verified and promoted, and how the last good snapshot keeps serving if a refresh fails. Do not change anything; give me the reviewed steps.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Set up and run the Enterprise Scale AI Factory Agent in usecase_code/40-agent-factory/40-aifactory-agent with its default knowledge corpus (this repository's documentation), and ask it one question.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/40-aifactory-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.12 (not the parent operator's 3.13 environment), Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. In that folder, create its own `.venv` and install `requirements.lock.txt` and the azurefactory-cli package exactly as the README shows.
+3. Create config.local.json from config.example.json only if it does not exist. Help me fill in `scopes` (<project001-dev>), `azure` (Foundry project, chat and embedding deployments, Search, storage) and `auth.grants` with my Entra object ID <object-id>, then show me the result.
+4. Run `--help` and `knowledge-status` (read-only) and summarize.
+5. `deploy-agent` and `ingest` write to Azure immediately (they have no --apply flag) and `ingest` makes billed embedding calls: ask me before each one.
+6. Run `ask --scope <project001-dev> --audience project --question "How can a project team start using Foundry agents in an existing AI Factory?"` (billed) and show the answer with its citations.
+7. Optional: run the read-only `deploy.py` plan for the private web app and summarize it. Do not run it with --apply.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Run the Enterprise Scale AI Factory Agent in usecase_code/40-agent-factory/40-aifactory-agent so it also answers from my own documents.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/40-aifactory-agent/readme.md (especially Grounding, refresh and citations).
+
+1. Check prerequisites and report anything missing: Python 3.12 (not the parent operator's 3.13 environment), Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Create the folder's own `.venv` and install `requirements.lock.txt` and the azurefactory-cli package as the README shows.
+3. Create config.local.json from config.example.json only if it does not exist, with scope <project001-dev> and my Entra object ID <object-id> in `auth.grants`.
+4. My documents: <describe them, e.g. Markdown and text files under <folder> in the checkout at <path>>. Update `knowledge.repository_root` and `knowledge.includes` so they are indexed, keep every default exclude (secrets, credentials, .env, tests, eval material), and show me the diff.
+5. Run `knowledge-status` (read-only). Then, after my approval, run `ingest` (Azure write plus billed embeddings) and confirm the new index generation was verified and promoted.
+6. Ask (billed): "<my question about my documents>" with --scope <project001-dev> --audience project, and show the answer with citations that point to my files.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a web app prototype called "AI Factory Agent": a private-looking enterprise chat for platform and project teams.
+- Header with a scope selector (project001-dev) and an explanation-view toggle: Platform | Project. The toggle changes the example questions, never permissions.
+- Example question tiles that fill the input box but never send automatically, for example "How can a project team start using Foundry agents in an existing AI Factory?" and "Does saving configuration deploy resources, and how does Full bootstrap differ?".
+- Answer bubbles with numbered citations that link to repository file paths and headings, plus a "knowledge snapshot" freshness badge.
+- A "Factory actions and cost monitoring" side panel with skill buttons (health, settings, monthly cost forecast). Any action opens an "Are you sure?" dialog with Cancel as the default and shows "plan prepared, waiting for human approval".
+- Cost cards that show actual and forecast per currency, without summing currencies.
+Use realistic mock answers and costs.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "AI Factory Agent" chat prototype, branded for <company name> with colors <colors> and logo text <text>.
+Use my own sample conversations as mock answers: <paste 5-10 rows of: question | answer | citation path>.
+Use my own example question tiles: <paste questions>.
+Use my own cost figures for the cost cards: <paste month, currency, actual, forecast>.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Model and agent
 
 The initial Azure catalog advertised `gpt-6.1-sol`, version `2026-09-29`, with

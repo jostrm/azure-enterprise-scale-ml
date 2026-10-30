@@ -140,6 +140,134 @@ Offline contract tests (no Azure calls), from the factory root `40-agent-factory
 .\42-multi-agent-fabric-iq\.venv\Scripts\python.exe -m unittest tests.test_fabric_iq_usecase -v
 ```
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Cost:** the optional Fabric IQ step needs a **paid F2 or larger Fabric capacity**, billed while it is Active. Every prompt below asks the assistant to pause it when you are done.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the Zava retail multi-agent demo in usecase_code/40-agent-factory/42-multi-agent-fabric-iq for my scope <project001-dev>: how the Supervisor-Agent routes to Sales-Associate-Agent, Rewards-Campaign-Agent (Foundry IQ) and Inventory-Agent (Fabric IQ), what parameters.env needs, the roles I need, the paid F2 Fabric capacity and how to pause it, and the workflow and tool retirement dates. Cite the documentation.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 42-multi-agent-fabric-iq
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want to run the Foundry IQ + Fabric IQ retail agents on our own catalog and inventory: products <describe>, loyalty and campaign rules <describe>, inventory per store <describe>. Explain, with citations, the exact fields for data/products.json and data/rewards.json, the columns of data/inventory.csv, and what else in setup_fabric.py (column descriptions and INSTRUCTIONS) must change if my columns differ.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Run the Zava retail demo in usecase_code/40-agent-factory/42-multi-agent-fabric-iq with its synthetic data and ask the supervisor workflow three questions.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/42-multi-agent-fabric-iq/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. In that folder, create its own `.venv`, install `requirements.txt`, and create parameters.env from parameters.env.template only if it does not exist. Help me fill in endpoint, model_deployment_name, server_label, server_url, project_connection_id and project_resource_id; leave fabric_connection_name empty for now.
+3. Run the offline unit tests the README lists.
+4. setup_knowledge.py writes to Azure directly (index, knowledge source, knowledge base, connection): ask me before running it.
+5. Ask me whether to set up Fabric IQ. It needs a paid F2 capacity: only after my explicit approval, create the capacity and run setup_fabric.py as the README shows. Otherwise skip it; Inventory-Agent will then say it cannot check stock.
+6. After my approval, run agents.py (creates agent and workflow versions).
+7. After my approval, run the billed chat.py with: "Want paint recommendation for my living room", "I am Anna Berg. What discount do I get on paint this Black Friday?" and "Is PROD000281 in stock?". Show which agent answered each one.
+8. When I say I am done, suspend the Fabric capacity with the README command and list the manual cleanup items.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Run the retail multi-agent demo in usecase_code/40-agent-factory/42-multi-agent-fabric-iq on my own product, rewards and inventory data.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/42-multi-agent-fabric-iq/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the folder's `.venv` and parameters.env as the README shows (never overwrite an existing parameters.env).
+3. Convert my data into the demo's formats and show me the result before writing it: products <path to my file> -> data/products.json; loyalty and campaign rules <path> -> data/rewards.json (JSON arrays with string fields id, ProductId, ProductName, Category, ProductDescription, and FormattedPrice for products); inventory <path> -> data/inventory.csv with columns ProductId,ProductName,StoreLocation,QuantityOnHand,ReorderPoint,InventoryStatus. If my columns differ, also update the column descriptions and INSTRUCTIONS in setup_fabric.py and tell me.
+4. Run the offline unit tests, then setup_knowledge.py, optional Fabric setup (paid F2, explicit approval), agents.py and chat.py, each only after my approval.
+5. Ask these questions: <question about products>, <question about a customer discount>, <question about stock for one of my ProductIds>.
+6. When I am done, suspend the Fabric capacity and list the manual cleanup items.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "Zava retail assistant" prototype for a home-improvement store.
+- A chat where each answer shows a routing badge: Sales Associate | Rewards Campaign | Inventory.
+- Sales answers recommend paint products with price and description cards.
+- Rewards answers show a discount card built from JSON like {"discount_percentage": 15} (example question: "I am Anna Berg. What discount do I get on paint this Black Friday?").
+- Inventory answers show a stock table per store (QuantityOnHand, ReorderPoint, InventoryStatus) for questions like "Is PROD000281 in stock?".
+Use about 20 mock products and 3 stores.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same retail assistant prototype for <store name>.
+Use my products as the mock catalog: <paste rows of ProductId | ProductName | Category | ProductDescription | FormattedPrice>.
+Use my loyalty rules: <paste rules>.
+Use my inventory: <paste CSV with ProductId,ProductName,StoreLocation,QuantityOnHand,ReorderPoint,InventoryStatus>.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Lifecycle notes
 
 - Foundry retires workflows on 2026-12-01. After that, a workflow YAML runs only

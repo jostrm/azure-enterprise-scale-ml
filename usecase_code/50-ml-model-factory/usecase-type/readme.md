@@ -34,3 +34,17 @@ The notebooks and README status blocks are generated from the use-case catalog:
 (add `--write` after changing the catalog or generator). Train a compatible versioned
 model first; choosing online/streaming does not imply continuous retraining. Folder names
 and templates are not evidence that a model/backend combination has been deployed.
+
+## Run this use case with an AI assistant
+
+Copy-paste prompts for the AI Factory Agent Chat, GitHub Copilot, Claude Code and Lovable, with demo data or your own data, are in each serving pattern's README:
+
+- [Batch](batch/readme.md#run-this-use-case-with-an-ai-assistant)
+- [Online](online/readme.md#run-this-use-case-with-an-ai-assistant)
+- [Streaming](streaming/readme.md#run-this-use-case-with-an-ai-assistant)
+
+[How these prompts work](../../40-agent-factory/readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them.
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.

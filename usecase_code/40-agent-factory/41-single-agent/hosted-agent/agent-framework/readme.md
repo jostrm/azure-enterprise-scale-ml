@@ -89,3 +89,13 @@ endpoints and model (`FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_RESOURCE_ENDPOINT`,
 Local CLI/browser credentials are excluded by the worker. Use the
 [hosted deployment workflow](../readme.md#how-to-run-the-code), not a local
 `python main.py` workaround.
+
+## Run this use case with an AI assistant
+
+Use the copy-paste prompts in the [hosted-agent README](../readme.md#run-this-use-case-with-an-ai-assistant) (AI Factory Agent Chat, GitHub Copilot, Claude Code and Lovable; demo data or your own data) and select `aif-agent-framework` as the framework agent.
+
+[How these prompts work](../../../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them.
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.

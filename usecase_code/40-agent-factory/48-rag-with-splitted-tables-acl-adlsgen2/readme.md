@@ -94,6 +94,130 @@ README's expected totals into its prompt. This control bypasses Playground's
 retrieval path; the [cutoff investigation](#playground-content-cutoff-investigation)
 below explains why that distinction matters.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Own data:** the retrieval experiment and the image branch accept **synthetic data only**. Real content enters only through the optional Graph extension, bound to an approved SharePoint library or OneDrive for Business drive, with access set by your Entra groups.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the split-tables RAG demo in usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2 for my scope <project001-dev>: the synthetic car-sales JSON and Excel sources, why exact totals come from a deterministic calculator rather than the LLM, how native ADLS Gen2 ACLs are enforced through AI Search and the Foundry agent (S09), which steps need --apply or --allow-paid, and the current status of the protected pipeline. Cite the documentation.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 48-rag-with-splitted-tables-acl-adlsgen2
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want per-group access on our own sales files: group <Entra group A> should see <file or folder A> and group <Entra group B> should see <file or folder B>, from SharePoint library <name>. Explain, with citations, how the Graph extension binds an approved SharePoint or OneDrive for Business drive, how principal_map and partition_policies use Entra groups, why permissions apply per file and not per row, and which roles test users must not have.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Run the split-tables demo in usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2 with its synthetic car-sales data: offline first, then, after my approval, the cloud steps, ending with an exact sales total.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. In that folder, create its own `.venv`, install `requirements.txt`, set TIKTOKEN_CACHE_DIR as the README shows, run `main.py generate --version v1 --seed 48` into my consumer state folder <C:\path\to\orange>\aifactory\agent-factory\sales-demo, and run the offline unit tests.
+3. Run `main.py init-config` with my factory config, target and rag-sources.json, then `plan` and `discover --update-config` (read-only), and summarize.
+4. Only after my approval of each step: `publish --apply`, `configure --apply --allow-paid`, `ingest --apply --allow-paid`, `verify`, `deploy --apply --allow-paid`.
+5. After my approval, run `ask --allow-paid --input "Give me the sum of all sales."` and then `evaluate` against the oracle. Never give the model the expected totals.
+6. Optional: run the retrieval-only experiment and `check_sum.py` scoring as the README shows, again asking me before every --apply and --allow-paid.
+7. If a step fails with 403, a hash mismatch or a chunk-completeness failure, stop and report it.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Configure the split-tables demo in usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2 so that my own Entra groups control access, and bind the optional Graph extension to my approved SharePoint library.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the folder's `.venv` and consumer config as the README shows (never overwrite an existing config).
+3. In partition_policies, set allowed_group_ids for the JSON source to <Entra group id A> and for the Excel source to <Entra group id B>. Prefer groups over user lists, and set acl_test_principal_ids and denied_test_user_ids to <test user ids>. Show me the diff.
+4. Copy graph-sync.example.json to my consumer folder and bind it to my approved SharePoint library or OneDrive for Business drive <drive id> with the stable item IDs of my two sales files <item ids>, plus a principal_map for my groups. Consumer OneDrive is not allowed. Show me the file.
+5. Run the read-only `sync.py plan` and `main.py plan`, and explain what would change.
+6. Stop for my approval before any --apply or --allow-paid step. Do not put my real content into the synthetic retrieval experiment or the image branch.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "Car sales: exact answers with access control" prototype.
+- Two mock sources: "car-sales-xyz.json" (about 100 rows) and "car-calculator-tool.xlsx" (about 150 rows), with columns date, model, region, quantity, unit_price_usd, amount_usd.
+- A question box with "Give me the sum of all sales", "...in the JSON dataset", "...in the Excel workbook" and "Give me the total and break it down by source". Compute the totals exactly in code and show them next to an "LLM estimate" card that is clearly labelled as approximate.
+- A user switcher: "Sales team" sees only the JSON source and "Finance board" sees both. Every answer shows "Sources you can access", and hidden sources are never counted.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "exact answers with access control" prototype using my own sample sales data.
+Source A (<name>): <paste CSV>. Source B (<name>): <paste CSV>. Amount column: <column name>; currency: <currency>.
+Users and access: <user or group> -> <sources>. Compute every total exactly and only over the sources the selected user can access.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Retrieval-only Playground experiment: no calculator
 
 Use `retrieval_only.py` when you want the **LLM itself** to attempt the arithmetic.

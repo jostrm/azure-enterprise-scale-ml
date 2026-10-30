@@ -243,6 +243,128 @@ cannot supply or impersonate this identity; missing managed identity is a hard e
    [worker guide](guide.txt) with that explicit index and current project-scoped
    connection policy.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Own data:** this folder is pinned to one public Kaggle helpdesk dataset; you choose only where it is stored. To index your own documents, use [45-rag-agent](../45-rag-agent/readme.md). The **your own data** prompts below follow that route.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the 43-data ingestion in usecase_code/40-agent-factory/43-data for my scope <project001-dev>: what the Kaggle helpdesk dataset contains, how evaluation answers are kept out of retrieval, the Data Factory route versus the managed-identity worker, the role grants and private links it needs, and how success is verified (document count and corpus hash). Cite the documentation.
+
+Then, in the Factory actions panel (read-only):
+/get-aifactory-settings
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want to prepare my own documents for RAG instead of the Kaggle helpdesk set: <describe them, e.g. 300 product FAQs as text>, stored in <common lake | project storage>. Explain, with citations, why 43-data cannot be pointed at them and how to publish them for 45-rag-agent: the shared-lake path layout, the documents.jsonl and _SUCCESS.json manifest, the SHA-256 pins, the `acl` value, and the size and format limits.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Prepare the demo Kaggle helpdesk corpus with usecase_code/40-agent-factory/43-data (Data Factory route) and verify the Foundry IQ knowledge.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/43-data/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>. Use `ingestion.mode: datafactory`.
+3. Run `plan`, `discover` and `preflight` (read-only) and summarize, including the selected storage account and container.
+4. After my approval, run `configure-datafactory --apply`. If it reports a pending private link, show me that exact connection and requester and only run `approve-datafactory-link` for it after my approval.
+5. After my approval, run `start-datafactory --apply`, then `poll-datafactory --apply` (it creates and runs the Search indexer), then `verify-datafactory`. Success means status ingested, document_count 10 and corpus_sha256_verified true.
+6. After my approval, run `configure-knowledge --apply` and confirm retrieval_verified is true.
+7. Run the steps one at a time and do not rerun a successful ingestion just to check it.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Prepare my own documents for RAG. 43-data is pinned to the Kaggle helpdesk set, so publish them for usecase_code/40-agent-factory/45-rag-agent instead.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/43-data/readme.md, usecase_code/40-agent-factory/45-rag-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. My documents: <describe them and give the local path>. Check that they are UTF-8 text (no PDF, OCR, images or audio), at most 1,000 documents and 4 MiB in total; report anything that does not fit.
+3. Convert them into the 45-rag-agent `shared-lake-jsonl` format with `acl: ["project001"]` on every document, and write documents.jsonl and _SUCCESS.json locally under <local output folder>. Show me a sample record.
+4. Compute the lowercase SHA-256 of both files and draft a new binding in my consumer rag-sources.json (unique agent_name, blob_path under mlops/v1/projects/<project>/environments/<env>/usecases/<usecase>/rag/corpora/<corpus>/versions/<version>/). Show me the diff.
+5. Tell me how the files get uploaded to the private lake through an approved route. Do not upload them yourself, and do not use keys or SAS.
+6. Stop there; I will run 45-rag-agent with the new binding.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "RAG data preparation" dashboard prototype.
+- Source card: Kaggle "Sample RAG Knowledge Item Dataset" (MIT, version 1, 10 rows) with columns ki_topic, ki_text, sample_question, sample_ground_truth.
+- A split view: on the left "Knowledge corpus" (ki_topic + ki_text, 10 documents); on the right "Evaluation set" (sample_question + sample_ground_truth), with a lock icon and the label "never indexed".
+- Pipeline status steps: download -> hash verified -> knowledge items -> Search index -> Foundry IQ knowledge source, each with a status badge.
+- A summary card: document_count 10, corpus_sha256_verified true, retrieval_verified true.
+Use mock helpdesk topics: Android email, jammed printer, Webex, wireless network, backups.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "RAG data preparation" dashboard, but let me upload my own CSV in the browser (client-side only) with columns <topic column>, <text column>, <question column>, <answer column>.
+Split it into a knowledge corpus and an evaluation set, show row counts, flag empty or duplicate texts and documents larger than 4 KB, and let me download the knowledge corpus as documents.jsonl with an "acl": ["project001"] field on every line.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Data sources and lake layout
 
 When the flag is omitted, `<project-data-storage>` retains legacy project `2001`

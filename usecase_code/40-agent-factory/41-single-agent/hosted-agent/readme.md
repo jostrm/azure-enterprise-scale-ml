@@ -109,6 +109,128 @@ starts its `python main.py` entry point in the managed host. The deployment sets
 The runtime excludes Azure CLI/browser/user credential fallbacks, so signing
 into Azure locally does not make the raw template runnable.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Compare the hosted-agent frameworks in usecase_code/40-agent-factory/41-single-agent/hosted-agent (agent-framework, langgraph, openai-agent-sdk, anthropic-agents, github-copilot-sdk, custom) for my scope <project001-dev>: what each one needs (quota, package build access, runtime identity roles, model deployment), why aif-knowledge must be active first, and which steps write to Azure or are billed. Recommend one framework for a first run and cite the documentation.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 41-single-agent
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want a hosted agent built with <framework> to answer from our own documents: <describe them>. Explain, with citations, how hosted workers get evidence (through the persisted aif-knowledge agent, not hardcoded storage paths), and how to give that agent my own corpus through 45-rag-agent or my own storage selection. List the steps and permissions; do not change anything.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Deploy one hosted framework agent from usecase_code/40-agent-factory/41-single-agent/hosted-agent with the demo helpdesk corpus and ask it a question. Framework: <aif-custom | aif-agent-framework | aif-langgraph | aif-openai-sdk | aif-anthropic | aif-copilot-sdk>.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/41-single-agent/hosted-agent/readme.md, the selected framework's own readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Run `plan --agent aif-knowledge --agent <framework agent>` (offline), then `preflight` (read-only). For aif-anthropic, confirm that `spec.model` names a Claude deployment local to Foundry.
+4. Optionally run the offline hosted unit tests the README lists.
+5. After my approval, run `deploy --agent aif-knowledge --apply`, then, after a second approval, `deploy --agent <framework agent> --apply`.
+6. After my approval, run the billed `invoke --agent <framework agent> --input "How do I reset my password?"` and show the answer with its source links.
+7. Do not run the framework's main.py locally and do not use --include-hosted.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Deploy one hosted framework agent from usecase_code/40-agent-factory/41-single-agent/hosted-agent against my own AI Factory storage and ask it my own questions. Framework: <aif-custom | aif-agent-framework | aif-langgraph | aif-openai-sdk | aif-anthropic | aif-copilot-sdk>.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/41-single-agent/hosted-agent/readme.md, usecase_code/40-agent-factory/45-rag-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Use my storage: `use_common_datalake_storage` = <true | false>, account <storage-account>, resource group <rg>, container <container>. Show me the config diff, then `plan` and `preflight`.
+4. Make sure aif-knowledge is grounded and active first; deploy it and then <framework agent>, each after my approval.
+5. Invoke <framework agent> (billed, after my approval) with: <question 1>, <question 2>.
+6. For my own documents, do not change the pinned corpus: draft a 45-rag-agent source binding and stop for my review. My documents: <describe them, e.g. 200 HR policy articles as UTF-8 text>, published as <shared-lake-jsonl | knowledge-json-array> at <container>/<blob path> in <common lake | project storage>.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "Framework comparison" prototype for hosted helpdesk agents.
+- Pick one or more frameworks: Microsoft Agent Framework, LangGraph, OpenAI Agents SDK, Anthropic, GitHub Copilot SDK, Custom.
+- Ask one question (default "How do I reset my password?") and show the answers side by side, each with source links, mock latency, token count and a "grounded via aif-knowledge" badge.
+- A details drawer shows the call flow: question -> aif-knowledge evidence -> framework answer.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "Framework comparison" prototype for <company name>, limited to the frameworks we evaluate: <list>.
+Use my own questions and mock answers per framework: <paste rows of question | framework | answer | sources>.
+Add a scoring column where a reviewer rates each answer 1-5 and the page shows the average per framework.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Platform background versus these examples
 
 The following background describes platform possibilities, not enabled tools.

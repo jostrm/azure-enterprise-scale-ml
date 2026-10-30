@@ -79,6 +79,129 @@ not implement the approval-response round trip, so a tool-approval request is
 not a successful answer. Do not disable approvals to make an invocation pass.
 These commands are instructions, not evidence of a live deployment.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the prompt-agent example in usecase_code/40-agent-factory/41-single-agent/prompt-agent (aif-knowledge, aif-reviewer and aif-docs) for my scope <project001-dev>: the prerequisites, the order of the steps (43-data ingestion and Foundry IQ before aif-knowledge), and which steps write to Azure or are billed. Cite the documentation and tell me what my project is still missing.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 41-single-agent
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want aif-knowledge to answer from our own documents: <describe them, e.g. IT support articles as UTF-8 text>. The prompt-agent corpus is the pinned Kaggle helpdesk set, so explain, with citations, how to bind my documents through 45-rag-agent instead: the supported formats, the SHA-256 pin, the required `acl`, the size limits, and whether to use common lake or project storage (`use_common_datalake_storage`). Also tell me how to point the shared config at my own storage account and container.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Deploy the prompt agents in usecase_code/40-agent-factory/41-single-agent/prompt-agent with the demo helpdesk corpus and ask aif-knowledge a question.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/41-single-agent/prompt-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Run `plan` for --agent aif-knowledge --agent aif-reviewer --agent aif-docs (offline, `mutations: false`), then `discover` and `preflight` (read-only), and summarize.
+4. Check that 43-data ingestion and Foundry IQ knowledge are verified for this target (journals beside my config). If not, stop and tell me to run 43-data first.
+5. After my approval, run `deploy ... --apply` for the three agents.
+6. After my approval, run the billed `invoke --agent aif-knowledge --input "How do I reset my password?"` and show the answer and the grounding tool call.
+7. Then invoke aif-reviewer with: "Review this draft: Everyone must reset passwords daily. No supporting evidence was supplied. Identify unsupported claims." Do not invoke aif-docs from the CLI; it needs an approval-capable client.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Deploy the prompt agents in usecase_code/40-agent-factory/41-single-agent/prompt-agent against my own AI Factory storage and ask them my own questions.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/readme.md (shared setup), usecase_code/40-agent-factory/41-single-agent/prompt-agent/readme.md, usecase_code/40-agent-factory/45-rag-agent/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Set up the shared operator from usecase_code/40-agent-factory: a Python 3.13 `.venv` with `requirements.txt`, my consumer config at <C:\path\to\consumer>\aifactory\agent-factory\config.json (create it from config.example.json only if it does not exist yet, then help me fill in the storage, target and variables_file values and show me the result) and target <project001-dev>.
+3. Use my storage: `use_common_datalake_storage` = <true | false>, account <storage-account>, resource group <rg>, container <container> (it already exists and is private). Show me the config diff, then run `plan`, `discover` and `preflight`.
+4. Follow the README order (43-data ingestion, Foundry IQ, then `deploy --apply` with my approval).
+5. Invoke aif-knowledge (billed, after my approval) with my questions: <question 1>, <question 2>.
+6. If I want my own documents instead of the pinned helpdesk corpus, do not change the pins: draft a 45-rag-agent source binding for them and stop for my review. My documents: <describe them, e.g. 200 HR policy articles as UTF-8 text>, published as <shared-lake-jsonl | knowledge-json-array> at <container>/<blob path> in <common lake | project storage>.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a helpdesk assistant prototype with three agent tabs:
+- "Knowledge": a chat that answers IT helpdesk questions with a "Sources" list. Mock topics: Android email setup, jammed printer, Webex, wireless network, backups. Example: "How do I reset my password?"
+- "Reviewer": paste a draft answer plus evidence; it highlights unsupported claims in red, with a short explanation for each.
+- "Docs": a Microsoft Learn search assistant that always shows an "Approval required before calling the tool" card, with Approve and Reject buttons.
+Show which agent answered and whether the answer was grounded (a badge with "knowledge_base_retrieve: success | missing").
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same three-tab helpdesk assistant prototype for <company name>.
+Use my own knowledge articles as the mock corpus (title | text): <paste 5-15 articles>.
+Use my own example questions: <paste questions>. The Knowledge tab should answer only from the pasted articles, cite the article title, and say "not in the knowledge base" otherwise.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Roles and actual tools
 
 | Agent | Default behavior | Expanded read-only profile |

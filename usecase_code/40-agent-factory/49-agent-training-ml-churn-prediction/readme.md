@@ -129,6 +129,139 @@ its own receipts and its own create-only lake paths, so a recorded job is never 
 - The commands keep the workstation awake during bounded Azure waits. After a sleep or VPN drop,
   rerun the same command with the same approved plan.
 
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Own data:** the agent's tools accept exactly two use cases (M49 churn, generated synthetically, and M05 air-passengers). To train on your own dataset, use a scenario in the [ML model factory](../../50-ml-model-factory/readme.md); the **your own data** prompts below follow that route.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the agent-driven ML use case in usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction for my scope <project001-dev>: how the agent creates the M49 churn use case from the batch/classification/azureml-pipeline template with synthetic data, trains it, retrains M05 air-passengers against its champion, and runs batch scoring through ESML v2; how plans are approved (plan SHA-256, "approve <code>"); and what the agent will never do. Cite the documentation.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-agent-oftype-for-project
+  type: 49-agent-training-ml-churn-prediction
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+I want to train and batch-score a churn-style model on our own customer data: <describe the dataset, target column and features>. Explain, with citations, why 49 accepts only its two fixed use cases, and how to define my own scenario in usecase_code/50-ml-model-factory/user-config/model/scenarios (task, target, features, split and quality gates) and run it through batch/classification/azureml-pipeline.
+
+Then, in the Factory actions panel (it prepares a reviewable plan; a person approves it):
+/create-ml-model-oftype-for-project
+  type: classification
+  serving_mode: batch
+  project_resource_id: </subscriptions/<sub>/resourceGroups/<project-rg>/providers/Microsoft.MachineLearningServices/workspaces/<workspace>>
+(This works only if the platform team has approved a workload profile for this type; otherwise the chat reports the blocker.)
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Run the agent-training use case in usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction: offline first, then, after my approval of the exact plan, demo uc1 (create, train and score M49 churn on synthetic data).
+
+First read AGENTS.md, then usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. In that folder, create its own `.venv`, install `requirements.txt` with ESML v2 exactly as the README shows, and run the offline unit tests.
+3. Run `main.py init-config` with my factory config <path>, target <project001-dev>, orange root <path>, reviewed rollout <path>, champion receipts <path>, Foundry project endpoint <url> and model deployment <name>. Show me the config.
+4. Run `offline` into a new empty work folder, then `prepare-local`, `preflight` (read-only) and `plan`. Show me the plan and its SHA-256.
+5. Only after I approve that exact plan, run `deploy`, then `ask --demo uc1` with --approved-plan, --plan-sha256, --apply and --allow-paid, and summarize who is predicted to churn.
+6. Optionally, after another approval, run `ask --demo uc2` (retrain M05 and compare with the champion).
+7. Never resubmit a recorded job; resume from receipts instead.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Train and batch-score a classification model on my own data with usecase_code/50-ml-model-factory (49 accepts only its two fixed use cases).
+
+First read AGENTS.md, then usecase_code/50-ml-model-factory/readme.md, usecase_code/50-ml-model-factory/user-config/readme.md, usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.10-3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Install the model factory in its root `.venv` as the README shows.
+3. My data: <local path to CSV or Parquet>, target column <target>, features <list or "all other columns">, categorical <list>, sensitive <list>. Copy it into data\in\<my-scenario>.
+4. Create user-config\model\scenarios\<my-scenario>.json modelled on churn.json, with a distinct name and quality gates no lower than churn.json, and run `validate`.
+5. Run `prepare`, `train` and `evaluate` locally into a fresh folder under ml-environment\outputs\<my-scenario> and show me the metrics and quality gate.
+6. Run `sample-requests` and `score` locally to produce batch predictions, and summarize the predicted churners.
+7. Stop before any Azure ML step; I will approve cloud training separately (commands with --execute).
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build a "Churn prediction results" dashboard prototype.
+- KPI cards: customers scored (50), predicted churners, average churn probability, model version (M49).
+- A table of 50 mock telco customers (customer_id, tenure_months, contract, monthly_charges, churn_probability, prediction), sortable, with the highest risk on top.
+- A "Champion vs challenger" card for the air-passengers forecasting model M05 (metric before and after retraining, and whether the champion was replaced), plus a 12-month forecast line chart.
+- An "Agent activity" timeline: plan -> approved -> create use case -> train -> register -> batch score.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "Churn prediction results" dashboard from my own scored output.
+Here is a CSV with columns <id column>, <feature columns>, <probability column>, <prediction column>: <paste up to 500 rows>.
+Show KPI cards, a sortable risk table, the probability distribution, and churn rate by <segment column>.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Foundry Playground (hosted agent)
 
 The hosted agent `<owner>-<version>-ml-churn-hosted` (for example

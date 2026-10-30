@@ -91,6 +91,19 @@ Preflight alone does not prove retrieval or inference. No live success is implie
 by these instructions. If `tool_profile` is `expanded-readonly`, also complete
 the [private MCP setup and verification](../44-azure-mcp/readme.md) before deployment.
 
+## Run this use case with an AI assistant
+
+Copy-paste prompts for the AI Factory Agent Chat, GitHub Copilot, Claude Code and Lovable, with demo data or your own data, are in each example's README:
+
+- [Prompt agents](prompt-agent/readme.md#run-this-use-case-with-an-ai-assistant)
+- [Hosted framework agents](hosted-agent/readme.md#run-this-use-case-with-an-ai-assistant)
+
+[How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them.
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
+
 ## Choose an authoring approach
 
 | Folder | Use when |

@@ -144,3 +144,123 @@ python deploy.py apim-parameters --output apim-mcp.parameters.json  # AI gateway
 The JSON report lists every create/update/unchanged action, the MCP and tool-server URLs and any
 Entra prerequisite. It never contains secrets. AI Gateway preview pricing applies to the gateway; the
 MCP app runs one replica of two 0.5 vCPU / 1 GiB containers.
+
+## Run this use case with an AI assistant
+
+Copy a prompt, replace the `<...>` placeholders, and paste it into the assistant. Every assistant has a **demo data** prompt and a **your own data** prompt. [How these prompts work](../readme.md#run-the-use-cases-with-an-ai-assistant) explains where to paste them and what each assistant can and cannot do.
+
+> **Data:** this is an opt-in pipeline step with no dataset. The **your own data** prompts target your own project variables, an existing AI Gateway or an existing MCP app.
+
+### AI Factory Agent Chat
+
+Paste into the [AI Factory Agent Chat](../40-aifactory-agent/readme.md) with the **Project** explanation view and your scope selected. It answers from the indexed documentation with citations; the Factory actions panel only prepares a reviewable plan, which a person approves.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Explain the AI Factory MCP and AI Gateway SKU step in usecase_code/40-agent-factory/45-aifactory-mcp-gateway for my scope <project001-dev>: what `enableAIFactoryMCP`, `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU` and `addAIFactoryMCP2APIM` each do, which pipeline step runs them, the Entra app and caller roles, the outbound subnet, and the costs. Cite the documentation and tell me which flags are enabled for my project.
+
+Then, in the Factory actions panel (read-only):
+/get-aifactory-settings
+/get-aifactory-health
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+We already have an AI Gateway <resource id> and want to register the AI Factory MCP on it, and also expose it on our APIM <service name> in <resource group>. Explain, with citations, which variables to set (aiGatewaySkuResourceId, aifactoryMcpEntraAppId, the APIM variables, the outbound subnet), how callers get the AiFactory.Mcp.Read role, and which read-only tools are allowed.
+```
+
+</details>
+
+### GitHub Copilot and Claude Code (one prompt for both)
+
+The same prompt works in **GitHub Copilot** (VS Code Chat in *Agent* mode) and **Claude Code** (run `claude` in the repository root). Use a machine that is signed in to Azure CLI and connected to the AI Factory private network. Both assistants read this repository's `AGENTS.md`.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Plan the AI Factory MCP and AI Gateway SKU step in usecase_code/40-agent-factory/45-aifactory-mcp-gateway for project001 Dev and, after my approval, apply it.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Tell me whether my team normally runs this through the project pipeline (ADO task 71-aifactory-mcp-ai-gateway or the GitHub Actions step). If so, prepare the variable changes as a diff for review instead of running anything locally.
+3. For a local run, set enableAIFactoryMCP=true, enableAIGatewaySKU=true and addAIFactoryMCP2AIGatewaySKU=true plus my project variables in the shell only, never in committed files.
+4. Run `python deploy.py validate` (offline) and `python deploy.py plan` (Azure GET only) and summarize every create, update and unchanged action and any Entra prerequisite.
+5. After my approval, run `python deploy.py apply --apply`, then show the MCP and tool-server URLs from the JSON report.
+6. Remind me that AI Gateway preview pricing applies and that setting a flag to false never deletes anything.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Plan the AI Factory MCP step in usecase_code/40-agent-factory/45-aifactory-mcp-gateway against my existing AI Gateway, APIM and project settings.
+
+First read AGENTS.md, then usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md.
+
+1. Check prerequisites and report anything missing: Python 3.13, Azure CLI with a cached sign-in to my tenant (only if missing, ask me to run `az login --tenant <tenant-id>`), and the AI Factory VPN/private DNS.
+2. Use my values: aiGatewaySkuResourceId <existing gateway id>, aifactoryMcpEntraAppId <app id>, aiGatewaySkuOutboundSubnetId <subnet id, /27 or larger, delegated to Microsoft.Web/serverFarms>, and, for APIM, apimGatewaySubscriptionId <id>, apimGatewayResourceGroup <rg>, apimGatewayServiceName <name>. Show me where each one belongs (pipeline variables or shell environment).
+3. Run `python deploy.py validate` and `python deploy.py plan` and confirm the plan adopts my existing resources instead of creating new ones.
+4. For APIM, run `python deploy.py apim-parameters --output apim-mcp.parameters.json` (GET only) and explain which AI gateway pipeline step consumes it.
+5. Only after my approval, run `python deploy.py apply --apply`.
+
+Rules:
+- Follow AGENTS.md. Use only commands and flags documented in the READMEs above; do not invent new ones.
+- Run offline and read-only steps first. Before any command that writes to Azure (`--apply`, `--execute`, or a script the README says writes directly) or makes a billed model call, show me the exact command and its target and wait for my "yes".
+- Never enable public network access, change networking or RBAC, approve all pending private links at once, edit integrity hashes, or print or store tokens, keys or SAS.
+- Never overwrite an existing configuration file, and never commit configuration, journals, .venv folders or data.
+- If a prerequisite is missing (private network, role, quota, upstream step), stop and tell me the blocker instead of working around it.
+```
+
+</details>
+
+### Lovable
+
+Lovable builds a hosted web front end. It cannot run this Python, sign in to your tenant or reach private AI Factory endpoints, so these prompts build a **prototype** with demo data or data you paste in. Paste only data you are allowed to share with an external service, and connect the prototype to the real result only through an API your platform team approves, never by enabling public access. Paste the **your own data** prompt as a follow-up message in the same Lovable project, after the demo prompt.
+
+<details>
+<summary><b>Demo data</b></summary>
+
+```text
+Build an "AI Factory MCP tool catalog" prototype for agent developers.
+- A list of read-only MCP tools: aifactory_factory_health, aifactory_factory_capabilities, aifactory_factory_skills, each with a description and a "Try it" button that shows a realistic mock JSON response.
+- A status card for the deployment: MCP app (private Container App), AI Gateway tool server, APIM exposure, each with a status badge and a last-updated time.
+- A "How to call it" panel with the steps an agent needs (Entra app role AiFactory.Mcp.Read, AI Gateway Tools User), with no real URLs or secrets.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+<details>
+<summary><b>Your own data</b></summary>
+
+```text
+Build the same "AI Factory MCP tool catalog" prototype, using my own deployment report.
+Here is the JSON report from `deploy.py plan` (it contains no secrets; replace URLs with placeholders if needed): <paste JSON>.
+Render each action as a row (create | update | unchanged) with its resource, and show any Entra prerequisite as a warning card.
+
+Constraints: front end only, no API keys or secrets in the code, and all data is mock or pasted sample data. Put every backend call behind one clearly named function in a single file, returning mock data for now, so it can later call an API my platform team approves.
+```
+
+</details>
+
+## Video walkthrough tutorial - TBA
+
+A video walkthrough tutorial, recorded by a person, will be published here soon. It shows how to run this code, step by step, to achieve the result described in this README.
