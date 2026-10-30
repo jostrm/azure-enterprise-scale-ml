@@ -5543,6 +5543,14 @@ def validate_exact_bootstrap(document):
     dns_rows = dns_permit["proposal"]["resources"] if dns_permit else {}
     require(not set(dns_rows) & set(permit_rows), "dns-soa-permits-must-be-independent")
     carried = {row["proposal"]["source_commit"] for row in (permit, dns_permit) if row}
+    # The commit an identity producer ran on is carried too when no consent was reviewed there (aif-138, 2026-10-30);
+    # it must also be declared as a consent ancestor, so the worker's git ancestry proof covers it.
+    identity_sources = proof.get("identity_sources", [])
+    require(isinstance(identity_sources, list) and identity_sources == sorted(set(identity_sources))
+            and all(isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)
+                    and commit != document["source"]["commit"] for commit in identity_sources)
+            and set(identity_sources) <= set(proof.get("consent_ancestors", [])), "consent-ancestors-invalid")
+    carried |= set(identity_sources)
     require(consent_sources(document) - {document["source"]["commit"]} <= carried, "consent-ancestors-unused")
     require(set(permit_rows) <= set(resources), "reviewed-preservation-resources-missing")
     for group, receipt in groups.items():
