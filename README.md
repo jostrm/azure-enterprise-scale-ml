@@ -76,7 +76,7 @@ The deployed features follow [Microsoft's Well-Architected Framework WAF](https:
     - `Operations`: `Reusing` common artifacts also makes it easier to operate, such as `Centralized Monitoring & Logging`, `Common security` separated from granular `Role Specific Access`.
     - See full [Documentation](./documentation/readme.md) for more info
 - The Azure Factory is designed, with its own compatible TEMPLATES for DataOps, MLOps, GenAIOps ( to avoid the challenges of incompatible security, etc)
-- Each `AI Factory project` can `add or remove +34 Azure services` - e.g. **Not only** the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
+- Each `Factory project` can `add or remove +34 Azure services` - e.g. **Not only** the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
         - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
         - Front-End (UI, Caching)
         - Back-End (Databases)
@@ -224,7 +224,7 @@ TRAINING & INFERENCE pipeline templates types in ESML AIFactory that accelerates
 
 </details>
 
-# Contributing to ESML AIFactory?
+# Contributing to Enterprise Scale Azure Factory?
 This repository is a push-only mirror. Ping Joakim Åström for contributions / ideas. 
 
 Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license) 
