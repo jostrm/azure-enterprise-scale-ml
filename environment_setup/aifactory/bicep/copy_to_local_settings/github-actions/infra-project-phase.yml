@@ -3051,6 +3051,24 @@ jobs:
               --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
               --query properties.outputs.projectLakeAccess.value --output json | tee project-lake-access.json
 
+      # GitHub OIDC client assertions live five minutes and azure/login caches only the ARM token, so a data-plane
+      # token requested long after the job's login fails (AADSTS700024). Log in again right before the data plane.
+      - name: Refresh Azure OIDC login before project lake access
+        if: ${{ inputs.phase == 'infra' && inputs.json_identity_auth }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ inputs.azure_client_id }}
+          tenant-id: ${{ inputs.azure_tenant_id }}
+          subscription-id: ${{ inputs.azure_subscription_id }}
+
+      - name: Refresh Azure OIDC login before project lake access (environment identity)
+        if: ${{ inputs.phase == 'infra' && !inputs.json_identity_auth && env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       - name: 102-project-lake-access
         if: inputs.phase == 'infra' && env.persona_access_mode != 'groups-v1' && env.deleteAllServicesForProject != 'true' && env.debug_disable_101_rbac_common_rg != 'true' && env.debug_disable_61_foundation != 'true' && env.debug_disable_62_core_infrastructure != 'true'
         shell: pwsh
