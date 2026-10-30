@@ -117,20 +117,35 @@ Besides above, optionally, automation exists for
 <details>
 ### Ensure only an existing factory's self-hosted runner
 
-The wizard's `scaling-mode` accepts `own-subscriptions` (`172.16.XX.0/20`, Dev/Stage/Prod `0/16/32`) or `shared-subscriptions` (default: `172.16.XX.0/18`, `0/64/128`). Each environment resolves to a network-aligned, non-overlapping VNet so the address ranges permit peering. Consecutive `61/62/63` works for `/24`, not `/18`. JSON/YAML use `scaling-mode`; environment/pipeline exports use `SCALING_MODE`. Canonical templates use the peerable shared defaults; existing user configurations are not migrated. Preflight rejects overlapping or misaligned ranges. “Up to 8 projects” is an address-budget target, not a deployment guarantee: the aligned-gap allocator's offline fixture fits nine full subnet profiles per `/18`, or two per `/20`, with four early common `/26`s and a final gateway `/27`; other reservations and fragmentation reduce capacity. Changing draft configuration never provisions subscriptions or moves deployed subnets. The separate scale-set CLI accepts a resolved `/20` through `AIF_DEV_VNET_CIDR`, not an `XX` template or a wizard-config import.
+#### Network ranges
 
-**Advanced Mode's integrated VPN** can keep `GatewaySubnet` at the final `/27`.
-`subnetCalc_v2.ps1` now uses aligned free gaps, preserves existing project ranges,
-and fails before emitting parameters if a complete allocation cannot fit.
-Simple Mode retains its early gateway/DNS reservations. MAUI and CLI registered
-Full bootstrap use the same API workflow, whose frozen project projection already
-uses free gaps; it does not execute the old append-only PowerShell path. Both routes
-require the reviewed, pinned source rather than stale consumer/API snapshots. See the
-[topology and runner details](./documentation/gh-io/docs/orchestrators/gh.md).
-Do not silently change an integrated selection to external to bypass a blocker.
+Set `scaling-mode` in the wizard (JSON/YAML: `scaling-mode`; environment/pipeline exports: `SCALING_MODE`):
 
-The isolated `runner` action is available on `ADO-azurefactory.sh`,
-`GHA-azurefactory.sh` and both `*-create-new-aifactory-scaleset.sh` wrappers:
+| Mode | VNet per environment | Dev / Stage / Prod offsets |
+|---|---|---|
+| `own-subscriptions` | `172.16.XX.0/20` | `0` / `16` / `32` |
+| `shared-subscriptions` (default) | `172.16.XX.0/18` | `0` / `64` / `128` |
+
+- Each environment gets an aligned, non-overlapping VNet, so the ranges can be peered. (Consecutive `61/62/63` works for `/24`, not `/18`.)
+- Preflight rejects overlapping or misaligned ranges.
+- Canonical templates use the shared defaults. Existing configurations are not migrated.
+- Changing draft configuration never provisions subscriptions or moves deployed subnets.
+- "Up to 8 projects" is an address-budget target, not a deployment guarantee. In the offline fixture, the allocator fits nine full subnet profiles per `/18` (two per `/20`), next to four early common `/26`s and a final gateway `/27`. Other reservations and fragmentation reduce this.
+- The separate scale-set CLI takes a resolved `/20` via `AIF_DEV_VNET_CIDR`, not an `XX` template or a wizard config.
+
+#### VPN and subnet allocation
+
+- **Advanced Mode** with an integrated VPN can keep `GatewaySubnet` at the final `/27`. **Simple Mode** keeps its early gateway/DNS reservations.
+- `subnetCalc_v2.ps1` allocates from aligned free gaps, keeps existing project ranges, and fails before emitting parameters if the allocation does not fit.
+- MAUI and CLI registered Full bootstrap use the same API workflow (free gaps), not the old append-only PowerShell path.
+- Both routes need the reviewed, pinned source, not stale consumer/API snapshots.
+- Do not switch an integrated selection to external to bypass a blocker.
+
+See the [topology and runner details](./documentation/gh-io/docs/orchestrators/gh.md).
+
+#### Run the isolated `runner` action
+
+Available on `ADO-azurefactory.sh`, `GHA-azurefactory.sh` and both `*-create-new-aifactory-scaleset.sh` wrappers:
 
 ```bash
 bash GHA-azurefactory.sh runner plan --consumer-root "$PWD" \
@@ -140,58 +155,48 @@ bash GHA-azurefactory.sh runner ensure --consumer-root "$PWD" \
   --config-source "$PWD/aifactory/variables.json" --environment dev --repository owner/repo --yes
 ```
 
-Use `runner --help` for all options. `--environment` defaults to **dev**; stage
-uses Azure's `test` naming. Legacy setup requires an exact `--config-source`.
-Schema-2 registered roots additionally require **both** `--factory-id` and
-`--scale-set-id`; their environment, tenant, subscription and orchestrator must
-match. Explicit GHA `--separate-github` setup can use that Azure placement
-without modifying an ADO factory or its frozen provenance. If register
-variables cannot be uniquely selected, supply its exact configuration projection.
-Unknown/ambiguous scopes and malformed files are errors, not an absent request.
+- `runner --help` lists all options.
+- `--environment` defaults to `dev`. Stage uses Azure's `test` naming.
+- Legacy setup requires an exact `--config-source`.
+- Schema-2 registered roots also require **both** `--factory-id` and `--scale-set-id`. Their environment, tenant, subscription and orchestrator must match.
+- GHA `--separate-github` can use that Azure placement without modifying an ADO factory or its frozen provenance.
+- If register variables cannot be uniquely selected, supply the exact configuration projection.
+- Unknown or ambiguous scopes and malformed files are errors, not an absent request.
 
-Applicable `variables.yaml`, `variables.yml`, `variables.json` and `.env`
-files are read as data, never executed. Canonical legacy locations are the
-consumer root, `aifactory`, and
-`aifactory/esml-infra/azure-devops/bicep/yaml/variables`. A nonstandard explicit
-source selects only its containing directory. YAML supports literal mappings
-and `name`/`value` variable lists (including environment sections), not executable
-templates, aliases or variable-group imports. **Any** selected
-`useSelfHostedBuildAgent: true` / `USE_SELF_HOSTED_BUILD_AGENT=true` wins over
-false; invalid values still fail. False/missing produces `skipped-not-requested`
-without cloud calls. Fresh interactive creation still permits explicit runner
-selection, while saved true is honored automatically.
+#### Configuration files
 
-Legacy ADO retains its existing Windows DSVM/agent default. GHA defaults to a
-separate deterministic Linux VM (`runner-gha-<region-short>-<env>-<suffix>`).
-Explicit supported OS/VM choices remain available; scoped registered lifecycle
-runners still require Linux for **both** providers. Missing Windows VMs are
-never replaced with Linux. Existing VMs must match the selected OS, region and
-private subnet; Linux resources must also carry this helper's exact ownership.
-New Linux VMs use Ubuntu 24.04 x64 Gen2, D4s_v5 (4 vCPU/16 GiB), a 128-GiB
-StandardSSD_LRS OS disk, **the factory's existing COMMON RG and subnet**, no
-public IP, no managed identity, and a dedicated deny-all-inbound NIC NSG.
-Optional `--ssh-public-key` supplies an existing public key. Otherwise a
-protected ephemeral key is generated only when creation is needed and discarded;
-guest installation uses managed Run Command, not inbound SSH.
+- `variables.yaml`, `variables.yml`, `variables.json` and `.env` are read as data, never executed.
+- Legacy locations: the consumer root, `aifactory`, and `aifactory/esml-infra/azure-devops/bicep/yaml/variables`. A nonstandard explicit source selects only its containing directory.
+- YAML supports literal mappings and `name`/`value` variable lists (including environment sections). It does not support executable templates, aliases or variable-group imports.
+- If **any** selected file sets `useSelfHostedBuildAgent: true` / `USE_SELF_HOSTED_BUILD_AGENT=true`, true wins. Invalid values still fail.
+- False or missing gives `skipped-not-requested`, with no cloud calls.
+- Fresh interactive creation still allows explicit runner selection. A saved `true` is honored automatically.
 
-`plan` makes cloud reads only and does not claim guest readiness. `ensure`
-requires `--yes`, existing authenticated Azure/ADO/GitHub access, and permissions
-for the exact resources and agent pool/repository. Serialize provisioning of
-these names: ARM PUT is not an atomic create-only API. Every create rechecks
-absence; ownership conflicts, failed/uncertain reads, stopped VMs and busy
-agents block rather than overwrite, restart, replace or delete anything.
-Retries reuse matching resources and verify guest prerequisites/registration.
-`--prereqs-only` performs VM/guest prerequisites without provider registration
-when the repository is not yet known; it never reports an agent ready.
+#### Runner VM
 
-This route never enters full-factory creation, changes config or register
-content, commits/pushes, creates repositories, dispatches projects, installs
-tools on the host, logs in, or changes shared Azure/GitHub defaults. ADO
-authentication uses a deterministic cached subscription in the explicit ADO
-tenant without requesting a PAT. Enrollment remains a separate reviewed
-operation; runner setup does not acknowledge governance or publish bindings.
-Full legacy creation ensures the selected runner after common deployment and
-before self-hosted project execution; `--prepare-only` is not runner readiness.
+- **Default OS**: legacy ADO keeps its Windows DSVM/agent. GHA uses a separate deterministic Linux VM, `runner-gha-<region-short>-<env>-<suffix>`.
+- Other supported OS/VM choices remain available. Scoped registered lifecycle runners require Linux for **both** providers.
+- A missing Windows VM is never replaced with Linux.
+- An existing VM must match the selected OS, region and private subnet. Linux VMs must also carry this helper's exact ownership.
+- **New Linux VMs**: Ubuntu 24.04 x64 Gen2, D4s_v5 (4 vCPU/16 GiB), 128-GiB StandardSSD_LRS OS disk, in **the factory's existing COMMON RG and subnet**. No public IP, no managed identity, and a dedicated deny-all-inbound NIC NSG.
+- **SSH key**: pass an existing public key with `--ssh-public-key`. Otherwise a protected ephemeral key is generated only when creation is needed, then discarded. Guest installation uses managed Run Command, not inbound SSH.
+
+#### `plan` vs `ensure`
+
+- `plan` only reads from the cloud. It does not claim guest readiness.
+- `ensure` needs `--yes`, existing authenticated Azure/ADO/GitHub access, and permissions for the exact resources and agent pool/repository.
+- Serialize provisioning of these names: ARM PUT is not an atomic create-only API. Every create rechecks absence.
+- Ownership conflicts, failed/uncertain reads, stopped VMs and busy agents block. Nothing is overwritten, restarted, replaced or deleted.
+- Retries reuse matching resources and verify guest prerequisites and registration.
+- `--prereqs-only` sets up the VM and guest prerequisites without provider registration (for when the repository is not yet known). It never reports an agent ready.
+
+#### What this route does not do
+
+It never enters full-factory creation, changes config or register content, commits/pushes, creates repositories, dispatches projects, installs tools on the host, logs in, or changes shared Azure/GitHub defaults.
+
+- ADO authentication uses a deterministic cached subscription in the explicit ADO tenant, without requesting a PAT.
+- Enrollment is a separate reviewed operation. Runner setup does not acknowledge governance or publish bindings.
+- Full legacy creation ensures the selected runner after common deployment and before self-hosted project execution. `--prepare-only` is not runner readiness.
 
 ## AI factory *AI Application Landingzones*: CONCEPTS & DESIGN: Differentiators? 
 - The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called `AI Factory project`.
