@@ -5270,6 +5270,22 @@ def source_lineage(document):
     return consent_sources(document)
 
 
+def secret_expiry_after(prepared_at):
+    """keyVaultSecretExpiry as the app freezes it (accelerator 1c7941ad): epoch seconds one year after the review time,
+    29 February moving to 28 February; None when the time is not exact."""
+    try:
+        moment = datetime.fromisoformat(str(prepared_at).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    try:
+        later = moment.replace(year=moment.year + 1)
+    except ValueError:
+        later = moment.replace(year=moment.year + 1, day=28)
+    return int(later.timestamp())
+
+
 def receipt_bound_document(document, receipt, route_commit=None):
     """The document as the receipt's own published commit saw it, so an identity produced on a carried ancestor
     keeps its binding across a published fast-forward (aif-138, 2026-10-29); a foreign commit changes nothing.
@@ -5284,6 +5300,20 @@ def receipt_bound_document(document, receipt, route_commit=None):
     if (isinstance(route_commit, str) and re.fullmatch(r"[0-9a-f]{40}", route_commit)
             and route_commit != document["route"].get("commit")):
         bound = {**bound, "route": {**bound["route"], "commit": route_commit}}
+    # keyVaultSecretExpiry is one year after the review's own time, so the continuation's differs from the producer's
+    # (aif-138, 2026-10-30); the producer's is rebuilt from the receipt's producer_prepared_at, and the receipt's
+    # binding hash proves it. Only the value that is exactly one year after this review's time is rebound.
+    proof = receipt.get("foundry_identity_receipt") if isinstance(receipt, dict) else None
+    produced = secret_expiry_after(proof.get("producer_prepared_at")) if isinstance(proof, dict) else None
+    current = secret_expiry_after(document.get("prepared_at"))
+    steps = document.get("deployment", {}).get("steps")
+    if produced is not None and current is not None and produced != current and isinstance(steps, list):
+        rebound = copy.deepcopy(steps)
+        for step in rebound:
+            parameters = step.get("parameters") if isinstance(step, dict) else None
+            if isinstance(parameters, dict) and parameters.get("keyVaultSecretExpiry") == current:
+                parameters["keyVaultSecretExpiry"] = produced
+        bound = {**bound, "deployment": {**bound["deployment"], "steps": rebound}}
     return bound
 
 
@@ -5291,8 +5321,12 @@ def foundry_producer_document(document):
     """The document as the identity producer's request saw it, from the commits its continuation records."""
     bound = document.get("deployment", {}).get("foundry_identity_continuation")
     producer = bound.get("producer", {}) if isinstance(bound, dict) and isinstance(bound.get("producer", {}), dict) else {}
-    return receipt_bound_document(document, {"source_commit": producer.get("source_commit")},
-                                  producer.get("route_commit"))
+    proof = bound.get("proof") if isinstance(bound, dict) else None
+    return receipt_bound_document(
+        document, {"source_commit": producer.get("source_commit"),
+                   "foundry_identity_receipt": {"producer_prepared_at": proof.get("producer_prepared_at")
+                                                if isinstance(proof, dict) else None}},
+        producer.get("route_commit"))
 
 
 def verify_consent_ancestors(cloud, root, source):
