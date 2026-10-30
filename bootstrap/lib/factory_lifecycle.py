@@ -3353,8 +3353,7 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
         resources = {**resources, **unchanged_resources}
     identity = document.get("deployment", {}).get("foundry_identity_continuation", {}).get("proof")
     if identity:
-        require(identity.get("binding_hash") == foundry_identity_context(foundry_producer_document(document))
-                and hash_value(identity.get("body_hash")), "native-foundry-identity-proof-invalid")
+        require(hash_value(identity.get("body_hash")), "native-foundry-identity-proof-invalid")
         resources = {**resources, identity["resource_id"]: {"body_hash": identity["body_hash"]}}
     changes = arm_changes(response, resources)
     raw_changes = response.get("properties", response)["changes"]
@@ -3472,12 +3471,12 @@ def foundry_identity_preparation(cloud, document, known_ownership):
         require(isinstance(receipt, dict) and digest(receipt) == evidence["receipt_hash"],
                 "native-foundry-identity-receipt-hash-mismatch")
         proof = receipt.get("foundry_identity_receipt")
-        bound = receipt_bound_document(document, receipt, evidence.get("route_commit"))
-        if not isinstance(proof, dict) or proof.get("request_hash") != foundry_identity_request_context(bound):
+        if not isinstance(proof, dict):
             continue
+        drift = foundry_binding_drift(document, receipt, evidence.get("route_commit"))
         require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
                 and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
-                and receipt.get("target") == document["target"] and receipt.get("source_commit") in source_lineage(document)
+                and receipt.get("target") == document["target"]
                 and receipt.get("run_id") == evidence["run_id"] == proof.get("producer_run_id")
                 and receipt.get("manifest_hash") == proof.get("producer_manifest_hash")
                 and hash_value(receipt.get("manifest_hash")) and hash_value(proof.get("binding_hash"))
@@ -3491,8 +3490,8 @@ def foundry_identity_preparation(cloud, document, known_ownership):
         require(receipt["run_id"] != document["run_id"]
                 and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at")) and age >= 0,
                 "native-foundry-identity-receipt-stale-or-replayed")
-        if age > RECEIPT_OBSERVATION_AGE_SECONDS:
-            revalidate_foundry_identity_receipt(cloud, document, proof)
+        if age > RECEIPT_OBSERVATION_AGE_SECONDS or drift:
+            revalidate_foundry_identity_receipt(cloud, document, proof, drift)
         status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
         require(status == 200 and str(body.get("id", "")).lower() == identifier
                 and foundry_uami_metadata(document, body) == proof.get("identity")
@@ -3705,7 +3704,7 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
     return True
 
 
-def verify_foundry_identity_receipt_effects(document, receipt):
+def verify_foundry_identity_receipt_effects(document, receipt, lineage=True):
     """Check the minimal receipt footprint; context, provenance and freshness require separate verification."""
     require(isinstance(receipt, dict) and isinstance(receipt.get("foundry_identity_receipt"), dict)
             and set(receipt) <= {
@@ -3717,7 +3716,7 @@ def verify_foundry_identity_receipt_effects(document, receipt):
     proof = receipt.get("foundry_identity_receipt", {})
     require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
             and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
-            and receipt.get("source_commit") in source_lineage(document)
+            and (not lineage or receipt.get("source_commit") in source_lineage(document))
             and receipt.get("target") == document["target"]
             and guid(receipt.get("run_id")) and hash_value(receipt.get("manifest_hash"))
             and proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
@@ -3789,7 +3788,21 @@ REVALIDATION_FIELDS = ("resource_id", "principal_id", "client_id", "tenant_id", 
                        "resource_group_tags")
 
 
-def revalidate_foundry_identity_receipt(cloud, document, proof):
+def foundry_binding_drift(document, receipt, route_commit=None):
+    """Which of the producer's request/binding hashes the review no longer reproduces. aif-138, 2026-10-30: a repin,
+    another review time or another published commit changed inputs the hashes cover (route commit, secret expiry,
+    lineage), none of which changes the identity the receipt names. A difference is therefore recorded as a warning in
+    the continuation and the live identity check below decides; it never blocks by itself."""
+    proof = receipt["foundry_identity_receipt"]
+    produced = receipt_bound_document(document, receipt, route_commit)
+    # The recovery of run inputs runs before the plan has steps: only the request hash exists then.
+    checks = [("request_hash", foundry_identity_request_context(produced))]
+    if isinstance(produced.get("deployment", {}).get("steps"), list):
+        checks.append(("binding_hash", foundry_identity_context(produced)))
+    return [name for name, expected in checks if proof.get(name) != expected]
+
+
+def revalidate_foundry_identity_receipt(cloud, document, proof, drift=None):
     """A receipt past its freshness window stays usable while the identity it names is unchanged right now (aif-138,
     2026-10-30: the producer ran the day before the continuation could): same resource id, principal, client and
     tenant, same body, in the same group with the planned tags. The refusal names the field that differs. The
@@ -3819,24 +3832,22 @@ def revalidate_foundry_identity_receipt(cloud, document, proof):
     if any(tags.get(key) != value for key, value in planned.items()):
         differs("resource_group_tags")
     return {"receipt_observed_at": proof["observed_at"], "review_prepared_at": document["prepared_at"],
-            "compared": list(REVALIDATION_FIELDS)}
+            "compared": list(REVALIDATION_FIELDS), **({"drift": list(drift)} if drift else {})}
 
 
 def verify_foundry_identity_receipt(document, receipt, *, continuation=False, cloud=None, route_commit=None):
-    verify_foundry_identity_receipt_effects(document, receipt)
+    verify_foundry_identity_receipt_effects(document, receipt, lineage=not continuation)
     proof = receipt["foundry_identity_receipt"]
-    bound = receipt_bound_document(document, receipt, route_commit)
-    require(proof["binding_hash"] == foundry_identity_context(bound)
-            and proof["request_hash"] == foundry_identity_request_context(bound),
-            "native-foundry-identity-receipt-invalid")
+    drift = foundry_binding_drift(document, receipt, route_commit)
+    require(continuation or not drift, "native-foundry-identity-receipt-invalid")
     at = timestamp(proof["observed_at"])
     if continuation:
         age = timestamp(document["prepared_at"]) - at
-        require(receipt["run_id"] != document["run_id"] and age >= 0
-                and (age <= RECEIPT_OBSERVATION_AGE_SECONDS or cloud is not None),
+        stale = age > RECEIPT_OBSERVATION_AGE_SECONDS
+        require(receipt["run_id"] != document["run_id"] and age >= 0 and (not (stale or drift) or cloud is not None),
                 "native-foundry-identity-receipt-stale-or-replayed")
-        if age > RECEIPT_OBSERVATION_AGE_SECONDS:
-            return revalidate_foundry_identity_receipt(cloud, document, proof)
+        if stale or drift:
+            return revalidate_foundry_identity_receipt(cloud, document, proof, drift)
     else:
         validate_foundry_identity_stage(document)
         stage = document["deployment"]["foundry_identity_stage"]
@@ -3965,9 +3976,10 @@ def validate_foundry_identity_continuation(document):
     require(isinstance(producer, dict) and set(producer) <= {"source_commit", "route_commit"},
             "native-foundry-identity-continuation-invalid")
     produced = foundry_producer_document(document)
+    drift = [name for name, expected in (("request_hash", foundry_identity_request_context(produced)),
+                                         ("binding_hash", foundry_identity_context(produced)))
+             if proof.get(name) != expected]
     require(proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
-            and proof.get("binding_hash") == foundry_identity_context(produced)
-            and proof.get("request_hash") == foundry_identity_request_context(produced)
             and proof.get("producer_run_id") == bound["run_id"]
             and hash_value(proof.get("producer_manifest_hash")) and hash_value(proof.get("payload_hash"))
             and hash_value(proof.get("body_hash"))
@@ -3984,10 +3996,10 @@ def validate_foundry_identity_continuation(document):
             and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at"))
             and timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) >= 0
             and bound.get("revalidation") == (
-                None if timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at"))
+                None if not drift and timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at"))
                 <= RECEIPT_OBSERVATION_AGE_SECONDS else
                 {"receipt_observed_at": proof["observed_at"], "review_prepared_at": document["prepared_at"],
-                 "compared": list(REVALIDATION_FIELDS)}),
+                 "compared": list(REVALIDATION_FIELDS), **({"drift": drift} if drift else {})}),
             "native-foundry-identity-continuation-binding-mismatch")
 
 
@@ -4021,8 +4033,6 @@ def bind_foundry_identity_template(cloud, document, step, source_root, template)
     validate_foundry_identity_continuation(document)
     require("template_spec_id" not in step, "native-foundry-identity-template-spec-unsupported")
     proof = continuation.get("proof", {})
-    require(proof.get("binding_hash") == foundry_identity_context(foundry_producer_document(document)),
-            "native-foundry-identity-continuation-binding-mismatch")
     identity = proof.get("identity", {})
     require(all(foundry_identity_guid(identity.get(key)) for key in ("principal_id", "client_id", "tenant_id"))
             and identity["tenant_id"] == document["target"]["tenant_id"].lower(),

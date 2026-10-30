@@ -624,8 +624,9 @@ def test_identity_preparation_reuses_only_receipt_bound_original_run_inputs(monk
                       "prepared_at": receipt["foundry_identity_receipt"]["producer_prepared_at"]}
     assert result["run_id"] != following["run_id"]
     assert "deployment" not in following
+    # A changed config only changes what the receipt's hashes cover: the recovery warns (drift) and the live identity decides.
     following["config"]["changed"] = True
-    assert fl.foundry_identity_preparation(cloud, following, known) is None
+    assert fl.foundry_identity_preparation(cloud, following, known)["run_id"] == receipt["run_id"]
     assert len(cloud.arm_writes) == 1
 
 
@@ -652,7 +653,7 @@ def test_identity_preparation_rejects_untrusted_or_replayed_seed(monkeypatch, de
     assert len(cloud.arm_writes) == 1
 
 
-@pytest.mark.parametrize("defect", ["same-run", "config", "source", "tenant", "scope", "future", "principal",
+@pytest.mark.parametrize("defect", ["same-run", "tenant", "future", "principal",
                                   "body", "receipt-hash", "missing-receipt"])
 def test_identity_continuation_rejects_replay_drift_and_unbound_success(monkeypatch, defect):
     document, cloud, _, receipt = completed_identity(monkeypatch)
@@ -2087,11 +2088,13 @@ def test_identity_continuation_accepts_the_receipt_from_a_carried_published_ance
     known = document["deployment"]["known_ownership"]
     assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
     fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
-    # A commit the plan does not carry as an ancestor still fails closed.
+    # A commit the plan does not carry as an ancestor is drift: a warning, the live identity decides (Joakim, 2026-10-30).
     document["deployment"]["bootstrap_foundation"]["consent_ancestors"] = ["d" * 40]
-    with pytest.raises(fl.Blocked):
+    record = fl.verify_foundry_identity_receipt(document, receipt, continuation=True, cloud=cloud)
+    assert set(record["drift"]) <= {"request_hash", "binding_hash"} and record["drift"]
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    with pytest.raises(fl.Blocked, match="stale-or-replayed"):
         fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
-    assert fl.foundry_identity_preparation(cloud, document, known) is None
 
 
 def test_identity_preview_without_an_identity_row_names_the_rows_it_did_list(monkeypatch):
@@ -2196,11 +2199,11 @@ def repinned_identity(monkeypatch):
     return document, cloud, receipt, document["deployment"]["known_ownership"], produced
 
 
-def test_repinned_consumer_without_the_producers_route_commit_is_not_recovered(monkeypatch):
+def test_repinned_consumer_without_the_producers_route_commit_is_recovered_with_a_drift_warning(monkeypatch):
     document, cloud, receipt, known, _ = repinned_identity(monkeypatch)
-    assert fl.foundry_identity_preparation(cloud, document, known) is None
-    with pytest.raises(fl.Blocked, match="^native-foundry-identity-receipt-invalid$"):
-        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert document["deployment"]["foundry_identity_continuation"]["revalidation"]["drift"]
 
 
 def test_repinned_consumer_keeps_the_receipt_when_its_hash_proves_the_producers_route_commit(monkeypatch):
@@ -2215,12 +2218,12 @@ def test_repinned_consumer_keeps_the_receipt_when_its_hash_proves_the_producers_
 
 
 @pytest.mark.parametrize("claimed", ["f" * 40, "not-a-commit", 7])
-def test_a_route_commit_the_receipt_does_not_prove_never_recovers_the_identity(monkeypatch, claimed):
+def test_a_route_commit_the_receipt_does_not_prove_is_only_drift(monkeypatch, claimed):
     document, cloud, receipt, known, _ = repinned_identity(monkeypatch)
     known[UAMI]["route_commit"] = claimed
-    assert fl.foundry_identity_preparation(cloud, document, known) is None
-    with pytest.raises(fl.Blocked):
-        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert document["deployment"]["foundry_identity_continuation"]["revalidation"]["drift"]
 
 
 def test_the_recorded_producer_route_commit_cannot_be_swapped_after_review(monkeypatch):
@@ -2302,5 +2305,54 @@ def test_continuation_binds_to_the_producers_secret_expiry_not_its_own_review_ti
 def test_a_secret_expiry_that_is_neither_the_reviews_nor_the_producers_is_not_rebound(monkeypatch):
     document, cloud, receipt, step = producer_with_secret_expiry(monkeypatch)
     step["parameters"]["keyVaultSecretExpiry"] = 1893456000
-    with pytest.raises(fl.Blocked, match="^native-foundry-identity-receipt-invalid$"):
+    # Neither value: the receipt's hashes drift, which warns (Joakim, 2026-10-30), and the live identity decides.
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    assert document["deployment"]["foundry_identity_continuation"]["revalidation"]["drift"]
+
+
+@pytest.mark.parametrize("change", ["config", "source", "route", "steps"])
+def test_receipt_hash_drift_only_warns_and_the_live_identity_decides(monkeypatch, change):
+    """aif-138, 2026-10-30 (Joakim: hash comparisons warn, they never block): whatever the hashes cover changes between
+    the producer and its continuation (config, published commit, consumer pin, a step parameter such as the secret
+    expiry); the identity is the same live resource, so the continuation records the drift and proceeds."""
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    if change == "config":
+        document["config"]["extra"] = "different"
+    elif change == "source":
+        document["source"]["commit"] = "b" * 40
+    elif change == "route":
+        document["route"]["commit"] = "e" * 40
+    else:
+        document["deployment"]["steps"][1]["parameters"]["keyVaultSecretExpiry"] = 1893456000
+    known = document["deployment"]["known_ownership"]
+    assert fl.foundry_identity_preparation(cloud, document, known)["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    revalidation = document["deployment"]["foundry_identity_continuation"]["revalidation"]
+    assert revalidation["drift"] and set(revalidation["drift"]) <= {"request_hash", "binding_hash"}
+    fl.validate_foundry_identity_continuation(document)
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+
+
+@pytest.mark.parametrize("defect", ["principal", "body", "tenant"])
+def test_receipt_hash_drift_with_a_changed_live_identity_still_refuses(monkeypatch, defect):
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    document["config"]["extra"] = "different"
+    if defect == "principal":
+        cloud.bodies[UAMI]["properties"]["principalId"] = str(uuid.uuid4())
+    elif defect == "body":
+        cloud.bodies[UAMI]["etag"] = '"changed"'
+    elif defect == "tenant":
+        cloud.bodies[UAMI]["properties"]["tenantId"] = str(uuid.uuid4())
+    else:
+        cloud.bodies.pop(UAMI)
+    with pytest.raises(fl.Blocked, match="revalidation-mismatch|receipt-instance-changed|agent-tenant"):
         fl.freeze_foundry_identity_stage(cloud, document, ROOT)
+
+
+def test_the_recorded_drift_cannot_be_hidden_after_review(monkeypatch):
+    document, cloud, _, _ = completed_identity(monkeypatch)
+    document["config"]["extra"] = "different"
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    document["deployment"]["foundry_identity_continuation"].pop("revalidation")
+    with pytest.raises(fl.Blocked):
+        fl.validate_foundry_identity_continuation(document)
