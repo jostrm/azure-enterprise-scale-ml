@@ -1242,6 +1242,10 @@ def test_search_read_denial_is_not_absence(runtime, runner, monkeypatch, error):
     'ERROR: {"error":{"code":"ResourceNotFound"},"statusCode":404}',
     "(ResourceNotFound) Missing.",
     "ERROR: (ResourceNotFound) Missing.\nCode: ResourceNotFound",
+    # az rest wraps the ARM body in the HTTP reason (aif-138 first project deploy, 2026-10-30).
+    'ERROR: Not Found({"error":{"code":"ResourceNotFound","message":"The Resource '
+    "'Microsoft.Search/searchServices/aisearchprj001' under resource group 'rg' was not found. For more details "
+    'please go to https://aka.ms/ARMResourceNotFoundFix"}})',
 ])
 def test_search_read_accepts_only_complete_explicit_not_found(runner, monkeypatch, error):
     monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
@@ -2129,3 +2133,26 @@ def test_compiled_batch_conditions_and_actual_pipeline_arguments_prevent_duplica
         found = [deployment for deployment in deployments(load_pipeline(pipeline)) if deployment.module == old]
         assert len(found) == 1
         assert found[0].parameters[disable] == "false"
+
+
+def test_an_empty_search_location_falls_back_to_the_factory_location(runner):
+    # The workflows always set aiSearchLocation (empty when unset): empty means "the factory location".
+    environment = {"AISEARCHLOCATION": "", "AI_SEARCH_LOCATION": "", "ADMIN_LOCATION": "swedencentral"}
+    assert runner.env_location(environment, "aiSearchLocation", "AI_SEARCH_LOCATION", "admin_location") == "swedencentral"
+    assert runner.env_location({"AISEARCHLOCATION": "francecentral", "ADMIN_LOCATION": "swedencentral"},
+                               "aiSearchLocation", "admin_location") == "francecentral"
+    assert runner.env_location({"AISEARCHLOCATION": " "}, "aiSearchLocation") is None
+
+
+def test_the_region_gate_publishes_with_an_empty_search_location(runner, monkeypatch):
+    for name in list(os.environ):
+        if name.upper() in ("AISEARCHLOCATION", "AI_SEARCH_LOCATION", "ADMIN_LOCATION", "LOCATION"):
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("dev_test_prod", "dev")
+    monkeypatch.setenv("aiSearchLocation", "")
+    monkeypatch.setenv("admin_location", "swedencentral")
+    published = []
+    monkeypatch.setattr(runner, "publish", lambda provider, name, value: published.append(name))
+    monkeypatch.setattr(sys, "argv", ["deploy-capacity-resource.py", "--publish-search-region-gate", "--provider", "github"])
+    assert runner.main() == 0
+    assert "AIF_AISEARCH_REGION_FALLBACK_ENABLED" in published

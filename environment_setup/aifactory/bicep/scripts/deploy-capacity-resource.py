@@ -172,6 +172,15 @@ def env_value(environment: Mapping[str, str], *names: str) -> str | None:
     return None
 
 
+def env_location(environment: Mapping[str, str], *names: str) -> str | None:
+    """The first non-empty location: the workflows always set aiSearchLocation, empty meaning the factory location."""
+    for name in names:
+        value = env_value(environment, name)
+        if value is not None and value.strip():
+            return value
+    return None
+
+
 def retry_enabled(value: str) -> bool:
     normalized = value.strip().lower()
     if normalized in ("true", "1", "yes"):
@@ -446,8 +455,13 @@ def search_identity(args: argparse.Namespace, az: str, parameters: dict) -> str:
 def resource_not_found(message: str) -> bool:
     text = message.strip()
 
+    body = re.sub(r"^ERROR:\s*", "", text)
+    # az rest wraps the ARM error body in the HTTP reason: ERROR: Not Found({"error": {...}}).
+    wrapped = re.fullmatch(r"[A-Z][A-Za-z ]{1,40}\((\{.*\})\)", body, flags=re.DOTALL)
+    if wrapped:
+        body = wrapped[1]
     try:
-        payload = json.loads(re.sub(r"^ERROR:\s*", "", text), object_pairs_hook=unique_error_object,
+        payload = json.loads(body, object_pairs_hook=unique_error_object,
                              parse_constant=invalid_error_constant)
     except json.JSONDecodeError:
         # Never recover a code fragment from a truncated or mixed JSON response.
@@ -683,7 +697,7 @@ def run_attempt(args: argparse.Namespace) -> int:
     regional = getattr(args, "search_region_fallback", False)
     if args.service == "ai-search":
         regions = search_regions_from_environment(environment)
-        primary = normalize_search_location(env_value(environment, "aiSearchLocation", "AI_SEARCH_LOCATION") or args.location)
+        primary = normalize_search_location(env_location(environment, "aiSearchLocation", "AI_SEARCH_LOCATION") or args.location)
         regions = [region for region in regions if region != primary]
     if regional and (args.service != "ai-search" or args.attempt != 1 or not regions
                      or env_value(environment, service.state) != SEARCH_PENDING):
@@ -814,7 +828,7 @@ def main() -> int:
         args = parser.parse_args()
         try:
             regions = search_regions_from_environment({name.upper(): value for name, value in os.environ.items()})
-            primary = normalize_search_location(env_value(
+            primary = normalize_search_location(env_location(
                 {name.upper(): value for name, value in os.environ.items()}, "aiSearchLocation", "AI_SEARCH_LOCATION",
                 "admin_location", "location") or "")
             regions = [region for region in regions if region != primary]
