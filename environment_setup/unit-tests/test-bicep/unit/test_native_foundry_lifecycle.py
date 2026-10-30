@@ -2262,3 +2262,45 @@ def test_repinned_identity_continuation_runs_the_whole_worker(monkeypatch):
     assert receipt["status"] == "succeeded", json.dumps(receipt)
     assert receipt["foundry_identity_continuation"]["run_id"] == producer["run_id"]
     fl.verify_worker_receipt(locks, document)
+
+
+def producer_with_secret_expiry(monkeypatch):
+    """Pink freezes keyVaultSecretExpiry as one year after the review time (accelerator 1c7941ad), so the continuation's
+    step parameter differs from the producer's: give the producer's binding the parameter its own review time implies."""
+    document, cloud, _, receipt = completed_identity(monkeypatch)
+    step = document["deployment"]["steps"][1]
+    produced = receipt["foundry_identity_receipt"]["producer_prepared_at"]
+    step["parameters"]["keyVaultSecretExpiry"] = fl.secret_expiry_after(produced)
+    receipt["foundry_identity_receipt"]["binding_hash"] = fl.foundry_identity_context(document)
+    cloud.runs["runs/" + receipt["run_id"] + ".worker.json"] = copy.deepcopy(receipt)
+    document["deployment"]["known_ownership"][UAMI]["receipt_hash"] = fl.digest(receipt)
+    step["parameters"]["keyVaultSecretExpiry"] = fl.secret_expiry_after(document["prepared_at"])
+    return document, cloud, receipt, step
+
+
+def test_secret_expiry_is_one_year_after_the_review_time():
+    assert fl.secret_expiry_after("2026-10-29T09:43:11.776265+00:00") == int(
+        datetime.fromisoformat("2027-10-29T09:43:11+00:00").timestamp())
+    assert fl.secret_expiry_after("2028-02-29T00:00:00+00:00") == int(
+        datetime.fromisoformat("2029-02-28T00:00:00+00:00").timestamp())
+    assert fl.secret_expiry_after("not a time") is None
+
+
+def test_continuation_binds_to_the_producers_secret_expiry_not_its_own_review_time(monkeypatch):
+    """aif-138, 2026-10-30: the continuation's keyVaultSecretExpiry is one year after its own review time; the producer's
+    receipt binds the one year after the producer's, which the receipt's producer_prepared_at proves."""
+    document, cloud, receipt, step = producer_with_secret_expiry(monkeypatch)
+    assert step["parameters"]["keyVaultSecretExpiry"] != fl.secret_expiry_after(
+        receipt["foundry_identity_receipt"]["producer_prepared_at"])
+    assert fl.foundry_identity_preparation(cloud, document, document["deployment"]["known_ownership"])["run_id"] == receipt["run_id"]
+    assert fl.freeze_foundry_identity_stage(cloud, document, ROOT) is False
+    fl.validate_foundry_identity_continuation(document)
+    fl.verify_foundry_identity_receipt(document, receipt, continuation=True)
+    assert step["parameters"]["keyVaultSecretExpiry"] == fl.secret_expiry_after(document["prepared_at"])
+
+
+def test_a_secret_expiry_that_is_neither_the_reviews_nor_the_producers_is_not_rebound(monkeypatch):
+    document, cloud, receipt, step = producer_with_secret_expiry(monkeypatch)
+    step["parameters"]["keyVaultSecretExpiry"] = 1893456000
+    with pytest.raises(fl.Blocked, match="^native-foundry-identity-receipt-invalid$"):
+        fl.freeze_foundry_identity_stage(cloud, document, ROOT)
