@@ -2084,3 +2084,21 @@ def test_ancestors_are_nothing_without_a_carried_consent():
     move_to_later_push(document)
     with pytest.raises(fl.Blocked, match="consent-ancestors-unused"):
         fl.validate_exact_bootstrap(document)
+
+def test_identity_producer_commit_is_a_declared_carried_source_without_any_permit():
+    """aif-138 (2026-10-30): the identity was produced on a published ancestor that no consent was reviewed at; the
+    registered handoff declares it so the continuation's lineage (and the git ancestry proof) covers it."""
+    document = exact_document(ClosureCloud())
+    produced = move_to_later_push(document)
+    document["deployment"]["bootstrap_foundation"]["identity_sources"] = [produced]
+    fl.validate_exact_bootstrap(document)
+    assert fl.source_lineage(document) == {LATER, produced}
+
+
+@pytest.mark.parametrize("sources", [["8" * 40], [LATER], ["A" * 40], "x", [None]])
+def test_declared_identity_sources_must_be_carried_published_ancestors(sources):
+    document = exact_document(ClosureCloud())
+    produced = move_to_later_push(document)
+    document["deployment"]["bootstrap_foundation"]["identity_sources"] = sources
+    with pytest.raises(fl.Blocked, match="consent-ancestors-(invalid|unused)"):
+        fl.validate_exact_bootstrap(document)
