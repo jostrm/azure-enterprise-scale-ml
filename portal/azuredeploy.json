@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "1414656482592177963"
+      "templateHash": "13101991752018766718"
     }
   },
   "functions": [
@@ -26,7 +26,7 @@
           ],
           "output": {
             "type": "string",
-            "value": "[replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(parameters('text'), '__P_location__', parameters('t').location), '__P_locationShort__', parameters('t').locationShort), '__P_prefix__', parameters('t').prefix), '__P_prefixBare__', parameters('t').prefixBare), '__P_scalesetNumber__', parameters('t').scalesetNumber), '__P_subscriptionId__', parameters('t').subscriptionId), '__P_tenantId__', parameters('t').tenantId), '__P_teamGroupObjectId__', parameters('t').teamGroupObjectId), '__P_teamGroupName__', parameters('t').teamGroupName), '__P_teamMemberEmail__', parameters('t').teamMemberEmail), '__P_costCenter__', parameters('t').costCenter), '__P_seedingKeyVaultName__', parameters('t').seedingKeyVaultName), '__P_bootstrapResourceGroup__', parameters('t').bootstrapResourceGroup), '__P_commonResourceGroup__', parameters('t').commonResourceGroup), '__P_searchLocation__', parameters('t').searchLocation), '__P_deploymentRandom__', parameters('t').deploymentRandom)]"
+            "value": "[replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(parameters('text'), '__P_location__', parameters('t').location), '__P_locationShort__', parameters('t').locationShort), '__P_prefix__', parameters('t').prefix), '__P_prefixBare__', parameters('t').prefixBare), '__P_scalesetNumber__', parameters('t').scalesetNumber), '__P_subscriptionId__', parameters('t').subscriptionId), '__P_tenantId__', parameters('t').tenantId), '__P_teamGroupObjectId__', parameters('t').teamGroupObjectId), '__P_teamGroupName__', parameters('t').teamGroupName), '__P_teamMemberEmail__', parameters('t').teamMemberEmail), '__P_costCenter__', parameters('t').costCenter), '__P_seedingKeyVaultName__', parameters('t').seedingKeyVaultName), '__P_bootstrapResourceGroup__', parameters('t').bootstrapResourceGroup), '__P_commonResourceGroup__', parameters('t').commonResourceGroup), '__P_searchLocation__', parameters('t').searchLocation), '__P_deploymentRandom__', parameters('t').deploymentRandom), '__P_ipAllowList__', parameters('t').ipAllowList)]"
           }
         },
         "stageParameters": {
@@ -250,6 +250,25 @@
         "description": "Redeploy only: the common VNet exists, so skip 12-networkCommon. Its VNet PUT would delete the subnets added later."
       }
     },
+    "networkMode": {
+      "type": "string",
+      "defaultValue": "private",
+      "allowedValues": [
+        "private",
+        "hybrid",
+        "public"
+      ],
+      "metadata": {
+        "description": "Networking mode (variables.json): private, hybrid (public UI for the IP allow list, private backend) or public (public UI for all, private backend)."
+      }
+    },
+    "ipAllowList": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Hybrid only: comma-separated IPv4 addresses or CIDR ranges (project_IP_whitelist)."
+      }
+    },
     "enableBastion": {
       "type": "bool",
       "defaultValue": true,
@@ -333,7 +352,8 @@
         "commonResourceGroup",
         "searchLocation",
         "deploymentRandom",
-        "prefixBare"
+        "prefixBare",
+        "ipAllowList"
       ],
       "network": {
         "vnetCidr": "172.16.0.0/20",
@@ -585,6 +605,32 @@
             ],
             "label": "Storage redundancy (Dev)",
             "default": "Standard_LRS"
+          }
+        },
+        "network": {
+          "modes": {
+            "private": {
+              "publicUi": false,
+              "publicPerimeter": false
+            },
+            "hybrid": {
+              "publicUi": true,
+              "publicPerimeter": false
+            },
+            "public": {
+              "publicUi": true,
+              "publicPerimeter": true
+            }
+          },
+          "default": "private",
+          "switches": {
+            "publicUi": [
+              "enablePublicGenAIAccess",
+              "allowPublicAccessWhenBehindVnet"
+            ],
+            "publicPerimeter": [
+              "enablePublicAccessWithPerimeter"
+            ]
           }
         },
         "maxRequiresDepth": 2
@@ -862,7 +908,6 @@
             "enableAdminVM": false,
             "enableDatafactoryCommon": false,
             "enableEncryptionAtHost": true,
-            "enablePublicAccessWithPerimeter": false,
             "enableVmBackup": false,
             "env": "dev",
             "hybridBenefit": true,
@@ -1035,7 +1080,12 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "always",
-          "toggled": {},
+          "toggled": {
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "hub-private-dns": {
@@ -1491,7 +1541,6 @@
             "commonResourceSuffix": "-001",
             "datalakeName_param": "",
             "enableLogicApps": false,
-            "enablePublicAccessWithPerimeter": false,
             "env": "dev",
             "kvNameFromCOMMON_param": "",
             "logicAppType": "Standard",
@@ -1623,7 +1672,12 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "always",
-          "toggled": {},
+          "toggled": {
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "project-01-foundation": {
@@ -1640,7 +1694,6 @@
             "DEBUG_admin_prjResourceSuffix": "-001",
             "DEBUG_admin_projectType": "all",
             "DEBUG_aifactory_salt": "<5>",
-            "DEBUG_allowPublicAccessWhenBehindVnet": false,
             "DEBUG_aseSku": "IsolatedV2",
             "DEBUG_aseSkuCode": "I1v2",
             "DEBUG_aseSkuWorkers": 1,
@@ -1663,15 +1716,12 @@
             "DEBUG_enableAzureSpeech": false,
             "DEBUG_enableBingSearch": false,
             "DEBUG_enableFunction": false,
-            "DEBUG_enablePublicAccessWithPerimeter": false,
-            "DEBUG_enablePublicGenAIAccess": false,
             "DEBUG_enableRedisCache": false,
             "DEBUG_enableSQLDatabase": false,
             "DEBUG_enableWebApp": false,
             "DEBUG_functionRuntime": "dotnet",
             "DEBUG_functionVersion": "v7.0",
             "DEBUG_kvNameFromCOMMON_param": "",
-            "DEBUG_project_IP_whitelist": "",
             "DEBUG_project_number_000": "001",
             "DEBUG_project_service_principal_AppID_seeding_kv_name": "",
             "DEBUG_project_service_principal_OID_seeding_kv_name": "",
@@ -1721,6 +1771,7 @@
           },
           "templated": {
             "DEBUG_admin_aifactorySuffixRG": "-__P_scalesetNumber__",
+            "DEBUG_project_IP_whitelist": "__P_ipAllowList__",
             "DEBUG_vnetNameFull_param": "vnt-esmlcmn-__P_locationShort__-dev-001",
             "DEBUG_vnetResourceGroup_param": "__P_prefix__esml-common-__P_locationShort__-dev-__P_scalesetNumber__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
@@ -1976,6 +2027,10 @@
           },
           "condition": "always",
           "toggled": {
+            "DEBUG_allowPublicAccessWhenBehindVnet": {
+              "choice": "publicUi",
+              "negate": false
+            },
             "DEBUG_enableAISearch": {
               "choice": "ai-search",
               "negate": false
@@ -1995,6 +2050,14 @@
             "DEBUG_enablePostgreSQL": {
               "choice": "postgresql",
               "negate": false
+            },
+            "DEBUG_enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "DEBUG_enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
             }
           },
           "chosen": {}
@@ -2006,12 +2069,10 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "acrProjectExists": false,
             "acr_adminUserEnabled": false,
             "acr_dedicated": true,
             "aifactorySalt10char": "",
-            "allowPublicAccessWhenBehindVnet": false,
             "centralDnsZoneByPolicyInHub": false,
             "cmk": false,
             "cmkKeyName": "<todo>_aifactory-cmk-key",
@@ -2024,8 +2085,6 @@
             "enableEncryptionAtHost": true,
             "enableLogicApps": false,
             "enableProjectVM": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "enableVmBackup": false,
             "env": "dev",
             "keyvaultExists": false,
@@ -2051,6 +2110,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -2209,8 +2269,20 @@
           },
           "condition": "always",
           "toggled": {
+            "allowPublicAccessWhenBehindVnet": {
+              "choice": "publicUi",
+              "negate": false
+            },
             "enableApplicationInsights": {
               "choice": "application-insights",
+              "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
               "negate": false
             }
           },
@@ -2225,7 +2297,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAISearch": false,
             "aiSearchDisableLocalAuth": true,
             "aiSearchExists": false,
@@ -2254,9 +2325,6 @@
             "enableBing": false,
             "enableBingCustomSearch": false,
             "enableContentSafety": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
-            "enablePublicNetworkAccessForCognitive": false,
             "env": "dev",
             "keyvaultExists": false,
             "keyvaultSoftDeleteDays": 7,
@@ -2300,6 +2368,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "admin_bicep_input_keyvault_subscription": "__P_subscriptionId__",
             "admin_bicep_kv_fw": "__P_seedingKeyVaultName__",
             "admin_bicep_kv_fw_rg": "__P_bootstrapResourceGroup__",
@@ -2541,6 +2610,18 @@
             "enableAISearchSharedPrivateLink": {
               "choice": "ai-search",
               "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
+            },
+            "enablePublicNetworkAccessForCognitive": {
+              "choice": "publicUi",
+              "negate": false
             }
           },
           "chosen": {
@@ -2555,7 +2636,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAISearch": false,
             "aiSearchDisableLocalAuth": true,
             "aiSearchExists": false,
@@ -2572,8 +2652,6 @@
             "enableAISearch": true,
             "enableAISearchSharedPrivateLink": true,
             "enableAIServices": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "env": "dev",
             "network_env": "dev",
             "projectNumber": "001",
@@ -2586,6 +2664,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "admin_bicep_input_keyvault_subscription": "__P_subscriptionId__",
             "admin_bicep_kv_fw": "__P_seedingKeyVaultName__",
             "admin_bicep_kv_fw_rg": "__P_bootstrapResourceGroup__",
@@ -2664,6 +2743,14 @@
             "enableAIFoundry": {
               "choice": "foundry",
               "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
             }
           },
           "chosen": {
@@ -2677,7 +2764,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "aifactorySalt10char": "",
             "centralDnsZoneByPolicyInHub": false,
             "cmk": false,
@@ -2697,8 +2783,6 @@
             "elasticType": "ElasticCloud",
             "enableElasticsearch": false,
             "enablePostgreSQL": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "enableRedisCache": false,
             "enableSQLDatabase": false,
             "env": "dev",
@@ -2727,6 +2811,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "admin_bicep_input_keyvault_subscription": "__P_subscriptionId__",
             "admin_bicep_kv_fw": "__P_seedingKeyVaultName__",
             "admin_bicep_kv_fw_rg": "__P_bootstrapResourceGroup__",
@@ -2916,6 +3001,14 @@
             "enableCosmosDB": {
               "choice": "cosmos-db",
               "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
             }
           },
           "chosen": {}
@@ -2936,7 +3029,6 @@
             "commonResourceSuffix": "-001",
             "diagnosticSettingLevel": "gold",
             "enablePostgreSQL": true,
-            "enablePublicAccessWithPerimeter": false,
             "env": "dev",
             "network_env": "dev",
             "postGresAdminEmails": "email_adress_only",
@@ -3030,7 +3122,12 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "postgresql",
-          "toggled": {},
+          "toggled": {
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "project-05-compute-services": {
@@ -3040,7 +3137,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "aca_a_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
             "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
             "addAISearch": false,
@@ -3074,8 +3170,6 @@
             "enableContainerApps": false,
             "enableEncryptionAtHost": true,
             "enableFunction": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "enableWebApp": false,
             "env": "dev",
             "funcAppServicePlanExists": false,
@@ -3107,6 +3201,7 @@
             "webAppServicePlanExists": false
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "location": "__P_location__",
@@ -3318,6 +3413,14 @@
             "enableAKS": {
               "choice": "aks",
               "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
             }
           },
           "chosen": {}
@@ -3329,7 +3432,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "aca_a_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
             "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
             "addAISearch": false,
@@ -3346,8 +3448,6 @@
             "enableAIServices": false,
             "enableBingSearch": false,
             "enableContainerApps": true,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "env": "dev",
             "network_env": "dev",
             "projectNumber": "001",
@@ -3360,6 +3460,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "location": "__P_location__",
@@ -3426,7 +3527,16 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "container-apps",
-          "toggled": {},
+          "toggled": {
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "project-06-ai-platform": {
@@ -3436,13 +3546,11 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAIFoundryHub": false,
             "addAISearch": false,
             "aiHubExists": false,
             "aifProjectExists": false,
             "aifactorySalt10char": "",
-            "allowPublicAccessWhenBehindVnet": false,
             "centralDnsZoneByPolicyInHub": false,
             "cmk": false,
             "cmkKeyName": "<todo>_aifactory-cmk-key",
@@ -3462,8 +3570,6 @@
             "diagnosticSettingLevel": "gold",
             "enableAIFoundryHub": false,
             "enableAIServices": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "env": "dev",
             "miPrjExists": false,
             "modelGPTXCapacity": 30,
@@ -3483,6 +3589,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -3646,8 +3753,20 @@
           },
           "condition": "always",
           "toggled": {
+            "allowPublicAccessWhenBehindVnet": {
+              "choice": "publicUi",
+              "negate": false
+            },
             "enableAISearch": {
               "choice": "ai-search",
+              "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
               "negate": false
             }
           },
@@ -3661,7 +3780,6 @@
           "resourceGroup": "",
           "constants": {
             "AMLStudioUIPrivate": true,
-            "IPwhiteList": "",
             "aifactorySalt10char": "",
             "aksComputeExists": false,
             "aksExists": false,
@@ -3687,7 +3805,6 @@
             "databricksExists": false,
             "diagnosticSettingLevel": "gold",
             "enableEncryptionAtHost": true,
-            "enablePublicAccessWithPerimeter": false,
             "env": "dev",
             "network_env": "dev",
             "projectNumber": "001",
@@ -3708,6 +3825,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -3893,6 +4011,10 @@
             "enableDatafactory": {
               "choice": "datafactory",
               "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
             }
           },
           "chosen": {}
@@ -3904,7 +4026,6 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAIFoundry": false,
             "aifactorySalt10char": "",
             "botServiceExists": false,
@@ -3918,7 +4039,6 @@
             "enableBotService": false,
             "enableFunction": false,
             "enableLogicApps": false,
-            "enablePublicAccessWithPerimeter": false,
             "enableWebApp": false,
             "env": "dev",
             "eventHubsExists": false,
@@ -3943,6 +4063,7 @@
             "webAppExists": false
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -4086,6 +4207,10 @@
           "toggled": {
             "enableEventHubs": {
               "choice": "event-hubs",
+              "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
               "negate": false
             }
           },
@@ -4500,13 +4625,11 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAIFoundry": false,
             "addAISearch": false,
             "aiFoundryV2Exists": false,
             "aiFoundryV2ProjectExists": false,
             "aifactorySalt10char": "",
-            "allowPublicAccessWhenBehindVnet": false,
             "apiManagementResourceId": "",
             "centralDnsZoneByPolicyInHub": false,
             "cmk": false,
@@ -4539,8 +4662,6 @@
             "enableCosmosDB": true,
             "enableDefenderforAIResourceLevel": false,
             "enableDefenderforAISubLevel": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "env": "dev",
             "foundryV22AccountOnly": true,
             "modelGPTXCapacity": 30,
@@ -4560,6 +4681,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -4741,7 +4863,20 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "foundry",
-          "toggled": {},
+          "toggled": {
+            "allowPublicAccessWhenBehindVnet": {
+              "choice": "publicUi",
+              "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "foundry-injection-rbac": {
@@ -4775,13 +4910,11 @@
           "scope": "subscription",
           "resourceGroup": "",
           "constants": {
-            "IPwhiteList": "",
             "addAIFoundry": false,
             "addAISearch": false,
             "aiFoundryV2Exists": false,
             "aiFoundryV2ProjectExists": false,
             "aifactorySalt10char": "",
-            "allowPublicAccessWhenBehindVnet": false,
             "apiManagementResourceId": "",
             "centralDnsZoneByPolicyInHub": false,
             "cmk": false,
@@ -4814,8 +4947,6 @@
             "enableCosmosDB": true,
             "enableDefenderforAIResourceLevel": false,
             "enableDefenderforAISubLevel": false,
-            "enablePublicAccessWithPerimeter": false,
-            "enablePublicGenAIAccess": false,
             "env": "dev",
             "foundryV22AccountOnly": false,
             "modelGPTXCapacity": 30,
@@ -4835,6 +4966,7 @@
             "vnetNameBase": "vnt-esmlcmn"
           },
           "templated": {
+            "IPwhiteList": "__P_ipAllowList__",
             "aifactorySuffixRG": "-__P_scalesetNumber__",
             "commonRGNamePrefix": "__P_prefix__",
             "inputKeyvault": "__P_seedingKeyVaultName__",
@@ -5016,7 +5148,20 @@
             "vnetResourceGroup_param": "string"
           },
           "condition": "foundry",
-          "toggled": {},
+          "toggled": {
+            "allowPublicAccessWhenBehindVnet": {
+              "choice": "publicUi",
+              "negate": false
+            },
+            "enablePublicAccessWithPerimeter": {
+              "choice": "publicPerimeter",
+              "negate": false
+            },
+            "enablePublicGenAIAccess": {
+              "choice": "publicUi",
+              "negate": false
+            }
+          },
           "chosen": {}
         },
         "foundry-cosmos-rbac": {
@@ -5183,7 +5328,7 @@
       "container-apps": "[parameters('enableContainerApps')]"
     },
     "resolved": "[toObject(variables('plan').choices.resources, lambda('choice', lambdaVariables('choice').id), lambda('choice', and(variables('requested')[lambdaVariables('choice').id], equals(length(filter(lambdaVariables('choice').requires, lambda('need', not(variables('requested')[lambdaVariables('need')])))), 0))))]",
-    "effective": "[union(toObject(variables('plan').choices.resources, lambda('choice', lambdaVariables('choice').id), lambda('choice', and(variables('resolved')[lambdaVariables('choice').id], equals(length(filter(lambdaVariables('choice').requires, lambda('need', not(variables('resolved')[lambdaVariables('need')])))), 0)))), createObject('always', true()))]",
+    "effective": "[union(toObject(variables('plan').choices.resources, lambda('choice', lambdaVariables('choice').id), lambda('choice', and(variables('resolved')[lambdaVariables('choice').id], equals(length(filter(lambdaVariables('choice').requires, lambda('need', not(variables('resolved')[lambdaVariables('need')])))), 0)))), createObject('always', true()), variables('plan').choices.network.modes[parameters('networkMode')])]",
     "skus": {
       "aiSearchSku": "[parameters('aiSearchSku')]",
       "storageSku": "[parameters('storageSku')]"
@@ -5211,7 +5356,8 @@
       "bootstrapResourceGroup": "[variables('bootstrapResourceGroup')]",
       "commonResourceGroup": "[variables('commonResourceGroup')]",
       "searchLocation": "[if(or(empty(parameters('aiSearchLocation')), equals(parameters('aiSearchLocation'), 'same-as-factory-region')), parameters('location'), parameters('aiSearchLocation'))]",
-      "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]"
+      "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]",
+      "ipAllowList": "[if(equals(parameters('networkMode'), 'hybrid'), parameters('ipAllowList'), '')]"
     },
     "stageName": "[format('aif-{0}-{1}-{2}', variables('prefixBare'), parameters('scalesetNumber'), variables('locationShort'))]",
     "certificateVaultParts": "[split(if(empty(parameters('appGatewayCertificateVaultId')), format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('commonResourceGroup')), parameters('appGatewayCertificateVaultId')), '/')]"

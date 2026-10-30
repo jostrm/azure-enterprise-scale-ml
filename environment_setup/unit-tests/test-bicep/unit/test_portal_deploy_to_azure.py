@@ -98,15 +98,58 @@ def test_disabled_simple_mode_features_stay_disabled(committed):
                 assert stage["constants"][parameter] in (False, "false"), (stage["template"], parameter)
 
 
-def test_private_networking_is_never_weakened(committed):
-    for stage in committed["stages"].values():
+NETWORK_MODES = {  # variables.json networking modes: [enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet, perimeter]
+    "private": {"publicUi": False, "publicPerimeter": False},
+    "hybrid": {"publicUi": True, "publicPerimeter": False},
+    "public": {"publicUi": True, "publicPerimeter": True},
+}
+NETWORK_SWITCHES = {"publicUi": {"enablePublicGenAIAccess", "allowPublicAccessWhenBehindVnet",
+                                 "enablePublicNetworkAccessForCognitive"},
+                    "publicPerimeter": {"enablePublicAccessWithPerimeter"}}
+
+
+def test_private_networking_is_the_default_and_only_the_networking_mode_opens_it(committed, main_template, form):
+    network = committed["choices"]["network"]
+    assert network["modes"] == NETWORK_MODES and network["default"] == "private"
+    assert main_template["parameters"]["networkMode"]["defaultValue"] == "private"
+    assert main_template["parameters"]["networkMode"]["allowedValues"] == list(NETWORK_MODES)
+    dropdown = next(element for element in form_elements(form) if element["name"] == "networkMode")
+    assert dropdown["defaultValue"].startswith("Private")
+    assert [option["value"] for option in dropdown["constraints"]["allowedValues"]] == list(NETWORK_MODES)
+    opened = {name for names in NETWORK_SWITCHES.values() for name in names}
+    toggled_public = 0
+    for key, stage in committed["stages"].items():
         constants = stage["constants"]
-        for parameter in ("enablePublicGenAIAccess", "allowPublicAccessWhenBehindVnet",
-                          "enablePublicAccessWithPerimeter", "centralDnsZoneByPolicyInHub"):
+        for parameter in opened | {"centralDnsZoneByPolicyInHub"}:
             if parameter in constants:
-                assert constants[parameter] in (False, "false"), (stage["template"], parameter)
+                assert constants[parameter] in (False, "false"), (key, parameter)
+        for parameter, toggle in stage["toggled"].items():
+            if parameter.removeprefix("DEBUG_") in opened:
+                assert parameter.removeprefix("DEBUG_") in NETWORK_SWITCHES[toggle["choice"]], (key, parameter)
+                assert not toggle["negate"], (key, parameter)
+                toggled_public += 1
+            else:
+                assert toggle["choice"] not in NETWORK_SWITCHES, (key, parameter)
         if "disableLocalAuth" in constants:
             assert constants["disableLocalAuth"] in (True, "true")
+    assert toggled_public >= 10
+
+
+def test_hybrid_ip_allow_list_reaches_every_project_stage(committed, main_template, form):
+    field = next(element for element in form_elements(form) if element["name"] == "ipAllowList")
+    assert field["visible"] == "[equals(steps('hub').networkMode, 'hybrid')]"
+    assert field["constraints"]["required"] is True
+    pattern = re.compile(field["constraints"]["regex"])
+    assert pattern.fullmatch("203.0.113.10") and pattern.fullmatch("203.0.113.0/24,198.51.100.7")
+    assert not pattern.fullmatch("203.0.113.0/24, 198.51.100.7") and not pattern.fullmatch("0.0.0.0/0")
+    assert form_outputs(form)["ipAllowList"] == "[coalesce(steps('hub').ipAllowList, '')]"
+    assert "ipAllowList" in committed["tokens"]
+    fed = [key for key, stage in committed["stages"].items()
+           if stage["templated"].get("IPwhiteList") == "__P_ipAllowList__"]
+    assert {"project-02-core-infrastructure", "project-03b-ai-search", "project-06-ai-platform",
+            "project-09-ai-foundry-2025-v4"} <= set(fed)
+    # The allow list only applies in hybrid mode; main passes '' otherwise.
+    assert "networkMode" in json.dumps(main_template["variables"]["tokens"]["ipAllowList"])
 
 
 def test_stages_follow_the_simple_mode_pipeline_order(committed):
@@ -465,7 +508,9 @@ def test_resource_choices_cover_the_optional_catalog(committed, main_template, f
 def test_choice_dependent_values_default_to_the_preset(committed):
     """A value that follows a choice equals the preset for the catalog's default selection."""
     preset = CONFIG.simple_mode_values()
-    defaults = {choice["id"]: choice["default"] for choice in committed["choices"]["resources"]}
+    network = committed["choices"]["network"]
+    defaults = {**{choice["id"]: choice["default"] for choice in committed["choices"]["resources"]},
+                **network["modes"][network["default"]]}
     checked = 0
     for stage in committed["stages"].values():
         for parameter, rule in stage["toggled"].items():

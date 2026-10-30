@@ -475,7 +475,55 @@
               "type": "Microsoft.Common.InfoBox",
               "options": {
                 "style": "Info",
-                "text": "Private networking is fixed: VNet 172.16.0.0/20, private endpoints, private DNS zones and a DNS Private Resolver inbound endpoint. The options below are billable or take 30-45 minutes and are off by default."
+                "text": "Every mode deploys the VNet 172.16.0.0/20, private endpoints, private DNS zones and a DNS Private Resolver inbound endpoint; the backend stays private. The networking mode only decides who may also reach the service UIs and APIs over public endpoints. The hub options below are billable or take 30-45 minutes and are off by default."
+              }
+            },
+            {
+              "name": "networkMode",
+              "type": "Microsoft.Common.DropDown",
+              "label": "Networking mode",
+              "defaultValue": "Private (recommended)",
+              "toolTip": "variables.json networking modes: private [false, false, false], hybrid [true, true, false], public [true, true, true] for enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet and enablePublicAccessWithPerimeter.",
+              "constraints": {
+                "required": true,
+                "allowedValues": [
+                  {
+                    "label": "Private (recommended)",
+                    "value": "private",
+                    "description": "No public access. Reach the UIs through Bastion, VPN or peering."
+                  },
+                  {
+                    "label": "Hybrid networking (private endpoints with public IP whitelisting)",
+                    "value": "hybrid",
+                    "description": "Public UI only for the IP addresses you list; private backend."
+                  },
+                  {
+                    "label": "Public networking",
+                    "value": "public",
+                    "description": "Public UI for all users; private backend."
+                  }
+                ]
+              }
+            },
+            {
+              "name": "ipAllowList",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Allowed public IP addresses or ranges",
+              "toolTip": "Comma-separated IPv4 addresses or CIDR ranges (/8-/32), no spaces, for example 203.0.113.10,198.51.100.0/24. Sets project_IP_whitelist.",
+              "visible": "[equals(steps('hub').networkMode, 'hybrid')]",
+              "constraints": {
+                "required": true,
+                "regex": "^(\\d{1,3}\\.){3}\\d{1,3}(/([89]|[12][0-9]|3[0-2]))?(,(\\d{1,3}\\.){3}\\d{1,3}(/([89]|[12][0-9]|3[0-2]))?)*$",
+                "validationMessage": "Comma-separated IPv4 addresses or CIDR ranges (/8-/32) without spaces."
+              }
+            },
+            {
+              "name": "publicWarning",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[equals(steps('hub').networkMode, 'public')]",
+              "options": {
+                "style": "Warning",
+                "text": "Public networking opens the service UIs and APIs to all networks. Microsoft Entra ID sign-in and RBAC still apply. Use it for quick tests only."
               }
             },
             {
@@ -646,6 +694,8 @@
         "enableContainerApps": "[equals(steps('services').enableContainerApps, 'true')]",
         "aiSearchSku": "[steps('services').aiSearchSku]",
         "storageSku": "[steps('services').storageSku]",
+        "networkMode": "[steps('hub').networkMode]",
+        "ipAllowList": "[coalesce(steps('hub').ipAllowList, '')]",
         "enableBastion": "[equals(steps('hub').enableBastion, 'true')]",
         "enablePrivateDnsPolicy": "[equals(steps('hub').enablePrivateDnsPolicy, 'true')]",
         "enableVpnGateway": "[equals(steps('hub').enableVpnGateway, 'true')]",

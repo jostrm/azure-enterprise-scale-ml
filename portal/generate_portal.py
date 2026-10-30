@@ -40,6 +40,7 @@ TOKENS = (
     "location", "locationShort", "prefix", "scalesetNumber", "subscriptionId", "tenantId",
     "teamGroupObjectId", "teamGroupName", "teamMemberEmail", "costCenter", "seedingKeyVaultName",
     "bootstrapResourceGroup", "commonResourceGroup", "searchLocation", "deploymentRandom", "prefixBare",
+    "ipAllowList",
 )
 
 
@@ -144,6 +145,24 @@ SKU_CHOICES = {
     "storageSku": {"keys": ("skuStorageAccountDev",), "values": ("Standard_LRS", "Standard_ZRS"),
                    "label": "Storage redundancy (Dev)"},
 }
+# Networking modes as documented in variables.json: [enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet,
+# enablePublicAccessWithPerimeter] = private [F,F,F], hybrid [T,T,F] (public UI for the IP allow list, private
+# backend), public [T,T,T]. Two switches explain them; Simple Mode's preset is private.
+NETWORK_SWITCHES = {
+    "publicUi": ("enablePublicGenAIAccess", "allowPublicAccessWhenBehindVnet"),
+    "publicPerimeter": ("enablePublicAccessWithPerimeter",),
+}
+NETWORK_MODES = {
+    "private": {"publicUi": False, "publicPerimeter": False},
+    "hybrid": {"publicUi": True, "publicPerimeter": False},
+    "public": {"publicUi": True, "publicPerimeter": True},
+}
+IP_ALLOW_LIST_REGEX = (r"^(\d{1,3}\.){3}\d{1,3}(/([89]|[12][0-9]|3[0-2]))?"
+                       r"(,(\d{1,3}\.){3}\d{1,3}(/([89]|[12][0-9]|3[0-2]))?)*$")
+
+
+def network_overrides(mode: str) -> dict[str, str]:
+    return {key: str(NETWORK_MODES[mode][switch]).lower() for switch, keys in NETWORK_SWITCHES.items() for key in keys}
 
 
 def load_module(path: Path, name: str):
@@ -464,7 +483,8 @@ def project_dynamic_env(env: dict[str, str], byo_clears: list[str]) -> dict[str,
     dynamic = {
         # 00_Initialize_Derived_Variables
         "deployment_random_value": token("deploymentRandom"),
-        "project_IP_whitelist": "" if env.get("project_IP_whitelist") in ("-", "<todo_ip>", None) else env["project_IP_whitelist"],
+        # PROJECT_MEMBERS_IP_ADDRESS (the CLI's ip_allowlist); the form's hybrid allow list, '' otherwise
+        "project_IP_whitelist": token("ipAllowList"),
         # 00_Resolve_Network_Env_Placeholders (vnetResourceGroup_param and vnetNameFull_param are empty)
         "vnetResourceGroup_resolved": (env["admin_aifactoryPrefixRG"] + env["vnetResourceGroupBase"] + "-"
                                        + env["admin_locationSuffix"] + "-" + env["dev_test_prod"]
@@ -941,22 +961,32 @@ def build_plan(root: Path) -> dict:
     for name, spec in SKU_CHOICES.items():
         if sku_defaults[name] not in spec["values"] or any(preset[key] != sku_defaults[name] for key in spec["keys"]):
             raise ValueError(f"{name}: preset {spec['keys']} disagree with the allowed values")
+    if network_overrides("private") != {key: preset[key] for key in network_overrides("private")}:
+        raise ValueError("Simple Mode's preset is no longer the private networking mode")
+    private = NETWORK_MODES["private"]
     samples = [defaults, {key: True for key in defaults}, {key: False for key in defaults}]
     samples += [_closure(defaults, choices, choice["id"]) for choice in choices]
     variants = []
     for states in samples:
-        states = {**states, **{name: sku_defaults[name] for name in SKU_CHOICES}}
+        states = {**states, **{name: sku_defaults[name] for name in SKU_CHOICES}, **private}
         if states not in [variant[0] for variant in variants]:
             variants.append((states, build_variant(root, _selection(states, choices))))
     for name, spec in SKU_CHOICES.items():
         for value in spec["values"]:
             if value != sku_defaults[name]:
-                states = {**defaults, **sku_defaults, name: value}
+                states = {**defaults, **sku_defaults, **private, name: value}
                 variants.append((states, build_variant(root, _selection(states, choices),
                                                        {key: value for key in spec["keys"]})))
+    for mode, switches in NETWORK_MODES.items():  # default and all-on selections, so optional stages are observed
+        if mode != "private":
+            for selection in (defaults, {key: True for key in defaults}):
+                states = {**selection, **sku_defaults, **switches}
+                variants.append((states, build_variant(root, _selection(states, choices), network_overrides(mode))))
     full = next(plan for states, plan in variants if all(states[key] for key in defaults)
-                and all(states[name] == sku_defaults[name] for name in SKU_CHOICES))
-    resource_keys, sku_keys = [choice["id"] for choice in choices], list(SKU_CHOICES)
+                and all(states[name] == sku_defaults[name] for name in SKU_CHOICES)
+                and all(states[switch] == value for switch, value in private.items()))
+    resource_keys = [choice["id"] for choice in choices] + list(NETWORK_SWITCHES)
+    sku_keys = list(SKU_CHOICES)
     stages = {}
     for key, stage in full["stages"].items():
         present = [(states, key in plan["stages"]) for states, plan in variants]
@@ -991,6 +1021,8 @@ def build_plan(root: Path) -> dict:
         "choices": {"resources": choices,
                     "skus": {name: {**{k: list(v) if isinstance(v, tuple) else v for k, v in spec.items()},
                                     "default": sku_defaults[name]} for name, spec in SKU_CHOICES.items()},
+                    "network": {"modes": NETWORK_MODES, "default": "private",
+                                "switches": {name: list(keys) for name, keys in NETWORK_SWITCHES.items()}},
                     "maxRequiresDepth": max(len(_ancestors(choice["id"], {c["id"]: c["requires"] for c in choices})) - 1
                                             for choice in choices)},
         "stages": stages,
@@ -1123,7 +1155,25 @@ def build_form(plan: dict) -> dict:
                                          "allowedValues": [{"label": value, "value": value} for value in spec["values"]]}})
     hub = [
         {"name": "hubInfo", "type": "Microsoft.Common.InfoBox",
-         "options": {"style": "Info", "text": "Private networking is fixed: VNet 172.16.0.0/20, private endpoints, private DNS zones and a DNS Private Resolver inbound endpoint. The options below are billable or take 30-45 minutes and are off by default."}},
+         "options": {"style": "Info", "text": "Every mode deploys the VNet 172.16.0.0/20, private endpoints, private DNS zones and a DNS Private Resolver inbound endpoint; the backend stays private. The networking mode only decides who may also reach the service UIs and APIs over public endpoints. The hub options below are billable or take 30-45 minutes and are off by default."}},
+        {"name": "networkMode", "type": "Microsoft.Common.DropDown", "label": "Networking mode",
+         "defaultValue": "Private (recommended)",
+         "toolTip": "variables.json networking modes: private [false, false, false], hybrid [true, true, false], public [true, true, true] for enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet and enablePublicAccessWithPerimeter.",
+         "constraints": {"required": True, "allowedValues": [
+             {"label": "Private (recommended)", "value": "private",
+              "description": "No public access. Reach the UIs through Bastion, VPN or peering."},
+             {"label": "Hybrid networking (private endpoints with public IP whitelisting)", "value": "hybrid",
+              "description": "Public UI only for the IP addresses you list; private backend."},
+             {"label": "Public networking", "value": "public",
+              "description": "Public UI for all users; private backend."}]}},
+        {"name": "ipAllowList", "type": "Microsoft.Common.TextBox", "label": "Allowed public IP addresses or ranges",
+         "toolTip": "Comma-separated IPv4 addresses or CIDR ranges (/8-/32), no spaces, for example 203.0.113.10,198.51.100.0/24. Sets project_IP_whitelist.",
+         "visible": "[equals(steps('hub').networkMode, 'hybrid')]",
+         "constraints": {"required": True, "regex": IP_ALLOW_LIST_REGEX,
+                         "validationMessage": "Comma-separated IPv4 addresses or CIDR ranges (/8-/32) without spaces."}},
+        {"name": "publicWarning", "type": "Microsoft.Common.InfoBox",
+         "visible": "[equals(steps('hub').networkMode, 'public')]",
+         "options": {"style": "Warning", "text": "Public networking opens the service UIs and APIs to all networks. Microsoft Entra ID sign-in and RBAC still apply. Use it for quick tests only."}},
         toggle("enableBastion", "Bastion Developer", True, "Free shared Bastion; no admin VM is deployed."),
         toggle("enablePrivateDnsPolicy", "Private DNS initiative", True,
                "Assign Deploy-Private-DNS-Zones to this subscription, as the Simple Mode CLI does."),
@@ -1161,6 +1211,8 @@ def build_form(plan: dict) -> dict:
         "aiSearchLocation": "[steps('services').aiSearchLocation]",
         **{choice["parameter"]: is_on("services", choice["parameter"]) for choice in plan["choices"]["resources"]},
         **{name: f"[steps('services').{name}]" for name in plan["choices"]["skus"]},
+        "networkMode": "[steps('hub').networkMode]",
+        "ipAllowList": "[coalesce(steps('hub').ipAllowList, '')]",
         "enableBastion": is_on("hub", "enableBastion"), "enablePrivateDnsPolicy": is_on("hub", "enablePrivateDnsPolicy"),
         "enableVpnGateway": is_on("hub", "enableVpnGateway"), "vpnClientCidr": "[steps('hub').vpnClientCidr]",
         "enableApplicationGateway": is_on("hub", "enableApplicationGateway"),

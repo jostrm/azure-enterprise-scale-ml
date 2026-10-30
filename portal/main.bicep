@@ -97,6 +97,17 @@ param storageSku string = 'Standard_LRS'
 @description('Redeploy only: the common VNet exists, so skip 12-networkCommon. Its VNet PUT would delete the subnets added later.')
 param commonVnetExists bool = false
 
+@description('Networking mode (variables.json): private, hybrid (public UI for the IP allow list, private backend) or public (public UI for all, private backend).')
+@allowed([
+  'private'
+  'hybrid'
+  'public'
+])
+param networkMode string = 'private'
+
+@description('Hybrid only: comma-separated IPv4 addresses or CIDR ranges (project_IP_whitelist).')
+param ipAllowList string = ''
+
 @description('Bastion Developer on the common VNet (free, no admin VM).')
 param enableBastion bool = true
 
@@ -143,7 +154,7 @@ var requested = {
 }
 // Two passes resolve the catalog's requirement chains (the generator asserts a depth of at most 2).
 var resolved = toObject(plan.choices.resources, choice => choice.id, choice => requested[choice.id] && length(filter(choice.requires, need => !requested[need])) == 0)
-var effective = union(toObject(plan.choices.resources, choice => choice.id, choice => resolved[choice.id] && length(filter(choice.requires, need => !resolved[need])) == 0), { always: true })
+var effective = union(toObject(plan.choices.resources, choice => choice.id, choice => resolved[choice.id] && length(filter(choice.requires, need => !resolved[need])) == 0), { always: true }, plan.choices.network.modes[networkMode])
 var skus = {
   aiSearchSku: aiSearchSku
   storageSku: storageSku
@@ -172,10 +183,11 @@ var tokens = {
   commonResourceGroup: commonResourceGroup
   searchLocation: empty(aiSearchLocation) || aiSearchLocation == 'same-as-factory-region' ? location : aiSearchLocation
   deploymentRandom: take(uniqueString(subscription().id, prefixNormalized, scalesetNumber, location), 10)
+  ipAllowList: networkMode == 'hybrid' ? ipAllowList : ''
 }
 
 func fill(text string, t object) string =>
-  replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+  replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
     text,
     '__P_location__', t.location),
     '__P_locationShort__', t.locationShort),
@@ -192,7 +204,8 @@ func fill(text string, t object) string =>
     '__P_bootstrapResourceGroup__', t.bootstrapResourceGroup),
     '__P_commonResourceGroup__', t.commonResourceGroup),
     '__P_searchLocation__', t.searchLocation),
-    '__P_deploymentRandom__', t.deploymentRandom)
+    '__P_deploymentRandom__', t.deploymentRandom),
+    '__P_ipAllowList__', t.ipAllowList)
 
 func stageParameters(stage object, t object, choices object, skus object) object =>
   union(
