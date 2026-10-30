@@ -28,6 +28,9 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/simulated_deletes.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md
+  - usecase_code/10-azure-function/13_func_lifecycle_sdk_starter/lifecycle.py
+  - usecase_code/10-azure-function/13_func_lifecycle_sdk_starter/factory_client.py
+  - usecase_code/10-azure-function/13_func_lifecycle_sdk_starter/function_app.py
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -42,12 +45,13 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_api_host_installer.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_simulated_deletes.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_infra_template.py
+  - usecase_code/10-azure-function/13_func_lifecycle_sdk_starter/tests/test_lifecycle.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: '98711370 + working tree; observed 2026-10-22; Flex Consumption hosting 2026-10-23'
+reviewed_source: '98711370 + working tree; observed 2026-10-22; Flex Consumption hosting 2026-10-23; SDK starter added on 08e60db0, 2026-10-30'
 ---
 # Lifecycle Function
 
@@ -117,6 +121,11 @@ GitHub runs through `workflow_run` events.
   scenarios 4-6 to the mock backend over a read-only catalog mirror (Decorator `DeleteSimulation`) and runs them as
   dummy workflows (`DeleteRoutingTracker`), so the Factory API never gets a delete. Scenario 6 is limited to single-environment factories because `delete-aifactory` always deletes every
   environment.
+- **SDK starter** (`13_func_lifecycle_sdk_starter`, added 2026-10-30): a minimal sibling with the same HTTP contract
+  that runs scenario 3 only (configure, deploy-project). Its mock is a stand-in for `AzureFactoryClient` with the
+  SDK's method names and reply shapes (`MockFactoryClient`), so `AIF_BACKEND=sdk` swaps in the real client and nothing
+  else; a test runs the same code through the real SDK against this template's `tests/fake_factory_api.py`.
+  Operations are in memory (one instance), and it has no event tracking, deletes, Entra role or infrastructure.
 
 ## Constraints
 

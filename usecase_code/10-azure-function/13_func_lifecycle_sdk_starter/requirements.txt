@@ -1,0 +1,3 @@
+azure-functions>=1.21,<2
+# Only for AIF_BACKEND=sdk: the stdlib-only azurefactory SDK, pinned to the same commit as the reference Function.
+azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@387497286a6dbb008b0932c116a9229525c6882a#subdirectory=environment_setup/azurefactory-cli
