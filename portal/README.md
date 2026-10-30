@@ -45,7 +45,7 @@ The list, defaults and requirements come from `SIMPLE_MODE_RESOURCE_CATALOG`. A 
 
 - Owner on the target subscription, or Contributor plus User Access Administrator. The stages create role assignments.
 - An existing Microsoft Entra security group for the project team. Paste its object ID; the deployment never writes to Entra ID.
-- Pick a region from the drop-down. The list is the intersection of the v1.25 CLI region table and Bastion Developer availability ([source](https://learn.microsoft.com/azure/bastion/bastion-sku-comparison#regional-availability)).
+- Pick a region from the drop-down. The list is the v1.25 CLI region table intersected with Bastion Developer availability ([source](https://learn.microsoft.com/azure/bastion/bastion-sku-comparison#regional-availability)), plus France Central (`frc`), Italy North (`itn`), Norway East (`noe`) and Denmark East (`dne`). The v1.25 CLI doesn't accept those four, so their short codes are the portal's own. Denmark East has no Bastion Developer, so Bastion is skipped there. The AI Search region list is the same.
 - Resource providers are registered automatically by ARM when the deploying identity may register them. If your policy blocks that, register `Microsoft.CognitiveServices`, `Microsoft.Search`, `Microsoft.DocumentDB`, `Microsoft.App`, `Microsoft.Network`, `Microsoft.KeyVault`, `Microsoft.Storage`, `Microsoft.ContainerRegistry`, `Microsoft.OperationalInsights` and `Microsoft.Insights` first.
 - Application Gateway only: register the `EnableApplicationGatewayNetworkIsolation` feature. You also need a custom hostname, a private HTTPS backend and an exportable PFX certificate in an RBAC Key Vault in this subscription.
 - Use a fresh prefix and scale set number. Like Simple Mode, the button expects a greenfield scale set (`*Exists=false`).
@@ -64,6 +64,16 @@ az deployment sub create --name aif-portal-001 --location swedencentral --templa
 ```
 
 `--template-uri` is required: the stages are linked with `templateLink.relativePath`, which ARM resolves only relative to a template URI.
+
+## Networking modes
+
+| Mode | `enablePublicGenAIAccess`, `allowPublicAccessWhenBehindVnet`, `enablePublicAccessWithPerimeter` | Hub access parts |
+| --- | --- | --- |
+| Private (default) | false, false, false | DNS Private Resolver, Bastion Developer and IP group; optional VPN Gateway and Application Gateway |
+| Hybrid | true, true, false; public UI only for the IP allow list (`project_IP_whitelist`) | Skipped |
+| Public | true, true, true | Skipped |
+
+Every mode deploys the VNet, the private endpoints, the private DNS zones and the DNS policy, so the backend stays private. In Hybrid and Public mode the UIs are reached over public endpoints, so the hub's access parts aren't needed and aren't deployed. That lowers the cost; the DNS Private Resolver is the main saving.
 
 ## Redeploy after a failure
 
@@ -118,6 +128,6 @@ python -m pytest environment_setup/unit-tests/test-bicep/unit/test_portal_deploy
 | `69a` / `69b` Foundry passes | Two linked deployments of `09-ai-foundry-2025-v4` with `dependsOn` |
 | `69a-Grant-NetworkContributor-For-Injection`, `69c` Cosmos role | `stages/portal-foundry-injection-rbac.json`, `stages/portal-cosmos-foundry-rbac.json` |
 | `aif_ensure_dns_private_resolver` | Resolver and inbound endpoint; the VNet DNS servers are not rewritten, because an ARM PUT of the VNet would replace its subnets |
-| VPN Gateway, Application Gateway | Optional, off by default |
+| VPN Gateway, Application Gateway | Optional, off by default; private networking only |
 | GitHub/ADO repository, OIDC, workflow dispatch | Not part of the button |
 

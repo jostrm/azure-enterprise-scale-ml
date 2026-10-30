@@ -135,6 +135,27 @@ def test_private_networking_is_the_default_and_only_the_networking_mode_opens_it
     assert toggled_public >= 10
 
 
+def test_hub_access_parts_are_only_deployed_for_private_networking(main_template, form):
+    # Hybrid and public reach the UIs over public endpoints: no resolver, Bastion, VPN or Application Gateway.
+    variables = main_template["variables"]
+    assert variables["privateHub"] == "[equals(parameters('networkMode'), 'private')]"
+    assert "privateHub" in variables["vpnEnabled"] and "privateHub" in variables["appGatewayEnabled"]
+    resources = main_template["resources"]
+    assert resources["hubAccess"]["condition"] == "[variables('privateHub')]"
+    assert resources["vpnGateway"]["condition"] == "[variables('vpnEnabled')]"
+    for name in ("appGatewayNetwork", "appGatewayCertificateRbac", "appGateway"):
+        assert resources[name]["condition"] == "[variables('appGatewayEnabled')]", name
+    for name in ("privateDns", "seedingEndpoint", "commonResources"):
+        assert "condition" not in resources[name] or "networkMode" not in resources[name]["condition"], name
+    assert "privateHub" in main_template["outputs"]["dnsResolverInboundIp"]["value"]
+    elements = {element["name"]: element for element in form_elements(form)}
+    for name in ("enableBastion", "enableVpnGateway", "enableApplicationGateway"):
+        assert elements[name]["visible"] == "[equals(steps('hub').networkMode, 'private')]", name
+    for name in ("vpnClientCidr", "appGatewayHostname", "appGatewayBackendFqdn",
+                 "appGatewayCertificateSecretId", "appGatewayCertificateVaultId"):
+        assert "networkMode" in elements[name]["visible"], name
+
+
 def test_hybrid_ip_allow_list_reaches_every_project_stage(committed, main_template, form):
     field = next(element for element in form_elements(form) if element["name"] == "ipAllowList")
     assert field["visible"] == "[equals(steps('hub').networkMode, 'hybrid')]"
@@ -377,11 +398,28 @@ def test_region_allow_list_is_sourced(form, main_template):
     assert scope["location"]["allowedValues"] == expected
     assert form_outputs(form)["location"] == "[steps('basics').resourceScope.location.name]"
     cli = GENERATOR.cli_regions(ROOT)
-    assert set(expected) <= set(cli)
-    assert set(expected) <= set(GENERATOR.bastion_developer_regions(ROOT))
+    extra = GENERATOR.PORTAL_ONLY_REGIONS
+    assert {"francecentral", "italynorth", "norwayeast", "denmarkeast"} <= set(expected)
+    assert set(expected) <= set(cli) | set(extra)
+    bastion = set(GENERATOR.bastion_developer_regions(ROOT))
+    assert set(expected) - set(extra) <= bastion
     page = GENERATOR.region_page_regions(ROOT)
     if page is not None:
-        assert set(expected) == set(cli) & set(page) & set(GENERATOR.bastion_developer_regions(ROOT))
+        assert set(expected) == ((set(cli) & bastion) | set(extra)) & set(page)
+    search = next(element for element in form_elements(form) if element["name"] == "aiSearchLocation")
+    assert [option["value"] for option in search["constraints"]["allowedValues"][1:]] == expected
+
+
+def test_every_region_has_a_unique_short_code_and_bastion_follows_availability(committed, main_template):
+    codes = committed["locationShort"]
+    assert set(codes) == set(committed["regions"]) and len(set(codes.values())) == len(codes)
+    assert all(re.fullmatch(r"[a-z0-9]{2,4}", code) for code in codes.values())
+    assert set(committed["bastionRegions"]) == set(committed["regions"]) & set(GENERATOR.bastion_developer_regions(ROOT))
+    assert "denmarkeast" not in committed["bastionRegions"]
+    assert main_template["variables"]["bastionEnabled"] == "[and(parameters('enableBastion'), contains(variables('plan').bastionRegions, parameters('location')))]"
+    hub = next(resource for resource in linked_deployments(main_template)
+               if resource["properties"]["templateLink"]["relativePath"] == "stages/portal-hub-access.json")
+    assert "variables('bastionEnabled')" in json.dumps(hub["properties"]["parameters"])
 
 
 def test_network_plan_matches_the_simple_mode_reservation(plan):

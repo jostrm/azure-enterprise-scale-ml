@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "13101991752018766718"
+      "templateHash": "895163962929626833"
     }
   },
   "functions": [
@@ -76,15 +76,19 @@
     "location": {
       "type": "string",
       "allowedValues": [
+        "denmarkeast",
         "eastus2",
+        "francecentral",
         "germanywestcentral",
+        "italynorth",
         "northeurope",
+        "norwayeast",
         "swedencentral",
         "uksouth",
         "westeurope"
       ],
       "metadata": {
-        "description": "AI Factory region. Limited to regions supported by the v1.25 CLI and Bastion Developer."
+        "description": "AI Factory region: the v1.25 CLI regions with Bastion Developer, plus the portal-only France Central, Italy North, Norway East and Denmark East."
       }
     },
     "prefix": {
@@ -421,21 +425,40 @@
         }
       },
       "regions": [
+        "denmarkeast",
         "eastus2",
+        "francecentral",
         "germanywestcentral",
+        "italynorth",
         "northeurope",
+        "norwayeast",
         "swedencentral",
         "uksouth",
         "westeurope"
       ],
       "locationShort": {
+        "denmarkeast": "dne",
         "eastus2": "eus2",
+        "francecentral": "frc",
         "germanywestcentral": "gwc",
+        "italynorth": "itn",
         "northeurope": "neu",
+        "norwayeast": "noe",
         "swedencentral": "sdc",
         "uksouth": "uks",
         "westeurope": "weu"
       },
+      "bastionRegions": [
+        "eastus2",
+        "francecentral",
+        "germanywestcentral",
+        "italynorth",
+        "northeurope",
+        "norwayeast",
+        "swedencentral",
+        "uksouth",
+        "westeurope"
+      ],
       "choices": {
         "resources": [
           {
@@ -5359,6 +5382,10 @@
       "deploymentRandom": "[take(uniqueString(subscription().id, variables('prefixNormalized'), parameters('scalesetNumber'), parameters('location')), 10)]",
       "ipAllowList": "[if(equals(parameters('networkMode'), 'hybrid'), parameters('ipAllowList'), '')]"
     },
+    "bastionEnabled": "[and(parameters('enableBastion'), contains(variables('plan').bastionRegions, parameters('location')))]",
+    "privateHub": "[equals(parameters('networkMode'), 'private')]",
+    "vpnEnabled": "[and(variables('privateHub'), parameters('enableVpnGateway'))]",
+    "appGatewayEnabled": "[and(variables('privateHub'), parameters('enableApplicationGateway'))]",
     "stageName": "[format('aif-{0}-{1}-{2}', variables('prefixBare'), parameters('scalesetNumber'), variables('locationShort'))]",
     "certificateVaultParts": "[split(if(empty(parameters('appGatewayCertificateVaultId')), format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('commonResourceGroup')), parameters('appGatewayCertificateVaultId')), '/')]"
   },
@@ -5489,6 +5516,7 @@
       ]
     },
     "hubAccess": {
+      "condition": "[variables('privateHub')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-hub-access', variables('stageName')), 64)]",
@@ -5498,14 +5526,14 @@
         "templateLink": {
           "relativePath": "stages/portal-hub-access.json"
         },
-        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-access'], variables('tokens'), variables('effective'), variables('skus')), createObject('resolverSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets')['snet-dns-private-resolver'])), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'enableBastion', createObject('value', parameters('enableBastion'))))]"
+        "parameters": "[union(__bicep.stageParameters(variables('stages')['hub-access'], variables('tokens'), variables('effective'), variables('skus')), createObject('resolverSubnetCidr', createObject('value', __bicep.subnetCidr(variables('vnetCidr'), variables('subnets')['snet-dns-private-resolver'])), 'vpnClientCidr', createObject('value', parameters('vpnClientCidr')), 'enableBastion', createObject('value', variables('bastionEnabled'))))]"
       },
       "dependsOn": [
         "privateDns"
       ]
     },
     "vpnGateway": {
-      "condition": "[parameters('enableVpnGateway')]",
+      "condition": "[variables('vpnEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-hub-vpn-gateway', variables('stageName')), 64)]",
@@ -5522,7 +5550,7 @@
       ]
     },
     "appGatewayNetwork": {
-      "condition": "[parameters('enableApplicationGateway')]",
+      "condition": "[variables('appGatewayEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-hub-app-gateway-network', variables('stageName')), 64)]",
@@ -5540,7 +5568,7 @@
       ]
     },
     "appGatewayCertificateRbac": {
-      "condition": "[parameters('enableApplicationGateway')]",
+      "condition": "[variables('appGatewayEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-hub-app-gateway-certificate-rbac', variables('stageName')), 64)]",
@@ -5894,7 +5922,7 @@
       ]
     },
     "appGateway": {
-      "condition": "[parameters('enableApplicationGateway')]",
+      "condition": "[variables('appGatewayEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('{0}-hub-app-gateway', variables('stageName')), 64)]",
@@ -5932,7 +5960,7 @@
     },
     "dnsResolverInboundIp": {
       "type": "string",
-      "value": "[reference('hubAccess').outputs.dnsResolverInboundIp.value]"
+      "value": "[if(variables('privateHub'), reference('hubAccess').outputs.dnsResolverInboundIp.value, '')]"
     }
   }
 }

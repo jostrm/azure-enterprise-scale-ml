@@ -85,21 +85,40 @@
     }
   },
   "regions": [
+    "denmarkeast",
     "eastus2",
+    "francecentral",
     "germanywestcentral",
+    "italynorth",
     "northeurope",
+    "norwayeast",
     "swedencentral",
     "uksouth",
     "westeurope"
   ],
   "locationShort": {
+    "denmarkeast": "dne",
     "eastus2": "eus2",
+    "francecentral": "frc",
     "germanywestcentral": "gwc",
+    "italynorth": "itn",
     "northeurope": "neu",
+    "norwayeast": "noe",
     "swedencentral": "sdc",
     "uksouth": "uks",
     "westeurope": "weu"
   },
+  "bastionRegions": [
+    "eastus2",
+    "francecentral",
+    "germanywestcentral",
+    "italynorth",
+    "northeurope",
+    "norwayeast",
+    "swedencentral",
+    "uksouth",
+    "westeurope"
+  ],
   "choices": {
     "resources": [
       {

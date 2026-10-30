@@ -5,11 +5,15 @@
 // variables.json and the GitHub workflows. This file only fills deployment-time tokens and wires outputs.
 targetScope = 'subscription'
 
-@description('AI Factory region. Limited to regions supported by the v1.25 CLI and Bastion Developer.')
+@description('AI Factory region: the v1.25 CLI regions with Bastion Developer, plus the portal-only France Central, Italy North, Norway East and Denmark East.')
 @allowed([
+  'denmarkeast'
   'eastus2'
+  'francecentral'
   'germanywestcentral'
+  'italynorth'
   'northeurope'
+  'norwayeast'
   'swedencentral'
   'uksouth'
   'westeurope'
@@ -218,6 +222,14 @@ func stageParameters(stage object, t object, choices object, skus object) object
 func subnetCidr(vnet string, entry array) string => cidrSubnet(vnet, entry[0], entry[1])
 
 // Includes the region: subscription-scope deployment records keep their location, so a same-named run elsewhere fails.
+// Bastion Developer is not offered in every allowed region (Denmark East); there the choice is ignored.
+var bastionEnabled = enableBastion && contains(plan.bastionRegions, location)
+// The hub's access parts (DNS Private Resolver, Bastion, IP group, VPN Gateway, Application Gateway) serve private
+// networking only. In hybrid and public mode people reach the UIs over public endpoints, so they are skipped; the
+// VNet, private endpoints, private DNS zones and DNS policy stay in every mode.
+var privateHub = networkMode == 'private'
+var vpnEnabled = privateHub && enableVpnGateway
+var appGatewayEnabled = privateHub && enableApplicationGateway
 var stageName = 'aif-${prefixBare}-${scalesetNumber}-${locationShort}'
 
 resource bootstrapGroup 'Microsoft.Resources/resourceGroups@2024-07-01' = {
@@ -308,7 +320,7 @@ resource privateDnsPolicy 'Microsoft.Resources/deployments@2022-09-01' = if (ena
   }
 }
 
-resource hubAccess 'Microsoft.Resources/deployments@2022-09-01' = {
+resource hubAccess 'Microsoft.Resources/deployments@2022-09-01' = if (privateHub) {
   name: take('${stageName}-hub-access', 64)
   resourceGroup: commonResourceGroup
   dependsOn: [privateDns]
@@ -318,12 +330,12 @@ resource hubAccess 'Microsoft.Resources/deployments@2022-09-01' = {
     parameters: union(stageParameters(stages['hub-access'], tokens, effective, skus), {
       resolverSubnetCidr: { value: subnetCidr(vnetCidr, subnets['snet-dns-private-resolver']) }
       vpnClientCidr: { value: vpnClientCidr }
-      enableBastion: { value: enableBastion }
+      enableBastion: { value: bastionEnabled }
     })
   }
 }
 
-resource vpnGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableVpnGateway) {
+resource vpnGateway 'Microsoft.Resources/deployments@2022-09-01' = if (vpnEnabled) {
   name: take('${stageName}-hub-vpn-gateway', 64)
   resourceGroup: commonResourceGroup
   dependsOn: [hubAccess]
@@ -337,7 +349,7 @@ resource vpnGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableVpn
   }
 }
 
-resource appGatewayNetwork 'Microsoft.Resources/deployments@2022-09-01' = if (enableApplicationGateway) {
+resource appGatewayNetwork 'Microsoft.Resources/deployments@2022-09-01' = if (appGatewayEnabled) {
   name: take('${stageName}-hub-app-gateway-network', 64)
   resourceGroup: commonResourceGroup
   dependsOn: [hubAccess, vpnGateway]
@@ -353,7 +365,7 @@ resource appGatewayNetwork 'Microsoft.Resources/deployments@2022-09-01' = if (en
 
 var certificateVaultParts = split(empty(appGatewayCertificateVaultId) ? '/subscriptions/${subscription().subscriptionId}/resourceGroups/${commonResourceGroup}' : appGatewayCertificateVaultId, '/')
 
-resource appGatewayCertificateRbac 'Microsoft.Resources/deployments@2022-09-01' = if (enableApplicationGateway) {
+resource appGatewayCertificateRbac 'Microsoft.Resources/deployments@2022-09-01' = if (appGatewayEnabled) {
   name: take('${stageName}-hub-app-gateway-certificate-rbac', 64)
   subscriptionId: certificateVaultParts[2]
   resourceGroup: certificateVaultParts[4]
@@ -617,7 +629,7 @@ resource foundryCosmosRbac 'Microsoft.Resources/deployments@2022-09-01' = if (ef
   }
 }
 
-resource appGateway 'Microsoft.Resources/deployments@2022-09-01' = if (enableApplicationGateway) {
+resource appGateway 'Microsoft.Resources/deployments@2022-09-01' = if (appGatewayEnabled) {
   name: take('${stageName}-hub-app-gateway', 64)
   resourceGroup: commonResourceGroup
   dependsOn: [rbacCommon, foundryCosmosRbac, appGatewayCertificateRbac]
@@ -636,4 +648,4 @@ output commonResourceGroup string = commonResourceGroup
 output bootstrapResourceGroup string = bootstrapResourceGroup
 output projectResourceGroup string = foundation.properties.outputs.foundationOutputs.value.projectResourceGroupName
 output foundryAccountName string = effective.foundry ? foundryAccount!.properties.outputs.aiFoundryV2Name.value : ''
-output dnsResolverInboundIp string = hubAccess.properties.outputs.dnsResolverInboundIp.value
+output dnsResolverInboundIp string = privateHub ? hubAccess!.properties.outputs.dnsResolverInboundIp.value : ''

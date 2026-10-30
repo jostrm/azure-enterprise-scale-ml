@@ -882,7 +882,7 @@ def build_variant(root: Path, selection: list[str] | None = None, overrides: dic
     regions = allowed_regions(root)
     return {
         "bicepVersion": BICEP_VERSION, "tokens": list(TOKENS), "network": NETWORK,
-        "regions": regions, "locationShort": {region: cli_regions(root)[region] for region in regions},
+        "regions": regions, "locationShort": {region: region_codes(root)[region] for region in regions},
         "stages": stages,
         "privateDnsZones": sorted({zone["name"] for zone in json.loads(dns["templatedJson"]["privateLinksDnsZones"])}),
     }
@@ -1018,6 +1018,7 @@ def build_plan(root: Path) -> dict:
     return {
         "bicepVersion": BICEP_VERSION, "tokens": list(TOKENS), "network": NETWORK,
         "regions": regions, "locationShort": full["locationShort"],
+        "bastionRegions": sorted(set(regions) & set(bastion_developer_regions(root))),
         "choices": {"resources": choices,
                     "skus": {name: {**{k: list(v) if isinstance(v, tuple) else v for k, v in spec.items()},
                                     "default": sku_defaults[name]} for name, spec in SKU_CHOICES.items()},
@@ -1039,6 +1040,18 @@ def cli_regions(root: Path) -> dict[str, str]:
     for match in re.finditer(r'AIF_LOCATION="([a-z0-9]+)";?\s*\n?\s*AIF_LOCATION_SHORT="([a-z0-9]+)"', script):
         regions[match[1]] = match[2]
     return regions
+
+
+# Portal-only regions the owner asked for. The v1.25 CLI rejects them ("Unsupported region"), so the short codes
+# are the portal's own, in the CLI's three-letter style. Bastion Developer is skipped where it is not offered.
+PORTAL_ONLY_REGIONS = {"francecentral": "frc", "italynorth": "itn", "norwayeast": "noe", "denmarkeast": "dne"}
+
+
+def region_codes(root: Path) -> dict[str, str]:
+    codes = {**PORTAL_ONLY_REGIONS, **cli_regions(root)}
+    if len(set(codes.values())) != len(codes):
+        raise ValueError("Region short codes must be unique")
+    return codes
 
 
 def bastion_developer_regions(root: Path) -> list[str]:
@@ -1065,7 +1078,7 @@ def region_page_regions(root: Path) -> list[str] | None:
 
 def allowed_regions(root: Path) -> list[str]:
     cli = cli_regions(root)
-    allowed = set(cli) & set(bastion_developer_regions(root))
+    allowed = (set(cli) & set(bastion_developer_regions(root))) | set(PORTAL_ONLY_REGIONS)
     page = region_page_regions(root)
     if page is not None:
         allowed &= set(page)
@@ -1089,6 +1102,13 @@ def is_on(step: str, name: str) -> str:
     return f"[equals(steps('{step}').{name}, 'true')]"
 
 
+PRIVATE_ONLY = "[equals(steps('hub').networkMode, 'private')]"
+
+
+def private_and(name: str) -> str:
+    return f"[and(equals(steps('hub').networkMode, 'private'), equals(steps('hub').{name}, 'true'))]"
+
+
 def build_form(plan: dict) -> dict:
     """Form view (uiFormDefinition 2021-09-09) for the subscription-scope main template."""
     regions = plan["regions"]
@@ -1097,7 +1117,7 @@ def build_form(plan: dict) -> dict:
         # (the AVD landing zone accelerator's subscription-scope Form view uses the same pattern).
         {"name": "resourceScope", "type": "Microsoft.Common.ResourceScope",
          "location": {"label": "AI Factory region",
-                      "toolTip": f"Regions supported by the {RELEASE} Simple Mode CLI and by Bastion Developer.",
+                      "toolTip": f"Regions supported by the {RELEASE} Simple Mode CLI and by Bastion Developer, plus France Central, Italy North, Norway East and Denmark East (portal only; no Bastion Developer in Denmark East).",
                       "allowedValues": regions}},
         {"name": "intro", "type": "Microsoft.Common.InfoBox",
          "options": {"style": "Info", "text": f"AI Factory {RELEASE} Simple Mode full bootstrap: private networking, "
@@ -1174,31 +1194,36 @@ def build_form(plan: dict) -> dict:
         {"name": "publicWarning", "type": "Microsoft.Common.InfoBox",
          "visible": "[equals(steps('hub').networkMode, 'public')]",
          "options": {"style": "Warning", "text": "Public networking opens the service UIs and APIs to all networks. Microsoft Entra ID sign-in and RBAC still apply. Use it for quick tests only."}},
-        toggle("enableBastion", "Bastion Developer", True, "Free shared Bastion; no admin VM is deployed."),
+        {"name": "hubSkipped", "type": "Microsoft.Common.InfoBox",
+         "visible": "[not(equals(steps('hub').networkMode, 'private'))]",
+         "options": {"style": "Info", "text": "Hybrid and public networking skip the hub's access parts: DNS Private Resolver, Bastion, VPN Gateway and Application Gateway. You reach the UIs over public endpoints, which lowers the cost. The VNet, private endpoints and private DNS zones are still deployed."}},
+        {**toggle("enableBastion", "Bastion Developer", True,
+               "Free shared Bastion; no admin VM is deployed. Skipped in regions without Bastion Developer (Denmark East)."),
+         "visible": PRIVATE_ONLY},
         toggle("enablePrivateDnsPolicy", "Private DNS initiative", True,
                "Assign Deploy-Private-DNS-Zones to this subscription, as the Simple Mode CLI does."),
-        toggle("enableVpnGateway", "Point-to-site VPN Gateway", False,
-               "VpnGw1AZ with Entra authentication. Billable; adds 30-45 minutes."),
+        {**toggle("enableVpnGateway", "Point-to-site VPN Gateway", False,
+                  "VpnGw1AZ with Entra authentication. Billable; adds 30-45 minutes."), "visible": PRIVATE_ONLY},
         {"name": "vpnClientCidr", "type": "Microsoft.Common.TextBox", "label": "VPN client address pool",
-         "defaultValue": "172.31.240.0/24", "visible": is_on("hub", "enableVpnGateway"),
+         "defaultValue": "172.31.240.0/24", "visible": private_and("enableVpnGateway"),
          "constraints": {"required": True, "regex": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/(1[6-9]|2[0-9])$",
                          "validationMessage": "IPv4 CIDR /16-/29 outside 172.16.0.0/20."}},
-        toggle("enableApplicationGateway", "Private Application Gateway WAF_v2", False,
-               "Billable. Needs a hostname, a private HTTPS backend and a Key Vault certificate."),
+        {**toggle("enableApplicationGateway", "Private Application Gateway WAF_v2", False,
+                  "Billable. Needs a hostname, a private HTTPS backend and a Key Vault certificate."), "visible": PRIVATE_ONLY},
         {"name": "appGatewayHostname", "type": "Microsoft.Common.TextBox", "label": "Gateway HTTPS hostname",
-         "visible": is_on("hub", "enableApplicationGateway"),
+         "visible": private_and("enableApplicationGateway"),
          "constraints": {"required": True, "regex": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.){2,}[a-z][a-z0-9-]{1,62}$",
                          "validationMessage": "Use a custom FQDN such as ai.contoso.com."}},
         {"name": "appGatewayBackendFqdn", "type": "Microsoft.Common.TextBox", "label": "Private HTTPS backend FQDN",
-         "visible": is_on("hub", "enableApplicationGateway"),
+         "visible": private_and("enableApplicationGateway"),
          "constraints": {"required": True, "regex": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z][a-z0-9-]{1,62}$",
                          "validationMessage": "Use an FQDN, not an IP address or URL."}},
         {"name": "appGatewayCertificateSecretId", "type": "Microsoft.Common.TextBox",
-         "label": "Versionless Key Vault certificate secret URI", "visible": is_on("hub", "enableApplicationGateway"),
+         "label": "Versionless Key Vault certificate secret URI", "visible": private_and("enableApplicationGateway"),
          "constraints": {"required": True, "regex": "^https://[a-z0-9-]{3,24}\\.vault\\.azure\\.net/secrets/[A-Za-z0-9-]{1,127}$",
                          "validationMessage": "Versionless https://<vault>.vault.azure.net/secrets/<name> URI."}},
         {"name": "appGatewayCertificateVaultId", "type": "Microsoft.Common.TextBox",
-         "label": "Certificate Key Vault resource ID", "visible": is_on("hub", "enableApplicationGateway"),
+         "label": "Certificate Key Vault resource ID", "visible": private_and("enableApplicationGateway"),
          "constraints": {"required": True, "regex": "^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft.KeyVault/vaults/[^/]+$",
                          "validationMessage": "Key Vault resource ID in this subscription."}},
     ]
