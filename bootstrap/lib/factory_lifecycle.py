@@ -3637,16 +3637,20 @@ def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sl
     # tagsProject (aif-138, 2026-10-29): a Modify of this factory's own group that touches nothing but its
     # tags is the planned tag update; any other Modify, and anything else in the footprint, still blocks.
     group_tags_updated = provenance.get(group) == "Modify" and group in tag_updates
+    status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
+    # An identity that exists is re-previewed with this review's inputs and may show as Modify (aif-138, 2026-10-30:
+    # other tags); the continuation never applies that projection, and the branch below requires the receipt that binds
+    # the live instance, so only a bound identity may differ in the preview.
+    identity_rows = ("Create", "NoChange", "Modify") if status == 200 else ("Create", "NoChange")
     if not (group in {scope.lower() for scope in document["locks"]["scopes"]}
             and {row["resource_id"] for row in changes} == {group, identifier}
-            and provenance.get(identifier) in ("Create", "NoChange")
+            and provenance.get(identifier) in identity_rows
             and (provenance.get(group) in ("Create", "NoChange") or group_tags_updated)):
         # The refusal names every what-if row and the tags-only updates it saw (aif-138, 2026-10-29: a bare code
         # cost a 56-minute walk per guess); resource ids and change types only, never bodies.
         raise Blocked("native-foundry-identity-preview-footprint-invalid", error_diagnostic={
             "resource_changes": {row["resource_id"]: str(provenance.get(row["resource_id"])) for row in changes},
             "tag_updates": sorted(tag_updates)})
-    status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
     if status == 200:
         require("foundry_identity_stage" not in plan, "native-foundry-identity-stage-already-materialized")
         evidence = plan.get("known_ownership", {}).get(identifier)
