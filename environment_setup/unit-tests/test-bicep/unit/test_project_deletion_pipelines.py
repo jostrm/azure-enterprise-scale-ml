@@ -376,7 +376,9 @@ def test_ado_actual_normalizer_handles_boolean_casing(tmp_path, full, services, 
 
 
 def test_github_services_only_preserves_legacy_foundation_boundary():
-    assert deletion("gha")["env"]["AIF_DELETE_PRESERVE_FOUNDATION"] == "true"
+    # Legacy default stays services-only; a reviewed configuration (the Factory API's project deletion) can set
+    # AIF_DELETE_PRESERVE_FOUNDATION=false to get ADO's complete services deletion (Key Vault, Storage, App Insights).
+    assert deletion("gha")["env"]["AIF_DELETE_PRESERVE_FOUNDATION"] == "${{ env.AIF_DELETE_PRESERVE_FOUNDATION || 'true' }}"
     assert "AIF_DELETE_PRESERVE_FOUNDATION" not in deletion("ado")["env"]
     # Legacy services-only cleanup did not include these foundation resources;
     # service private endpoints and bot-specific identities remain service-owned.
