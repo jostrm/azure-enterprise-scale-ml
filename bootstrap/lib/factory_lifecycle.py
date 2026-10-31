@@ -1664,6 +1664,11 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     def arm_read(path, api, allowed=None):
         return "arm", ("GET", path, api), () if allowed is None else (("allowed", allowed),)
 
+    def resource_read(resource_id, api):
+        # A dashboard tile or an alert rule still names a resource a project deletion removed: its 404 is a
+        # dangling reference (recorded in closure["references"], never walked), not a failed inventory.
+        return arm_read(resource_id, api, (200, 404) if resource_id.lower() in referenced else None)
+
     def collection_read(path, api, extension=False, single=None):
         if single:
             return arm_read(path + "/" + single, api, (200, 404))
@@ -1719,6 +1724,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             return "unclassified"
 
     derived = set()  # resources whose api-version came from the provider schema, not a pin
+    referenced = set()  # resources only another body names; they may already be deleted (dangling reference)
 
     def served(read, api, kind=None):
         """(version used, read(version)). A version from the provider schema (kind given) that the region does
@@ -1821,7 +1827,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             kind = resource_type_from_id(resource_id)
             if kind in LISTED_ONLY_CHILDREN:
                 return
-            reader.prefetch(arm_read(resource_id, versions[resource_id.lower()]))
+            reader.prefetch(resource_read(resource_id, versions[resource_id.lower()]))
             if kind not in terminal_extensions:
                 read_children_ahead(resource_id, kind)
                 read_extensions_ahead(resource_id)
@@ -1935,8 +1941,10 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                                         "body_hash": resource_digest(body, kind), "etag": resource_etag(body, {}, kind)}
             closure["references"][key] = []
             continue
-        api, (_, headers, body) = served(lambda value: reader.get(arm_read(resource_id, value)), api,
-                                         kind if key in derived else None)
+        api, (status, headers, body) = served(lambda value: reader.get(resource_read(resource_id, value)), api,
+                                              kind if key in derived else None)
+        if status == 404:
+            continue
         versions[key] = api
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
@@ -1968,6 +1976,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
             adopt(reference, resource_versions.get(reference) or version(referenced_kind, parent_api),
                   not resource_versions.get(reference))
+            referenced.add(reference.lower())
             enqueue(reference)
         if kind in terminal_extensions:
             continue
@@ -1982,6 +1991,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         extensions(resource_id)
     for reference, metadata in closure["inline"].items():
         parent = metadata["parent_id"]
+        if parent not in bodies and parent in referenced:
+            continue  # the inline child of a dangling reference: its deleted parent has no body to verify
         entries = bodies.get(parent)
         for field in inline[resource_type_from_id(reference)]:
             entries = entries.get(field) if isinstance(entries, dict) else None

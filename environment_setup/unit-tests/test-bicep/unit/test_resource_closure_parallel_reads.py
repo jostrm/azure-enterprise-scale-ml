@@ -323,3 +323,50 @@ def test_concurrent_token_reads_share_one_cli_refresh():
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda _: cloud.token(fl.ARM), range(32)))
     assert len(issued) == 2
+
+
+@pytest.mark.parametrize("workers", [None, 8])
+def test_a_dangling_reference_to_a_deleted_resource_is_recorded_never_a_failed_read(workers):
+    # aif-138 Scenario 5: after a project deletion, the common portal dashboard and Azure's auto-created
+    # "Failure Anomalies" alert rule still name the deleted project resources. Their reads answered 404 and
+    # stopped the scale-set deletion inventory with remote-request-failed-404.
+    cloud = InventoryCloud(workers=workers)
+    first = cloud.groups[0]
+    gone = first + "/providers/Microsoft.KeyVault/vaults/kv-deleted"
+    board = first + "/providers/Microsoft.Network/networkInterfaces/nic-dashboard"
+    cloud.add(board, {"tile": {"id": gone}})
+    closure, bodies = collect(cloud)
+    assert gone.lower() not in closure["resources"] and gone.lower() not in bodies
+    assert gone.lower() in closure["references"][board.lower()]
+    assert ("arm", gone.lower(), API["microsoft.keyvault/vaults"], (200, 404)) in cloud.calls
+    assert closure == collect(_with_dashboard())[0]  # serial and parallel walks record the same closure
+    assert not read_threads()
+
+
+def _with_dashboard():
+    cloud = InventoryCloud()
+    first = cloud.groups[0]
+    cloud.add(first + "/providers/Microsoft.Network/networkInterfaces/nic-dashboard",
+              {"tile": {"id": first + "/providers/Microsoft.KeyVault/vaults/kv-deleted"}})
+    return cloud
+
+
+def test_a_listed_resource_that_vanishes_still_fails_the_closure():
+    # Only reference-discovered resources may be gone: a listed root that answers 404 is a changed inventory.
+    cloud = InventoryCloud()
+    first = cloud.groups[0]
+    vm = (first + "/providers/Microsoft.Compute/virtualMachines/vm-0").lower()
+    cloud.failures[("arm", vm, "2024-07-01", (200,))] = fl.Blocked("remote-request-failed-404")
+    with pytest.raises(fl.Blocked, match="^remote-request-failed-404$"):
+        collect(cloud)
+
+
+def test_a_dangling_reference_to_an_inline_child_of_a_deleted_parent_is_recorded_too():
+    cloud = InventoryCloud()
+    first = cloud.groups[0]
+    gone = first + "/providers/Microsoft.KeyVault/vaults/kv-deleted"
+    board = first + "/providers/Microsoft.Network/networkInterfaces/nic-dashboard"
+    cloud.add(board, {"tile": {"id": gone + "/accessPolicies/policy-0"}})
+    closure, _ = collect(cloud)
+    assert gone.lower() not in closure["resources"]
+    assert closure["inline"][(gone + "/accessPolicies/policy-0").lower()] == {"parent_id": gone.lower()}
