@@ -2937,3 +2937,43 @@ def test_closure_walk_inventories_platform_managed_tables_from_their_list_withou
     changed.tables[0]["properties"]["plan"] = "Basic"
     assert fl.collect_resource_closure(changed, [GROUP])[0]["resources"] != closure["resources"]
     assert closure == fl.collect_resource_closure(WorkspaceTablesCloud(), [GROUP])[0]
+
+
+SEARCH = GROUP + "/providers/Microsoft.Search/searchServices/aisearchprj002"
+
+
+class SearchCloud(ClosureCloud):
+    """A project group with an Azure AI Search service: ARM's type is Microsoft.Search/searchServices (the provider
+    registers no 'services' type; aif-138 project deletion, 2026-10-31)."""
+
+    def __init__(self):
+        super().__init__()
+        self.bodies[SEARCH.lower()] = {"id": SEARCH, "type": "Microsoft.Search/searchServices", "etag": '"search"',
+                                       "tags": {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()},
+                                       "properties": {}}
+        self.search_lists = []
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.search":
+            return {"resourceTypes": [
+                {"resourceType": "searchServices", "apiVersions": ["2025-05-01"]},
+                {"resourceType": "searchServices/sharedPrivateLinkResources", "apiVersions": ["2025-05-01"]}]}
+        return super().provider_schema(namespace)
+
+    def list_resources(self, scope):
+        return super().list_resources(scope) + [copy.deepcopy(self.bodies[SEARCH.lower()])]
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower() == SEARCH.lower() + "/sharedprivatelinkresources":
+            self.search_lists.append(api_version)
+            return [], None
+        return super().collection(path, api_version, extension)
+
+
+def test_the_real_search_service_arm_type_is_walked_with_its_shared_private_links():
+    cloud = SearchCloud()
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    assert closure["resources"][SEARCH.lower()]["type"] == "microsoft.search/searchservices"
+    assert SEARCH.lower() in bodies
+    # Its documented child is listed once, at the pinned version; a failed list never means an empty list.
+    assert cloud.search_lists == ["2025-05-01"]
