@@ -2500,6 +2500,26 @@ def delete_project_resources(cloud, locks, document, receipt, persist, sleep=tim
     persist()
 
 
+ENROLLMENT_GRANT_ROLES = frozenset({"b24988ac-6180-42a0-ab88-20f7382dd24c",   # Contributor
+                                    "f58310d9-a9f6-439a-9e8d-f62e7b41a168"})  # Role Based Access Control Administrator
+
+
+def enrollment_grant(resource_id, body, document, scopes):
+    """An enroll-scale-set grant: the bound deployment principal's Contributor or RBAC Administrator role assigned on
+    an enrolled group itself. Role assignments carry no tags and the enrollment records them in its audit record, not
+    in a worker receipt; exactly these grants are the scale set's own. Any other role assignment needs evidence."""
+    key = str(resource_id).lower()
+    properties = (body or {}).get("properties") or {}
+    scope = str(properties.get("scope", "")).lower().rstrip("/")
+    role = str(properties.get("roleDefinitionId", "")).lower().rsplit("/", 1)[-1]
+    principal = str(properties.get("principalId", "")).lower()
+    return ("/providers/microsoft.authorization/roleassignments/" in key
+            and principal == str(document["identity"]["deployment_object_id"]).lower()
+            and role in ENROLLMENT_GRANT_ROLES
+            and scope in {str(item).lower().rstrip("/") for item in scopes}
+            and key.startswith(scope + "/providers/microsoft.authorization/roleassignments/"))
+
+
 def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
     require(isinstance(evidence, dict) and guid(evidence.get("run_id"))
             and hash_value(evidence.get("receipt_hash")), "child-ownership-evidence-required")
@@ -6020,6 +6040,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 owner = {field: tags[TAG_KEYS[field]] for field in TAG_KEYS if TAG_KEYS[field] in tags}
                 if all(field in owner for field in ("factory_id", "scaleset_id")):
                     previous_owners[key] = owner
+                elif enrollment_grant(key, current_bodies[key], document, existing_scopes):
+                    previous_owners[key] = {field: document["target"][field] for field in ("factory_id", "scaleset_id")}
                 else:
                     evidence = document["deployment"].get("known_ownership", {}).get(key, {})
                     if not evidence and key in bootstrap_owners:
