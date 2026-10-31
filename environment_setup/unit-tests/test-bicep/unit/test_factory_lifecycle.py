@@ -2977,3 +2977,23 @@ def test_the_real_search_service_arm_type_is_walked_with_its_shared_private_link
     assert SEARCH.lower() in bodies
     # Its documented child is listed once, at the pinned version; a failed list never means an empty list.
     assert cloud.search_lists == ["2025-05-01"]
+
+
+def test_a_refused_remote_request_names_its_call_on_stderr(capsys):
+    # aif-138 project deletion (2026-10-31) stopped with remote-request-failed-400/409 and nothing said which call.
+    def answer(request, timeout=None):
+        raise HTTPError(request.full_url, 409, "Conflict", email.message.Message(),
+                        io.BytesIO(fl.canonical({"error": {"code": "AnotherOperationInProgress", "message": "busy"}})))
+
+    opener = Mock()
+    opener.open.side_effect = answer
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=opener)
+    cloud.token = Mock(return_value="synthetic-token")
+    with pytest.raises(fl.Blocked) as raised:
+        cloud.arm("GET", NSG, "2024-05-01")
+    assert raised.value.code == "remote-request-failed-409"
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    refused = [event for event in events if event.get("event") == "remote-request-refused"]
+    assert refused == [{"event": "remote-request-refused", "method": "GET", "host": "management.azure.com",
+                        "path": NSG, "api_version": "2024-05-01", "status": 409,
+                        "error_code": "AnotherOperationInProgress"}]

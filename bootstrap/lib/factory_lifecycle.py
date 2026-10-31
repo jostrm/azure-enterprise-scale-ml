@@ -319,6 +319,20 @@ SEARCH_SERVICE_KINDS = frozenset({"microsoft.search/searchservices", "microsoft.
 SEARCH_SHARED_LINK_KINDS = frozenset(kind + "/sharedprivatelinkresources" for kind in SEARCH_SERVICE_KINDS)
 
 
+def refused_request_event(method, parsed, error):
+    """A non-secret record of a refused remote call: method, host, path, api-version, status and the error code."""
+    api = parse_qs(parsed.query).get("api-version", [])
+    code = None
+    try:
+        body = json.loads(error.read(MAX_DOCUMENT + 1) or b"{}")
+        candidate = (body.get("error") or {}).get("code") if isinstance(body.get("error"), dict) else body.get("code")
+        code = candidate if isinstance(candidate, str) and ARM_ERROR_CODE.fullmatch(candidate) else None
+    except Exception:  # an unreadable answer has no code
+        pass
+    return {"event": "remote-request-refused", "method": method, "host": parsed.hostname, "path": parsed.path,
+            "api_version": api[0] if len(api) == 1 else None, "status": error.code, "error_code": code}
+
+
 def require(condition, code):
     if not condition:
         raise Blocked(code)
@@ -1290,8 +1304,12 @@ class Cloud:
                     response = self.opener.open(request, timeout=timeout)
                 except HTTPError as error:
                     if error.code not in allowed:
-                        failure = (ApiVersionNotServed if readonly and http_error_api_version_not_served(error, url)
-                                   else Blocked)
+                        not_served = readonly and http_error_api_version_not_served(error, url)
+                        failure = ApiVersionNotServed if not_served else Blocked
+                        if not not_served:
+                            # Name the refused call (the code alone never says which of thousands of reads failed).
+                            print(json.dumps(refused_request_event(method, parsed, error), sort_keys=True),
+                                  file=sys.stderr, flush=True)
                         try:
                             error.close()
                         finally:
