@@ -277,6 +277,43 @@ class Blocked(ValueError):
         super().__init__(code)
 
 
+class ApiVersionNotServed(Blocked):
+    """ARM's 400 NoRegisteredProviderFound naming the requested api-version: the region does not serve it yet.
+
+    During an api-version rollout an ARM front end can advertise a provider version (in the provider schema)
+    before the resource's region serves it (aif-128 COMMON, 2026-10-26: 2026-07-01 for ~83 Microsoft.Network
+    types, while swedencentral answered it with this 400; aif-138 project deletion, 2026-10-31, the same for
+    privateEndpoints and networkInterfaces). It keeps the caller's fail-closed code, so every caller that does not
+    handle it fails exactly as before; only the closure walk retries a schema-derived version at an older one.
+    """
+
+
+# Older stable api-versions the closure walk may try after a schema-derived version is not served.
+API_VERSION_FALLBACKS = 2
+
+
+def api_version_not_served(body, api_version):
+    error = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(error, dict) or type(api_version) is not str:
+        return False
+    message = error.get("message")
+    return (error.get("code") == "NoRegisteredProviderFound" and isinstance(message, str)
+            and "api version '" + api_version.lower() + "'" in message.lower())
+
+
+def http_error_api_version_not_served(error, url):
+    """True only when an HTTPError is ARM's 400 that says the URL's api-version is not served."""
+    try:
+        if error.code != 400:
+            return False
+        raw = error.read(MAX_DOCUMENT + 1)
+        versions = parse_qs(urlsplit(url).query).get("api-version", [])
+        return (len(raw) <= MAX_DOCUMENT and len(versions) == 1
+                and api_version_not_served(json.loads(raw), versions[0]))
+    except Exception:  # an unreadable answer is a plain failure
+        return False
+
+
 def require(condition, code):
     if not condition:
         raise Blocked(code)
@@ -1248,10 +1285,12 @@ class Cloud:
                     response = self.opener.open(request, timeout=timeout)
                 except HTTPError as error:
                     if error.code not in allowed:
+                        failure = (ApiVersionNotServed if readonly and http_error_api_version_not_served(error, url)
+                                   else Blocked)
                         try:
                             error.close()
                         finally:
-                            raise Blocked("remote-request-failed-" + str(error.code)) from None
+                            raise failure("remote-request-failed-" + str(error.code)) from None
                     response = error
                 with response:
                     status, response_headers = response.code, dict(response.headers)
@@ -1451,7 +1490,9 @@ class Cloud:
                 code = error.get("code") if isinstance(error, dict) else None
                 if not (extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
                         and not ("error" in body and "code" in body)):
-                    raise Blocked("unsupported-child-inventory-endpoint", error_diagnostic={
+                    failure = (ApiVersionNotServed if status == 400 and api_version_not_served(body, api_version)
+                               else Blocked)
+                    raise failure("unsupported-child-inventory-endpoint", error_diagnostic={
                         "resource_type": collection_resource_type(path), "api_version": api_version,
                         "status": status, "error_code": code if isinstance(code, str)
                         and ARM_ERROR_CODE.fullmatch(code) else None})
@@ -1654,6 +1695,34 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         except Blocked:
             return "unclassified"
 
+    derived = set()  # resources whose api-version came from the provider schema, not a pin
+
+    def served(read, api, kind=None):
+        """(version used, read(version)). A version from the provider schema (kind given) that the region does
+        not serve (ApiVersionNotServed) retries the same schema's next older stable versions of that type, at
+        most API_VERSION_FALLBACKS. A pinned version never falls back. Exhausted, it fails with the read's own
+        code and diagnostic."""
+        try:
+            return api, read(api)
+        except ApiVersionNotServed as error:
+            failure = error
+        if kind is not None:
+            # The schema is consulted only after the region refused its version (no extra reads otherwise).
+            namespace, relative = kind.split("/", 1)
+            for candidate in sorted((value for value in provider(namespace).get(relative.lower(), [])
+                                     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
+                                    reverse=True)[:API_VERSION_FALLBACKS]:
+                try:
+                    return candidate, read(candidate)
+                except ApiVersionNotServed as error:
+                    failure = error
+        raise Blocked(failure.code, error_diagnostic=failure.error_diagnostic) from None
+
+    def adopt(resource_id, api, schema_derived):
+        versions[resource_id.lower()] = api
+        if schema_derived:
+            derived.add(resource_id.lower())
+
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
@@ -1786,7 +1855,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         for row in rows:
             resource_id = row["id"].lower()
             if resource_id not in versions:
-                versions[resource_id] = resource_versions.get(resource_id, api)
+                adopt(resource_id, resource_versions.get(resource_id, api), resource_id not in resource_versions)
                 enqueue(row["id"])
 
     def extensions(scope):
@@ -1823,7 +1892,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             require(arm_scope(resource_id) == scope.lower(), "inventory-escaped-resource-group")
             api = resource_versions.get(resource_id.lower()) or version(resource_type_from_id(resource_id))
             if resource_id.lower() not in versions:
-                versions[resource_id.lower()] = api
+                adopt(resource_id, api, not resource_versions.get(resource_id.lower()))
                 enqueue(resource_id)
         extensions(scope)
     visited = set()
@@ -1843,7 +1912,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                                         "body_hash": resource_digest(body, kind), "etag": resource_etag(body, {}, kind)}
             closure["references"][key] = []
             continue
-        _, headers, body = reader.get(arm_read(resource_id, api))
+        api, (_, headers, body) = served(lambda value: reader.get(arm_read(resource_id, value)), api,
+                                         kind if key in derived else None)
+        versions[key] = api
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
         require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
@@ -1872,7 +1943,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                 # but is never read or walked.
                 continue
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
-            versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
+            adopt(reference, resource_versions.get(reference) or version(referenced_kind, parent_api),
+                  not resource_versions.get(reference))
             enqueue(reference)
         if kind in terminal_extensions:
             continue

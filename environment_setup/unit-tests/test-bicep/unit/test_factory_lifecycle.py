@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+from urllib.error import HTTPError
 from urllib.request import HTTPSHandler, build_opener
 from urllib.response import addinfourl
 from uuid import uuid4
@@ -2084,6 +2085,183 @@ def test_child_inventory_diagnostic_is_closed_and_revalidated(detail):
             "status": 400, "error_code": "KindNotSpecified"}
     assert fl.safe_instance_diagnostic("unsupported-child-inventory-endpoint", good) == good
     assert fl.safe_instance_diagnostic("bootstrap-resource-instance-changed", good) is None
+
+
+# aif-128 COMMON (2026-10-26, read-only): during a Microsoft.Network api-version rollout about one
+# provider-schema read in five came from a front end advertising 2026-07-01 for ~83 types, while the
+# swedencentral provider answered that version with 400 NoRegisteredProviderFound (the same list at
+# 2026-05-01 answered 200). The walk lists each child at the schema's newest stable version, so it stopped.
+UNSERVED_API = "2026-07-01"
+
+
+def not_served_body(api, kind="virtualNetworks/taggedTrafficConsumers"):
+    return {"error": {"code": "NoRegisteredProviderFound", "message": (
+        "No registered resource provider found for location 'swedencentral' and API version '" + api
+        + "' for type '" + kind + "'. The supported api-versions are '2024-05-01'. "
+        "The supported locations are 'swedencentral'.")}}
+
+
+def real_cloud_failure(body, call):
+    """What the real Cloud raises when ARM answers this HTTP 400 (urllib raises HTTPError for it)."""
+    def answer(request, timeout=None):
+        raise HTTPError(request.full_url, 400, "Bad Request", email.message.Message(),
+                        io.BytesIO(fl.canonical(body)))
+
+    opener = Mock()
+    opener.open.side_effect = answer
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=opener)
+    cloud.token = Mock(return_value="synthetic-token")
+    with pytest.raises(fl.Blocked) as raised:
+        call(cloud)
+    assert opener.open.call_count == 1
+    return raised.value
+
+
+class ApiRolloutCloud(ClosureCloud):
+    """A schema read from a front end that advertises newer api-versions the resource's region does not serve."""
+
+    def __init__(self, unserved=(UNSERVED_API,), kinds=("networksecuritygroups", "networksecuritygroups/securityrules"),
+                 body=not_served_body):
+        super().__init__()
+        self.unserved, self.kinds, self.body, self.reads = set(unserved), set(kinds), body, []
+
+    def provider_schema(self, namespace):
+        result = super().provider_schema(namespace)
+        for row in result["resourceTypes"]:
+            if row["resourceType"].lower() in self.kinds:
+                row["apiVersions"] = sorted(self.unserved, reverse=True) + row["apiVersions"]
+        return result
+
+    def collection(self, path, api_version, extension=False):
+        self.reads.append(("collection", path.lower(), api_version))
+        if api_version in self.unserved:
+            raise real_cloud_failure(self.body(api_version),
+                                     lambda cloud: cloud.collection(path, api_version, extension=extension))
+        return super().collection(path, api_version, extension)
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "GET":
+            self.reads.append(("arm", resource_id.lower(), api_version))
+            if api_version in self.unserved:
+                raise real_cloud_failure(self.body(api_version),
+                                         lambda cloud: cloud.arm("GET", resource_id, api_version, allowed))
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+RULES = NSG.lower() + "/securityrules"
+
+
+@pytest.mark.parametrize("call,code", [
+    (lambda cloud: cloud.collection(NSG + "/securityRules", UNSERVED_API), "unsupported-child-inventory-endpoint"),
+    (lambda cloud: cloud.arm("GET", NSG, UNSERVED_API), "remote-request-failed-400"),
+])
+def test_an_unserved_api_version_keeps_the_fail_closed_code_and_is_told_apart(call, code):
+    error = real_cloud_failure(not_served_body(UNSERVED_API), call)
+    assert error.code == str(error) == code
+    assert isinstance(error, fl.ApiVersionNotServed)
+    if code == "unsupported-child-inventory-endpoint":
+        assert error.error_diagnostic == {
+            "resource_type": "microsoft.network/networksecuritygroups/securityrules", "api_version": UNSERVED_API,
+            "status": 400, "error_code": "NoRegisteredProviderFound"}
+
+
+OTHER_400_BODIES = [
+    {"error": {"code": "InvalidResourceType", "message": "API version '" + UNSERVED_API + "' is not valid."}},
+    {"error": {"code": "NoRegisteredProviderFound", "message": not_served_body("2025-01-01")["error"]["message"]}},
+    {"error": {"code": "NoRegisteredProviderFound", "message": "No registered resource provider found."}},
+    {"error": {"code": "NoRegisteredProviderFound"}},
+    {"code": "NoRegisteredProviderFound", "message": not_served_body(UNSERVED_API)["error"]["message"]},
+    {"error": {"code": "BadRequest", "details": [not_served_body(UNSERVED_API)["error"]]}},
+]
+
+
+@pytest.mark.parametrize("body", OTHER_400_BODIES)
+@pytest.mark.parametrize("call,code", [
+    (lambda cloud: cloud.collection(NSG + "/securityRules", UNSERVED_API), "unsupported-child-inventory-endpoint"),
+    (lambda cloud: cloud.arm("GET", NSG, UNSERVED_API), "remote-request-failed-400"),
+])
+def test_other_400_answers_are_never_an_unserved_api_version(body, call, code):
+    error = real_cloud_failure(body, call)
+    assert error.code == code and not isinstance(error, fl.ApiVersionNotServed)
+
+
+@pytest.mark.parametrize("workers", [1, 4])
+def test_closure_walk_falls_back_from_an_unserved_schema_api_version(workers):
+    baseline, _ = fl.collect_resource_closure(ClosureCloud(), [GROUP])
+    cloud = ApiRolloutCloud()
+    cloud.closure_read_workers = workers
+    closure, bodies = fl.collect_resource_closure(cloud, [GROUP])
+    # The walk records the version it actually used, so only the provider schema fingerprint differs.
+    assert closure["collections"][RULES]["api_version"] == "2024-05-01"
+    assert closure["resources"][NSG.lower()]["api_version"] == closure["resources"][RULE.lower()]["api_version"] \
+        == "2024-05-01"
+    assert {key: value for key, value in closure.items() if key != "providers"} \
+        == {key: value for key, value in baseline.items() if key != "providers"}
+    assert set(bodies) == {GROUP.lower(), NSG.lower(), RULE.lower()}
+    for read in (("arm", NSG.lower()), ("collection", RULES), ("arm", RULE.lower())):
+        assert [api for *key, api in cloud.reads if tuple(key) == read] == (
+            ["2024-05-01"] if read[1] == RULE.lower() else [UNSERVED_API, "2024-05-01"])
+
+
+@pytest.mark.parametrize("body", OTHER_400_BODIES)
+@pytest.mark.parametrize("kind,code", [
+    ("networksecuritygroups", "remote-request-failed-400"),
+    ("networksecuritygroups/securityrules", "unsupported-child-inventory-endpoint"),
+])
+def test_closure_walk_never_falls_back_for_other_400_answers(body, kind, code):
+    cloud = ApiRolloutCloud(kinds=(kind,), body=lambda api: body)
+    if kind == "networksecuritygroups":
+        with pytest.raises(fl.Blocked) as raised:
+            fl.collect_resource_closure(cloud, [GROUP])
+        assert raised.value.code == code
+        assert [api for _, path, api in cloud.reads if path == NSG.lower()] == [UNSERVED_API]
+        return
+    # release/v1.25 keeps its tolerant child inventory (aif-135/136): a child list that still fails after the schema's
+    # older stable versions is recorded as not listable, never raised and never treated as empty. Here an older
+    # stable version answers, which that pre-existing retry already uses.
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    entry = closure["collections"][RULES]
+    assert entry["unsupported"] in (None, "not-listable-400")
+    assert entry["unsupported"] or entry["api_version"] != UNSERVED_API
+
+
+def test_pinned_resource_api_versions_never_fall_back():
+    cloud = ApiRolloutCloud(kinds=("networksecuritygroups",))
+    with pytest.raises(fl.Blocked) as raised:
+        fl.collect_resource_closure(cloud, [GROUP], {NSG.lower(): UNSERVED_API})
+    assert raised.value.code == "remote-request-failed-400" and type(raised.value) is fl.Blocked
+    assert [read for read in cloud.reads if read[1] == NSG.lower()] == [("arm", NSG.lower(), UNSERVED_API)]
+
+
+def test_pinned_extension_api_versions_never_fall_back():
+    api = dict(fl.EXTENSION_COLLECTIONS)["Microsoft.Insights/diagnosticSettings"]
+    cloud = ApiRolloutCloud(unserved=(api,), kinds=())
+    # release/v1.25's tolerant walk records a failing extension list instead of raising; it never falls back.
+    closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+    assert closure["collections"][NSG.lower() + "/providers/microsoft.insights/diagnosticsettings"]["unsupported"]         == "not-listable-400"
+    reads = [read for read in cloud.reads if read[1].endswith("/diagnosticsettings")]
+    assert ("collection", NSG.lower() + "/providers/microsoft.insights/diagnosticsettings", api) in reads
+    assert all(read[2] == api for read in reads)  # pinned: one read each, never another version
+
+
+@pytest.mark.parametrize("unserved,served", [
+    (("2026-08-01", "2026-07-01"), True),
+    (("2026-09-01", "2026-08-01", "2026-07-01"), False),
+])
+def test_api_version_fallback_is_bounded(unserved, served):
+    assert fl.API_VERSION_FALLBACKS == 2
+    cloud = ApiRolloutCloud(unserved=unserved, kinds=("networksecuritygroups/securityrules",))
+    if served:
+        closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+        assert closure["collections"][RULES]["api_version"] == "2024-05-01"
+    else:
+        # Exhausted: release/v1.25's tolerant child inventory records the collection as not listable.
+        closure, _ = fl.collect_resource_closure(cloud, [GROUP])
+        assert closure["collections"][RULES]["unsupported"] == "not-listable-400"
+    tried = [api for kind, path, api in cloud.reads if path == RULES]
+    assert tried[:len(unserved)] == sorted(unserved, reverse=True)
+    if served:
+        assert tried[-1] == "2024-05-01"
 
 
 def test_what_if_accepts_empty_202_polls_before_final_changes():
