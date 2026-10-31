@@ -27,13 +27,14 @@ require that external project or .NET.
 
 ## Automatic checks after a push or pull request
 
-`.github/workflows/infrastructure-tests.yml` runs on every push, pull request and
-manual dispatch, and nightly. A local commit alone does not start remote CI; push it first.
+`.github/workflows/infrastructure-tests.yml` runs on pushes to `main`, pull requests to `main`,
+`release_*` tags and manual dispatch. Pushes to other branches and a nightly schedule do not
+start it, to save GitHub Actions minutes. A local commit alone does not start remote CI; push it first.
 The checks are **IaC / unit / ubuntu-22.04**, **IaC / unit / windows-2022**,
 **IaC / syntax / ubuntu-22.04** and **IaC / bicep / ubuntu-22.04**.
 
 - **Unit:** the selected [test tiers](#test-tiers) of `unit/test_*.py` and root-level
-  `test_*.py`: tiers 1-4 on push and pull request, every tier nightly. This includes the
+  `test_*.py`: tiers 1-3 on `main` and pull requests, every tier for a `release_*` tag. This includes the
   existing parity, bootstrap, project-only, exact-version, DNS and resource-discovery
   regressions. The new contracts inventory every exposed `ENABLE_*` setting and
   reject an unreviewed new flag, missing mapping, cross-wiring, wrong boolean
@@ -97,8 +98,8 @@ test file is not assigned to a tier, so add it to `tiers.py` in the same change.
 | 4 | `lifecycle` | Factory and project lifecycle: bootstrap, enrollment, registration, promotion, deletion, single-writer coordination, runners and read-only transports. |
 | 5 | `capacity` | Preflight and capacity: capacity preflight, regional and SKU fallback, capacity retries, region reports, subnet scaling and peerability checks. |
 
-The default selection is **1-4** (`default` in `tiers.py`), so pushes and pull requests
-skip tier 5. A selection is a tier (`5`), a range (`1-4`), a list (`1,5`), `default` or `all`.
+The default selection is **1-3** (`default` in `tiers.py`): tier 1 is the smallest and tier 5
+the largest selection, so pushes and pull requests skip tiers 4 and 5. A selection is a tier (`5`), a range (`1-4`), a list (`1,5`), `default` or `all`.
 The first of these that is set wins:
 
 1. `--tiers` on `run_ci.py` or `pytest`, for example `python run_ci.py --phase unit --tiers all`;
@@ -120,9 +121,13 @@ Enabling tier 5 in CI:
   `infrastructure-tests.yml` and `verify-aifactory-dev.yml` read it. Azure Pipelines
   uses only the `testTiers` parameter; a pipeline variable of the same name is ignored.
 - **Permanently in source:** change `default` in `tiers.py` to `all`.
-- **Nightly (02:17 UTC):** GitHub runs every tier every night. Azure Pipelines runs every
-  tier on nights when `main` changed (`always: false`), unless a schedule set in its UI
-  overrides the YAML schedule.
+- **For a release:** pushing a `release_*` tag (for example `release_125`) runs every tier in
+  GitHub. The release snapshot script also runs every tier locally first and publishes the
+  dual-graph snapshot only when they all pass; see
+  [`environment_setup/graphify/release_snapshot.py`](../../graphify/release_snapshot.py).
+- **Nightly:** GitHub has no nightly run. Azure Pipelines runs every tier at 02:17 UTC on
+  nights when `main` changed (`always: false`), unless a schedule set in its UI overrides
+  the YAML schedule.
 
 ## What the matrix proves (and does not)
 
@@ -166,7 +171,7 @@ Install the existing requirements in an isolated Python environment:
 ```bash
 cd environment_setup/unit-tests/test-bicep
 python -m pip install -r requirements.txt
-python run_ci.py --phase unit              # default tiers 1-4
+python run_ci.py --phase unit              # default tiers 1-3
 python run_ci.py --phase unit --tiers all  # every tier, including 5 (preflight and capacity)
 python run_ci.py --phase syntax
 python run_bicep_matrix.py --bicep bicep --prepare-cache --report test-results/bicep-dependencies.json

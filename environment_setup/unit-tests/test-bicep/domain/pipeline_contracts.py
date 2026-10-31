@@ -304,6 +304,8 @@ def evaluate(expression: str, context: dict[str, Any]) -> Any:
                 "not": lambda item: not item, "eq": equal,
                 "ne": lambda left, right: not equal(left, right),
                 "in": lambda item, *items: any(equal(item, other) for other in items),
+                # GitHub's startsWith is case-insensitive, like its comparisons.
+                "startsWith": lambda text, prefix: str(text or "").lower().startswith(str(prefix).lower()),
                 "always": lambda: True,
                 "success": lambda: context.get("success", True),
                 "succeeded": lambda: context.get("success", True),

@@ -1,5 +1,6 @@
 # Generated corpus data is delivered through verified, explicitly pinned bundles.
 snapshots/
+release-assets/
 current.json
 graph.json
 graph.html

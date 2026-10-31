@@ -9,11 +9,14 @@ sources:
   - mcp/src/aifactory_mcp/graph.py
   - environment_setup/graphify/generate.py
   - environment_setup/graphify/static_runner.py
+  - environment_setup/graphify/release_snapshot.py
+  - .github/workflows/infrastructure-tests.yml
   - environment_setup/graphify/requirements.txt
   - environment_setup/graphify/requirements.lock.txt
 tests:
   - environment_setup/graphify/tests/test_extraction.py
   - environment_setup/graphify/tests/test_graphify_cli.py
+  - environment_setup/graphify/tests/test_release_snapshot.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_dual_graph.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_integration.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_packaging.py
@@ -104,6 +107,31 @@ Normal application/MCP queries use the shared governed runtime adapter, **not** 
 The local Scout skill `esml-dual-graph` was installed by the coordinating task and uses this shared CLI fallback. Its presence is not proof that Scout discovered native MCP tools. The separate MCP `--graph-only` addition was still in progress at this documentation freeze; verify its current implementation/tests before describing it as available.
 
 Operator-only `DualGraphStore.export_snapshot` exports a verified pinned bundle for packaging. Gateway configuration, application deployment and retrieval ingestion were not changed by this local graph work. Final snapshot identifiers belong in the generation handoff, not these indexed notes, avoiding a self-hash cycle.
+
+## Release snapshots
+
+Snapshots are never committed: `meta/graphify/.gitignore` excludes them, so a fresh clone has
+none. A release snapshot is published as two GitHub Release assets on an explicit `release_NNN`
+tag (for example `release_125`; `release/v1.25` is the branch): `aifactory-dual-graph-<tag>.zip`
+and its `.sha256` checksum. Commits, pushes and ordinary releases do not rebuild it, and no
+GitHub Actions job generates or uploads it.
+
+`environment_setup/graphify/release_snapshot.py publish --tag <tag>` runs on the operator
+workstation in the extraction environment. It refuses an uncommitted or unpushed checkout and a
+tag on another commit, then runs every unit-test tier (`run_ci.py --phase unit --tiers all`, with
+`--test-python` naming an interpreter that has the test-bicep requirements). Only when tiers 1-5
+pass does it generate the snapshot, require a clean, fresh snapshot of exactly the release
+commit, and write a deterministic zip and checksum to the ignored `meta/graphify/release-assets/`.
+Without `--apply` it prints the remaining `git`/`gh` commands; with `--apply` it creates and pushes
+the annotated tag, creates the release and uploads the assets. It never replaces an uploaded
+snapshot. Pushing the tag also runs every tier in `infrastructure-tests.yml`.
+
+`release_snapshot.py fetch --tag <tag>` (or `--asset` for a local file) verifies the checksum
+and the snapshot's own integrity manifest, rejects unexpected or escaping zip members, and unpacks
+to `meta/graphify/snapshots/<snapshot-id>`. That directory is the immutable pinned root the chat
+agent and MCP accept (`snapshot_root` plus `expected_snapshot_id`); fetching does not change the
+local `current.json`. A release asset establishes the snapshot published for that tag, not the
+version installed in any deployment.
 
 ## Coverage and trust
 

@@ -21,7 +21,7 @@ schedules:
 
 parameters:
   - name: testTiers
-    displayName: "Unit-test tiers: default (tiers.py, 1-4), all, 1-5, 5 or 1,3"
+    displayName: "Unit-test tiers: default (tiers.py, 1-3), all, 1-5, 5 or 1,3"
     type: string
     default: default
 

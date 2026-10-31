@@ -1,15 +1,21 @@
 name: AI Factory infrastructure tests
 
+# Every run spends GitHub Actions minutes: only main, pull requests to main and release tags
+# run automatically. A release tag (release_125) runs every tier, 1-5, before its graph
+# snapshot is published (environment_setup/graphify/release_snapshot.py).
 on:
   push:
+    branches:
+      - main
+    tags:
+      - "release_*"
   pull_request:
-  schedule:
-    # Nightly run of every unit-test tier, including tier 5 (preflight and capacity).
-    - cron: "17 2 * * *"
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tiers:
-        description: "Unit-test tiers: all, 1-5, 5 or 1,3. Empty: repository variable AIF_TEST_TIERS, else the tiers.py default (1-4)."
+        description: "Unit-test tiers: all, 1-5, 5 or 1,3. Empty: repository variable AIF_TEST_TIERS, else the tiers.py default (1-3)."
         required: false
         default: ""
         type: string
@@ -40,8 +46,8 @@ jobs:
     env:
       LIVE_AZURE: "0"
       PYTHONUTF8: "1"
-      # Validated by run_ci.py; empty means the tiers.py default, which skips tier 5.
-      AIF_TEST_TIERS: ${{ github.event_name == 'schedule' && 'all' || inputs.tiers || vars.AIF_TEST_TIERS }}
+      # Validated by run_ci.py; empty means the tiers.py default (1-3). A release tag always runs every tier.
+      AIF_TEST_TIERS: ${{ startsWith(github.ref, 'refs/tags/release_') && 'all' || inputs.tiers || vars.AIF_TEST_TIERS }}
     steps:
       - name: Check out code without persisted credentials
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

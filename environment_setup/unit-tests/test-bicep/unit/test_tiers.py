@@ -56,7 +56,17 @@ def test_preflight_and_capacity_suites_are_tier_five_and_skipped_by_default():
         "unit/test_subnet_scaling_capacity.py",
     ):
         assert MANIFEST.tier_of(path) == 5, path
-    assert MANIFEST.parse(MANIFEST.default) == frozenset({1, 2, 3, 4})
+    assert 5 not in MANIFEST.parse(MANIFEST.default)
+
+
+def test_default_selection_is_the_cumulative_tiers_one_to_three():
+    # Tier 1 is the smallest selection and 5 the largest; pushes and pull requests stop at tier 3.
+    assert MANIFEST.default == "1-3"
+    assert MANIFEST.parse(MANIFEST.default) == frozenset({1, 2, 3})
+
+
+def test_github_oidc_refresh_contract_is_a_pipeline_test():
+    assert MANIFEST.tier_of("unit/test_github_oidc_refresh.py") == 2
 
 
 def test_key_vault_principal_guard_runs_on_every_push_with_identity_tests():
@@ -73,7 +83,7 @@ def test_this_contract_and_the_ci_runner_contract_are_core():
 @pytest.mark.parametrize("spec,expected", [
     ("1-4", {1, 2, 3, 4}), ("5", {5}), ("1,5", {1, 5}), (" 2 - 3 , 5 ", {2, 3, 5}),
     ("all", {1, 2, 3, 4, 5}), ("ALL", {1, 2, 3, 4, 5}), ("1-5", {1, 2, 3, 4, 5}), ("3-3", {3}),
-    ("default", {1, 2, 3, 4}),
+    ("default", {1, 2, 3}),
 ])
 def test_selection_accepts_numbers_ranges_lists_and_all(spec, expected):
     assert MANIFEST.parse(spec) == frozenset(expected)
@@ -102,7 +112,7 @@ def test_selection_spec_is_normalized_for_reports():
     assert manifest.resolve("3, 1-2", {}).spec == "all"
     assert manifest.resolve("1,3", {}).spec == "1,3"
     assert MANIFEST.resolve("5,1-3", {}).spec == "1-3,5"
-    assert MANIFEST.resolve(None, {}).skipped == (5,)
+    assert MANIFEST.resolve(None, {}).skipped == (4, 5)
 
 
 def test_default_selection_still_runs_a_file_that_was_named_explicitly():
@@ -210,8 +220,8 @@ def run_unit_phase(tmp_path, monkeypatch, *arguments: str, environment: dict[str
 def test_run_ci_passes_the_default_selection_to_pytest_and_reports_it(tmp_path, monkeypatch):
     code, command, summary = run_unit_phase(tmp_path, monkeypatch)
     assert code == 0
-    assert command[command.index("--tiers") + 1] == "1-4"
-    assert summary["tiers"] == {"selected": "1-4", "source": "default", "skipped": [5]}
+    assert command[command.index("--tiers") + 1] == "1-3"
+    assert summary["tiers"] == {"selected": "1-3", "source": "default", "skipped": [4, 5]}
 
 
 def test_run_ci_option_and_environment_enable_tier_five(tmp_path, monkeypatch):

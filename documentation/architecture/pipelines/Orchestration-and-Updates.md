@@ -88,14 +88,16 @@ Persona preflight readiness is runtime state, not a public `.env` input.
 Unit tests are split into tiers 1-5 (core, pipelines, infra, lifecycle, capacity).
 `tiers.py` assigns every offline test file to exactly one tier, and
 `unit/test_tiers.py` rejects an unassigned or stale file. The selection comes from
-`--tiers`, then `AIF_TEST_TIERS`, then the `tiers.py` default `1-4`, so push and pull
-request runs skip tier 5 (preflight and capacity). `run_ci.py` validates the
+`--tiers`, then `AIF_TEST_TIERS`, then the `tiers.py` default `1-3`, so push and pull
+request runs skip tiers 4 (lifecycle) and 5 (preflight and capacity). `run_ci.py` validates the
 selection for the unit phase only, passes it to pytest and records it in
 `unit-summary.json`. The GitHub workflows take a `tiers` dispatch input or the
 `AIF_TEST_TIERS` repository variable; Azure Pipelines takes only a `testTiers`
-parameter. GitHub runs every tier nightly; Azure Pipelines does so on nights when
-`main` changed (`always: false`). Each event type has its own GitHub concurrency
-group, so a push cannot cancel the nightly run.
+parameter. GitHub runs only for pushes to `main`, pull requests to `main`, `release_*` tags
+and manual dispatch, with no nightly schedule; a `release_*` tag always runs every tier.
+Azure Pipelines runs every tier on nights when `main` changed (`always: false`). Each ref
+and event type has its own GitHub concurrency group, so a `main` push cannot cancel a
+release-tag run.
 
 See [[Bootstrap-and-Layouts]], [[Lifecycle-and-Recovery]], [[Factory-Scope-Model]], [[Engines-and-Pipelines]], [[State-Machines-and-DAGs]] and [[Index]].
 

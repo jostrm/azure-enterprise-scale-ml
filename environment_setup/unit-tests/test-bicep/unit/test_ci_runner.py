@@ -140,27 +140,36 @@ def test_github_runs_all_checks_on_push_and_pull_requests_without_azure_permissi
     assert "${{ secrets." not in path.read_text(encoding="utf-8")
 
 
-def test_github_skips_default_tiers_on_push_but_runs_every_tier_nightly_or_on_request():
+def test_github_runs_only_for_main_and_release_tags_without_a_nightly_schedule():
+    # Every run spends Actions minutes: feature-branch pushes and a nightly run are not worth it.
+    path = REPO_ROOT / ".github" / "workflows" / "infrastructure-tests.yml"
+    workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)
+    assert workflow["on"]["push"] == {"branches": ["main"], "tags": ["release_*"]}
+    assert workflow["on"]["pull_request"] == {"branches": ["main"]}
+    assert "schedule" not in workflow["on"]
+
+
+def test_github_runs_default_tiers_on_main_but_every_tier_for_a_release_tag_or_on_request():
     path = REPO_ROOT / ".github" / "workflows" / "infrastructure-tests.yml"
     workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)
     tiers = workflow["on"]["workflow_dispatch"]["inputs"]["tiers"]
     assert tiers["required"] is False
     assert tiers["default"] == ""
     assert tiers["type"] == "string"
-    assert [set(entry) for entry in workflow["on"]["schedule"]] == [{"cron"}]
     job = workflow["jobs"]["offline"]
-    for event, dispatched, variable, expected in (
-        ("schedule", None, "", "all"),
-        ("schedule", None, "1", "all"),
-        ("push", None, "", ""),
-        ("pull_request", None, "", ""),
-        ("push", None, "all", "all"),
-        ("workflow_dispatch", "", "5", "5"),
-        ("workflow_dispatch", "1,5", "5", "1,5"),
+    for event, ref, dispatched, variable, expected in (
+        ("push", "refs/heads/main", None, "", ""),
+        ("pull_request", "refs/pull/7/merge", None, "", ""),
+        ("push", "refs/heads/main", None, "all", "all"),
+        ("push", "refs/tags/release_125", None, "", "all"),
+        ("push", "refs/tags/release_125", None, "1", "all"),
+        ("workflow_dispatch", "refs/heads/main", "", "5", "5"),
+        ("workflow_dispatch", "refs/heads/main", "1,5", "5", "1,5"),
     ):
-        context = {"github.event_name": event, "inputs.tiers": dispatched, "vars.AIF_TEST_TIERS": variable}
-        assert (evaluate(job["env"]["AIF_TEST_TIERS"], context) or "") == expected, (event, dispatched, variable)
-    assert "github.event_name" in workflow["concurrency"]["group"], "A push must not cancel the nightly run."
+        context = {"github.event_name": event, "github.ref": ref, "inputs.tiers": dispatched,
+                   "vars.AIF_TEST_TIERS": variable}
+        assert (evaluate(job["env"]["AIF_TEST_TIERS"], context) or "") == expected, (event, ref, dispatched, variable)
+    assert "github.ref" in workflow["concurrency"]["group"], "A main push must not cancel a release-tag run."
     execution = next(step for step in job["steps"] if "run_ci.py" in step.get("run", ""))
     assert "--tiers" not in execution["run"], "The selection comes from AIF_TEST_TIERS or tiers.py."
 

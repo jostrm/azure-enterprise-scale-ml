@@ -10,7 +10,7 @@ from __future__ import annotations
 from base.tiers import Tier, TierManifest
 
 
-MANIFEST = TierManifest(default="1-4", tiers=(
+MANIFEST = TierManifest(default="1-3", tiers=(
     Tier(1, "core", "Configuration templates, ENABLE_* flags, ADO/GHA parity, parameter documentation, "
          "the domain model and this suite's own harness.", (
         "test_env_parity.py",
@@ -53,6 +53,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_factory_chat_agent_flag.py",
         "unit/test_github_json_bootstrap.py",
         "unit/test_github_manual_inputs.py",
+        "unit/test_github_oidc_refresh.py",
         "unit/test_json_identity_routing.py",
         "unit/test_linux_project_pipeline.py",
         "unit/test_project_deployment_contract.py",
