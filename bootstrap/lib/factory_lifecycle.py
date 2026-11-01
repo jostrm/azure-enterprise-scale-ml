@@ -2153,6 +2153,14 @@ def absent_groups(cloud, scopes, code="resource-group-absence-unverified"):
     return absent
 
 
+def present_scopes(document, scopes):
+    """The scopes still to read: a group the reviewed deletion recorded as already absent is never read again
+    (verify_full_inventory proves it stays absent)."""
+    absent = {group["id"].lower() for group in (document.get("deletion") or {}).get("resource_groups", [])
+              if group.get("already_absent") is True}
+    return [scope for scope in scopes if scope.lower() not in absent]
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
@@ -6999,14 +7007,14 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             validate_manifest(document)
             cloud.verify_identity()
             cloud.assert_no_active_runs(locks.enrollment)
-            for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]:
+            for scope in present_scopes(document, document["locks"]["scopes"] + document["locks"]["common_dependencies"]):
                 cloud.assert_no_active_deployments(scope)
             if selective:
                 verify_project_inventory(cloud, document)
                 verify_project_permissions(cloud, document["deletion"])
             else:
                 verify_full_inventory(cloud, document)
-                _, identity_inventory = collect_resource_closure(cloud, document["locks"]["scopes"])
+                _, identity_inventory = collect_resource_closure(cloud, present_scopes(document, document["locks"]["scopes"]))
                 for member in documents:
                     verify_deletion_identity(member, identity_inventory)
         union.assert_held()
@@ -7133,7 +7141,7 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         claimed = True
         receipt["status"] = "running"
         persist()
-        for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]:
+        for scope in present_scopes(document, document["locks"]["scopes"] + document["locks"]["common_dependencies"]):
             if (document["operation"] in ("create-factory", "create-scaleset")
                     or "foundry_lifecycle" in document.get("deployment", {})):
                 status, _, _ = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
