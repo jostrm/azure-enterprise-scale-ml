@@ -3123,7 +3123,9 @@ def verify_ownership(body, owner):
 def verify_fingerprint(item, body, headers):
     require(isinstance(body, dict) and str(body.get("id", "")).lower() == item["id"].lower(),
             "live-resource-identity-mismatch")
-    require(resource_etag(body, headers) == item.get("etag") and resource_digest(body) == item["body_hash"],
+    # The type the review recorded, as the closure hashed it: a listed Log Analytics table has no "type" in its body.
+    kind = item.get("type")
+    require(resource_etag(body, headers, kind) == item.get("etag") and resource_digest(body, kind) == item["body_hash"],
             "inventory-changed-since-prepare")
 
 
