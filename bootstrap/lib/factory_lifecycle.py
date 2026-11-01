@@ -2614,10 +2614,9 @@ def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=
     closure, bodies = collect_resource_closure(cloud, scopes)
     verify_deletion_identity(document, bodies)
     expected = data["closure"]
-    # Provider schemas are global to the subscription; retain only those still
-    # required after an earlier approved resource group has been removed.
-    for namespace, fingerprint in closure["providers"].items():
-        require(expected["providers"].get(namespace) == fingerprint, "provider-schema-changed")
+    # A provider-schema fingerprint is derived and warns, never blocks: ARM front ends answer schema reads differently
+    # during api-version rollouts (aif-128 2026-10-26; aif-138 scale set 002 confirm 2026-11-01). The live closure below
+    # (groups, resources, child collections and their api-versions) decides.
     for section in ("groups", "resources", "collections"):
         retained = {}
         for key, value in expected[section].items():

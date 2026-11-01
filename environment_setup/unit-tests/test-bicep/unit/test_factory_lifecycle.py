@@ -1981,6 +1981,20 @@ def test_a_child_changed_since_its_receipt_is_owned_through_its_parent(changed):
     else:
         assert rule["ownership_source"] == "deployment-receipt" and "receipt_superseded" not in rule
 
+
+def test_a_provider_schema_read_from_another_front_end_never_blocks_by_itself():
+    # ARM front ends answer provider-schema reads differently during rollouts (aif-128 2026-10-26; aif-138 scale set
+    # 002 confirm 2026-11-01): the fingerprint is derived, so only a changed resource closure blocks.
+    cloud = ClosureCloud()
+    document = manifest()
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, {})
+    schema = cloud.provider_schema
+    cloud.provider_schema = lambda namespace: {**schema(namespace), "registrationPolicy": "RegistrationRequired"}
+    fl.verify_full_inventory(cloud, document)
+    cloud.bodies[RULE.lower()]["properties"]["priority"] = 200
+    with pytest.raises(fl.Blocked, match="complete-resource-closure-changed"):
+        fl.verify_full_inventory(cloud, document)
+
 OWNED_TAGS = {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()}
 STORAGE = GROUP + "/providers/Microsoft.Storage/storageAccounts/owned"
 TOPIC = GROUP + "/providers/Microsoft.EventGrid/systemTopics/defender"
