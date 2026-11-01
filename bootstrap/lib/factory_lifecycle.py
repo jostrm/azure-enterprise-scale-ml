@@ -2098,8 +2098,38 @@ def inherited_new_resource_owner(resource_id, bodies):
     return {}
 
 
+UNTAGGABLE_GROUP_EXTENSIONS = {"microsoft.authorization/roleassignments"}
+
+
+def managed_parent_id(resource_id, bodies, owner):
+    """Whole-group deletion only: the owned resource an untagged child is deleted with, so it needs no receipt of its
+    own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, or
+    the owned source of an Event Grid system topic. A top-level resource never inherits its group's owner."""
+    key = resource_id.lower()
+    scope, relative = key.rsplit("/providers/", 1)
+    parts = relative.split("/")
+    resource_type = resource_type_from_id(key)
+    topic = resource_type == "microsoft.eventgrid/systemtopics"
+    if topic:
+        parent = str(((bodies.get(key) or {}).get("properties") or {}).get("source", "")).lower()
+    elif len(parts) > 3:
+        parent = scope + "/providers/" + "/".join(parts[:-2])
+    else:
+        parent = scope
+    require(parent in bodies and parent != key and arm_scope(parent) == arm_scope(key)
+            and (parent != arm_scope(key) or resource_type in UNTAGGABLE_GROUP_EXTENSIONS)
+            and not (topic and resource_type_from_id(parent) == resource_type),
+            "known-child-ownership-record-required")
+    tags = {name.lower() for name in (bodies[parent].get("tags") or {})}
+    if TAG_KEYS["factory_id"] in tags or TAG_KEYS["scaleset_id"] in tags:
+        verify_ownership(bodies[parent], owner)
+    else:
+        managed_parent_id(parent, bodies, owner)
+    return parent
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
-    """Read-only exact RG inventory builder; untaggable owners need real receipts."""
+    """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
     deletion_reader(cloud, document)
     scopes = document["locks"]["scopes"]
@@ -2123,8 +2153,10 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
             item = {"owner": tagged, "ownership_source": "tags"}
         else:
             item = dict(ownership_records.get(resource_id, {}))
-            require(item.get("ownership_source") == "deployment-receipt" and item.get("ownership_evidence"),
-                    "known-child-ownership-record-required")
+            if item.get("ownership_source") != "deployment-receipt" or not item.get("ownership_evidence"):
+                # Pipeline-created children (role assignments, peerings, tables) record no receipt.
+                item = {"owner": owner, "ownership_source": "managed-parent",
+                        "managed_parent_id": managed_parent_id(resource_id, bodies, owner)}
         resources.append({**item, "id": resource_id, **metadata, "delete": True,
                           "depends_on": sorted(cross_group_references(body, arm_scope(resource_id)))})
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
@@ -2631,6 +2663,9 @@ def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=
         verify_fingerprint(item, bodies[key], {"etag": closure["resources"][key]["etag"]})
         if item.get("ownership_source", "tags") == "tags":
             verify_ownership(bodies[key], item["owner"])
+        elif item.get("ownership_source") == "managed-parent":
+            require(managed_parent_id(key, bodies, item["owner"]) == item.get("managed_parent_id"),
+                    "managed-parent-ownership-changed")
         else:
             require(item.get("ownership_source") == "deployment-receipt", "unknown-child-ownership-source")
             evidence = item.get("ownership_evidence", {})
