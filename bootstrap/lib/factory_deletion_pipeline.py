@@ -429,12 +429,17 @@ def freeze(cloud, document, ownership_records, registered_projects):
                 if error.code != "child-instance-ownership-unverified":
                     raise
                 # Hash drift warns, never blocks (as fl.freeze_deletion_inventory, aif-138 2026-11-01): a pipeline or
-                # the platform updated the child after its receipt, so the owned parent it is deleted with decides.
-                owner = copy.deepcopy(evidence.get("owner") or {})
-                proof = {"ownership_source": "managed-parent", "owner": owner,
-                         "managed_parent_id": fl.managed_parent_id(key, bodies, owner),
-                         "receipt_superseded": {"code": error.code,
-                                                "ownership_evidence": copy.deepcopy(evidence.get("ownership_evidence"))}}
+                # the platform updated the child after its receipt. A bootstrap-recorded hub resource (the untagged
+                # common VNet whose peerings changed) is proven by the hub proof below; any other by the owned parent
+                # it is deleted with. The superseded receipt stays as review evidence.
+                superseded = {"code": error.code, "ownership_evidence": copy.deepcopy(evidence.get("ownership_evidence"))}
+                if hub_covers(hub, key):
+                    owner, proof = {}, {}
+                else:
+                    owner = copy.deepcopy(evidence.get("owner") or {})
+                    proof = {"ownership_source": "managed-parent", "owner": owner,
+                             "managed_parent_id": fl.managed_parent_id(key, bodies, owner)}
+                proof["receipt_superseded"] = superseded
         if hub_covers(hub, key):
             fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
             fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
@@ -442,7 +447,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
             if not owner:
                 owner = dict(core_owner)
                 proof = {"ownership_source": HUB_SOURCE, "owner": owner,
-                         "ownership_evidence": copy.deepcopy(hub["evidence"])}
+                         "ownership_evidence": copy.deepcopy(hub["evidence"]),
+                         **({"receipt_superseded": proof["receipt_superseded"]} if "receipt_superseded" in proof else {})}
         number = owner.get("project_id")
         owned = all(owner.get(field) == value for field, value in core_owner.items())
         selected = owned and (not number or number in project_map)

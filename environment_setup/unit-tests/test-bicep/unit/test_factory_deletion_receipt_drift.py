@@ -52,3 +52,22 @@ def test_a_drifted_child_under_a_foreign_parent_still_blocks():
     document, cloud, projects, records, _ = drifted({**OWNER, "factory_id": "factory-b"})
     with pytest.raises(fl.Blocked, match="^live-resource-ownership-mismatch$"):
         fl.freeze_factory_deletion_pipeline(cloud, document, records, projects)
+
+
+def test_a_drifted_hub_vnet_is_owned_through_the_bootstrap_hub_proof():
+    # aif-138: the untagged common VNet changed since its receipt (peerings removed); the bootstrap record proves it.
+    from .test_factory_deletion_access_hub import VNET as HUB_SOURCE_VNET, hub_document, projects
+    document, cloud = hub_document()
+    run = str(uuid4())
+    receipt = {"schema": 1, "status": "succeeded", "run_id": run, "manifest_hash": "e" * 64,
+               "target": {key: OWNER[key] for key in ("factory_id", "scaleset_id")},
+               "ownership": [{"resource_id": HUB_SOURCE_VNET, "body_hash": fl.digest({"before": "peerings"}),
+                              "owner": {key: OWNER[key] for key in ("factory_id", "scaleset_id")}}]}
+    cloud.runs["runs/" + run + ".worker.json"] = receipt
+    evidence = {"run_id": run, "receipt_hash": fl.digest(receipt)}
+    records = {HUB_SOURCE_VNET: {"owner": receipt["ownership"][0]["owner"], "ownership_source": "deployment-receipt",
+                                 "ownership_evidence": evidence}}
+    data = fl.freeze_factory_deletion_pipeline(cloud, document, records, projects())
+    vnet = next(row for row in data["resources"] if row["id"].lower() == HUB_SOURCE_VNET.lower())
+    assert vnet["ownership_source"] == "access-hub-bootstrap-record" and vnet["delete"] is True
+    assert vnet["receipt_superseded"] == {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
