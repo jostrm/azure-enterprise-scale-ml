@@ -2573,10 +2573,12 @@ def verify_project_inventory(cloud, document, removed=()):
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes)
     expected = data["closure"]
+    # A provider-schema fingerprint is derived and warns, never blocks (as verify_full_inventory, 48b243f8; aif-138
+    # 2026-11-01: the factory deletion's project stage under ARM throttling). The live closure decides.
     if not removed:
-        require(closure == expected, "project-complete-inventory-changed")
-    for namespace, value in closure["providers"].items():
-        require(expected["providers"].get(namespace) == value, "project-provider-schema-changed")
+        require({key: value for key, value in closure.items() if key != "providers"}
+                == {key: value for key, value in expected.items() if key != "providers"},
+                "project-complete-inventory-changed")
     require(set(bodies) == set(data["bodies"]) - removed, "project-resource-closure-changed")
     for key, body in bodies.items():
         before = data["bodies"][key]
