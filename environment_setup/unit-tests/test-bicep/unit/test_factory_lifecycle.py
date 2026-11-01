@@ -1939,6 +1939,78 @@ def test_read_only_full_delete_prepare_uses_actual_tags_and_verified_child_recei
     assert not cloud.deleted and not cloud.leases
 
 
+def test_whole_group_delete_owns_an_untaggable_child_through_its_owned_parent():
+    # A pipeline-created child (a rule, a role assignment, a peering) carries no tags and no receipt; deleting its
+    # whole group deletes it with its owned parent, so the parent's ownership proves it.
+    cloud = ClosureCloud()
+    document = manifest()
+    result = fl.freeze_deletion_inventory(cloud, document, {})
+    rule = next(row for row in result["resources"] if row["id"] == RULE.lower())
+    assert {key: rule[key] for key in ("owner", "ownership_source", "managed_parent_id")} == {
+        "owner": CORE_OWNER, "ownership_source": "managed-parent", "managed_parent_id": NSG.lower()}
+    assert not cloud.deleted and not cloud.leases
+
+
+def test_a_managed_parent_child_is_rechecked_at_execution():
+    cloud = ClosureCloud()
+    document = manifest()
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, {})
+    rule = next(row for row in document["deletion"]["resources"] if row["id"] == RULE.lower())
+    rule["managed_parent_id"] = GROUP.lower()
+    with pytest.raises(fl.Blocked, match="managed-parent-ownership-changed"):
+        fl.verify_full_inventory(cloud, document)
+
+
+OWNED_TAGS = {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()}
+STORAGE = GROUP + "/providers/Microsoft.Storage/storageAccounts/owned"
+TOPIC = GROUP + "/providers/Microsoft.EventGrid/systemTopics/defender"
+ASSIGNMENT = "/providers/Microsoft.Authorization/roleAssignments/" + str(uuid4())
+
+
+def managed_parent_bodies():
+    return {GROUP.lower(): {"id": GROUP, "tags": dict(OWNED_TAGS)},
+            NSG.lower(): {"id": NSG, "tags": dict(OWNED_TAGS)},
+            STORAGE.lower(): {"id": STORAGE, "tags": dict(OWNED_TAGS)},
+            TOPIC.lower(): {"id": TOPIC, "properties": {"source": STORAGE}}}
+
+
+@pytest.mark.parametrize("child, parent", [
+    (RULE, NSG),
+    (GROUP + ASSIGNMENT, GROUP),
+    (NSG + ASSIGNMENT, NSG),
+    (TOPIC, STORAGE),
+    (TOPIC + "/eventSubscriptions/defender", TOPIC),
+])
+def test_managed_parent_is_the_owned_resource_a_child_is_deleted_with(child, parent):
+    assert fl.managed_parent_id(child.lower(), managed_parent_bodies(), CORE_OWNER) == parent.lower()
+
+
+@pytest.mark.parametrize("change, code", [
+    ("top-level", "known-child-ownership-record-required"),
+    ("untagged-parent", "known-child-ownership-record-required"),
+    ("missing-parent", "known-child-ownership-record-required"),
+    ("source-in-another-group", "known-child-ownership-record-required"),
+    ("foreign-parent", "live-resource-ownership-mismatch"),
+])
+def test_managed_parent_never_adopts_a_top_level_or_foreign_resource(change, code):
+    bodies, child = managed_parent_bodies(), RULE
+    if change == "top-level":
+        child = GROUP + "/providers/Microsoft.Storage/storageAccounts/foreign"
+    elif change == "untagged-parent":
+        bodies[NSG.lower()].pop("tags")
+    elif change == "missing-parent":
+        bodies.pop(NSG.lower())
+    elif change == "source-in-another-group":
+        other = COMMON + "/providers/Microsoft.Storage/storageAccounts/owned"
+        bodies[other.lower()] = {"id": other, "tags": dict(OWNED_TAGS)}
+        bodies[TOPIC.lower()]["properties"]["source"] = other
+        child = TOPIC
+    else:
+        bodies[NSG.lower()]["tags"][fl.TAG_KEYS["scaleset_id"]] = "another-scale-set"
+    with pytest.raises(fl.Blocked, match=code):
+        fl.managed_parent_id(child.lower(), bodies, CORE_OWNER)
+
+
 @pytest.mark.parametrize("status", ["Failed", "Running", "Canceled"])
 def test_partial_what_if_response_never_authorizes_deployment(status):
     with pytest.raises(fl.Blocked, match="arm-what-if-failed-or-incomplete"):
