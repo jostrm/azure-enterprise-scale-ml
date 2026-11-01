@@ -69,6 +69,11 @@ def phase(item):
     return 2
 
 
+# A private endpoint may outlive the service it connects to: deleting the service only disconnects it, and the
+# endpoint still leaves in the network phase (aif-138 2026-11-01: the common group's Key Vault, storage and ACR PEs).
+OUTLIVING_TYPES = {"microsoft.network/privateendpoints", "microsoft.network/privateendpoints/privatelinkserviceproxies"}
+
+
 def ordered_resources(rows):
     deleted = {row["id"].lower(): copy.deepcopy(row) for row in rows if row["delete"]}
     inherited = {}
@@ -83,6 +88,8 @@ def ordered_resources(rows):
         dependencies = {value.lower() for value in row.get("depends_on", []) if value.lower() in deleted}
         dependencies.update(inherited.get(identifier, ()))
         dependencies.update(parent for parent in deleted if identifier.startswith(parent + "/"))
+        if str(row.get("type", "")).lower() in OUTLIVING_TYPES:
+            dependencies = {value for value in dependencies if phase(deleted[value]) >= phase(row)}
         fl.require(all(phase(row) <= phase(deleted[value]) for value in dependencies),
                    "factory-delete-phase-dependency-conflict")
         row["depends_on"] = sorted(dependencies)
