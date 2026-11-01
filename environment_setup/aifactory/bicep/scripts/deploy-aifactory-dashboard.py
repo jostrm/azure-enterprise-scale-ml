@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -50,6 +50,33 @@ ML_DATA_SHORTCUTS = (
     ("Azure Databricks", "microsoft.databricks/workspaces"),
     ("Azure Data Factory", "microsoft.datafactory/factories"),
 )
+
+
+# Deletion proves the dashboard by these tags (aif-138, 2026-11-01): it is factory-wide, so the factory and the scale set
+# of the DEV common group that hosts it own it, never a project.
+OWNERSHIP_TAGS = {"factory_id": "aifactory.factory_id", "scaleset_id": "aifactory.scaleset_id"}
+
+
+def dashboard_ownership(raw: object) -> dict[str, str]:
+    """The factory and scale set named by a project configuration's tagsProject (a JSON object or its text)."""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    values = {key: str(raw.get(tag, "")).strip() for key, tag in OWNERSHIP_TAGS.items()}
+    if not all(values.values()) or any(UNEXPANDED.match(value) for value in values.values()):
+        return {}
+    return values
+
+
+def ownership_tags(inventory: dict) -> dict[str, str]:
+    owner = inventory.get("ownership")
+    if not isinstance(owner, dict):
+        return {}
+    return {tag: owner[key] for key, tag in OWNERSHIP_TAGS.items() if isinstance(owner.get(key), str) and owner[key]}
 
 
 class ConcurrentUpdate(RuntimeError):
@@ -147,6 +174,7 @@ class Config:
     vnet_subscription: str
     vnet_resource_group: str
     template_file: Path
+    ownership: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> Config:
@@ -232,6 +260,9 @@ class Config:
             ),
             vnet_resource_group=env_value("DASHBOARD_VNET_RESOURCE_GROUP"),
             template_file=template_file,
+            # Only a DEV run stamps the owner: the dashboard lives in the DEV common group.
+            ownership=(dashboard_ownership(dev_configuration.get("tagsProject"))
+                       if current_environment == "dev" else {}),
         )
         for name in (
             config.dashboard_resource_group,
@@ -1014,6 +1045,9 @@ def reconcile(config: Config, az: Az = az_cli, *, include_usage: bool = True) ->
         "hubResourceGroups": merge_hub_resource_groups(config, inventory),
         "environments": environments,
     }
+    owner = config.ownership or inventory.get("ownership")
+    if ownership_tags({"ownership": owner}):
+        reconciled["ownership"] = dict(owner)
 
     tenant_result = az(
         "account",
@@ -1041,6 +1075,7 @@ def dashboard_resource(config: Config, inventory: dict, tenant_id: str) -> dict:
             "AI-Factory-Dashboard": "true",
             "AI-Factory": "true",
             "AI-Factory-Location": config.location_suffix,
+            **ownership_tags(inventory),
         },
         "properties": {
             "lenses": [
@@ -1148,6 +1183,7 @@ def deploy(
                 "value": {
                     "AI-Factory": "true",
                     "AI-Factory-Location": config.location_suffix,
+                    **ownership_tags(inventory),
                 }
             },
         },
