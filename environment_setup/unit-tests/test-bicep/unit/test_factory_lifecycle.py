@@ -1961,6 +1961,26 @@ def test_a_managed_parent_child_is_rechecked_at_execution():
         fl.verify_full_inventory(cloud, document)
 
 
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_a_child_changed_since_its_receipt_is_owned_through_its_parent(changed):
+    # Hash drift warns, never blocks (aif-138 2026-11-01): a child a pipeline or the platform updated after its
+    # deployment receipt is proven by its owned parent; the superseded receipt stays as review evidence.
+    cloud = ClosureCloud()
+    document = owned_group_manifest(cloud)
+    child = next(item for item in document["deletion"]["resources"] if item["id"] == RULE.lower())
+    records = {RULE.lower(): {key: child[key] for key in ("owner", "ownership_source", "ownership_evidence")}}
+    if changed:
+        cloud.bodies[RULE.lower()]["properties"]["priority"] = 200
+    result = fl.freeze_deletion_inventory(cloud, document, records)
+    rule = next(row for row in result["resources"] if row["id"] == RULE.lower())
+    if changed:
+        assert (rule["ownership_source"], rule["managed_parent_id"]) == ("managed-parent", NSG.lower())
+        assert rule["receipt_superseded"] == {"code": "child-instance-ownership-unverified",
+                                              "ownership_evidence": child["ownership_evidence"]}
+    else:
+        assert rule["ownership_source"] == "deployment-receipt" and "receipt_superseded" not in rule
+
 OWNED_TAGS = {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()}
 STORAGE = GROUP + "/providers/Microsoft.Storage/storageAccounts/owned"
 TOPIC = GROUP + "/providers/Microsoft.EventGrid/systemTopics/defender"
