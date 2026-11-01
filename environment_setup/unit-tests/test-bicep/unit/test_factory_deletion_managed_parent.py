@@ -71,3 +71,39 @@ def test_a_role_assignment_granting_the_deployment_principal_is_not_its_identity
     cloud.bodies[ASSIGNMENT.lower()]["properties"]["principalId"] = document["identity"]["deployment_object_id"]
     data = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
     assert any(item["id"].lower() == ASSIGNMENT.lower() for item in data["resources"])
+
+
+NSG = GROUP + "/providers/Microsoft.Network/networkSecurityGroups/kept-nsg"
+DEFAULT_RULE = NSG + "/defaultSecurityRules/AllowVnetInBound"
+
+
+def test_an_adopted_child_of_a_retained_parent_is_retained_with_it():
+    # aif-138: 24 built-in defaultSecurityRules (no ARM delete of their own) under NSGs the deletion keeps.
+    from .test_selective_project_deletion import tagged
+    document, cloud, projects = with_assignment()
+    cloud.bodies[NSG.lower()] = tagged(NSG, "Microsoft.Network/networkSecurityGroups", OWNER)
+    cloud.bodies[DEFAULT_RULE.lower()] = {"id": DEFAULT_RULE, "type": "Microsoft.Network/networkSecurityGroups/defaultSecurityRules",
+                                          "etag": '"d"', "properties": {"priority": 65000}}
+    cloud.bodies[NSG.lower()]["tags"]["aifactory.protected"] = "true"  # kept: protects its own body, not its children
+    schema, operations, collection = cloud.provider_schema, cloud.provider_operations, cloud.collection
+
+    def provider_schema(namespace):
+        value = schema(namespace)
+        if namespace.lower() == "microsoft.network":
+            value = {"resourceTypes": [*value["resourceTypes"], {"resourceType": "networkSecurityGroups/defaultSecurityRules",
+                                                                 "apiVersions": ["2024-05-01"]}]}
+        return value
+
+    def provider_operations(namespace):
+        return [name for name in operations(namespace) if name != "microsoft.network/networksecuritygroups/defaultsecurityrules/delete"]
+
+    def child_collection(path, api_version, extension=False):
+        if path.lower().endswith("/defaultsecurityrules"):
+            return [copy.deepcopy(body) for key, body in cloud.bodies.items() if key.startswith(path.lower() + "/")], None
+        return collection(path, api_version, extension)
+    cloud.provider_schema, cloud.provider_operations, cloud.collection = provider_schema, provider_operations, child_collection
+    data = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    rows = {item["id"].lower(): item for item in data["resources"]}
+    assert rows[NSG.lower()]["delete"] is False
+    assert rows[DEFAULT_RULE.lower()]["delete"] is False
+    assert rows[DEFAULT_RULE.lower()]["retention_reason"] == "retained-managed-parent"

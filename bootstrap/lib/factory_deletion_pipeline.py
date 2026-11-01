@@ -503,6 +503,13 @@ def freeze(cloud, document, ownership_records, registered_projects):
     while changed:
         changed = False
         for key, item in entries.items():
+            parent = item.get("managed_parent_id") if item.get("ownership_source") == "managed-parent" else None
+            if item["delete"] and parent and not entries.get(parent, {}).get("delete"):
+                # Option A owns a child through the parent it is deleted with; a retained parent keeps it
+                # (aif-138 2026-11-01: built-in defaultSecurityRules of kept NSGs).
+                item["delete"] = False
+                item["retention_reason"] = "retained-managed-parent"
+                changed = True
             if not item["delete"]:
                 for candidate, other in entries.items():
                     if other["delete"] and (key.startswith(candidate + "/") or candidate in item["depends_on"]):
