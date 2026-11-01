@@ -440,6 +440,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
                     proof = {"ownership_source": "managed-parent", "owner": owner,
                              "managed_parent_id": fl.managed_parent_id(key, bodies, owner)}
                 proof["receipt_superseded"] = superseded
+        if not owner and key not in records and not hub_covers(hub, key) and not fl.RG_ID.fullmatch(key):
+            adopted = managed_parent_owner(key, bodies)
+            if adopted:
+                owner = adopted[1]
+                proof = {"ownership_source": "managed-parent", "owner": owner, "managed_parent_id": adopted[0]}
         if hub_covers(hub, key):
             fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
             fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
@@ -1272,6 +1277,25 @@ def teardown_owner(document, closure, bodies, key):
     parent = _parent_resource(key)
     fl.require(parent in bodies, "bootstrap-teardown-unowned-resource")
     return teardown_owner(document, closure, bodies, parent)[0], "parent"
+
+
+def tag_owner(body):
+    tags = body.get("tags") or {}
+    return {field: tags[tag] for field, tag in fl.TAG_KEYS.items() if tag in tags}
+
+
+def managed_parent_owner(key, bodies):
+    """Option A (aif-138 2026-11-01, as fl.freeze_deletion_inventory): (parent, owner) of an untaggable child without
+    a receipt (a pipeline's role assignment at an owned group, a child of an owned resource) through the tagged
+    ancestor it is deleted with, or None. fl.managed_parent_id never adopts an untagged top-level resource."""
+    try:
+        parent = fl.managed_parent_id(key, bodies, {})
+        ancestor = parent
+        while not tag_owner(bodies[ancestor]):
+            ancestor = fl.managed_parent_id(ancestor, bodies, {})
+    except fl.Blocked:
+        return None
+    return parent, tag_owner(bodies[ancestor])
 
 
 def absent_groups(cloud, scopes):
