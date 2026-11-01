@@ -2122,17 +2122,37 @@ def managed_parent_id(resource_id, bodies, owner):
     return parent
 
 
+def absent_groups(cloud, scopes, code="resource-group-absence-unverified"):
+    """Groups already deleted (by an interrupted deletion or `az group delete`): ARM answers 404
+    ResourceGroupNotFound on the exact group id. Any other status or 404 body is not proof of absence."""
+    absent = []
+    for scope in scopes:
+        status, _, body = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
+        if status == 404:
+            error = body.get("error") if isinstance(body, dict) else None
+            require(isinstance(error, dict) and error.get("code") == "ResourceGroupNotFound", code)
+            absent.append(scope)
+    return absent
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
     deletion_reader(cloud, document)
     scopes = document["locks"]["scopes"]
-    closure, bodies = collect_resource_closure(cloud, scopes)
+    # Idempotent: a group an interrupted deletion already removed (aif-138, 2026-11-01) has nothing left to delete.
+    # It is recorded as already absent, rechecked before every write and never read as a closure.
+    absent = {scope.lower() for scope in absent_groups(cloud, scopes)}
+    closure, bodies = collect_resource_closure(cloud, [scope for scope in scopes if scope.lower() not in absent])
     verify_deletion_identity(document, bodies)
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     groups, resources = [], []
     evidence_reader, receipt_cache = None, {}
     for scope in scopes:
+        if scope.lower() in absent:
+            groups.append({"id": scope, "etag": None, "body_hash": digest({"already_absent": scope.lower()}),
+                           "delete": True, "owner": owner, "already_absent": True})
+            continue
         require(not project_resource_shared(bodies[scope.lower()]), "shared-resource-group-delete-forbidden")
         manager = verify_group_ownership(bodies[scope.lower()], owner, bodies)
         entry = {"id": scope, **closure["groups"][scope.lower()], "delete": True, "owner": owner}
@@ -2614,7 +2634,9 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
 
 def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=()):
     data = document["deletion"]
-    removed = {scope.lower() for scope in removed_groups}
+    absent = [group["id"] for group in data["resource_groups"] if group.get("already_absent") is True]
+    require(absent_groups(cloud, absent) == absent, "absent-resource-group-reappeared")
+    removed = {scope.lower() for scope in [*removed_groups, *absent]}
     removed_children = {identifier.lower() for identifier in removed_resources}
     require(removed_children <= {row["id"].lower() for row in data["resources"] if row["delete"]},
             "unreviewed-removed-child")
@@ -2699,7 +2721,9 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
             other = arm_scope(dependency)
             if other != scope and other in planned:
                 planned[scope]["depends_on"].append(other)
-    removed = []
+    # A group the review recorded as already absent counts as deleted; it is never sent a DELETE.
+    removed = [group["id"] for group in groups if group.get("already_absent") is True]
+    receipt["deleted_resources"].extend(scope for scope in removed if scope not in receipt["deleted_resources"])
     removed_children = set()
     # Only independently proven entries in the immutable manifest are eligible.
     # Leave private endpoint connections to the reviewed RG cascade: deleting
