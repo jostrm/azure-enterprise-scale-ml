@@ -2290,12 +2290,14 @@ def project_resource_shared(body):
 
 def project_resource_dependencies(body):
     key = body["id"].lower()
-    references = resource_references(body)
+    # Dependency planning, not ownership: a provider-owned malformed ID-looking string (aif-138 2026-11-01: a Container
+    # Apps serviceAssociationLink's properties.link has no /providers/) is no resolvable dependency and is skipped.
+    references = resource_references(body, tolerant=True)
     if str(body.get("type", "")).lower() in PROJECT_NETWORK_TYPES | {"microsoft.network/virtualnetworks"}:
         # Subnets are reverse links or separately inventoried child bodies.
-        references -= resource_references((body.get("properties") or {}).get("subnets", []))
+        references -= resource_references((body.get("properties") or {}).get("subnets", []), tolerant=True)
     for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
-        references -= resource_references([body.get(field), (body.get("properties") or {}).get(field)])
+        references -= resource_references([body.get(field), (body.get("properties") or {}).get(field)], tolerant=True)
     return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
 
 
