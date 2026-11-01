@@ -105,6 +105,9 @@ RESOURCE_CLOSURE_READ_WORKERS = 8
 # 883 resources were Log Analytics tables, and their per-table body plus five extension reads each made every exact
 # inventory walk (review, start and worker) take 50 minutes under ARM throttling.
 LISTED_ONLY_CHILDREN = {"microsoft.operationalinsights/workspaces/tables"}
+# ARM refuses some platform-managed children to every client when read on their own; their parent's list still returns
+# them. aif-138 (2026-11-01): Container Apps subnet links serviceAssociationLinks/legionservicelink/details/detail.
+PLATFORM_REFUSED_READ = "UnauthorizedClientApplication"
 # The peer cut the TLS session (EOF without close_notify, or close_notify): a transport drop like a reset,
 # unlike a certificate or protocol failure, which stays permanent.
 TLS_SESSION_CUT_ERRORS = (ssl.SSLEOFError, ssl.SSLZeroReturnError)
@@ -1670,6 +1673,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     }
     terminal_extensions = {kind.lower() for kind, _ in EXTENSION_COLLECTIONS}
     listed_bodies = {}  # LISTED_ONLY_CHILDREN rows as their parent's list returned them
+    listed_rows = {}  # every listed child row, the fallback body for a child the platform refuses to read on its own
     ahead = reader.pool is not None
     planned = set()  # queued resources whose child reads were already started
 
@@ -1679,7 +1683,10 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     def resource_read(resource_id, api):
         # A dashboard tile or an alert rule still names a resource a project deletion removed: its 404 is a
         # dangling reference (recorded in closure["references"], never walked), not a failed inventory.
-        return arm_read(resource_id, api, (200, 404) if resource_id.lower() in referenced else None)
+        # A listed child may answer 409; only PLATFORM_REFUSED_READ is accepted (see the walk).
+        allowed = (200, *((404,) if resource_id.lower() in referenced else ()),
+                   *((409,) if resource_id.lower() in listed_rows else ()))
+        return arm_read(resource_id, api, allowed if len(allowed) > 1 else None)
 
     def collection_read(path, api, extension=False, single=None):
         if single:
@@ -1888,6 +1895,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         if listed_kind in LISTED_ONLY_CHILDREN:
             listed_bodies.update({row["id"].lower(): copy.deepcopy(row) for row in rows
                                   if isinstance(row, dict) and isinstance(row.get("id"), str)})
+        if not single and not extension:
+            listed_rows.update({row["id"].lower(): copy.deepcopy(row) for row in rows
+                                if isinstance(row, dict) and isinstance(row.get("id"), str)})
         rows = [fingerprint_body(row) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
@@ -1957,6 +1967,12 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                                               kind if key in derived else None)
         if status == 404:
             continue
+        if status == 409:
+            error = body.get("error") if isinstance(body, dict) else None
+            require(isinstance(error, dict) and error.get("code") == PLATFORM_REFUSED_READ and key in listed_rows,
+                    "remote-request-failed-409")
+            # Every client is refused this read; the parent's list row is the reviewed body and fingerprint.
+            body, headers = copy.deepcopy(listed_rows[key]), {}
         versions[key] = api
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
