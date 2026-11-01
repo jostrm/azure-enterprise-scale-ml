@@ -2244,7 +2244,11 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
 
 def verify_deletion_identity(document, bodies):
     principal = str(document["identity"]["object_id"]).lower()
-    for body in bodies.values():
+    for key, body in bodies.items():
+        if "/providers/microsoft.authorization/roleassignments/" in str(key).lower():
+            # A role assignment's principalId is its grantee, not an identity the executor runs as (aif-138
+            # 2026-11-01: the deployment principal's own assignments on the project group it deletes).
+            continue
         properties = body.get("properties") or {}
         identity = body.get("identity") or {}
         identifiers = [properties.get("principalId"), identity.get("principalId")]
