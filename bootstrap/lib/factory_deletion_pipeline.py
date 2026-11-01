@@ -1258,17 +1258,8 @@ def teardown_owner(document, closure, bodies, key):
 
 
 def absent_groups(cloud, scopes):
-    """Recorded groups already deleted (for example by `az group delete`): ARM answers 404
-    ResourceGroupNotFound on the exact group id. Any other status or 404 body is not proof of absence."""
-    absent = []
-    for scope in scopes:
-        status, _, body = cloud.arm("GET", scope, fl.RG_API, allowed=(200, 404))
-        if status == 404:
-            error = body.get("error") if isinstance(body, dict) else None
-            fl.require(isinstance(error, dict) and error.get("code") == "ResourceGroupNotFound",
-                       "bootstrap-teardown-group-absence-unverified")
-            absent.append(scope)
-    return absent
+    """Recorded groups already deleted; only 404 ResourceGroupNotFound proves absence (fl.absent_groups)."""
+    return fl.absent_groups(cloud, scopes, "bootstrap-teardown-group-absence-unverified")
 
 
 def _recorded_vnets(document, absent):
