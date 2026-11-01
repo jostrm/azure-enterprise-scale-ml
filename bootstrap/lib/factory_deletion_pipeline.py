@@ -420,10 +420,21 @@ def freeze(cloud, document, ownership_records, registered_projects):
         proof = {"ownership_source": "tags", "owner": owner}
         if not owner and key in records:
             evidence = records[key]
-            owner = fl.verified_receipt_owner(reader, evidence.get("ownership_evidence"), key,
-                                             fl.resource_digest(body), cache)
-            fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
-            proof = {**evidence, "owner": owner}
+            try:
+                owner = fl.verified_receipt_owner(reader, evidence.get("ownership_evidence"), key,
+                                                 fl.resource_digest(body), cache)
+                fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
+                proof = {**evidence, "owner": owner}
+            except fl.Blocked as error:
+                if error.code != "child-instance-ownership-unverified":
+                    raise
+                # Hash drift warns, never blocks (as fl.freeze_deletion_inventory, aif-138 2026-11-01): a pipeline or
+                # the platform updated the child after its receipt, so the owned parent it is deleted with decides.
+                owner = copy.deepcopy(evidence.get("owner") or {})
+                proof = {"ownership_source": "managed-parent", "owner": owner,
+                         "managed_parent_id": fl.managed_parent_id(key, bodies, owner),
+                         "receipt_superseded": {"code": error.code,
+                                                "ownership_evidence": copy.deepcopy(evidence.get("ownership_evidence"))}}
         if hub_covers(hub, key):
             fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
             fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
