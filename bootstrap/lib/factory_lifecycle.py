@@ -2137,6 +2137,7 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
     verify_deletion_identity(document, bodies)
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     groups, resources = [], []
+    evidence_reader, receipt_cache = None, {}
     for scope in scopes:
         require(not project_resource_shared(bodies[scope.lower()]), "shared-resource-group-delete-forbidden")
         manager = verify_group_ownership(bodies[scope.lower()], owner, bodies)
@@ -2153,10 +2154,24 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
             item = {"owner": tagged, "ownership_source": "tags"}
         else:
             item = dict(ownership_records.get(resource_id, {}))
+            superseded = {}
+            if item.get("ownership_source") == "deployment-receipt" and item.get("ownership_evidence"):
+                try:
+                    evidence_reader = evidence_reader or coordination(cloud, document)
+                    verified_receipt_owner(evidence_reader, item["ownership_evidence"], resource_id,
+                                           metadata["body_hash"], receipt_cache)
+                except Blocked as error:
+                    if error.code != "child-instance-ownership-unverified":
+                        raise
+                    # Hash drift warns, never blocks: a pipeline or the platform updated the child after its receipt,
+                    # so its owned parent proves it; the superseded receipt stays as review evidence.
+                    superseded = {"receipt_superseded": {"code": error.code,
+                                                         "ownership_evidence": item["ownership_evidence"]}}
+                    item = {}
             if item.get("ownership_source") != "deployment-receipt" or not item.get("ownership_evidence"):
                 # Pipeline-created children (role assignments, peerings, tables) record no receipt.
                 item = {"owner": owner, "ownership_source": "managed-parent",
-                        "managed_parent_id": managed_parent_id(resource_id, bodies, owner)}
+                        "managed_parent_id": managed_parent_id(resource_id, bodies, owner), **superseded}
         resources.append({**item, "id": resource_id, **metadata, "delete": True,
                           "depends_on": sorted(cross_group_references(body, arm_scope(resource_id)))})
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
