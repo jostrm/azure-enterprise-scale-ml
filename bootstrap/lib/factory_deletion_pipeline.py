@@ -587,7 +587,9 @@ def validate(document):
     verify_access_hub_network(hub, data["bodies"], links)
     validate_shared_hub_links(data, links, entries)
     for key, row in entries.items():
-        fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.resource_digest(data["bodies"][key]),
+        # The type the closure recorded: a listed Log Analytics table has no "type" in its body (as fl.verify_fingerprint).
+        fl.require(type(row.get("delete")) is bool
+                   and row.get("body_hash") == fl.resource_digest(data["bodies"][key], row.get("type")),
                    "factory-delete-resource-fingerprint-required")
         owner_number = row.get("owner", {}).get("project_id")
         owned = all(row.get("owner", {}).get(field) == document["target"][field]
