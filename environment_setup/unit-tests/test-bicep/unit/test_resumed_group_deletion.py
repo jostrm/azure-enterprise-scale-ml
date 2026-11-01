@@ -16,6 +16,7 @@ spec = importlib.util.spec_from_file_location("factory_lifecycle_resumed_base",
 base = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base)
 fl = base.fl
+workspace = base.workspace
 ABSENT = base.GROUP + "-gone"
 
 
@@ -33,6 +34,18 @@ class ResumedCloud(base.CohortCloud):
         if method == "DELETE" and fl.RG_ID.fullmatch(resource_id):
             self.group_deletes.append(resource_id)
         return super().arm(method, resource_id, api_version, allowed, headers)
+
+    def gone(self, scope):
+        # ARM answers 404 for every read under a deleted group, as in the aif-138 execution.
+        fl.require(scope.lower() != ABSENT.lower() or ABSENT.lower() in self.bodies, "remote-request-failed-404")
+
+    def assert_no_active_deployments(self, scope):
+        self.gone(scope)
+        return super().assert_no_active_deployments(scope)
+
+    def list_resources(self, scope):
+        self.gone(scope)
+        return super().list_resources(scope)
 
 
 def resumed(code="ResourceGroupNotFound"):
@@ -78,3 +91,15 @@ def test_only_resource_group_not_found_proves_a_group_absent():
     cloud, document = resumed(code="AuthorizationFailed")
     with pytest.raises(fl.Blocked, match="^resource-group-absence-unverified$"):
         fl.freeze_deletion_inventory(cloud, document, {})
+
+
+def test_a_resumed_cohort_executes_without_reading_the_absent_group(monkeypatch, workspace):
+    cloud, document = resumed()
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, {})
+    base.seal(document)
+    cloud.calls.clear()
+    source, execution, path = base.setup_execute(monkeypatch, workspace)
+    result = fl.execute_cohort([document], source, execution, path, cloud_factory=lambda value: cloud)
+    assert result["status"] == "succeeded" and not result["lock_retained"], result.get("error_code")
+    assert cloud.group_deletes == [base.GROUP]
+    assert ABSENT in result["children"][0]["deleted_resources"]
