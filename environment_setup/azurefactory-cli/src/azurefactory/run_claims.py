@@ -73,7 +73,10 @@ def validate_claim_preview(request: dict[str, Any], preview: Any) -> None:
             or not _sha(preview.get("provider_head"), 40)):
         invalid("missing provider repository, state ref or reviewed head")
     claim = preview.get("active_claim")
-    if (not isinstance(claim, dict) or claim.get("kind") != "run" or claim.get("run_id") != request["run_id"]
+    # A local deletion cohort's claim (aif-138, 2026-11-01) names its cohort and has no remote run to verify.
+    cohort = isinstance(claim, dict) and claim.get("kind") == "deletion-cohort"
+    if (not isinstance(claim, dict) or claim.get("kind") not in ("run", "deletion-cohort")
+            or cohort and not _sha(claim.get("cohort_hash"), 64) or claim.get("run_id") != request["run_id"]
             or not _sha(claim.get("manifest_hash"), 64) or not isinstance(claim.get("scopes"), list)
             or not claim["scopes"] or any(not _text(scope) for scope in claim["scopes"])):
         invalid("the active claim is not exactly this run's claim")
@@ -90,8 +93,10 @@ def validate_claim_preview(request: dict[str, Any], preview: Any) -> None:
         invalid("the run and worker receipts must be terminal" if not finalized else
                 "a finalized release names a run receipt that still says running; the receipts do not match")
     remote = preview.get("remote_run")
-    if (not isinstance(remote, dict) or remote.get("kind") not in ("gha", "ado")
-            or type(remote.get("run_id")) is not int or remote.get("status") != "completed"):
+    if cohort and remote is not None:
+        invalid("a local deletion cohort has no GitHub Actions or Azure DevOps run")
+    if not cohort and (not isinstance(remote, dict) or remote.get("kind") not in ("gha", "ado")
+                       or type(remote.get("run_id")) is not int or remote.get("status") != "completed"):
         invalid("the GitHub Actions or Azure DevOps run must be completed")
     if type(preview.get("other_runs_in_progress")) is not int or preview["other_runs_in_progress"] != 0:
         invalid("another workflow run is queued or in progress")
@@ -118,6 +123,10 @@ def validate_release(result: Any, receipt: dict[str, Any]) -> None:
 
 def describe(preview: dict[str, Any]) -> dict[str, Any]:
     remote = preview["remote_run"]
+    if remote is None:
+        shown = ("Local deletion worker", "no GitHub Actions or Azure DevOps run; the local worker finished")
+    else:
+        shown = ("GitHub Actions run" if remote["kind"] == "gha" else "Azure DevOps run", remote)
     return {
         "Run": preview["run_id"], "Operation": preview.get("operation"), "Local job": preview["job_id"],
         "Factory ID": preview["factory_id"], "Saved folder": preview["folder"],
@@ -126,7 +135,7 @@ def describe(preview: dict[str, Any]) -> dict[str, Any]:
         "Server review fingerprint": preview["preview_hash"],
         "Retained claim": preview["active_claim"],
         "Run receipt": preview["run_receipt"], "Worker receipt": preview["worker_receipt"],
-        ("GitHub Actions run" if remote["kind"] == "gha" else "Azure DevOps run"): remote,
+        shown[0]: shown[1],
         "Other workflow runs queued or in progress": preview["other_runs_in_progress"],
         "Records kept unchanged": preview["records_preserved"], "Audit record added": preview["audit_record"],
         "Effects": preview["effects"], "Cautions": preview["warnings"],
