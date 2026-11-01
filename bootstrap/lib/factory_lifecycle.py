@@ -1371,29 +1371,41 @@ class Cloud:
                 "single-writer-provider-auth-required")
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json",
                    "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"}
-        try:
-            response = self.opener.open(Request(url, method=method, data=canonical(body) if body is not None else None,
-                                                headers=headers), timeout=SIDE_REQUEST_TIMEOUT_SECONDS)
-        except HTTPError as error:
-            response = error
-        except (URLError, OSError, TimeoutError):
-            raise Blocked("single-writer-provider-write-or-read-uncertain") from None
-        with response:
-            status = response.code
-            raw, incoming = response.read(STATE_RESPONSE_MAX + 1), dict(response.headers)
-        require(status in allowed, "single-writer-provider-request-failed-" + str(status))
-        require(len(raw) <= STATE_RESPONSE_MAX, "single-writer-provider-response-too-large")
-        try:
-            return status, incoming, json.loads(raw) if raw else None
-        except (ValueError, UnicodeError):
-            length = next((value for name, value in incoming.items() if name.lower() == "content-length"), None)
-            parsed = urlsplit(url)
-            print(json.dumps({
-                "event": "single-writer-provider-response-invalid", "method": method, "host": parsed.hostname,
-                "path": parsed.path, "status": status, "bytes": len(raw),
-                "content_length": int(length) if isinstance(length, str) and length.isdigit() else None,
-            }, sort_keys=True), file=sys.stderr, flush=True)
-            raise Blocked("single-writer-provider-response-invalid") from None
+        # A state read is sent again after a failed transport or a cut-short body (aif-138, 2026-11-01: one 20 MB
+        # state.json read stopped a scale-set deletion after it deleted the common group). A write is sent once:
+        # its outcome is uncertain and only a fresh read may decide it.
+        attempts = READ_TRANSPORT_ATTEMPTS if method == "GET" else 1
+        for attempt in range(1, attempts + 1):
+            retry = attempt < attempts
+            try:
+                response = self.opener.open(Request(url, method=method, data=canonical(body) if body is not None else None,
+                                                    headers=headers), timeout=SIDE_REQUEST_TIMEOUT_SECONDS)
+            except HTTPError as error:
+                response = error
+            except (URLError, OSError, TimeoutError):
+                if not retry:
+                    raise Blocked("single-writer-provider-write-or-read-uncertain") from None
+                time.sleep(READ_TRANSPORT_RETRY_DELAYS[attempt - 1])
+                continue
+            with response:
+                status = response.code
+                raw, incoming = response.read(STATE_RESPONSE_MAX + 1), dict(response.headers)
+            require(status in allowed, "single-writer-provider-request-failed-" + str(status))
+            require(len(raw) <= STATE_RESPONSE_MAX, "single-writer-provider-response-too-large")
+            try:
+                return status, incoming, json.loads(raw) if raw else None
+            except (ValueError, UnicodeError):
+                length = next((value for name, value in incoming.items() if name.lower() == "content-length"), None)
+                parsed = urlsplit(url)
+                print(json.dumps({
+                    "event": "single-writer-provider-response-invalid", "method": method, "host": parsed.hostname,
+                    "path": parsed.path, "status": status, "bytes": len(raw),
+                    "content_length": int(length) if isinstance(length, str) and length.isdigit() else None,
+                    "attempt": attempt, "retrying": retry,
+                }, sort_keys=True), file=sys.stderr, flush=True)
+                if not retry:
+                    raise Blocked("single-writer-provider-response-invalid") from None
+                time.sleep(READ_TRANSPORT_RETRY_DELAYS[attempt - 1])
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
         arm_scope(resource_id)

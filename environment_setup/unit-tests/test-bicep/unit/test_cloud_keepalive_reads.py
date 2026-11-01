@@ -271,7 +271,7 @@ def test_pooled_reads_return_a_large_provider_state_blob_whole():
         cloud.request("GET", URL, fl.ARM)
 
 
-def test_an_unparseable_provider_response_is_named_before_it_blocks(capsys):
+def test_an_unparseable_provider_response_is_named_before_it_blocks(capsys, monkeypatch):
     import json
     truncated = b'{"sha":"0b28dc89","content":"c3Nz'  # a body cut short of its Content-Length
 
@@ -280,10 +280,12 @@ def test_an_unparseable_provider_response_is_named_before_it_blocks(capsys):
     server = Server(answer)
     cloud = cloud_for(build_opener(fl.NoRedirect, handler_for(server)))
     cloud.command = Mock(return_value="synthetic-github-token")
+    monkeypatch.setattr(fl.time, "sleep", lambda seconds: None)
     with pytest.raises(fl.Blocked, match="^single-writer-provider-response-invalid$"):
         cloud.state_request("gha", "GET", "repos/reviewed/private/git/blobs/0b28dc89", None, (200,))
     events = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
-    assert [e["event"] for e in events] == ["single-writer-provider-response-invalid"]
+    # A state read is read again after a cut-short body (aif-138, 2026-11-01); every attempt is named.
+    assert [e["event"] for e in events] == ["single-writer-provider-response-invalid"] * fl.READ_TRANSPORT_ATTEMPTS
     assert events[0]["method"] == "GET" and events[0]["host"] == "api.github.com"
     assert events[0]["path"] == "/repos/reviewed/private/git/blobs/0b28dc89" and events[0]["status"] == 200
     assert events[0]["bytes"] == len(truncated) and events[0]["content_length"] is None
