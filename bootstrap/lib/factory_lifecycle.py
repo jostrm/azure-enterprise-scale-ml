@@ -2162,6 +2162,31 @@ def present_scopes(document, scopes):
     return [scope for scope in scopes if scope.lower() not in absent]
 
 
+def receipt_parent_id(resource_id, bodies, owner):
+    """Drift fallback of a resource its verified deployment receipt names (hash drift warns, never blocks): the owned
+    resource or group it is deleted with. Unlike managed_parent_id, an untagged top-level resource names its group,
+    which must carry exactly this owner: option B (2026-11-01) receipts of API-2-Pipelines project runs name untagged
+    Key Vaults, storage accounts, private endpoints and NICs, and the receipt, not the group, made each one the
+    factory's. An untagged parent of a child is followed the same way."""
+    key = resource_id.lower()
+    scope, relative = key.rsplit("/providers/", 1)
+    if scope == arm_scope(key) and len(relative.split("/")) == 3:
+        require(scope in bodies and scope != key, "known-child-ownership-record-required")
+        verify_ownership(bodies[scope], owner)  # every owner field, project_id too, must be a tag of the group
+        return scope
+    try:
+        return managed_parent_id(key, bodies, owner)
+    except Blocked as error:
+        if error.code != "known-child-ownership-record-required":
+            raise
+    parts = relative.split("/")
+    parent = scope if len(parts) == 3 else scope + "/providers/" + "/".join(parts[:-2])
+    require(parent in bodies and parent != key and arm_scope(parent) == arm_scope(key),
+            "known-child-ownership-record-required")
+    receipt_parent_id(parent, bodies, owner)
+    return parent
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
@@ -2211,8 +2236,8 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
                     item = {}
             if item.get("ownership_source") != "deployment-receipt" or not item.get("ownership_evidence"):
                 # Pipeline-created children (role assignments, peerings, tables) record no receipt.
-                item = {"owner": owner, "ownership_source": "managed-parent",
-                        "managed_parent_id": managed_parent_id(resource_id, bodies, owner), **superseded}
+                parent = (receipt_parent_id if superseded else managed_parent_id)(resource_id, bodies, owner)
+                item = {"owner": owner, "ownership_source": "managed-parent", "managed_parent_id": parent, **superseded}
         resources.append({**item, "id": resource_id, **metadata, "delete": True,
                           "depends_on": sorted(cross_group_references(body, arm_scope(resource_id)))})
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
@@ -2727,7 +2752,8 @@ def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=
         if item.get("ownership_source", "tags") == "tags":
             verify_ownership(bodies[key], item["owner"])
         elif item.get("ownership_source") == "managed-parent":
-            require(managed_parent_id(key, bodies, item["owner"]) == item.get("managed_parent_id"),
+            parent = receipt_parent_id if "receipt_superseded" in item else managed_parent_id
+            require(parent(key, bodies, item["owner"]) == item.get("managed_parent_id"),
                     "managed-parent-ownership-changed")
         else:
             require(item.get("ownership_source") == "deployment-receipt", "unknown-child-ownership-source")

@@ -1982,6 +1982,37 @@ def test_a_child_changed_since_its_receipt_is_owned_through_its_parent(changed):
         assert rule["ownership_source"] == "deployment-receipt" and "receipt_superseded" not in rule
 
 
+@pytest.mark.parametrize("group_owner, code", [(CORE_OWNER, None), ({**CORE_OWNER, "scaleset_id": "Stage002"},
+                                                                       "live-resource-ownership-mismatch")])
+def test_an_untagged_top_level_resource_changed_since_its_receipt_is_owned_through_its_group(group_owner, code):
+    # Option B (2026-11-01): a pipeline receipt names untagged top-level resources; a drifted one is deleted with the
+    # group that carries exactly its owner, and the execution recheck follows the same rule.
+    cloud = ClosureCloud()
+    cloud.bodies[NSG.lower()].pop("tags")
+    cloud.bodies[GROUP.lower()]["tags"] = {fl.TAG_KEYS[key]: value for key, value in group_owner.items()}
+    run = str(uuid4())
+    receipt = {"schema": 1, "status": "succeeded", "run_id": run, "manifest_hash": "e" * 64, "target": CORE_OWNER,
+               "ownership": [{"resource_id": NSG.lower(), "owner": CORE_OWNER, "body_hash": fl.digest({"before": 1})},
+                             {"resource_id": RULE.lower(), "owner": CORE_OWNER,
+                              "body_hash": fl.resource_digest(cloud.bodies[RULE.lower()])}]}
+    cloud.runs["runs/" + run + ".worker.json"] = receipt
+    evidence = {"run_id": run, "receipt_hash": fl.digest(receipt)}
+    records = {key: {"owner": CORE_OWNER, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+               for key in (NSG.lower(), RULE.lower())}
+    document = manifest()
+    if code:
+        with pytest.raises(fl.Blocked, match="^" + code + "$"):
+            fl.freeze_deletion_inventory(cloud, document, records)
+        return
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, records)
+    nsg = next(row for row in document["deletion"]["resources"] if row["id"] == NSG.lower())
+    assert (nsg["ownership_source"], nsg["managed_parent_id"]) == ("managed-parent", GROUP.lower())
+    assert nsg["receipt_superseded"] == {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
+    rule = next(row for row in document["deletion"]["resources"] if row["id"] == RULE.lower())
+    assert rule["ownership_source"] == "deployment-receipt" and "receipt_superseded" not in rule
+    fl.verify_full_inventory(cloud, document)
+
+
 def test_a_provider_schema_read_from_another_front_end_never_blocks_by_itself():
     # ARM front ends answer provider-schema reads differently during rollouts (aif-128 2026-10-26; aif-138 scale set
     # 002 confirm 2026-11-01): the fingerprint is derived, so only a changed resource closure blocks.

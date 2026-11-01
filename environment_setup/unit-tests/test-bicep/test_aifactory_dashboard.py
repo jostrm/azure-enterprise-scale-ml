@@ -797,6 +797,50 @@ class TestAifactoryDashboard(unittest.TestCase):
         self.assertIn(str(TEMPLATE), deployment_call)
         self.assertIn(config.dashboard_resource_group, deployment_call)
 
+    def owned_config(self, folder: str, values: dict[str, str] | None = None):
+        # The pink Factory API's reviewed project configuration stamps the aifactory.* ownership tags in tagsProject.
+        tags = json.dumps({"aifactory.factory_id": "factory-a", "aifactory.scaleset_id": "scale-1",
+                           "aifactory.project_id": "001", "CostCenter": "1"})
+        path = Path(folder) / "variables.json"
+        path.write_text(json.dumps({"dev": {"dev_sub_id": DEV_SUB, "tagsProject": tags},
+                                    "stage_prod": {"tagsProject": tags}}), encoding="utf-8")
+        with patch.dict(os.environ, environment() | {"DASHBOARD_CONFIG_FILE": str(path)} | (values or {}), clear=True):
+            return module.Config.from_env()
+
+    def test_a_dev_run_tags_the_dashboard_with_its_factory_and_scale_set(self) -> None:
+        # aif-138 (2026-11-01): the dashboard in the common group carried only display tags, so deletion could not
+        # prove it. It is factory-wide: the factory and scale set own it, never one project.
+        with tempfile.TemporaryDirectory() as folder:
+            config = self.owned_config(folder)
+        fake = FakeAz(config)
+        inventory, tenant, etag = module.reconcile(config, fake)
+        module.deploy(config, inventory, tenant, etag, fake)
+        tags = fake.deployment_parameters["parameters"]["tags"]["value"]
+        self.assertEqual("factory-a", tags["aifactory.factory_id"])
+        self.assertEqual("scale-1", tags["aifactory.scaleset_id"])
+        self.assertNotIn("aifactory.project_id", tags)
+        self.assertEqual("true", tags["AI-Factory"])
+
+    def test_an_update_from_another_environment_keeps_the_dashboards_owner(self) -> None:
+        # The dashboard lives in the DEV common group; a STAGE project run updates it but never re-owns it.
+        with tempfile.TemporaryDirectory() as folder:
+            config = self.owned_config(folder, {"DASHBOARD_CURRENT_SUBSCRIPTION_ID": TEST_SUB,
+                                                "DASHBOARD_CURRENT_ENV": "test"})
+        self.assertEqual({}, config.ownership)
+        existing = {"schemaVersion": 1, "hubResourceGroups": [], "environments": [],
+                    "ownership": {"factory_id": "factory-a", "scaleset_id": "scale-1"}}
+        fake = FakeAz(config, existing)
+        inventory, tenant, etag = module.reconcile(config, fake)
+        module.deploy(config, inventory, tenant, etag, fake)
+        tags = fake.rest_body["tags"]
+        self.assertEqual("factory-a", tags["aifactory.factory_id"])
+        self.assertEqual("scale-1", tags["aifactory.scaleset_id"])
+
+    def test_unexpanded_or_partial_ownership_tags_are_not_stamped(self) -> None:
+        self.assertEqual({}, module.dashboard_ownership('{"aifactory.factory_id": "$(factory)"}'))
+        self.assertEqual({}, module.dashboard_ownership({"aifactory.factory_id": "factory-a"}))
+        self.assertEqual({}, module.dashboard_ownership("not json"))
+
     def test_optional_ml_data_shortcuts_use_second_row_even_without_base_services(self) -> None:
         config = self.config()
         inventory, tenant, _ = module.reconcile(config, FakeAz(config))
