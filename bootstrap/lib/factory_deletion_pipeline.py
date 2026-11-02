@@ -700,11 +700,23 @@ def verify_absent(cloud, rows):
             fl.require(status == 404, "factory-delete-resource-still-present")
 
 
+def group_cascaded_grants(document, rows):
+    """The deployment identity's own enrollment grants (fl.enrollment_grant) on a group these rows delete. They go with
+    the group delete, never one by one: its Contributor grant deletes the group and its RBAC Administrator grant deletes
+    role assignments, so deleting either first locks the stage out (aif-138 2026-11-02, project-delete-permission-required)."""
+    groups = [row["id"] for row in rows if row["delete"] and fl.RG_ID.fullmatch(row["id"])]
+    bodies = document["deletion"].get("bodies", {})
+    return {row["id"].lower() for row in rows
+            if row["delete"] and row["id"].lower() in bodies
+            and fl.enrollment_grant(row["id"], bodies[row["id"].lower()], document, groups)}
+
+
 def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep, fresh=None):
     flags = document["deletion"]["flags"]
     validate_flags(flags)
     entries = document["deletion"]["resources"] + document["deletion"]["resource_groups"]
     removed = {value.lower() for value in receipt.get("deleted_resources", []) + receipt.get("observed_absent", [])}
+    cascaded = group_cascaded_grants(document, rows)
     for row in teardown_order(document, rows):
         key = row["id"].lower()
         if key in removed:
@@ -713,7 +725,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                 receipt.setdefault("deleted_resources", []).append(row["id"])
                 persist()
             continue
-        if row.get("delete_via_parent"):
+        if row.get("delete_via_parent") or key in cascaded:
             continue
         fl.require(flags["enableDeleteForDisabledResources"] is True
                    and flags["deleteAllServicesForProject"] is True,
@@ -731,7 +743,8 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
             receipt.setdefault("deleted_resources", []).append(row["id"])
             for child in entries:
                 if child["id"].lower().startswith(key + "/") and child["id"].lower() not in removed:
-                    fl.require(child["delete"] and child.get("delete_via_parent") == key,
+                    fl.require(child["delete"] and (child.get("delete_via_parent") == key
+                                                    or child["id"].lower() in cascaded),
                                "factory-delete-unreviewed-service-cascade")
                     fl.wait_absent(cloud, locks, child["id"], child["api_version"], sleep)
                     removed.add(child["id"].lower())
@@ -749,7 +762,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
             fl.verify_project_inventory(cloud, document, removed)
         if fl.RG_ID.fullmatch(key):
             fl.require(flags["deleteAllForProject"] is True, "factory-delete-group-not-enabled")
-            fl.require(all(child["id"].lower() in removed for child in entries
+            fl.require(all(child["id"].lower() in removed | cascaded for child in entries
                            if child["id"].lower().startswith(key + "/")),
                        "factory-delete-project-rg-shortcut-forbidden")
             fl.require(not cloud.list_resources(row["id"]), "factory-delete-group-not-empty")
@@ -765,7 +778,8 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
         receipt.setdefault("deleted_resources", []).append(row["id"])
         for child in entries:
             if child["id"].lower().startswith(key + "/") and child["id"].lower() not in removed:
-                fl.require(child["delete"] and child.get("delete_via_parent") == key,
+                fl.require(child["delete"] and (child.get("delete_via_parent") == key
+                                                or child["id"].lower() in cascaded),
                            "factory-delete-unreviewed-service-cascade")
                 fl.wait_absent(cloud, locks, child["id"], child["api_version"], sleep)
                 removed.add(child["id"].lower())
