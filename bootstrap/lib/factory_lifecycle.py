@@ -431,8 +431,12 @@ VOLATILE_FIELDS = {
     "microsoft.network/virtualnetworks": (
         ("etag",), ("properties", "subnets", "*", "etag"),
         ("properties", "subnets", "*", "properties", "delegations", "*", "etag"),
+        ("properties", "subnets", "*", "properties", "purpose"),
         ("properties", "virtualNetworkPeerings", "*", "etag")),
-    "microsoft.network/virtualnetworks/subnets": (("etag",), ("properties", "delegations", "*", "etag")),
+    # Network RP sets a subnet's read-only purpose from what is in it; it leaves when the last private endpoint does
+    # (aif-138 2026-11-02 run18).
+    "microsoft.network/virtualnetworks/subnets": (
+        ("etag",), ("properties", "delegations", "*", "etag"), ("properties", "purpose")),
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
