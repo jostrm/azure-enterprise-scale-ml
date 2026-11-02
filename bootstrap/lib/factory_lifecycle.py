@@ -2646,6 +2646,12 @@ def verify_project_inventory(cloud, document, removed=()):
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
     expected = data["closure"]
+    # A resource the review deletes that the platform removed with another deletion is absent, like one this run
+    # deleted (aif-138 2026-11-02: Defender's Event Grid system topic left with its last event subscription). A vanished
+    # resource the review retains still blocks below.
+    deletable = {row["id"].lower() for row in data["resources"] if row["delete"]}
+    vanished = set(data["bodies"]) - removed - set(bodies) - {scope.lower() for scope in scopes}
+    removed = removed | (vanished & deletable)
     # A provider-schema fingerprint is derived and warns, never blocks (as verify_full_inventory, 48b243f8; aif-138
     # 2026-11-01: the factory deletion's project stage under ARM throttling). The live closure decides.
     if not removed:
