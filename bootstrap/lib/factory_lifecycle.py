@@ -2600,7 +2600,14 @@ def _without_deleted_children(body, removed):
         return [_without_deleted_children(item, removed) for item in body
                 if not isinstance(item, dict) or str(item.get("id", "")).lower() not in removed]
     if isinstance(body, dict):
-        return {key: _without_deleted_children(value, removed) for key, value in body.items() if key.lower() != "etag"}
+        result = {}
+        for key, value in body.items():
+            kept = _without_deleted_children(value, removed)
+            # ARM leaves out a child list once its last child is deleted (aif-138 2026-11-02: a Key Vault's
+            # privateEndpointConnections), so an empty list and a missing one are the same parent.
+            if key.lower() != "etag" and not (isinstance(kept, list) and not kept):
+                result[key] = kept
+        return result
     return body
 
 
