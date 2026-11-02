@@ -2774,7 +2774,9 @@ def test_default_cloud_opener_waits_out_throttled_reads(monkeypatch):
     assert [type(handler) for handler in handlers[1:]] == [fl.ThrottledReadHandler, fl.KeepAliveHTTPSHandler]
 
 
-@pytest.mark.parametrize("status", [429, 503])
+# 502 and 504 are ARM gateway timeouts, transient like 503 (aif-138 2026-11-02, run14: a 504 on an NSG's locks
+# collection made one closure walk record it unreadable and stopped the factory deletion).
+@pytest.mark.parametrize("status", [429, 502, 503, 504])
 def test_throttled_arm_reads_wait_for_retry_after_and_retry(throttled_reads, capsys, status):
     # Observed 2026-10-23: a real COMMON run's worker stopped as reconciliation-required with
     # remote-request-failed-429 before any Azure write, because a throttled ARM read was never repeated.
@@ -2836,7 +2838,7 @@ def test_throttled_writes_are_never_repeated(throttled_reads, method):
     assert server.methods == [method] and throttled_reads.sleeps == []
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 500, 502, 504])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 500])
 def test_other_http_errors_on_reads_still_stop_at_once(throttled_reads, status):
     cloud, server = throttled_reads.cloud((status, "1"), (200, None))
     with pytest.raises(fl.Blocked, match="^remote-request-failed-" + str(status) + "$"):

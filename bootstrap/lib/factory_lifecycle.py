@@ -1064,7 +1064,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 class ThrottledReadHandler(BaseHandler):
-    """Waits out throttling for reads only: a GET or HEAD answered 429 or 503 is sent again after Retry-After.
+    """Waits out throttling for reads only: a GET or HEAD answered 429, 503 or a 502/504 gateway timeout is sent again
+    after Retry-After (aif-138 2026-11-02: a 504 on one locks collection stopped a factory deletion).
 
     A resource closure makes thousands of ARM reads on parallel threads, and ARM answers such a burst with 429
     (observed 2026-10-23: a COMMON worker stopped with remote-request-failed-429 before any Azure write). A read is
@@ -1095,7 +1096,7 @@ class ThrottledReadHandler(BaseHandler):
         request.aifactory_throttled, request.aifactory_throttled_since = attempt, since
         return self.parent.open(request, timeout=request.timeout)
 
-    http_error_429 = http_error_503 = _throttled
+    http_error_429 = http_error_502 = http_error_503 = http_error_504 = _throttled
 
 
 class KeepAliveHTTPSHandler(HTTPSHandler):
