@@ -65,6 +65,9 @@ RECEIPT_REPLACE_ATTEMPTS = 40
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
 READ_TRANSPORT_ATTEMPTS = 6
 READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5, 1, 2, 4)
+# A provider state read moves the whole state.json (28.5 MB on aif-138, 2026-11-02, whose read failed five times in
+# eight seconds): its retries wait out a network drop instead.
+STATE_READ_RETRY_DELAYS = (5, 10, 20, 40, 60)
 # Windows getaddrinfo "no data record": a resolver hiccup for an ARM host that always resolves.
 WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
@@ -1384,7 +1387,7 @@ class Cloud:
         # A state read is sent again after a failed transport or a cut-short body (aif-138, 2026-11-01: one 20 MB
         # state.json read stopped a scale-set deletion after it deleted the common group). A write is sent once:
         # its outcome is uncertain and only a fresh read may decide it.
-        attempts = READ_TRANSPORT_ATTEMPTS if method == "GET" else 1
+        attempts, started = (READ_TRANSPORT_ATTEMPTS if method == "GET" else 1), time.monotonic()
         for attempt in range(1, attempts + 1):
             retry = attempt < attempts
             try:
@@ -1392,10 +1395,19 @@ class Cloud:
                                                     headers=headers), timeout=SIDE_REQUEST_TIMEOUT_SECONDS)
             except HTTPError as error:
                 response = error
-            except (URLError, OSError, TimeoutError):
+            except (URLError, OSError, TimeoutError) as error:
+                reason = error.reason if isinstance(error, URLError) and isinstance(error.reason, BaseException) else error
+                parsed = urlsplit(url)
+                print(json.dumps({
+                    "event": "single-writer-provider-transport-failure", "method": method, "host": parsed.hostname,
+                    "path": parsed.path, "attempt": attempt, "exception_type": type(error).__name__,
+                    "reason_type": type(reason).__name__,
+                    "errno": reason.errno if isinstance(reason, OSError) and type(reason.errno) is int else None,
+                    "elapsed_seconds": round(time.monotonic() - started, 3), "retrying": retry,
+                }, sort_keys=True), file=sys.stderr, flush=True)
                 if not retry:
                     raise Blocked("single-writer-provider-write-or-read-uncertain") from None
-                time.sleep(READ_TRANSPORT_RETRY_DELAYS[attempt - 1])
+                time.sleep(STATE_READ_RETRY_DELAYS[attempt - 1])
                 continue
             with response:
                 status = response.code
@@ -1415,7 +1427,7 @@ class Cloud:
                 }, sort_keys=True), file=sys.stderr, flush=True)
                 if not retry:
                     raise Blocked("single-writer-provider-response-invalid") from None
-                time.sleep(READ_TRANSPORT_RETRY_DELAYS[attempt - 1])
+                time.sleep(STATE_READ_RETRY_DELAYS[attempt - 1])
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
         arm_scope(resource_id)

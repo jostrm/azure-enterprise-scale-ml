@@ -42,6 +42,7 @@ fdp = load("factory_deletion_pipeline")
     # factory_lifecycle: read transport, throttling, local commands and polling deadlines (doubled)
     (fl, "READ_TRANSPORT_ATTEMPTS", 6),
     (fl, "READ_TRANSPORT_RETRY_DELAYS", (0.25, 0.5, 1, 2, 4)),
+    (fl, "STATE_READ_RETRY_DELAYS", (5, 10, 20, 40, 60)),
     (fl, "READ_TRANSPORT_RETRY_WINDOW_SECONDS", 360),
     (fl, "THROTTLED_READ_ATTEMPTS", 16),
     (fl, "REMOTE_SOCKET_TIMEOUT_SECONDS", 120),
