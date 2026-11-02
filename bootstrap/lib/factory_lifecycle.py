@@ -381,12 +381,27 @@ VOLATILE_FIELDS = {
         ("properties", "privateLinkServiceConnections", "*", "properties", "privateLinkServiceConnectionState"),
         ("properties", "manualPrivateLinkServiceConnections", "*", "etag"),
         ("properties", "manualPrivateLinkServiceConnections", "*", "properties", "privateLinkServiceConnectionState")),
+    # A private endpoint's proxy is the platform's view of its connection: DNS, GUIDs, VIPs and state reset when the
+    # service side deletes the connection (aif-138 2026-11-02). Its group and remote connection still count.
+    "microsoft.network/privateendpoints/privatelinkserviceproxies": (
+        ("etag",), ("properties", "provisioningState"),
+        ("properties", "groupConnectivityInformation", "*", "customerVisibleFqdns"),
+        ("properties", "groupConnectivityInformation", "*", "explicitDnsSettings"),
+        ("properties", "groupConnectivityInformation", "*", "internalFqdn"),
+        ("properties", "groupConnectivityInformation", "*", "internalFqdnType"),
+        ("properties", "groupConnectivityInformation", "*", "redirectMapId"),
+        ("properties", "groupConnectivityInformation", "*", "privateLinkServiceArmRegion"),
+        ("properties", "remotePrivateEndpointConnectionResourceGuid"),
+        ("properties", "remotePrivateLinkServiceConnectionState"),
+        ("properties", "remotePrivateLinkServiceResourceGuid"),
+        ("properties", "remoteRegionExpansionOrContraction"), ("properties", "remoteVipAddresses")),
     # An NSG copies its etag into every rule it embeds, and the rule children carry it (as a VNet into its subnets).
     "microsoft.network/networksecuritygroups": (
         ("etag",), ("properties", "securityRules", "*", "etag"), ("properties", "defaultSecurityRules", "*", "etag")),
     "microsoft.network/networksecuritygroups/securityrules": (("etag",),),
     "microsoft.network/networksecuritygroups/defaultsecurityrules": (("etag",),),
-    "microsoft.network/networkinterfaces/ipconfigurations": (("etag",),),
+    "microsoft.network/networkinterfaces/ipconfigurations": (
+        ("etag",), ("properties", "privateLinkConnectionProperties", "fqdns")),
     # A VNet copies its etag into every embedded subnet, delegation and peering, and its subnet children carry it
     # (aif-138 2026-11-02: the resumed factory deletion's common stage). Addresses, delegations and settings still count.
     "microsoft.network/virtualnetworks": (
