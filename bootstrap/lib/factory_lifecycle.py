@@ -397,7 +397,9 @@ VOLATILE_FIELDS = {
     "microsoft.network/networkinterfaces": (
         ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
         ("properties", "dnsSettings", "internalDomainNameSuffix"), ("properties", "ipConfigurations", "*", "etag"),
-        ("properties", "ipConfigurations", "*", "properties", "privateLinkConnectionProperties", "fqdns")),
+        ("properties", "ipConfigurations", "*", "properties", "privateLinkConnectionProperties", "fqdns"),
+        # VM attachment state: primary leaves and enableGuestRdma appears when the VM is deleted (aif-138 run19).
+        ("properties", "primary"), ("properties", "enableGuestRdma")),
     # The same deletion sets the endpoint's connection state to Disconnected; the service sets it on approval too.
     # Its etag copies roll with it. Target service, group ids and subnet still count.
     "microsoft.network/privateendpoints": (
