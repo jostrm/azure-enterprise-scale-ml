@@ -317,7 +317,7 @@ def test_untaggable_subnet_requires_actual_immutable_receipt():
     identifier = str(uuid4())
     receipt = {"schema": 1, "run_id": identifier, "manifest_hash": "f" * 64,
                "status": "succeeded", "target": document["target"],
-               "ownership": [{"resource_id": SUBNET, "owner": OWNER, "body_hash": fl.digest(cloud.bodies[SUBNET.lower()])}]}
+               "ownership": [{"resource_id": SUBNET, "owner": OWNER, "body_hash": fl.resource_digest(cloud.bodies[SUBNET.lower()])}]}
     cloud.runs["runs/" + identifier + ".worker.json"] = receipt
     records = {SUBNET.lower(): {"owner": OWNER, "ownership_source": "deployment-receipt",
                                 "ownership_evidence": {"run_id": identifier, "receipt_hash": fl.digest(receipt)}}}
