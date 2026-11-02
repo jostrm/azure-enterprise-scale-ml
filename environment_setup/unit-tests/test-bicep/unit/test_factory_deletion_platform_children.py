@@ -62,6 +62,10 @@ def rows(document):
     ("microsoft.containerregistry/registries/scopemaps", "ci-push", False),
     ("microsoft.network/privateendpoints/privatelinkserviceproxies", "pe.proxy.534e4b28", True),
     ("microsoft.network/virtualnetworks/taggedtrafficconsumers", "Microsoft.KeyVault.swedencentral", True),
+    # run15 (2026-11-02): ARM refuses a Bastion NSG rule DELETE (NetworkSecurityGroupNotCompliantForAzureBastionSubnet);
+    # rules leave with their NSG, after the subnets that reference it.
+    ("microsoft.network/networksecuritygroups/securityrules", "Bastion_AzureCloudOutbound", True),
+    ("microsoft.network/networksecuritygroups/securityrules", "allow-https", True),
     ("microsoft.network/virtualnetworks/subnets", "snet-esml-cmn-001", False),
 ])
 def test_only_platform_maintained_children_are_classified_as_such(kind, name, expected):
