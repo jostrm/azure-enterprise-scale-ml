@@ -372,6 +372,13 @@ VOLATILE_FIELDS = {
         ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
         ("properties", "dnsSettings", "internalDomainNameSuffix"), ("properties", "ipConfigurations", "*", "etag")),
     "microsoft.network/networkinterfaces/ipconfigurations": (("etag",),),
+    # A VNet copies its etag into every embedded subnet, delegation and peering, and its subnet children carry it
+    # (aif-138 2026-11-02: the resumed factory deletion's common stage). Addresses, delegations and settings still count.
+    "microsoft.network/virtualnetworks": (
+        ("etag",), ("properties", "subnets", "*", "etag"),
+        ("properties", "subnets", "*", "properties", "delegations", "*", "etag"),
+        ("properties", "virtualNetworkPeerings", "*", "etag")),
+    "microsoft.network/virtualnetworks/subnets": (("etag",), ("properties", "delegations", "*", "etag")),
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
