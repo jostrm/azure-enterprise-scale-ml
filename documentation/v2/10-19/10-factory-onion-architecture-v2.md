@@ -11,7 +11,7 @@ That is why an ESAF call such as `esaf.upsert_project("002")` now gets an answer
 ![AI Factory onion V2: API-2-Pipelines](./images/10-factory-onion-architecture-v2.svg)
 
 <!-- onion:colors:start -->
-Colour = average time in the layer per measured run, relative to the slowest layer: green under 5%, orange under 30%, pink under 75%, red the slowest. Blue = neutral (the consumer, outside the AI Factory). Purple is the AI Factory color, which always means the best, so the onion does not use it.
+Ring colours mark the layers: green L1 Clients, blue L2 Factory REST API, purple L3 Pipelines, orange L4 Bicep + pipeline-called scripts, red L5 Azure Resource Manager. Blue also marks the consumer. Chart bars show time: green fastest, then orange and pink, red slowest. On this page purple marks the pipeline layer, where the work now happens (Joakim, 2026-11-02).
 <!-- onion:colors:end -->
 
 Also as [PNG](./images/10-factory-onion-architecture-v2.png), as an
@@ -114,8 +114,8 @@ What the numbers say:
 ## Update the picture and the numbers
 
 All numbers, texts and colors live in [images/onion/onion-layers-v2.json](./images/onion/onion-layers-v2.json): the
-`runs` hold the measured rows, and the layer colors and the ranges in the texts (13-24 s, 24-52 min) are derived from
-them. After a new measured run, add or change its row and its evidence, then:
+`runs` hold the measured rows, and the ranges in the texts (13-24 s, 24-52 min) and the time colours of the chart bars
+are derived from them. The ring colours are fixed per layer (`colors.layers`). After a new measured run, add or change its row and its evidence, then:
 
 ```bash
 cd documentation/v2/10-19/images/onion

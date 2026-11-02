@@ -153,6 +153,7 @@ def main() -> None:
     subprocess.run(node, check=True, cwd=HERE)
     checked = check_text(args.font_dir) if args.font_dir else 0
     scale = [band["hex"] for band in data["colors"]["time_scale"]] + [data["colors"]["neutral"]]
+    scale += [layer["color"] for layer in data["layers"] if layer["color"] not in scale]
     gif = make_gif(plan, out["animated_gif"], scale)
     manifest = {
         "schemaVersion": 1, "generated": data["updated"], "speed": plan["speed"], "endHoldSeconds": plan["end_hold_seconds"],

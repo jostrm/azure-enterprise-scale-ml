@@ -152,14 +152,21 @@ class OnionV2(unittest.TestCase):
         self.assertEqual(onion.fill("{worker_pipeline}", self.data), "10.1 min")
         self.assertEqual(onion.fill("/operations/{id}/confirm", self.data), "/operations/{id}/confirm")
 
-    def test_the_api_is_green_the_pipeline_layers_red_and_the_consumer_blue(self):
+    def test_each_layer_has_its_own_fixed_colour_and_only_the_core_is_red(self):
+        """Joakim 2026-11-02: L1 green, L2 blue like the consumer, L3 purple, L4 orange, L5 (ARM) red."""
         colors = {layer["id"]: layer["color"] for layer in self.data["layers"]}
-        self.assertEqual(colors["l2"], self.scale["green"])
-        for layer_id in ("l3", "l4", "l5"):
-            self.assertEqual(colors[layer_id], self.scale["red"], layer_id)
-        self.assertEqual(self.data["consumer"]["color"], self.raw["colors"]["neutral"])
+        purple = self.raw["colors"]["extra"]["purple"]
+        self.assertEqual(colors, {"l1": self.scale["green"], "l2": self.raw["colors"]["neutral"], "l3": purple,
+                                  "l4": self.scale["orange"], "l5": self.scale["red"]})
+        self.assertEqual(self.data["consumer"]["color"], colors["l2"])
+        self.assertEqual([layer_id for layer_id, color in colors.items() if color == self.scale["red"]], ["l5"])
         for item in [self.raw["consumer"]] + self.raw["layers"]:
             self.assertNotIn("color", item, item["id"])
+
+    def test_the_legend_names_every_layer_colour_and_the_time_bars(self):
+        legend = onion.color_legend(self.data)
+        for words in ("green L1", "blue L2", "purple L3", "orange L4", "red L5", "green fastest"):
+            self.assertIn(words, legend)
 
     def test_the_poster_labels_every_measured_number(self):
         poster = onion.poster(self.data)[0]
@@ -176,12 +183,11 @@ class OnionV2(unittest.TestCase):
         for path in (V2, self.out["poster_svg"], self.out["animated_svg"], self.out["doc"]):
             self.assertNotIn("esaif", path.read_text(encoding="utf-8").lower(), path.name)
 
-    def test_no_purple_in_the_v2_pictures(self):
+    def test_purple_is_used_only_for_the_pipeline_layer(self):
+        purple = self.raw["colors"]["extra"]["purple"]
+        self.assertNotIn(purple, [band["hex"] for band in self.raw["colors"]["time_scale"]], "time bars never purple")
         for key in ("poster_svg", "animated_svg"):
-            for color in set(re.findall(r"#[0-9A-Fa-f]{6}\b", self.out[key].read_text(encoding="utf-8"))):
-                r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
-                hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
-                self.assertFalse(250 <= hue * 360 <= 300 and saturation > .25 and .08 < lightness < .95, color)
+            self.assertIn(purple, self.out[key].read_text(encoding="utf-8"), key)
 
     def test_committed_v2_svgs_and_doc_tables_are_regenerated_from_the_json(self):
         with tempfile.TemporaryDirectory() as folder:

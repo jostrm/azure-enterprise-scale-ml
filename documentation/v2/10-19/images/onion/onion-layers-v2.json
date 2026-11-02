@@ -18,9 +18,10 @@
     "R3": "Scenario 5 (esaf.delete_scale_set, worker route) was blocked when the 2026-10-31 table was verified: four attempts were refused at prepare after about 5 min. After the ownership fixes, attempt m succeeded (update 2026-11-01 16:00 CET): job db2fa13d 15:13-15:24Z, prepare 148 s, then the deletion worker on the API host for about 9 min (no GitHub run), 11.5 min in total. Attempt i (2026-11-01, 91 min, stopped after deleting common-002) is not in the table."
   },
   "colors": {
-    "note": "Purple is the AI Factory color, which always means the best, so the onion does not use it.",
-    "basis": "average time in the layer per measured run",
+    "note": "On this page purple marks the pipeline layer, where the work now happens (Joakim, 2026-11-02).",
     "neutral": "#5AA9FF",
+    "extra": {"purple": "#B07CFF"},
+    "layers": {"l1": "green", "l2": "blue", "l3": "purple", "l4": "orange", "l5": "red"},
     "time_scale": [
       {"name": "green", "hex": "#3DDC97", "below_share": 0.05},
       {"name": "orange", "hex": "#FFB84D", "below_share": 0.3},

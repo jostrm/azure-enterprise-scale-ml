@@ -144,9 +144,22 @@ def band_for(data, share: float) -> dict:
     return next(b for b in data["colors"]["time_scale"] if b["below_share"] is None or share < b["below_share"])
 
 
-def assign_colors(data) -> None:
-    """Green for the fastest layers .. red for the slowest, by share of the slowest layer; consumer neutral."""
+def palette(data) -> dict[str, str]:
     colors = data["colors"]
+    return {**{b["name"]: b["hex"] for b in colors["time_scale"]}, **colors.get("extra", {}), "blue": colors["neutral"]}
+
+
+def assign_colors(data) -> None:
+    """Green for the fastest layers .. red for the slowest, by share of the slowest layer; consumer neutral.
+    A data file may instead fix one colour per layer (colors.layers, onion V2)."""
+    colors = data["colors"]
+    data["consumer"]["color"], data["consumer"]["color_name"] = colors["neutral"], "blue"
+    if colors.get("layers"):
+        named = palette(data)
+        for layer in data["layers"]:
+            layer["color_name"] = colors["layers"][layer["id"]]
+            layer["color"] = named[layer["color_name"]]
+        return
     slowest = max(average_minutes(data, layer["id"]) for layer in data["layers"]) or 1
     for layer in data["layers"]:
         band = band_for(data, average_minutes(data, layer["id"]) / slowest)
@@ -156,6 +169,11 @@ def assign_colors(data) -> None:
 
 def color_legend(data) -> str:
     bands = data["colors"]["time_scale"]
+    if data["colors"].get("layers"):
+        names = [f'{layer["color_name"]} {layer["label"]} {layer["name"]}' for layer in data["layers"]]
+        return ("Ring colours mark the layers: " + ", ".join(names) + ". Blue also marks the consumer. "
+                f'Chart bars show time: {bands[0]["name"]} fastest, then ' + " and ".join(b["name"] for b in bands[1:-1])
+                + f', {bands[-1]["name"]} slowest.')
     parts = [f'{b["name"]} under {round(b["below_share"] * 100)}%' for b in bands if b["below_share"] is not None]
     basis = data["colors"].get("basis", "average time in the layer per scenario")
     return (f"Colour = {basis}, relative to the slowest layer: " + ", ".join(parts)
@@ -401,9 +419,9 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         scene.add(f'<path d="M0,{num(y + 10)} H44" stroke="{color}" stroke-width="2.4"{dash(path["dashed"])}/>')
         scene.text(f'{path["label"]}: {fill(path["text"], data)}', 56, y, DW - 56, 14, color if path["dashed"] else WHITE, True, 20)
         y += 24
-    bands = data["colors"]["time_scale"]
-    for index, band in enumerate(bands):
-        scene.rect(index * 11, y + 6, 10, 10, band["hex"], radius=2)
+    swatches = [layer["color"] for layer in data["layers"]] if data["colors"].get("layers") else         [band["hex"] for band in data["colors"]["time_scale"]]
+    for index, color in enumerate(swatches):
+        scene.rect(index * 11, y + 6, 10, 10, color, radius=2)
     y = scene.text(color_legend(data), 56, y, DW - 56, 14, WHITE, True, 20) + 4
     return scene, y, routes
 
