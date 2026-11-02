@@ -82,7 +82,9 @@ class LifecycleService:
             raise ValidationFailed("settings must be a JSON object of catalog setting names to values.")
         options = self._options(body)
         self._guard.check(target)
-        steps, resolved = plan(scenario, target, self._backend.catalog(), options)
+        single_scenario = self._backend.name == "sdk" and not (
+            scenario.destructive and self._backend.delete_mode == "simulate")
+        steps, resolved = plan(scenario, target, self._backend.catalog(), options, single_scenario=single_scenario)
         operation = Operation.create(operation_id=self._ids(), scenario=scenario, target=str(target), settings=settings,
                                      steps=steps, backend=self._backend.name, executor=self._tracker.name,
                                      now=self._clock.now(), options=options, resolved=resolved)

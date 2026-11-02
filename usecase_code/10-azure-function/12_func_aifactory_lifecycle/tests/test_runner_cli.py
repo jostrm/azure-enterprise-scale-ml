@@ -98,7 +98,7 @@ def test_prepare_goes_through_rest_and_posts_a_signed_result_with_the_catalog(fu
     assert parse_result(result).preview.plan[0] == PREVIEW["summary"]
 
 
-@pytest.mark.parametrize("backend", ["rest", "sdk"])
+@pytest.mark.parametrize("backend", ["rest"])
 def test_the_runner_waits_for_a_slow_factory_api_call_as_long_as_its_setting_allows(function, backend):
     # A real runtime review takes minutes; AIF_FACTORY_API_TIMEOUT_SECONDS (runner.json or environment) bounds the call.
     with FakeFactoryApi(slow={"/api/v1/factory-catalog/prepare": 1.5}) as api:
@@ -112,16 +112,17 @@ def test_the_runner_waits_for_a_slow_factory_api_call_as_long_as_its_setting_all
     assert answered["outcome"] == "ok" and answered["preview"]["backend_ref"]["confirmation_id"] == CONFIRMATION_ID
 
 
-def test_sdk_and_rest_report_the_same_review(function):
-    bodies = {}
-    for backend in ("rest", "sdk"):
-        with FakeFactoryApi() as api:
-            runner.main(env_for(api.url, function, {"action": "prepare", "request": step_request()}, backend))
-        bodies[backend] = {key: value for key, value in function.result().items() if key != "resultId"}
-    assert bodies["rest"]["preview"] == bodies["sdk"]["preview"]
+def test_sdk_refuses_old_step_requests_instead_of_repeating_them(function):
+    with FakeFactoryApi() as api:
+        runner.main(env_for(api.url, function, {"action": "prepare", "request": step_request()}, "sdk"))
+        posts = [call for call in api.calls if call["method"] == "POST"]
+    result = function.result()
+    assert result["outcome"] == "error"
+    assert result["error"]["code"] == "sdk-operation-upgrade"
+    assert posts == []
 
 
-@pytest.mark.parametrize("backend", ["rest", "sdk"])
+@pytest.mark.parametrize("backend", ["rest"])
 def test_the_runner_reviews_and_confirms_a_scale_set_enrollment_once_with_its_phrase(function, backend):
     request = step_request("enroll-scaleset", StepKind.ENROLL)
     with FakeFactoryApi() as api:

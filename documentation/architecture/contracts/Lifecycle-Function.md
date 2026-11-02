@@ -28,6 +28,7 @@ sources:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/simulated_deletes.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md
+  - environment_setup/azurefactory-cli/src/azurefactory/esaf.py
 tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_ids.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_regions.py
@@ -42,12 +43,13 @@ tests:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_api_host_installer.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_simulated_deletes.py
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_infra_template.py
+  - usecase_code/10-azure-function/12_func_aifactory_lifecycle/tests/test_esaf_scenarios.py
 graph_symbols:
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/application/service.py::class:LifecycleService
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/domain/operation.py::class:Operation
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/factory_api.py::class:FactoryApiBackend
   - usecase_code/10-azure-function/12_func_aifactory_lifecycle/aif_lifecycle/adapters/runner_backend.py::class:RunnerBackend
-reviewed_source: '98711370 + working tree; observed 2026-10-22; Flex Consumption hosting 2026-10-23'
+reviewed_source: 'a9c597fe + working tree; SDK facade integration observed 2026-11-02'
 ---
 # Lifecycle Function
 
@@ -55,21 +57,31 @@ reviewed_source: '98711370 + working tree; observed 2026-10-22; Flex Consumption
 
 A usecase template (`usecase_code/10-azure-function/12_func_aifactory_lifecycle`) that runs six lifecycle scenarios -
 init factory, add scale set, add or update project, delete project, delete scale set, delete factory - as reviewed
-two-step operations over the Factory API, through REST or the `AzureFactoryClient` SDK, and follows the resulting
-GitHub runs through `workflow_run` events.
+operations over the Factory API. `AIF_BACKEND=sdk` calls one `azurefactory.esaf` method per scenario;
+`rest` retains the legacy per-step API contract. Jobs are followed through API status; dummy workflow runs use events.
 
 - **Readable IDs** (`domain/ids.py`) are purple's resource-group tokens: FactoryId `prefix-loc-env`, ScalesetId plus the
   RG suffix, ProjectId = the project RG name. Azure tokens are `dev/test/prod`; the catalog's `stage` maps to `test`.
   IDs resolve by formatting each catalog entity and matching the whole string; no lookup by key exists in the API.
-- **Operations** (`domain/operation.py`) follow the reviewed-operation shape of [[Reviewed-Operations]]: one Function
-  confirm per Factory API confirmation, a token bound to the exact preview, CAS-saved `confirming` before the
-  non-idempotent call, and `uncertain` as a terminal outcome that is never retried.
-- **Backends** share one step-to-call mapping (`adapters/factory_api.py`, Template Method); REST and SDK only differ in
-  transport, and a parity test proves they make identical calls. A mock backend keeps a persistent catalog for
-  end-to-end tests without Azure. Scenario 1 saves the factory through `/api/v1/creation/prepare|confirm` (full
-  bootstrap, dev scale set 001, prefix/region/suffix pinned to the FactoryId) and runs the creation workflow under one
-  whole-workflow approval that the API continues by itself; a mid-workflow review request stops the step
-  (`action_required`) rather than being auto-confirmed. Scenario 2 is configure -> add-project001 -> enroll-scaleset
+- **Operations** (`domain/operation.py`) retain a token bound to the exact preview, CAS-saved `confirming` before the
+  non-idempotent call, and terminal `uncertain` outcomes that are never retried. SDK mode has one `scenario` step
+  and one local scope approval (not a live Azure preview). Confirm invokes `init_factory`, `add_scale_set`,
+  `apply_project`, `delete_project`, `delete_scale_set` or `delete_factory`. Any facade failure may follow partial
+  configuration/permission writes, so it is uncertain rather than safely retryable.
+- **SDK adapter** (`adapters/sdk_backend.py`) implements the port directly; it does not inherit the REST orchestration.
+  The facade owns preparation, API confirmation phrases, enrollment and deletion permission. Explicit per-call sessions
+  select the resolved factory, environment and scale-set suffix. The adapter checks actual target identities again
+  before execution, but does not block unrelated revision drift. Job ID, kind and factory are persisted and rebuilt
+  as `EsafJob` for status reads, including the dedicated factory-deletion endpoint.
+  Project runtime reviews must carry `runtime_scope_authorization` for the exact selected IDs and subscription,
+  live enrollment and explicit deletion permission; missing proof prevents SDK confirmation even on an older API
+  that incorrectly reports an executable review. This is actual scope/permission evidence, not a version/hash gate.
+  Scenario 1 supplies `creation_request`: the facade saves the factory and starts a bounded whole-workflow approval
+  whose continuation is server-owned, not a Function/runner daemon thread. A mid-workflow human review stops the step
+  (`action_required`). SDK Scenario 2 deploys only the scale set's common resources; Scenario 3 adds projects explicitly.
+  `apply_project` retains `upsert_project` compatibility.
+- **REST compatibility** keeps the step-to-call mapping in `adapters/factory_api.py`. A mock backend keeps a persistent
+  catalog for offline operation. REST Scenario 2 is configure -> add-project001 -> enroll-scaleset
   -> deploy-common -> deploy-project001: `enroll-scaleset` (step kind `enroll`) is the reviewed provider-state
   operation `enroll-scale-set` that extends a single-writer factory's binding and enrollment to the new scale set and
   the projects placed on it at prepare time; the API's exact Blob-coordination blocker marks it not needed
@@ -77,8 +89,9 @@ GitHub runs through `workflow_run` events.
 - **Executors**: `inprocess` (the API on this host's loopback), `github-dummy` (dummy workflow runs) and
   `github-runner` (the management runner calls the API on 127.0.0.1). The Function never calls the Factory API over
   the network because catalog and deployment routes require a loopback client.
-- **Runner executor** (`adapters/runner_backend.py`, `application/runner_protocol.py`, `runner.py`): every Factory API
-  call is a hand-off (Asynchronous Request-Reply). The Function dispatches `aif-ops.yml` with a request it signs with
+- **Runner executor** (`adapters/runner_backend.py`, `application/runner_protocol.py`, `runner.py`): every backend
+  prepare/confirm/status call is a hand-off (Asynchronous Request-Reply); one SDK confirm covers the complete scenario
+  submission. The Function dispatches `aif-ops.yml` with a request it signs with
   the event secret and an expiry; the runner verifies it, checks that the workflow inputs describe it, makes the one
   call through the REST or SDK adapter and posts one signed result to `/api/v1/runner/results`. The step waits in
   `preparing` or `confirming`; a review that never reports fails, a confirmation that never reports (or whose run ends
@@ -131,6 +144,12 @@ GitHub runs through `workflow_run` events.
 - The Function's own name must stay outside purple's `func-prj<NNN>-...` pattern: purple's project pipelines treat such
   an app as the project Function and can delete it (`delete-services-if-disabled.sh`).
 - A consumer copy is configuration plus a template copy; the template does not change factory Bicep or pipelines.
+- Upgrade the Function and lifecycle runner together using the SDK commit pinned in requirements.txt. Old SDK jobs
+  remain readable, but unconfirmed old per-step requests fail with `sdk-operation-upgrade`; reconcile before starting
+  a new operation. Local fake/HTTP tests are not evidence of live Azure deployment.
+- The server must include existing-target enrollment extension and project scope/deletion checks before
+  `API-2-Pipelines` dispatch and again before queueing. Install the updated API before the SDK/Function; retain
+  real-delete refusal during rollout. Project scope proof is produced by those live server checks.
 
 See [[Factory-API-and-SDK]], [[Reviewed-Operations]], [[Lifecycle-and-Recovery]], [[Factory-Scope-Model]],
 [[Trust-and-Authorization]] and [[Index]].

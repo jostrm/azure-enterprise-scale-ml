@@ -2,8 +2,8 @@
 
 An operation runs a scenario as ordered steps. Each step is reviewed (prepare -> preview), confirmed once with the
 token bound to that exact preview, then executed as zero or more GitHub runs that complete in order. The model mirrors
-the Agent Factory's reviewed operations: one confirm per Factory API confirmation, CAS-saved before the
-non-idempotent call, and an uncertain confirm is terminal - never retried.
+the Agent Factory's reviewed operations: CAS-saved before the non-idempotent call, and an uncertain confirm is
+terminal - never retried. SDK mode approves one whole scenario; REST mode approves individual API steps.
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ _RUN_RANK = {"pending": 0, "requested": 1, "queued": 1, "waiting": 1, "in_progre
 
 
 class StepKind(str, Enum):
+    SCENARIO = "scenario"
     CONFIGURE = "configure"
     BOOTSTRAP = "bootstrap"
     DEPLOY = "deploy"

@@ -19,11 +19,13 @@ JOB_ID = "44444444-4444-4444-8444-444444444444"
 WORKFLOW_ID = "55555555-5555-4555-8555-555555555555"
 CONFIRMATION_ID = "66666666-6666-4666-8666-666666666666"
 AUTHORIZATION_HASH = "c" * 64
+SUBSCRIPTION_ID = "f0fe8b33-73bf-41e4-9997-e3920d793c06"
 
 CATALOG = {"contract_version": 1, "mode": "catalog", "revision": REVISION, "factories": [{
     "id": FACTORY_ID, "key": "aif-121-swedencentral", "kind": "ai", "prefix": "aif-121-", "region": "swedencentral",
     "region_short_name": "sdc",
-    "scale_sets": [{"id": SCALESET_ID, "environment": "dev", "suffix": "001", "status": "configured"}],
+    "scale_sets": [{"id": SCALESET_ID, "environment": "dev", "suffix": "001", "status": "configured",
+                   "subscription_id": SUBSCRIPTION_ID}],
     "projects": [{"id": PROJECT_ID, "key": "project-001-001", "number": "001", "display_name": "Project 001",
                   "placements": [{"environment": "dev", "scale_set_id": SCALESET_ID}]}],
 }]}
@@ -41,11 +43,11 @@ JOB = {"id": JOB_ID, "action": "deploy", "status": "queued", "message": "", "fac
 OPENAPI = {"openapi": "3.1.0", "components": {"schemas": {"CatalogPrepare": {"properties": {
     "initial_project": {}, "target_region_short_name": {}}}}}}
 
-SUBSCRIPTION_ID = "f0fe8b33-73bf-41e4-9997-e3920d793c06"
 ENROLL_PREPARE = "/api/v1/operations/enroll-scale-set/prepare"
 ENROLL_CONFIRM = "/api/v1/operations/enroll-scale-set/confirm"
 ENROLL_PHRASE = "ENROLL SCALE SET aif-121 002"
 BLOB_BLOCKER = "Blob-coordinated factories are not supported yet; nothing was changed."
+ENROLLED_BLOCKER = "The scale set already has a binding target; it is enrolled. Nothing was changed."
 CONTRIBUTOR = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMIN = "/providers/Microsoft.Authorization/roleDefinitions/f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 
@@ -178,6 +180,8 @@ class StatefulCatalog:
         groups = [self._groups(scale, None)] + [self._groups(scale, p) for p in placed]
         phrase = f"ENROLL SCALE SET {self.factory['prefix'].rstrip('-')} {scale['suffix']}"
         blockers = [BLOB_BLOCKER] if self.coordination != "single-writer" else self.enroll_blockers
+        if not blockers and all(group in self.enrolled for group in groups):
+            blockers = [ENROLLED_BLOCKER]
         confirmation_id = str(uuid.uuid4())
         preview = enroll_preview(body, groups, phrase=phrase, blockers=blockers, confirmation_id=confirmation_id)
         if not blockers:
@@ -200,7 +204,8 @@ class StatefulCatalog:
         return self.document["factories"][0]
 
     def _bump(self) -> None:
-        text = json.dumps(self.document["factories"], sort_keys=True)
+        text = json.dumps({"factories": self.document["factories"],
+                           "configurations": self.document.get("configurations", {})}, sort_keys=True)
         self.document["revision"] = hashlib.sha256(text.encode()).hexdigest()
 
     def _scale(self, scale_set_id: str) -> dict:
@@ -242,7 +247,17 @@ class StatefulCatalog:
         confirmation_id = str(uuid.uuid4())
         self.pending[confirmation_id] = copy.deepcopy(body)
         # A future expiry: the SDK refuses a review that has expired by the real clock before it saves a receipt.
-        return {**PREVIEW, "confirmation_id": confirmation_id, "can_execute": True, "blockers": [],
+        scope = ({"target": {"id": body["factory_id"]},
+                  **{key: body.get(key) for key in ("factory_id", "scale_set_id", "project_id")}}
+                 if action == "configure-settings" else {})
+        if action == "deploy" and body.get("project_id"):
+            project = next(p for p in self.factory["projects"] if p["id"] == body["project_id"])
+            scope["runtime_scope_authorization"] = {
+                "factory_id": body["factory_id"], "scale_set_id": body["scale_set_id"],
+                "project_id": project["id"],
+                "resource_group_id": group_id(self._groups(self._scale(body["scale_set_id"]), project)),
+                "enrolled": True, "delete_authorized": False}
+        return {**PREVIEW, **scope, "confirmation_id": confirmation_id, "can_execute": True, "blockers": [],
                 "source_revision": self.document["revision"], "expires_at": "2099-01-01T00:00:00Z",
                 "operation_mode": "runtime" if action == "deploy" else "configuration"}
 
@@ -254,7 +269,8 @@ class StatefulCatalog:
         if action == "create-scale-set":
             for item in body["scale_sets"]:
                 self.factory["scale_sets"].append({"id": str(uuid.uuid4()), "environment": item["environment"],
-                                                   "suffix": item["suffix"], "status": "draft"})
+                                                   "suffix": item["suffix"], "status": "draft",
+                                                   "subscription_id": item["subscription_id"]})
         elif action == "add-project":
             number = body["project"]["number"]
             keys = {p["key"] for p in self.factory["projects"]}
@@ -268,6 +284,8 @@ class StatefulCatalog:
         elif action == "add-project-placements":
             project = next(p for p in self.factory["projects"] if p["id"] == body["project_id"])
             project["placements"].extend(copy.deepcopy(body["placements"]))
+        elif action == "configure-settings":
+            self.document.setdefault("configurations", {})[body["project_id"]] = copy.deepcopy(body["settings"])
         else:
             self.jobs += 1
             job = {**JOB, "id": str(uuid.UUID(int=self.jobs)), "action": action}

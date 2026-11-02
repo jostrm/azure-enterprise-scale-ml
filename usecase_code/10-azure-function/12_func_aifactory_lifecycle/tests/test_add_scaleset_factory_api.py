@@ -1,4 +1,4 @@
-"""Scenario 2 (add-scaleset) end to end against a fake with pink's catalog semantics, no IDs injected.
+"""REST Scenario 2 compatibility against a fake with pink's catalog semantics, no IDs injected.
 
 Pink's `create-scale-set` adds a draft scale set and no project, and a project has one placement per environment,
 so project001 on the new scale set is a new logical project (`add-project`), not a second placement of the existing
@@ -14,7 +14,6 @@ with one exact message, and the Function records the step as not needed and cont
 import pytest
 
 from aif_lifecycle.adapters.rest_backend import RestFactoryBackend, RestTransport
-from aif_lifecycle.adapters.sdk_backend import SdkFactoryBackend
 from aif_lifecycle.adapters.stores import MemoryStore
 from aif_lifecycle.adapters.trackers import InstantTracker
 from aif_lifecycle.application.guard import SelfProtection
@@ -37,9 +36,8 @@ BODY = {"scalesetId": "aif-121-sdc-dev-002", "scaleSet": SCALE_SET}
 
 
 def backend(option, api):
-    if option == "rest":
-        return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER)
-    return SdkFactoryBackend(api.url, api.api_key, FOLDER)
+    assert option == "rest"
+    return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER)
 
 
 def api_service(api, clock, option="rest"):
@@ -56,7 +54,7 @@ def calls(api, path):
     return [call["body"] for call in api.calls if call["path"] == path]
 
 
-@pytest.mark.parametrize("option", ["rest", "sdk"])
+@pytest.mark.parametrize("option", ["rest"])
 def test_scenario_2_places_project001_enrolls_the_scale_set_then_deploys_it(clock, option):
     with FakeFactoryApi(stateful=True) as api:
         service = api_service(api, clock, option)
@@ -122,7 +120,7 @@ def test_without_the_enrollment_the_single_writer_api_refuses_the_common_deploy(
             backend("rest", api).prepare(request)
 
 
-@pytest.mark.parametrize("option", ["rest", "sdk"])
+@pytest.mark.parametrize("option", ["rest"])
 def test_a_blob_coordinated_factory_needs_no_enrollment_and_keeps_working(clock, option):
     with FakeFactoryApi(stateful=True, coordination="blob") as api:
         service = api_service(api, clock, option)
@@ -138,7 +136,7 @@ def test_a_blob_coordinated_factory_needs_no_enrollment_and_keeps_working(clock,
     assert any(item["event"] == "step-not-needed" for item in operation.history)
 
 
-@pytest.mark.parametrize("option", ["rest", "sdk"])
+@pytest.mark.parametrize("option", ["rest"])
 def test_any_other_enrollment_blocker_stops_the_operation_with_the_blocker_shown(clock, option):
     blocker = "Scale-set enrollment blocked: the saved binding is not the live single-writer enrollment."
     with FakeFactoryApi(stateful=True, enroll_blockers=[blocker]) as api:
@@ -149,7 +147,7 @@ def test_any_other_enrollment_blocker_stops_the_operation_with_the_blocker_shown
     assert operation.to_public()["steps"][2]["preview"]["blockers"] == [blocker]
 
 
-@pytest.mark.parametrize("option", ["rest", "sdk"])
+@pytest.mark.parametrize("option", ["rest"])
 def test_an_api_without_the_operation_is_reported_as_too_old(clock, option):
     with FakeFactoryApi(stateful=True, enroll_routes=False) as api:
         service = api_service(api, clock, option)

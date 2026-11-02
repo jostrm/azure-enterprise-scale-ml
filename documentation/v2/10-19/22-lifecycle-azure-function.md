@@ -4,6 +4,10 @@ A private Azure Function that runs the AI Factory lifecycle as an API: initializ
 update a project, and delete a project, a scale set or a whole factory. Each change is a review followed by a separate
 confirmation, and the Function follows the resulting GitHub workflow runs until they succeed or fail.
 
+With `AIF_BACKEND=sdk`, each approval invokes one `azurefactory.esaf` method for the whole scenario. Prepare is a
+local scope approval, not a live Azure dry-run; the SDK owns the API reviews, confirmations and deletion grants.
+`AIF_BACKEND=rest` retains the legacy per-step approvals.
+
 Template: [usecase_code/10-azure-function/12_func_aifactory_lifecycle](../../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md).
 Design and constraints: [Lifecycle Function](../../architecture/contracts/Lifecycle-Function.md).
 Every secret and identity, with copyable examples of the full solution:
@@ -47,7 +51,11 @@ Invoke-RestMethod -Uri "$base/v1/operations/$($op.operationId)" -Headers $header
 Deletes also need `confirmationPhrase` (shown in the preview, for example `DELETE aif-121-sdc-dev-002`). A review
 expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application/problem+json` with a stable `code`.
 
-Adding a scale set runs `configure`, `add-project001`, `enroll-scaleset`, `deploy-common` and `deploy-project001`. In
+SDK mode calls `esaf.add_scale_set` once to register, enroll and deploy common resources; add project001 explicitly
+with Scenario 3 (`esaf.apply_project`). New bootstrap uses `esaf.init_factory(creation_request=...)`, with continuation
+owned by the API rather than a Function background thread. Jobs are persisted by ID and kind for later status reads.
+
+In REST mode, adding a scale set runs `configure`, `add-project001`, `enroll-scaleset`, `deploy-common` and `deploy-project001`. In
 a single-writer factory, `enroll-scaleset` extends the deployment binding and live enrollment to the new scale set
 (its common resource group and the project placed on it just before), so the Factory API accepts its deployments;
 confirm it with the phrase in its preview, for example `ENROLL SCALE SET aif-121 002`. A Blob-coordinated factory does
@@ -57,7 +65,7 @@ operation fails the step with `factory-api-too-old`.
 ## Set it up in a project
 
 1. Copy the template to your consumer repo (`aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/`)
-   and the workflows from its `workflows/` folder to `.github/workflows/` of the factory repo.
+   and the workflows from its `workflows/` folder to `.github/workflows/` of a separate ops repo.
 2. Create `settings.<consumer>.json` from `settings.example.json`: a VNet integration subnet delegated to
    `Microsoft.App/environments` (/27 or larger, not used by Container Apps; add one such as `snt-prj001-func`), the
    private endpoint subnet, storage account, Application Insights, Log Analytics and Key Vault. Name the app outside
@@ -68,14 +76,14 @@ operation fails the step with `factory-api-too-old`.
    subscription governance switched off nightly on the earlier Dedicated (B1) plan and so stopped the timer and queue
    triggers; it costs execution time only (roughly USD 0-10 a month here, against about USD 13 for B1).
 4. Put the event secret and the GitHub token in the project Key Vault and set `AIF_KEY_VAULT_NAME`,
-   `AIF_EVENT_SECRET_NAME` and `AIF_GITHUB_TOKEN_NAME`. Use a fine-grained token limited to the factory repo's Actions.
-5. For events, register the management runner for the factory repo with its own label (for example
+   `AIF_EVENT_SECRET_NAME` and `AIF_GITHUB_TOKEN_NAME`. Use a fine-grained token limited to the ops repo's Actions.
+5. For events, register the management runner for the ops repo with its own label (for example
    `aif-lifecycle-mgmt`) and set the relay's `AIF_LIFECYCLE_EVENTS_URL` variable and `AIF_LIFECYCLE_EVENT_SECRET` secret.
 
 Start with `AIF_BACKEND=mock` and `AIF_EXECUTOR=inprocess`, then `github-dummy`, before switching to the real API.
 Add App Service authentication with an Entra app role before real deployments; function keys are for the mock passes.
 
-For the real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=rest` (or `sdk`):
+For the simplified real API set `AIF_EXECUTOR=github-runner` with `AIF_BACKEND=sdk` (`rest` remains available):
 
 1. Keep the Function's workflows (`aif-ops.yml`, `aif-event-relay.yml`) in an ops repository of their own: the
    Factory API won't dispatch the factory's runs while another workflow of the factory repo is running. Point

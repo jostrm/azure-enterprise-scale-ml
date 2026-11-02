@@ -1,6 +1,6 @@
 """Runner entry point: aif-ops.yml runs `python -m aif_lifecycle.runner` on the management runner, next to the API.
 
-It makes the one Factory API call in AIF_RUNNER_REQUEST through the REST or SDK adapter on loopback and POSTs one
+It makes the backend call in AIF_RUNNER_REQUEST (a whole scenario submission for SDK confirm) on loopback and POSTs one
 signed result to the Function (AIF_RESULTS_URL). Before calling, it checks that the Function signed the request, that
 it has not expired and that the workflow inputs (the run name) describe it. A confirm is submitted exactly once: a
 re-run of its job does nothing. Only the result post is retried, because the Function ignores a result it has

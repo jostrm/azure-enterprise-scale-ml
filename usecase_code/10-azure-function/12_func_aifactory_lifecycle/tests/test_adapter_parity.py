@@ -1,10 +1,9 @@
-"""Option 1 (REST) and option 2 (SDK) must make exactly the same Factory API calls for every scenario."""
+"""REST compatibility contract. SDK scenario-level coverage lives in test_esaf_scenarios.py."""
 
 import pytest
 
 from aif_lifecycle.adapters.factory_api import WHOLE_WORKFLOW_SECONDS, job_observation
 from aif_lifecycle.adapters.rest_backend import RestFactoryBackend, RestTransport
-from aif_lifecycle.adapters.sdk_backend import SdkFactoryBackend
 from aif_lifecycle.domain.errors import ValidationFailed
 from aif_lifecycle.domain.operation import StepKind
 from aif_lifecycle.domain.scenarios import Scenario
@@ -104,10 +103,8 @@ EXPECTED_ROUTES = {
 
 
 def backend_for(option, api):
-    """Parity covers every scenario's API calls, deletes included, so these backends opt in to real deletes."""
-    if option == "rest":
-        return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER, allow_deletes=True)
-    return SdkFactoryBackend(api.url, api.api_key, FOLDER, allow_deletes=True)
+    assert option == "rest"
+    return RestFactoryBackend(RestTransport(api.url, api.api_key), FOLDER, allow_deletes=True)
 
 
 def record(option, steps):
@@ -122,9 +119,8 @@ def record(option, steps):
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS)
-def test_rest_and_sdk_make_the_same_calls(scenario):
-    rest, sdk = record("rest", SCENARIOS[scenario]), record("sdk", SCENARIOS[scenario])
-    assert rest == sdk
+def test_rest_keeps_the_reviewed_step_calls(scenario):
+    rest = record("rest", SCENARIOS[scenario])
     routes = [f"{call['method']} {call['path']}" for call in rest]
     assert routes[:-2] == EXPECTED_ROUTES[scenario]
     assert routes[-2:] == [f"GET /api/v1/factory-catalog/jobs/{JOB_ID}", f"GET /api/v1/creation/workflows/{WORKFLOW_ID}"]
@@ -176,7 +172,7 @@ def test_a_full_bootstrap_creates_a_dev_factory_only():
                       {"prefix": "aif-121-", "region": "swedencentral", "region_code": "sdc", "environment": "prod",
                        "suffix": "001", "project_number": "001"}, options={"bootstrapConfig": BOOTSTRAP})
     with FakeFactoryApi() as api, pytest.raises(ValidationFailed, match="dev"):
-        backend_for("sdk", api).prepare(request)
+        backend_for("rest", api).prepare(request)
 
 
 @pytest.mark.parametrize("status,expected", [
@@ -198,7 +194,7 @@ def test_job_and_creation_workflow_states_map_to_run_states(status, expected):
 
 
 def test_delete_factory_confirm_sends_the_reviewed_hash_and_phrase_once():
-    calls = record("sdk", SCENARIOS["6-delete-factory"])
+    calls = record("rest", SCENARIOS["6-delete-factory"])
     confirms = [call for call in calls if call["path"].endswith("/delete-aifactory/confirm")]
     assert len(confirms) == 1
     assert confirms[0]["body"]["preview_hash"] == "b" * 64
@@ -206,7 +202,7 @@ def test_delete_factory_confirm_sends_the_reviewed_hash_and_phrase_once():
 
 
 def test_the_enrollment_sends_the_closed_request_and_the_reviewed_hash_and_phrase_once():
-    calls = record("sdk", SCENARIOS["2-add-scaleset"])
+    calls = record("rest", SCENARIOS["2-add-scaleset"])
     by_route = {call["path"]: call["body"] for call in calls}
     assert by_route["/api/v1/operations/enroll-scale-set/prepare"] == {
         "contract_version": 1, "folder": FOLDER, "factory_id": FACTORY_ID, "scale_set_id": SCALESET_ID}

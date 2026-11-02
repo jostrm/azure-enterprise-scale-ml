@@ -1,309 +1,122 @@
 # AI Factory lifecycle Function
 
-A reusable Azure Functions template (Python v2 model) that runs six AI Factory lifecycle scenarios through the
-Factory API - over REST (option 1) or the `azurefactory` Python SDK (option 2) - and follows every run through
-GitHub workflow events until it succeeds or fails.
+An Azure Functions Python consumer of `from azurefactory import esaf`. Set **`AIF_BACKEND=sdk`** to run each
+scenario through **one facade method**, with one Function scope approval. The SDK owns the Factory API's
+prepare/confirm calls, enrollment, deletion authorization and server confirmation phrases.
 
-Every secret and identity, and the full solution with copyable examples: [README_More_Info.md](README_More_Info.md).
+| # | Function route segment | SDK method | Result |
+|---|---|---|---|
+| 1 | `init-factory` | `esaf.init_factory(creation_request=..., session=...)` | Save a new factory and start its server-owned full-bootstrap workflow |
+| 2 | `add-scaleset` | `esaf.add_scale_set(suffix, cidr=..., session=...)` | Register, enroll and deploy the scale set's common resources |
+| 3 | `add-or-update-project` | `esaf.apply_project(number, scale_set=..., session=...)` | Add or update the selected project, then deploy it |
+| 4 | `delete-project` | `esaf.delete_project(number, scale_set=..., session=...)` | Delete the project in the selected environment and scale set |
+| 5 | `delete-scaleset` | `esaf.delete_scale_set(suffix, environment=..., session=...)` | Delete the scale set's registered resources |
+| 6 | `delete-factory` | `esaf.delete_factory(session=...)` | Delete the factory's registered resources; shared hubs and subscriptions stay |
 
-| # | Scenario | Route segment | Input | What it does |
-|---|---|---|---|---|
-| 1 | Init AI Factory | `init-factory` | `factoryId` | Catalog entry, then connectivity, scale set 001 (common RG + vNet) and project001 |
-| 2 | Add scale set | `add-scaleset` | `scalesetId` | New common RG, vNet and default project001; enrolls the scale set first in a single-writer factory |
-| 3 | Add or update project | `add-or-update-project` | `projectId` | A new number adds the project; an existing number updates it |
-| 4 | Delete project | `delete-project` | `projectId` | Deletes one project in a scale set |
-| 5 | Delete scale set | `delete-scaleset` | `scalesetId` | Deletes its projects and its common RG |
-| 6 | Delete AI Factory | `delete-factory` | `factoryId` | Deletes all scale sets of a single-environment factory |
+`apply_project` retains `upsert_project` as a compatible spelling. The folder belongs to an explicit `esaf.Session`,
+not the first positional argument of every method. Each session selects the resolved factory ID; project and scale-set
+calls also carry the environment. Scenario 2 does **not** create project001 implicitly: use Scenario 3 for it.
 
-## Readable IDs
+## Call the Function
 
-| ID | Grammar | Example (Spider) |
-|---|---|---|
-| FactoryId | `prefix-regioncode-env` | `spider-sdc-dev` |
-| ScalesetId | `FactoryId-suffix` | `spider-sdc-dev-001` (common RG `spider-esml-common-sdc-dev-001`) |
-| ProjectId | the project resource group name | `spider-esml-project001-sdc-dev-001-rg` |
-
-- Tokens follow purple's resource-group naming; Azure names use `dev`/`test`/`prod` (the catalog's `stage` is `test`).
-- Region codes come from `bootstrap/lib/create-new-aifactory-scaleset.sh`; `tests/test_regions.py` fails if the copy
-  in `aif_lifecycle/domain/regions.py` drifts.
-- There is no salt: an ID only has to be unique within one consumer repo's catalog. IDs are resolved by formatting each
-  catalog entity (`GET /api/v1/factory-catalog`) and matching the whole string.
-
-## Architecture
-
-The Factory API serves catalog and deployment routes to loopback clients only, so the Function never calls it over the
-network. It hands the work to an executor:
-
-```
-Caller (VPN)
- -> Function (private endpoint): validate, resolve IDs, self-protect, record the operation, 202 + Location
-    -> executor  inprocess     : adapters call the API on this host's loopback (local `func start` next to the API)
-                 github-dummy  : one aif-dummy-step.yml run per resource group (mocked API, real GitHub events)
-                 github-runner : aif-ops.yml on the management runner -> REST/SDK adapter -> API on 127.0.0.1:8765
-                                 -> the API dispatches factory-lifecycle.yml in the factory repo
- <- results: the runner POSTs one signed result per call to /api/v1/runner/results (github-runner)
- <- events: aif-event-relay.yml (workflow_run, on the management runner) POSTs the payload, HMAC-signed
- <- fallback: the timer polls runs whose events are late and times out runner calls that never report
-```
-
-With `github-runner`, every Factory API call is a hand-off: the step waits in `preparing` or `confirming`
-(`waitingFor` on the operation) until the runner's signed result arrives. A review that never reports fails with
-`runner-timeout`; a confirmation that never reports, or whose aif-ops run ends without a result, becomes `uncertain`
-(never retried). Planning reads a catalog snapshot that every runner result refreshes; the first prepare answers 503
-`catalog-pending` while the snapshot is read, and `POST /api/v1/catalog/refresh` reads it again. Job status checks also
-run on the runner, one at a time.
-
-| Layer | Code | Patterns |
-|---|---|---|
-| Entry | `function_app.py` (thin), `aif_lifecycle/http_api.py`, `aif_lifecycle/runner.py` (runner host) | Gatekeeper (HMAC), Asynchronous Request-Reply |
-| Application | `application/service.py` (`LifecycleService`), `planner.py`, `resolver.py`, `guard.py`, `events.py`, `runner_protocol.py` (Function-runner contract) | Facade |
-| Domain | `domain/ids.py`, `operation.py`, `scenarios.py`, `errors.py` | State (transition table) |
-| Ports | `ports.py` | |
-| Adapters | `adapters/mock_backend.py`, `factory_api.py` + `rest_backend.py` / `sdk_backend.py`, `runner_backend.py`, `trackers.py`, `github.py`, `stores.py`, `queue.py` | Strategy, Template Method, Adapter, Queue-Based Load Leveling |
-| Composition root | `composition.py`, `settings.py` | |
-
-- **Two steps everywhere.** `POST .../prepare` returns 202; the preview (plan, affected resource groups, blockers,
-  `canExecute`, `expiresAt`, `confirmationToken`) is on `GET /api/v1/operations/{id}`; `POST .../confirm` sends the
-  token, plus the phrase for deletes. One Function confirm per Factory API confirmation; nothing is auto-confirmed.
-- **Never retry an uncertain confirm.** The operation is saved as `confirming` (compare-and-swap) before the
-  non-idempotent call. A timeout or 5xx makes it `uncertain`, which is terminal: reconcile the API job first.
-- **Chained steps** advance on `completed/success`: the next step is prepared automatically and waits for its own
-  confirmation. A failed run stops the chain with the run link and a log excerpt.
-- **Self-protection.** Targets that contain `AIF_SELF_PROJECT_ID` or any `AIF_PROTECTED_IDS` entry (for example the
-  management runner's scale set) are refused with 403, so scenario 5 or 6 can never delete the host.
-- **No real deletes by default.** With a real backend (`rest`, `sdk`, `github-runner`), scenarios 4-6 answer 403
-  `deletes-disabled` before anything is recorded or sent: the REST and SDK adapters, the Function's runner adapter and
-  the runner itself (`AIF_ALLOW_REAL_DELETES` in its `runner.json`, off unless `true`) each refuse a delete on their
-  own. `AIF_DELETES=simulate` rehearses scenarios 4-6 end to end instead: the mock backend reviews them over a
-  read-only copy of the real catalog and their runs are `aif-dummy-step.yml` workflows, so the Factory API never sees
-  a delete. Real deletes need `AIF_DELETES=allow` on the Function and `AIF_ALLOW_REAL_DELETES=true` on the runner.
-- **Scenario 6** uses `delete-aifactory`, which always deletes every environment of a factory. The Function accepts a
-  FactoryId only when all of the factory's scale sets are in that environment; otherwise 409 `scope-not-supported`
-  (delete the scale sets one by one with scenario 5).
-
-## HTTP API
-
-| Method and route | Auth | Answer |
-|---|---|---|
-| `GET /api/v1/health` | anonymous | 200 `{status, version, backend, executor}` |
-| `POST /api/v1/lifecycle/{scenario}/prepare` | function key (+ Entra app role) | 202, `Location`, `Retry-After` |
-| `GET /api/v1/operations` | function key (+ Entra app role) | 200 list |
-| `GET /api/v1/operations/{id}` | function key (+ Entra app role) | 200 operation with steps, previews, runs, history |
-| `POST /api/v1/operations/{id}/confirm` | function key (+ Entra app role) | 202, `Location`, `Retry-After` |
-| `POST /api/v1/github/events` | anonymous + `X-Hub-Signature-256` | 202 applied/queued, 200 duplicate/ignored, 401 bad signature |
-| `POST /api/v1/runner/results` | anonymous + `X-Hub-Signature-256` | 202 applied, 200 ignored (not the pending hand-off), 401 bad signature |
-| `POST /api/v1/catalog/refresh` | function key | 202; `github-runner` only (400 `not-supported` otherwise) |
-
-Prepare bodies: `{"factoryId": "aif-121-sdc-dev"}`, `{"scalesetId": "aif-121-sdc-dev-002"}`,
-`{"projectId": "aif-121-esml-project002-sdc-dev-001-rg", "settings": {...}}`. Optional: `wholeWorkflow` (scenario 1,
-one bounded approval; required with the real API), `includeProjectSubnets` / `includeKeyvaultAndResourceGroup`
-(scenario 4, default true), `scaleSet` `{subscriptionId, tenantId, orchestrator, vnetCidr, maxProjects}` (scenario 2
-against the real API), `bootstrapConfig` (scenario 1 against the real API: the API's full bootstrap configuration, for
-example `subscription_id`, `tenant_id`, `team_member_email`, `team_group_name`, `github_repository`,
-`coordination_mode`, `access_hub_mode`, `setup_hub_access`). Mock only: `simulate` `{failAt, uncertainAt, rejectAt,
-dropEventAt}` and `ttlSeconds`.
-
-Against the real API, scenario 1 saves the factory with `POST /api/v1/creation/prepare` and `/confirm` (full
-bootstrap, dev scale set 001; the Function pins `factory_prefix`, `location` and `scale_set_number` to the FactoryId),
-then runs the creation workflow under one whole-workflow approval, which the API continues by itself between stages.
-If the API asks for a new human review mid-workflow (`requires_review`), the step stops with `action_required` and the
-API's message.
-
-Scenario 2 runs five reviewed steps: `configure` (create-scale-set, a draft without projects), `add-project001` (a new
-logical project001 with an explicit placement on the new scale set; configuration only, so it needs nothing deployed),
-`enroll-scaleset`, `deploy-common` and `deploy-project001`. A single-writer factory's binding and live enrollment cover
-only what was enrolled, and the API refuses to deploy the new scale set until they cover it: `enroll-scaleset` reviews
-and confirms the Factory API's `enroll-scale-set` operation (`POST /api/v1/operations/enroll-scale-set/prepare` and
-`/confirm`, capability `enroll-scale-set-v1`). It covers the scale set's common RG plus the RG of every project placed
-on it when it is prepared (so project001 is placed first), creates missing RGs, assigns Contributor and Role Based
-Access Control Administrator to the deployment identity on exactly those RGs, writes the enrollment and re-pins the
-saved binding. Its review shows the RG IDs, creations and role assignments and is confirmed like every other step:
-the confirmation token plus the typed phrase `ENROLL SCALE SET <factory key> <suffix>` (for example
-`ENROLL SCALE SET aif-121 002`); the Function sends the API's preview hash once and never retries. The catalog does not
-say how a factory is coordinated, so a Blob-coordinated factory is recognized by the API's exact blocker "Blob-coordinated
-factories are not supported yet; nothing was changed.": the step is recorded as not needed (`succeeded`, history event
-`step-not-needed`, no confirmation) and the operation continues. Any other blocker stops the operation (`blocked`), and
-an API without the operation fails the step with 502 `factory-api-too-old` ("Factory API too old for
-enroll-scale-set"). With `AIF_EXECUTOR=github-runner`, update the runner on the API host with the Function: an older
-runner refuses the new step kind.
-
-Errors are RFC 9457 `application/problem+json` with `code` and `correlationId`, never stack traces or secrets:
-400 `validation-failed` / `invalid-id` / `invalid-json` / `unsupported-scenario` / `confirmation-mismatch` /
-`confirmation-phrase-mismatch`, 401 `invalid-signature`, 403 `protected-target`, 404 `unknown-id` /
-`operation-not-found`, 409 `already-exists` / `in-progress` / `revision-mismatch` / `invalid-state` /
-`scope-not-supported`, 410 `confirmation-expired`, 502 `upstream-error` / `upstream-refused` / `factory-api-too-old`, 503 `upstream-unavailable`
-/ `configuration-invalid`, 504 `upstream-timeout`.
-
-## Settings
-
-| Setting | Values (default first) | Notes |
-|---|---|---|
-| `AIF_BACKEND` | `mock`, `rest`, `sdk` | Mock keeps a persistent catalog in the state store |
-| `AIF_EXECUTOR` | `inprocess`, `github-dummy`, `github-runner` | See Architecture |
-| `AIF_STORE` | `memory`, `file`, `table` | `table` uses the Function's managed identity (`AIF_TABLE_ACCOUNT`, `AIF_TABLE_NAME`) |
-| `AIF_EVENT_PROCESSING` | `inline`, `queue` | `queue` answers fast and applies events from `AIF_EVENT_QUEUE` |
-| `AIF_SELF_PROJECT_ID`, `AIF_PROTECTED_IDS` | IDs | Deny list for self-protection |
-| `AIF_DELETES` | `refuse` (default), `simulate`, `allow` | Real backends only: `refuse` answers 403 `deletes-disabled`, `simulate` runs scenarios 4-6 on the mock and dummy workflows, `allow` deletes for real; health shows the mode (`mock` with the mock backend) |
-| `AIF_KEY_VAULT_NAME` | vault name | The Function reads the secrets below by name with its managed identity |
-| `AIF_EVENT_SECRET_NAME` | secret name | HMAC secret for the events route and queued messages; a secret value may hold two comma-separated values while rotating |
-| `AIF_GITHUB_REPOSITORY`, `AIF_GITHUB_TOKEN_NAME` | `owner/repo`, secret name | Fine-grained token or GitHub App limited to that repo's Actions |
-| `AIF_FACTORY_API_URL`, `AIF_FACTORY_API_KEY_NAME`, `AIF_FACTORY_FOLDER` | `http://127.0.0.1:8765`, secret name, path | REST/SDK with `inprocess`; plain http only to loopback. With `github-runner` they belong to the runner (`runner.json`), not the Function |
-| `AIF_OPS_WORKFLOW`, `AIF_RUNNER_TIMEOUT_SECONDS` | `aif-ops.yml`, 4200 | `github-runner`: the workflow it dispatches in `AIF_GITHUB_REPOSITORY`, and how long a hand-off may stay silent (longer than `aif-ops.yml`'s 60-minute job) |
-| `AIF_FACTORY_API_TIMEOUT_SECONDS` | 2700 | How long one Factory API call may take on the runner: on the real API a runtime deploy review took 13 minutes and its confirmation held the catalog lock for 18 minutes while it built the run. A machine environment variable on the VM overrides `runner.json`, which the installer rewrites. In-process calls are also capped by the Function's `functionTimeout` (10 minutes) |
-| `AIF_REQUIRED_ROLE` | app role, for example `Lifecycle.Operator` | Lifecycle routes also need this role in the caller's Entra token; refused at startup unless App Service authentication is on (`authClientId`) |
-| `AIF_REVIEW_TTL_SECONDS`, `AIF_POLL_AFTER_SECONDS` | 600, 120 | |
-
-For local development, `AIF_EVENT_SECRET`, `AIF_GITHUB_TOKEN` and `AIF_FACTORY_API_KEY` can hold plain values.
-App Service Key Vault *references* are not used: on Linux plans other than Flex they need route-all to reach a private
-vault, which would cut the app's GitHub egress. A setting that still holds an unresolved `@Microsoft.KeyVault(...)`
-reference is refused with 503 `configuration-invalid` instead of being used as a secret.
-
-The SDK is pinned to a purple commit in `requirements.txt` (`git+https://...@<sha>#subdirectory=...`), not copied.
-
-## Local development
+The existing HTTP routes remain: `POST /api/v1/lifecycle/{scenario}/prepare`, `GET /api/v1/operations/{id}`,
+and `POST /api/v1/operations/{id}/confirm`. Writes return `202`, `Location` and `Retry-After`.
 
 ```powershell
-python -m venv .venv; .\.venv\Scripts\pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest tests -q
-Copy-Item local.settings.example.json local.settings.json   # git-ignored; mock backend, file store
-func start   # timers and queues need Azurite or a real storage account
+# $base ends in /api; $headers contains the function key and, when enabled, an Entra bearer token.
+$op = Invoke-RestMethod "$base/v1/lifecycle/add-or-update-project/prepare" -Method Post -Headers $headers `
+    -ContentType application/json -Body '{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{}}'
+$op = Invoke-RestMethod "$base/v1/operations/$($op.operationId)" -Headers $headers
+# With github-runner, read the operation until awaiting_confirmation before continuing.
+$review = $op.steps[0].preview
+$review
+$body = @{ confirmationToken = $review.confirmationToken; confirmationPhrase = $review.confirmationPhrase }
+Invoke-RestMethod "$base/v1/operations/$($op.operationId)/confirm" -Method Post -Headers $headers `
+    -ContentType application/json -Body ($body | ConvertTo-Json)
 ```
 
-With the wizard's Factory API on the same machine, set `AIF_BACKEND=rest` (or `sdk`), `AIF_FACTORY_FOLDER`,
-`AIF_FACTORY_API_KEY` and keep `AIF_EXECUTOR=inprocess`: that is the fast dev loop.
+**SDK prepare is a local scope approval, not an Azure dry-run.** It resolves catalog IDs and validates input but
+does not call a mutating facade method or prepare a live deployment. Confirm approves the entire scenario; the
+SDK then checks and confirms the live API reviews. The returned SDK job ID and kind are saved in the operation.
+The existing reconciler reads `EsafJob.status()` after host restarts; it does not depend on an in-memory job or thread.
+Scenario 1 uses the API's bounded whole-workflow approval and stops if the API requires another human review.
 
-## Deploy to an AI Factory project
+## Architecture and safety
 
-1. Copy `settings.example.json` to `settings.<consumer>.json` and fill in the project's subnets, storage account,
-   Application Insights, Log Analytics, Key Vault and DNS zone. Never put secret values in it. Name the app outside
-   purple's `func-prj<NNN>-...` pattern (for example `aiflc-prj001-sdc-dev-<uniq5>-001`): purple's project pipelines
-   treat such an app as the project Function and can delete it; `deploy.ps1` refuses such a name unless you pass
-   `-AcceptPurpleFunctionName`. The integration subnet must be delegated to `Microsoft.App/environments`, /27 or
-   larger, and not used by Container Apps or private endpoints (a project's `snt-prjNNN-aca` subnets are taken by
-   Container Apps, and `snt-prjNNN-webapp` is delegated to Dedicated plans): add one, for example `snt-prj001-func`.
-2. Connect to the factory's VPN (the app and its deployment endpoint are private), then run PowerShell 7:
+```text
+HTTP Function -> LifecycleService (scope approval, protection, durable operation)
+             -> SdkFactoryBackend -> one esaf method -> Factory API -> lifecycle job
+             <- persisted EsafJob ID/kind <- status via the reconciler
+```
 
-   ```powershell
-   .\deploy.ps1 -SettingsFile .\settings.<consumer>.json -WhatIf
-   .\deploy.ps1 -SettingsFile .\settings.<consumer>.json
-   ```
+The Factory API's catalog/deployment routes are loopback-only. Choose `AIF_EXECUTOR=inprocess` for a local Function
+beside the API, or `github-runner` for an Azure-hosted Function: a signed request runs on the management VM beside
+the API, then posts its signed result back. The Function never calls those API routes across the network.
+The runner and relay workflows belong in a separate ops repository, not the factory repository.
 
-   `infra/function-app.bicep` creates a private Linux app on the Flex Consumption plan with VNet integration, a
-   private endpoint, a deployment package container in the project's storage account (read with the app's identity),
-   identity-based storage roles, an optional Key Vault Secrets User grant, diagnostics to Log Analytics and no basic
-   publishing credentials. The code is deployed with
-   `az functionapp deployment source config-zip --build-remote` (Microsoft Entra), which **replaces every function in
-   the app**: give this template its own app.
-3. Get the function key with `az functionapp keys list` and call `GET /api/v1/health`.
+- **Protected scopes:** `AIF_SELF_PROJECT_ID` and `AIF_PROTECTED_IDS` prevent changing the Function/runner's host.
+- **Deletes off:** `AIF_DELETES=refuse` is the default. `simulate` uses a read-only catalog mirror and dummy runs.
+  Real deletes require `allow`, plus `AIF_ALLOW_REAL_DELETES=true` on a remote runner.
+- **No uncertain retries:** the operation is saved as `confirming` before execution. A failed facade call may already
+  have changed configuration or permissions, so it becomes `uncertain`; inspect the API state before another attempt.
+- **Exact scope:** changed factory/project/scale-set identities require a new approval; unrelated catalog revision
+  drift does not block. Scenario 6 refuses a factory containing other environments than the requested FactoryId.
+- **Authentication:** lifecycle routes require a function key; enable Entra App Service authentication and
+  `Lifecycle.Operator` for real use. Events and runner results require HMAC signatures.
 
-### Hosting plan
+| Layer | Files |
+|---|---|
+| HTTP / runner entry points | `function_app.py`, `http_api.py`, `runner.py` |
+| Application | `application/service.py`, `planner.py`, `resolver.py`, `guard.py` |
+| State and contracts | `domain/operation.py`, `ports.py`, `application/runner_protocol.py` |
+| SDK adapter | `adapters/sdk_backend.py` (no hand-written API prepare/confirm chain) |
+| Persistence / status / transport | `adapters/stores.py`, `trackers.py`, `runner_backend.py` |
+| Composition | `composition.py`, `settings.py` |
 
-The app runs on the Flex Consumption plan because it needs no Always On. On a Dedicated (App Service) plan the
-Functions host goes idle after a few minutes without Always On, and only HTTP requests wake it, so the 2-minute
-`reconcile` timer and the GitHub-events queue trigger stop. Subscription governance (MCAPS) switched Always On off on
-the Spider app every night at about 01:36 CEST (2026-10-22 and 2026-10-23). Flex Consumption starts instances for
-every trigger by itself.
+## IDs and settings
 
-Cost (Sweden Central list prices, October 2026): the Dedicated B1 plan was about USD 13 per month. Flex Consumption
-bills execution time only, after a monthly free grant of 100,000 GB-seconds and 250,000 executions; the reconcile
-timer runs about 22,000 times a month, so expect roughly USD 0-10 per month. Optional always-ready instances (to avoid
-cold starts) cost about USD 5 per month per 512 MB instance, USD 21 per 2,048 MB. Elastic Premium (EP1, about USD 154
-per month) is not used.
+| ID | Example |
+|---|---|
+| Factory | `contoso-ai-sdc-dev` |
+| Scale set | `contoso-ai-sdc-dev-001` |
+| Project (resource group name) | `contoso-ai-esml-project002-sdc-dev-001-rg` |
 
-An existing Dedicated app cannot be moved to Flex Consumption in place: deploy a new app (new name, Flex-delegated
-integration subnet), switch its callers (event relay, runner results, operators) to it, then retire the old app.
+IDs use the accelerator's naming; Azure `test` maps to catalog `stage`.
 
-Use function keys for the mock passes. Before real deployments, add App Service authentication with an Entra app role:
+| Setting | Purpose |
+|---|---|
+| `AIF_BACKEND` | `sdk` for the simplified facade; default `mock` for offline use; `rest` for the legacy per-step contract |
+| `AIF_EXECUTOR` | `inprocess`, `github-runner`; `github-dummy` is mock-only |
+| `AIF_FACTORY_FOLDER`, `AIF_FACTORY_API_URL` | Consumer `azurefactory` folder on the API host; loopback URL, default `http://127.0.0.1:8765` |
+| `AIF_FACTORY_API_KEY_NAME`, `AIF_KEY_VAULT_NAME` | API key secret name and vault; remote mode configures these on the runner |
+| `AIF_STORE` | `memory` for tests, `file` locally, `table` in Azure |
+| `AIF_DELETES` | `refuse`, `simulate`, `allow` |
+| `AIF_REVIEW_TTL_SECONDS` | Scope approval lifetime, default 600 seconds |
+
+The SDK is installed from the exact published purple commit in `requirements.txt`, not copied into the Function.
+Before rollout, update the Factory API to a build that supports existing-scale-set enrollment extension and enforces
+project enrollment/deletion permission before `API-2-Pipelines` dispatch. Updating the SDK alone is insufficient;
+keep real deletes refused during the upgrade.
+Full setup, identities, secrets, deployment and troubleshooting: [README_More_Info.md](README_More_Info.md).
+
+## Local use and upgrades
 
 ```powershell
-.\scripts\register-entra-app.ps1 -DisplayName aif-lifecycle-func-<consumer> -Operator <upn>   # prints authClientId
+python -m venv .venv
+.\.venv\Scripts\pip install -r requirements-dev.txt
+Copy-Item local.settings.example.json local.settings.json
+# Set AIF_BACKEND=sdk and the API-host settings; leave deletes refused.
+func start
 ```
 
-Put `authClientId` in `settings.<consumer>.json` and redeploy with infrastructure; the template then sets
-`AIF_REQUIRED_ROLE` (`requiredRole`, default `Lifecycle.Operator`) itself, and never passes `WEBSITE_AUTH_*` settings
-through. Clearing `authClientId` turns App Service authentication off again. Tokens are accepted only from the client
-applications in `authAllowedClientApplications` (default: Azure CLI); with an empty list, Azure CLI tokens got 403 on
-the Spider Function. App Service authentication answers 401 to calls without a valid
-token for `api://<authClientId>`, and the Function answers 403 `missing-role` to callers without the role; health,
-events and runner results stay anonymous (HMAC-checked). Callers send both the function key and a token:
+New scenario coverage is in `tests/test_esaf_scenarios.py`; run explicit test node IDs for the behavior being changed.
+These tests cover all six routes through the local and signed-runner paths, real SDK HTTP integration, restart-safe
+job status, scope protection and uncertain outcomes.
 
-```powershell
-$token = az account get-access-token --resource api://<authClientId> --query accessToken -o tsv
-Invoke-RestMethod "$base/v1/operations" -Headers @{ 'x-functions-key' = $key; Authorization = "Bearer $token" }
-```
+Copy this folder into the consumer's `aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/`.
+Preserve consumer settings and update the Function and lifecycle runner together. Finish/reconcile old SDK operations
+before upgrading: old job handles remain readable, but unconfirmed old per-step requests are refused with
+`sdk-operation-upgrade`. Re-prepare them under the new scope-approval contract; never replay an uncertain confirm.
 
-## GitHub events: relay and management runner
-
-- `workflows/aif-dummy-step.yml` (GitHub-hosted runner) simulates one resource-group deployment; its run name starts
-  with `aif-step [<operationId>/<step>/<target>]`, which the Function matches as a whole.
-- `workflows/aif-event-relay.yml` must be on the default branch of the repository that runs the Function's workflows
-  (the ops repository with the runner executor). It forwards only `workflow_dispatch` runs of the same repository (for
-  `aif-ops`, only runs that ended without success), signs the payload with the first value of the event secret (the
-  Function's rule) and retries transient failures three times. The Function also checks the event, workflow file and repository, keeps the
-  first run id bound to a run, and records a delivery only after it was applied or queued. The poller recovers events
-  that never arrive (`dropEventAt` simulates that).
-- Register the management runner for that repository (user-owned repos can't share runners):
-  `scripts/register-management-runner.ps1` gets a one-hour registration token with `gh` and runs
-  `scripts/install-github-runner.ps1` on the VM through a VM run command, passing the token as a protected parameter.
-  The runner package hash is verified. Use a label of its own (default `aif-lifecycle-mgmt`), never the factory's
-  runner label.
-- **The label is privileged.** Any workflow that targets it runs on the management VM, which reaches the Function's
-  private endpoint and (for the runner executor) the Factory API. Keep fork-pull-request workflows off and limit
-  collaborators to trusted admins.
-- Repository settings: variable `AIF_LIFECYCLE_EVENTS_URL` (`https://<app>.azurewebsites.net/api/v1/github/events`)
-  and secret `AIF_LIFECYCLE_EVENT_SECRET` (one value, no commas).
-
-## Runner executor: the Factory API host
-
-`AIF_EXECUTOR=github-runner` (with `AIF_BACKEND=rest` or `sdk`, the adapter the runner uses) needs:
-
-- **Two repositories.** The Factory API refuses to dispatch `factory-lifecycle.yml` while any other workflow of the
-  factory repo is queued or running, so `aif-ops.yml`, `aif-event-relay.yml` (and `aif-dummy-step.yml`) live in a
-  separate ops repository with the management runner; `AIF_GITHUB_REPOSITORY` names that ops repository. The factory
-  repository holds only what the Factory API writes there. Runs the API dispatches are followed through the API's job
-  status, because the factory repository can't run a relay either.
-- **The Factory API on the management VM**, loopback only, as a service of one fixed Windows user (its confirmations
-  are sealed for that user) with a fixed `AIFACTORY_CATALOG_OWNER`, and with that user's own `az` and `gh` logins: the
-  API passes no token variables to the CLIs it runs. Keep a persistent clone of the factory repository outside the
-  runner's `_work` folder; the API's `folder` is its `azurefactory` subfolder.
-  `scripts/install-factory-api-host.ps1` sets this up with SYSTEM as that user (run it on the VM, for example with
-  `az vm run-command invoke --command-id RunPowerShellScript --scripts @install-factory-api-host.ps1 --parameters
-  KeyVaultName=<vault>`): a pinned release checked against its `SHA256SUMS.txt`, a startup task, `gh` logged in from Key
-  Vault. It needs, before it runs:
-  - the VM's managed identity (the installer signs the API's own `az` profile, `C:\aif-api\azure-cli`, in with it at
-    every start, so other SYSTEM jobs cannot log the API out) has Owner on the factory subscription and the Microsoft
-    Graph app roles `Group.ReadWrite.All` and `User.Read.All` (a Privileged Role
-    Administrator grants them; the bootstrap creates the team group);
-  - Reader for the same identity on every virtual network in another subscription that is peered with a network in
-    the factory subscription, for example a connectivity hub's: the bootstrap's network-foundation stage follows those
-    peerings, and an ARM 403 there stops a whole-workflow bootstrap as `uncertain` (recovery steps in
-    [README_More_Info.md](README_More_Info.md));
-  - Key Vault secret `aif-factory-api-key`: any long random value, the API's `X-API-Key`;
-  - Key Vault secret `aif-factory-api-gh-token`: a classic GitHub PAT with `repo`, `workflow` and `read:org`, nothing
-    more (`gh auth login` refuses a classic token without `read:org`, and the bootstrap pushes workflow files). The
-    script checks the scopes before it changes anything. Classic, because the factory repository doesn't exist yet
-    when the bootstrap creates it.
-- **The runner entry point** on the same VM: `C:\aif-lifecycle\app` (this folder), `venv\` with `requirements.txt`, and
-  `runner.json` with `AIF_FACTORY_API_URL`, `AIF_FACTORY_FOLDER`, `AIF_KEY_VAULT_NAME` and
-  `AIF_FACTORY_API_KEY_NAME` (the VM's managed identity reads the key). The ops repository gets variable
-  `AIF_LIFECYCLE_RESULTS_URL` (`https://<app>.azurewebsites.net/api/v1/runner/results`); the result is signed with
-  `AIF_LIFECYCLE_EVENT_SECRET`.
-- One management runner and the Factory API's catalog lock serialize every Factory API call, so run long operations
-  (runtime deploys) one at a time: a confirm that waits behind another long call can find its API review expired and
-  is rejected (409), never retried.
-- Requests travel as workflow inputs, which anyone with read access to the ops repository can see: reviews and catalog
-  IDs, never secrets. The Function signs each request with the event secret and an expiry (`AIF_RUNNER_TIMEOUT_SECONDS`);
-  the runner refuses a request it can't verify, one that expired, or one whose workflow inputs differ from it. The run
-  name ends in `<action>-<nonce>`, so only the run of the pending call can end it. A confirmation is submitted once (a
-  re-run of its job does nothing); only the result post is retried. `install-lifecycle-runner.ps1` removes inherited
-  rights so the runner account can read and run the install but never change it, and aif-ops runs Python with `-P`
-  so the job's working folder can't stand in for the installed code.
-
-## Consumer copy
-
-A consumer repo copies this folder to `aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/` and the
-workflow templates from `workflows/` to its `.github/workflows/`, then adds its own `settings.<consumer>.json`.
-
-Upgrading a copy from before the longer Factory API timeouts: set `AIF_RUNNER_TIMEOUT_SECONDS` to 4200 (or remove it)
-in `settings.<consumer>.json` and redeploy (the Bicep replaces all app settings), copy `workflows/aif-ops.yml` to the
-ops repository again, then reinstall the runner entry point with `scripts/install-lifecycle-runner.ps1`.
+`AIF_BACKEND=rest` intentionally keeps its reviewed per-step behavior, including Scenario 2's project001 creation.
+Its transport and tests remain for compatibility; it does not use the esaf facade.

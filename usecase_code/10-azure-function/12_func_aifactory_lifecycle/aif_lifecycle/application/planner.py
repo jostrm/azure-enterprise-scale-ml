@@ -14,10 +14,13 @@ from . import resolver
 DEFAULT_PROJECT_NUMBER = "001"
 
 
-def plan(scenario: Scenario, target: AnyId, catalog: Catalog, options: dict[str, Any]) -> tuple[list[Step], dict[str, Any]]:
+def plan(scenario: Scenario, target: AnyId, catalog: Catalog, options: dict[str, Any], *,
+         single_scenario: bool = False) -> tuple[list[Step], dict[str, Any]]:
     builder = _BUILDERS[scenario]
     steps, resolved = builder(target, catalog, options)
     resolved["expected_revision"] = catalog.revision
+    if single_scenario:
+        steps = [Step.new(scenario.value, StepKind.SCENARIO)]
     return steps, resolved
 
 

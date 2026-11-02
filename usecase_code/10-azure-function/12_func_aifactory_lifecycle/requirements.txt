@@ -3,6 +3,6 @@ azure-identity>=1.15
 azure-data-tables>=12.5
 azure-storage-queue>=12.9
 azure-keyvault-secrets>=4.8
-# Option 2 (AIF_BACKEND=sdk): the stdlib-only azurefactory SDK, pinned to a purple commit (not copied).
-# 38749728 adds enroll_scale_set_prepare/_confirm (scenario 2's enroll-scaleset step).
-azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@387497286a6dbb008b0932c116a9229525c6882a#subdirectory=environment_setup/azurefactory-cli
+# AIF_BACKEND=sdk: esaf scenarios with server-owned bootstrap and exact runtime authorization evidence.
+# Upgrade the Factory API's enrollment/project guards too; the SDK refuses unsupported project reviews.
+azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@4b6d1ff78aed9e63e7cb179e00b2380f9262c9c8#subdirectory=environment_setup/azurefactory-cli

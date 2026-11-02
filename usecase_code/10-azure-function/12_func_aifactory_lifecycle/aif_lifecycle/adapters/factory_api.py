@@ -1,7 +1,6 @@
-"""Shared Factory API backend (Template Method): maps steps to Factory API calls; subclasses do the transport.
+"""REST compatibility backend (Template Method) and shared Factory API response/request helpers.
 
-REST (option 1) and SDK (option 2) inherit this class, so a scenario makes the same API calls whichever transport is
-configured; `tests/test_adapter_parity.py` proves it against a fake API. Routes and bodies follow
+The SDK adapter uses esaf instead of this step-by-step orchestration. REST routes and bodies follow
 environment_setup/azurefactory-cli (client.py, catalog_requests.py) and pink's docs/API.md.
 """
 
@@ -224,8 +223,26 @@ def refuse_deletes(delete_mode: str, request: StepRequest) -> None:
                               "deletes are off here. Set AIF_DELETES=simulate to rehearse it, or allow to delete.")
 
 
+def bootstrap_config(request: StepRequest) -> dict[str, Any]:
+    """Pin the bootstrap configuration to the approved readable FactoryId."""
+    config = request.options.get("bootstrapConfig")
+    if not isinstance(config, dict):
+        raise ValidationFailed("Send bootstrapConfig (the API's Full bootstrap configuration) for init-factory.")
+    r = request.resolved
+    if r.get("environment", "dev") != "dev":
+        raise ValidationFailed("A full bootstrap creates the factory's dev scale set; initialize it with a dev "
+                              "FactoryId and add other environments as scale sets.")
+    return {**config, "factory_prefix": r["prefix"], "location": r["region"], "scale_set_number": r.get("suffix", "001")}
+
+
+def repository_root(folder: str) -> str:
+    paths = ntpath if ("\\" in folder or ntpath.splitdrive(folder)[0]) else posixpath
+    trimmed = folder.rstrip("\\/")
+    return paths.dirname(trimmed) if paths.basename(trimmed).lower() == "azurefactory" else trimmed
+
+
 class FactoryApiBackend(ABC):
-    """Steps -> Factory API calls. Subclasses implement the primitive calls (REST or SDK)."""
+    """Compatibility steps -> Factory API calls, with primitive calls supplied by the REST transport."""
 
     name = "api"
 
@@ -308,8 +325,8 @@ class FactoryApiBackend(ABC):
                 # Never an expected_revision: the API refuses a factory creation that selects an existing scope or
                 # revision, and the consumer folder's catalog has one as soon as anything was saved there.
                 return self._creation_prepare({"contract_version": 1, "mode": "full-bootstrap",
-                                               "folder": self._repository_root(), "orchestrator": "gha",
-                                               "config": self._bootstrap_config(request),
+                                               "folder": repository_root(self.folder), "orchestrator": "gha",
+                                               "config": bootstrap_config(request),
                                                "region_short_name": r["region_code"]})
             if adds_project(request.scenario, name, r):
                 # Scenario 3's settings belong to its new project; scenario 2's project001 starts from defaults.
@@ -342,18 +359,6 @@ class FactoryApiBackend(ABC):
                                                  "factory_id": r["factory_id"], "expected_revision": revision})
         raise ValidationFailed(f"Step '{name}' has no Factory API preparation.")
 
-    def _bootstrap_config(self, request: StepRequest) -> dict[str, Any]:
-        """The caller's full bootstrap configuration, pinned to the FactoryId so the saved scope can't drift from it.
-        The creation and its workflow send the same values: the API refuses a workflow whose settings differ."""
-        config = request.options.get("bootstrapConfig")
-        if not isinstance(config, dict):
-            raise ValidationFailed("Send bootstrapConfig (the API's Full bootstrap configuration) for init-factory.")
-        r = request.resolved
-        if r.get("environment", "dev") != "dev":
-            raise ValidationFailed("A full bootstrap creates the factory's dev scale set; initialize it with a dev "
-                                   "FactoryId and add other environments as scale sets.")
-        return {**config, "factory_prefix": r["prefix"], "location": r["region"], "scale_set_number": r.get("suffix", "001")}
-
     def _workflow_request(self, request: StepRequest, revision: str | None) -> dict[str, Any]:
         r = request.resolved
         scope = {"folder": self.folder, "factory_id": r["factory_id"], "scale_set_id": r["scale_set_id"]}
@@ -361,7 +366,7 @@ class FactoryApiBackend(ABC):
             scope["project_id"] = r["project_id"]
         return {"contract_version": 1, "operation": "create-factory", "execution_mode": "privileged-bootstrap",
                 "creation_mode": "full-bootstrap", "scope": scope, "expected_revision": revision,
-                "bootstrap_config": self._bootstrap_config(request), "approval_mode": "whole-workflow",
+                "bootstrap_config": bootstrap_config(request), "approval_mode": "whole-workflow",
                 "authorization_valid_for_seconds": WHOLE_WORKFLOW_SECONDS}
 
     @staticmethod
@@ -376,12 +381,6 @@ class FactoryApiBackend(ABC):
                                      f"API on its host to a version with {ENROLL_CAPABILITY}. Nothing was "
                                      "changed.") from None
             raise
-
-    def _repository_root(self) -> str:
-        """The consumer repository (the parent of its azurefactory folder), as the creation routes take it."""
-        paths = ntpath if ("\\" in self.folder or ntpath.splitdrive(self.folder)[0]) else posixpath
-        trimmed = self.folder.rstrip("\\/")
-        return paths.dirname(trimmed) if paths.basename(trimmed).lower() == "azurefactory" else trimmed
 
     # ----- primitives (transport) -----
 
