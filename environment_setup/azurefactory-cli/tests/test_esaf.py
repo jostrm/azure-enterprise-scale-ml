@@ -67,7 +67,21 @@ class Client:
 
     def catalog_prepare(self, body):
         self.body = body
-        return self._call("catalog_prepare:" + body["action"])
+        review = self._call("catalog_prepare:" + body["action"])
+        if review["can_execute"] and body.get("project_id") is not None:
+            review["runtime_scope_authorization"] = self._runtime_proof(
+                body["factory_id"], body["scale_set_id"], body["project_id"])
+        return review
+
+    def _runtime_proof(self, factory_id, scale_set_id, project_id):
+        factory = next(f for f in self.document["factories"] if f["id"] == factory_id)
+        scale = next(s for s in factory["scale_sets"] if s["id"] == scale_set_id)
+        project = next(p for p in factory["projects"] if p["id"] == project_id)
+        assert {"environment": scale["environment"], "scale_set_id": scale_set_id} in project["placements"]
+        group = f"{factory['key']}-esml-project{project['number']}-sdc-{scale['environment']}-{scale['suffix']}-rg"
+        return {"factory_id": factory_id, "scale_set_id": scale_set_id, "project_id": project_id,
+                "resource_group_id": f"/subscriptions/{scale['subscription_id']}/resourcegroups/{group}",
+                "enrolled": True, "delete_authorized": True}
 
     def catalog_confirm(self, folder, confirmation_id):
         self.calls.append("catalog_confirm")
@@ -95,7 +109,10 @@ class Client:
                                include_keyvault_and_resource_group, expected_revision, scale_set_id=None,
                                version_ref=None):
         self.deletion = (project_id, environments, include_project_subnets, include_keyvault_and_resource_group)
-        return self._call("project_delete_prepare")
+        review = self._call("project_delete_prepare")
+        if review["can_execute"]:
+            review["runtime_scope_authorization"] = self._runtime_proof(factory_id, scale_set_id, project_id)
+        return review
 
     def scaleset_delete_prepare(self, folder, factory_id, scale_set_id, *, expected_revision, version_ref=None):
         self.deleted_scale = scale_set_id

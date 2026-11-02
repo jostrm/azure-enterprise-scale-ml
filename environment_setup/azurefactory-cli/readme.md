@@ -31,6 +31,34 @@ Obtain the actual URL/key from your operator and run `doctor`
 against that host. Local API authentication is distinct from both the Azure CLI
 identity on the host and a user's approval to save or deploy.
 
+## Scenario facade for Python consumers
+
+`from azurefactory import esaf` provides `init_factory`, `add_scale_set`, `apply_project`,
+`delete_project`, `delete_scale_set` and `delete_factory`. `upsert_project` remains a compatible
+alias for `apply_project`. These calls are **execution approval**, not prepare-only commands:
+the facade checks and confirms the underlying API reviews.
+
+Pass an explicit `esaf.Session(folder, client, factory=<factory ID or key>)` in concurrent consumers.
+Project/scale-set selection accepts `environment` and `scale_set`/suffix so repeated project numbers
+and suffixes cannot silently select another physical scope. Ambiguous selections fail before writes.
+Applying a project saves its settings, refreshes the scale set's enrollment (including its registered
+projects), then deploys it. Adding a scale set deploys common resources, not an implicit project001.
+
+Project deployment/deletion reviews must contain `runtime_scope_authorization`: exact scope IDs, live enrollment,
+explicit deletion permission and a normalized resource-group ARM ID in the selected subscription. The facade refuses
+missing/mismatched evidence before confirmation, and deletion also requires live `delete_authorized=true`.
+Use an API build with existing-target enrollment extension and guarded project-pipeline dispatch; a new SDK alone
+cannot upgrade an older server. Reconcile any earlier configuration save after a blocked scenario.
+
+For a fresh full bootstrap, `esaf.init_factory(creation_request=body, session=session)` accepts the
+creation API's full-bootstrap body, saves the new catalog scope and starts one bounded whole-workflow
+approval. The API owns continuation; no client daemon must remain alive. The returned `EsafJob` has
+a persistable ID and kind; reconstruct it with the same session and call `status()` after a restart.
+Existing `workflow_id`/`request` callers retain their local stage-driver behavior.
+
+See the [lifecycle Function consumer](../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md)
+for all six routes, scope approval, protected targets, delete opt-in and restart-safe job tracking.
+
 ## Quickstart: CONFIGURE a factory with default project001 locally
 
 Use **this existing CLI**, not another CLI or a deployment shell fallback. The
@@ -803,7 +831,8 @@ that configuration, then refresh `catalog list`. Pass the returned DEV/002 UUID
 to `project add --number 003 --placement dev=<new-scale-set-uuid>` when the earlier
 existing-scale example already created 002. If running only the new-scale
 scenario, 002 is available instead. For existing DEV/001 use that scale set's
-UUID. Project numbers are unique across the factory; the two writes are not atomic.
+UUID. Project numbers are unique within each physical scale set, not across the whole factory;
+the same number can identify different logical projects on different scale sets. The two writes are not atomic.
 
 ### Latest-successful placement selection
 
