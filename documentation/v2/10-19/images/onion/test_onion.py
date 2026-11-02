@@ -111,5 +111,96 @@ class OnionOutputs(unittest.TestCase):
                          "Run make_onion_svg.py")
 
 
+V2 = HERE / "onion-layers-v2.json"
+
+# The verified rows of the aif-138 timing table (handover 2026-10-31 23:45 CET): API time in seconds, pipeline and
+# job wall clock in minutes. Scenario 5 was blocked when the table was verified, so it is not measured on this page.
+VERIFIED = {
+    "deploy-001": (None, 51.7, None, "41140735956"),
+    "enroll-002": (138, 10.1, 13.9, "41171926400"),
+    "deploy-002": (13, 29.5, 30.1, "41179463357"),
+    "settings-002": (13, 24.4, 25.0, "41181519894"),
+    "delete-002-services": (14, 23.6, 25.0, "41196230976"),
+    "delete-002-full": (24, 30.5, 31.3, "41216080228"),
+    "delete-scaleset-002": (None, None, None, None),
+}
+
+
+class OnionV2(unittest.TestCase):
+    """Onion V2: PROJECT mode API-2-Pipelines, drawn from measured runs instead of per-layer estimates."""
+
+    def setUp(self):
+        self.raw = json.loads(V2.read_text(encoding="utf-8"))
+        self.data = onion.load(V2)
+        self.out = {key: (V2.parent / value).resolve() for key, value in self.data["outputs"].items()}
+        self.scale = {band["name"]: band["hex"] for band in self.raw["colors"]["time_scale"]}
+
+    def test_every_run_is_a_verified_row_of_the_handover_table(self):
+        runs = {run["id"]: (run.get("api_seconds"), run.get("pipeline_minutes"), run.get("job_minutes"), run.get("run_id"))
+                for run in self.data["runs"]}
+        self.assertEqual(runs, VERIFIED)
+        blocked = next(run for run in self.data["runs"] if run["id"] == "delete-scaleset-002")
+        self.assertIn("not yet measured", blocked["api_note"])
+
+    def test_the_message_ranges_come_from_the_runs(self):
+        self.assertEqual(onion.fill("{api_range}", self.data), "13-24 s")
+        self.assertEqual(onion.fill("{pipeline_range}", self.data), "24-52 min")
+        self.assertEqual(onion.fill("{worker_api}", self.data), "2 min 18 s")
+        self.assertEqual(onion.fill("{worker_pipeline}", self.data), "10.1 min")
+        self.assertEqual(onion.fill("/operations/{id}/confirm", self.data), "/operations/{id}/confirm")
+
+    def test_the_api_is_green_the_pipeline_layers_red_and_the_consumer_blue(self):
+        colors = {layer["id"]: layer["color"] for layer in self.data["layers"]}
+        self.assertEqual(colors["l2"], self.scale["green"])
+        for layer_id in ("l3", "l4", "l5"):
+            self.assertEqual(colors[layer_id], self.scale["red"], layer_id)
+        self.assertEqual(self.data["consumer"]["color"], self.raw["colors"]["neutral"])
+        for item in [self.raw["consumer"]] + self.raw["layers"]:
+            self.assertNotIn("color", item, item["id"])
+
+    def test_the_poster_labels_every_measured_number(self):
+        poster = onion.poster(self.data)[0]
+        for api, pipeline, _, _ in VERIFIED.values():
+            if api is not None:
+                self.assertIn(f">{onion.seconds_text(api)}<", poster)
+            if pipeline is not None:
+                self.assertIn(f">{pipeline:.1f} min<", poster)
+        self.assertIn("not yet measured", poster)
+
+    def test_public_text_never_says_esaif(self):
+        for path in (V2, self.out["poster_svg"], self.out["animated_svg"], self.out["doc"]):
+            self.assertNotIn("esaif", path.read_text(encoding="utf-8").lower(), path.name)
+
+    def test_no_purple_in_the_v2_pictures(self):
+        for key in ("poster_svg", "animated_svg"):
+            for color in set(re.findall(r"#[0-9A-Fa-f]{6}\b", self.out[key].read_text(encoding="utf-8"))):
+                r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+                hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+                self.assertFalse(250 <= hue * 360 <= 300 and saturation > .25 and .08 < lightness < .95, color)
+
+    def test_committed_v2_svgs_and_doc_tables_are_regenerated_from_the_json(self):
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "doc.md"
+            shutil.copy(self.out["doc"], doc)
+            onion.update_doc(doc, self.data)
+            self.assertEqual(doc.read_text(encoding="utf-8"), self.out["doc"].read_text(encoding="utf-8"),
+                             "Run make_onion_svg.py --data onion-layers-v2.json --update-doc")
+        self.assertEqual(onion.poster(self.data)[0], self.out["poster_svg"].read_text(encoding="utf-8"),
+                         "Run make_onion_svg.py --data onion-layers-v2.json")
+        self.assertEqual(onion.animation(self.data, None)[0], self.out["animated_svg"].read_text(encoding="utf-8"))
+
+    def test_the_ranges_in_the_hand_written_prose_match_the_runs(self):
+        doc = self.out["doc"].read_text(encoding="utf-8")
+        v1 = (HERE / onion.load()["outputs"]["doc"]).resolve().read_text(encoding="utf-8")
+        for token in ("api_range", "pipeline_range"):
+            for page in (doc, v1):
+                self.assertIn(onion.fill("{" + token + "}", self.data), page, token)
+        self.assertIn(onion.fill("{worker_api}", self.data), doc)
+
+    def test_the_v1_page_links_to_the_v2_page(self):
+        v1 = (HERE / onion.load()["outputs"]["doc"]).resolve().read_text(encoding="utf-8")
+        self.assertIn("10-factory-onion-architecture-v2.md", v1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-11-02",
+  "speed": 3,
+  "endHoldSeconds": 1,
+  "nominalFramesPerSecond": 20,
+  "width": 1400,
+  "animationHeight": 1762,
+  "steps": [
+    "onion",
+    "call",
+    "api",
+    "pipeline",
+    "worker",
+    "time"
+  ],
+  "gif": {
+    "file": "10-factory-onion-architecture-v2.gif",
+    "frames": 536,
+    "durationSeconds": 27.67,
+    "checkedFrames": [
+      0,
+      44,
+      131,
+      218,
+      305,
+      392,
+      485,
+      535
+    ]
+  },
+  "textLinesCheckedWithOpenSans": 617,
+  "renderer": {
+    "svg": "make_onion_svg.py (standard library), SMIL animation",
+    "raster": "@resvg/resvg-js 2.6.2 (CPU, no browser capture)",
+    "gif": "Pillow 12.1.0 global palette, delta frames"
+  },
+  "files": {
+    "10-factory-onion-architecture-v2.svg": {
+      "bytes": 17849,
+      "sha256": "fe10e13a7e5f9a6dba5872b13e202e880de3990232a2786f70592998011e7f91"
+    },
+    "10-factory-onion-architecture-v2.png": {
+      "bytes": 343641,
+      "sha256": "28488d99a121042e84bc3b9690bae3ca2bc05977e1d7f7933aff87029d921792"
+    },
+    "10-factory-onion-architecture-v2-animated.svg": {
+      "bytes": 98982,
+      "sha256": "f5b8feb59f517123ba74eb148f25d5bfb736a499e9ae7130fee1b0bed4896fa7"
+    },
+    "10-factory-onion-architecture-v2.gif": {
+      "bytes": 963482,
+      "sha256": "0667f4c17ebd2bd2ff03b82fee1483711580433c43c77b680b3618ce2dba0b34"
+    }
+  },
+  "limitations": [
+    "The animated SVG needs SMIL support (browsers do; GitHub shows it when the file is opened directly). A static viewer shows the first step.",
+    "GIF timestamps are whole centiseconds and the palette has 256 colors.",
+    "Fonts are not embedded: the SVGs use Open Sans when installed and fall back to Segoe UI, Helvetica or Arial."
+  ]
+}

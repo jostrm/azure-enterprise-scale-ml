@@ -17,6 +17,10 @@ Also as [PNG](./images/10-factory-onion-architecture.png), as an
 The picture, the animation and every table on this page are generated from one data file,
 [onion-layers.json](./images/onion/onion-layers.json): see [Update the picture and the numbers](#update-the-picture-and-the-numbers).
 
+**New: [onion V2, API-2-Pipelines](./10-factory-onion-architecture-v2.md).** In PROJECT mode the Factory API now writes
+the reviewed configuration and starts the consumer's infra-project pipeline, so it hands off in 13-24 s and the
+pipeline does the work (24-52 min), measured on aif-138 on 2026-10-31.
+
 ## The onion in one minute
 
 | Ring | Name | Lives in |

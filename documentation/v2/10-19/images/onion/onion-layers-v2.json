@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "updated": "2026-11-02",
+  "title": "AI Factory onion V2: API-2-Pipelines",
+  "summary": "In PROJECT mode the Factory API writes the reviewed configuration and starts the consumer's own infra-project pipeline: {api_range} in the API, {pipeline_range} in the pipeline.",
+  "poster_note": "Measured on aif-138, 2026-10-30 and 2026-10-31: documentation/v2/10-19/10-factory-onion-architecture-v2.md",
+  "outputs": {
+    "poster_svg": "../10-factory-onion-architecture-v2.svg",
+    "poster_png": "../10-factory-onion-architecture-v2.png",
+    "animated_svg": "../10-factory-onion-architecture-v2-animated.svg",
+    "animated_gif": "../10-factory-onion-architecture-v2.gif",
+    "doc": "../../10-factory-onion-architecture-v2.md",
+    "manifest": "manifest-v2.json"
+  },
+  "evidence": {
+    "R1": "Verified 2026-10-31 23:45 CET for the aif-138 end-to-end run through the ESAF facade (consumer repository jostrm/azure-enterprise-scale-byor-138): catalog jobs in the Factory API's catalog-operations.sqlite and gh run list. API time = the catalog job's created_at to the GitHub run's createdAt. Job total = the job's created_at to updated_at. The jobs' pipeline_runs confirm which run belongs to which job.",
+    "R2": "Not in the table: two failed attempts with the same 13 s API time, project 002 deploy 6a380c35 (run 41172892614 failed after 59.6 min) and delete 3bd1d25d (run 41194343416 failed after 24.9 min).",
+    "R3": "Scenario 5 (esaf.delete_scale_set) was blocked when the table was verified: four attempts on 2026-10-31 were refused at prepare after about 5 min, before any pipeline. It goes through the worker route, not API-2-Pipelines."
+  },
+  "colors": {
+    "note": "Purple is the AI Factory color, which always means the best, so the onion does not use it.",
+    "basis": "average time in the layer per measured run",
+    "neutral": "#5AA9FF",
+    "time_scale": [
+      {"name": "green", "hex": "#3DDC97", "below_share": 0.05},
+      {"name": "orange", "hex": "#FFB84D", "below_share": 0.3},
+      {"name": "pink", "hex": "#FF6FD8", "below_share": 0.75},
+      {"name": "red", "hex": "#FF4545", "below_share": null}
+    ]
+  },
+  "api_layer": "l2",
+  "pipeline_layers": ["l3", "l4", "l5"],
+  "consumer": {
+    "id": "consumer",
+    "label": "Consumer",
+    "name": "Consumer: Python with the ESAF facade",
+    "card_title": "Python + ESAF",
+    "card_subtitle": "esaf.upsert_project(...)",
+    "tag": "ANY PYTHON SESSION",
+    "where": "A Python session next to the Factory API (the aif-138 walkthrough), or the lifecycle Azure Function",
+    "what": "Calls one ESAF scenario method. Calling it is the approval; it gets a job handle back at once.",
+    "example": "esaf.upsert_project(\"002\", scale_set=\"002\")",
+    "called_by": "A developer, a notebook or an automation.",
+    "calls": "L1: the esaf facade in the azurefactory Python package."
+  },
+  "layers": [
+    {
+      "id": "l1",
+      "n": 1,
+      "label": "L1",
+      "name": "Clients",
+      "ring_top": "L1 · CLIENTS · ESAF FACADE · SDK · CLI",
+      "ring_bottom": "PURPLE · PINK · MAUI",
+      "tag": "PURPLE · PINK · MAUI",
+      "where": "azurefactory Python package: esaf facade over AzureFactoryClient (purple environment_setup/azurefactory-cli) · CLI · Tkinter wizard (pink) · MAUI ConfigWizard",
+      "what": "Thin clients. The esaf facade prepares the review, checks it and confirms it in one call, then returns an EsafJob. No deployment logic.",
+      "example": "esaf.add_scale_set · esaf.upsert_project · esaf.delete_project",
+      "called_by": "The consumer: a Python session, a notebook or the lifecycle Function.",
+      "calls": "L2 over HTTP on loopback with the API key in X-API-Key."
+    },
+    {
+      "id": "l2",
+      "n": 2,
+      "label": "L2",
+      "name": "Factory REST API",
+      "ring_top": "L2 · FACTORY REST API · SECONDS",
+      "ring_bottom": "PINK",
+      "tag": "PINK",
+      "where": "jostrm/azure-aifactory-config: src/onion_mode.py, src/creation_project_pipeline.py, src/catalog_runtime.py · loopback on the API host",
+      "what": "Owns every decision: catalog, reviews, consent. For PROJECT it only writes the reviewed configuration and starts the consumer's pipeline: {api_range} before the run starts.",
+      "example": "onion-deployment-mode common=API-2-ARM;project=API-2-Pipelines",
+      "called_by": "L1 clients on the same host (catalog and deployment routes accept loopback clients only).",
+      "calls": "L3: installs infra-project.yml and infra-project-phase.yml in the consumer repository when they are missing or differ, hands the project's variables.json to the run as an environment secret (never committed, deleted after the run), then starts the run."
+    },
+    {
+      "id": "l3",
+      "n": 3,
+      "label": "L3",
+      "name": "Pipelines",
+      "ring_top": "L3 · PIPELINES · INFRA-PROJECT.YML",
+      "ring_bottom": "CONSUMER REPOSITORY",
+      "tag": "CONSUMER REPOSITORY",
+      "where": "Consumer repository .github/workflows/infra-project.yml + infra-project-phase.yml, from purple environment_setup/aifactory/bicep/copy_to_local_settings/github-actions · self-hosted runner",
+      "what": "Does the work: networking and services, then AI Foundry, as separate az deployment steps. {pipeline_range} per PROJECT run, one wall clock for L3, L4 and L5.",
+      "example": "infra-project.yml > infra-project-phase.yml",
+      "called_by": "L2 starts the run (GitHub Actions; the Azure DevOps route is not available yet in this mode).",
+      "calls": "L4: az deployment of the project Bicep and the pipeline-called scripts."
+    },
+    {
+      "id": "l4",
+      "n": 4,
+      "label": "L4",
+      "name": "Bicep + pipeline-called scripts",
+      "ring_top": "L4 · BICEP + SCRIPTS",
+      "ring_bottom": "PURPLE",
+      "tag": "PURPLE",
+      "where": "purple environment_setup/aifactory/bicep (esml-genai-1: 31-network, 01-foundation ... 11-integration) and bicep/scripts, at the pinned purple commit",
+      "what": "Infrastructure as code the pipeline deploys, plus the scripts it runs around it. Its time is inside the pipeline's wall clock.",
+      "example": "subnetCalc_v2.ps1 · delete-services-if-disabled.sh",
+      "called_by": "L3 pipelines on the self-hosted runner.",
+      "calls": "L5: resource-group deployments and az CLI calls."
+    },
+    {
+      "id": "l5",
+      "n": 5,
+      "label": "L5",
+      "name": "Azure Resource Manager",
+      "ring_top": "L5 · ARM",
+      "ring_bottom": "AZURE",
+      "tag": "AZURE",
+      "where": "management.azure.com: deployments, resource groups, resources, role assignments",
+      "what": "The only layer that changes Azure: networks, private endpoints, DNS, AI Foundry. Its time is inside the pipeline's wall clock.",
+      "example": "Microsoft.Resources/deployments",
+      "called_by": "L4 deployments from the runner.",
+      "calls": "Nothing in AI Factory: Azure resource providers."
+    }
+  ],
+  "paths": [
+    {
+      "id": "api2pipelines",
+      "label": "PROJECT path (API-2-Pipelines)",
+      "angle": -150,
+      "dashed": false,
+      "via": ["consumer", "l1", "l2", "l3", "l4", "l5"],
+      "text": "Consumer > L1 esaf > L2 writes the configuration and starts the run ({api_range}) > L3 infra-project pipeline > L4 Bicep > L5 ({pipeline_range})"
+    },
+    {
+      "id": "worker",
+      "label": "Worker path (scale-set enroll)",
+      "angle": -30,
+      "dashed": true,
+      "via": ["l2", "l3", "l4", "l5"],
+      "text": "L2 freezes a deployment plan ({worker_api}) > L3 factory-lifecycle worker > L4 Bicep > L5 ({worker_pipeline})"
+    }
+  ],
+  "chart": {
+    "title": "Where the time goes: API before the pipeline, then the pipeline",
+    "subtitle": "Measured runs on aif-138. API time = job created to GitHub run created. Worker = the factory-lifecycle worker route; the other runs are API-2-Pipelines.",
+    "api_header": "API BEFORE PIPELINE",
+    "pipeline_header": "PIPELINE WALL CLOCK"
+  },
+  "runs": [
+    {
+      "n": 1,
+      "id": "deploy-001",
+      "label": "Deploy project 001",
+      "step": "PROJECT 001 deploy, first success",
+      "when": "2026-10-30 22:50-23:42Z",
+      "call": "esaf.init_factory(...)",
+      "route": "API-2-Pipelines",
+      "api_seconds": null,
+      "api_note": "not in catalog jobs",
+      "api_short": "not in catalog jobs",
+      "run_id": "41140735956",
+      "pipeline_minutes": 51.7,
+      "job_minutes": null
+    },
+    {
+      "n": 2,
+      "id": "enroll-002",
+      "label": "Enroll scale set 002 (worker)",
+      "step": "enroll scale set 002, job bb9086fc",
+      "when": "2026-10-31 05:14Z",
+      "call": "esaf.add_scale_set(\"002\", ...)",
+      "route": "worker",
+      "api_seconds": 138,
+      "api_note": "frozen plan, then dispatch",
+      "run_id": "41171926400",
+      "pipeline_minutes": 10.1,
+      "job_minutes": 13.9
+    },
+    {
+      "n": 2,
+      "id": "deploy-002",
+      "label": "Deploy project 002",
+      "step": "deploy project 002, job c03b0eb4",
+      "when": "2026-10-31 07:09Z",
+      "call": "esaf.add_scale_set(\"002\", ...)",
+      "route": "API-2-Pipelines",
+      "api_seconds": 13,
+      "run_id": "41179463357",
+      "pipeline_minutes": 29.5,
+      "job_minutes": 30.1
+    },
+    {
+      "n": 3,
+      "id": "settings-002",
+      "label": "Project settings change",
+      "step": "project settings change, job ea99c79c",
+      "when": "2026-10-31 07:40Z",
+      "call": "esaf.upsert_project(\"002\", settings=...)",
+      "route": "API-2-Pipelines",
+      "api_seconds": 13,
+      "run_id": "41181519894",
+      "pipeline_minutes": 24.4,
+      "job_minutes": 25.0
+    },
+    {
+      "n": 4,
+      "id": "delete-002-services",
+      "label": "Delete project 002, services",
+      "step": "delete project002, services only, job a8aaf31e",
+      "when": "2026-10-31 11:17Z",
+      "call": "esaf.delete_project(\"002\", include_keyvault_and_resource_group=False)",
+      "route": "API-2-Pipelines",
+      "api_seconds": 14,
+      "run_id": "41196230976",
+      "pipeline_minutes": 23.6,
+      "job_minutes": 25.0
+    },
+    {
+      "n": 4,
+      "id": "delete-002-full",
+      "label": "Delete project 002, full",
+      "step": "delete project002, full, job f16ed1fb",
+      "when": "2026-10-31 15:41Z",
+      "call": "esaf.delete_project(\"002\")",
+      "route": "API-2-Pipelines",
+      "api_seconds": 24,
+      "api_note": "facade: started after 25 s",
+      "run_id": "41216080228",
+      "pipeline_minutes": 30.5,
+      "job_minutes": 31.3,
+      "job_note": "facade 32.5 min"
+    },
+    {
+      "n": 5,
+      "id": "delete-scaleset-002",
+      "label": "Delete scale set 002 (worker)",
+      "step": "delete scale set 002",
+      "when": "2026-10-31 20:20-22:35Z",
+      "call": "esaf.delete_scale_set(\"002\")",
+      "route": "worker",
+      "api_seconds": null,
+      "api_note": "not yet measured (blocked at prepare)",
+      "api_short": "not yet measured",
+      "run_id": null,
+      "pipeline_minutes": null,
+      "pipeline_short": "not yet measured",
+      "job_minutes": null,
+      "job_note": "not yet measured"
+    }
+  ],
+  "animation": {
+    "speed": 3,
+    "end_hold_seconds": 1,
+    "note": "Illustrative animation; every time is measured.",
+    "steps": [
+      {
+        "id": "onion",
+        "chapter": "01 / ONION V2",
+        "title": "Same five layers. The API now hands off in seconds.",
+        "explanation": "In PROJECT mode (onion-deployment-mode API-2-Pipelines) the Factory API writes the reviewed configuration and starts the consumer's own infra-project pipeline. The pipeline does the work. The colours show where the time goes: green is fast, red is the slowest.",
+        "key": "API: {api_range} before the pipeline starts. Pipeline: {pipeline_range}.",
+        "active": ["consumer", "l1", "l2", "l3", "l4", "l5"],
+        "links": [],
+        "seconds": 13
+      },
+      {
+        "id": "call",
+        "chapter": "02 / CONSUMER + LAYER 1 · ESAF",
+        "title": "One ESAF call is the approval.",
+        "explanation": "esaf.upsert_project(\"002\", scale_set=\"002\") prepares the review, checks it and confirms it, then returns an EsafJob at once. The client holds no deployment logic.",
+        "key": "Fire and forget: job.wait() follows the server-side job to its end.",
+        "active": ["consumer", "l1", "l2"],
+        "links": [
+          {"from": "consumer", "to": "l1", "label": "esaf.upsert_project(...)", "path": "api2pipelines"},
+          {"from": "l1", "to": "l2", "label": "prepare + confirm over REST with X-API-Key", "path": "api2pipelines"}
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "api",
+        "chapter": "03 / LAYER 2 · FACTORY REST API",
+        "title": "The API writes the configuration and starts the run.",
+        "explanation": "It installs infra-project.yml when it is missing or differs, hands the project's variables.json to the run as an environment secret, and starts the run. It no longer freezes an ARM plan or deploys anything itself.",
+        "key": "Job created to GitHub run created: {api_range} (measured 2026-10-31).",
+        "active": ["l2", "l3"],
+        "links": [
+          {"from": "l2", "to": "l3", "label": "write the configuration, start infra-project.yml", "path": "api2pipelines"}
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "pipeline",
+        "chapter": "04 / LAYERS 3-5 · THE PIPELINE",
+        "title": "The pipeline does the work.",
+        "explanation": "infra-project.yml calls infra-project-phase.yml for networking and services, then AI Foundry, as separate az deployment steps on the factory's runner. Bicep and ARM time are inside the pipeline's wall clock.",
+        "key": "Pipeline wall clock: {pipeline_range} per PROJECT run.",
+        "active": ["l3", "l4", "l5"],
+        "links": [
+          {"from": "l3", "to": "l4", "label": "az deployment of the project Bicep", "path": "api2pipelines"},
+          {"from": "l4", "to": "l5", "label": "resource-group deployments", "path": "api2pipelines"}
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "worker",
+        "chapter": "05 / CONTRAST · WORKER ROUTE",
+        "title": "The worker route still prepares first.",
+        "explanation": "Enrolling a scale set takes the factory-lifecycle worker route: the API freezes a deployment plan before it starts the pipeline, and the worker deploys that plan.",
+        "key": "Worker route: {worker_api} in the API before the pipeline, then {worker_pipeline} in it.",
+        "active": ["l2", "l3", "l4", "l5"],
+        "links": [
+          {"from": "l2", "to": "l3", "label": "frozen plan, then start the factory-lifecycle pipeline", "path": "worker"},
+          {"from": "l3", "to": "l4", "label": "the worker deploys the frozen plan's Bicep", "path": "worker"},
+          {"from": "l4", "to": "l5", "label": "resource-group deployments", "path": "worker"}
+        ],
+        "seconds": 13
+      },
+      {
+        "id": "time",
+        "chapter": "06 / WHERE THE TIME GOES",
+        "title": "Seconds in the API, minutes in the pipeline.",
+        "explanation": "Measured on aif-138 on 2026-10-30 and 2026-10-31. Scenario 5 (delete scale set) is not yet measured.",
+        "key": "The API answers in {api_range}; the pipeline needs {pipeline_range}.",
+        "active": ["consumer", "l1", "l2", "l3", "l4", "l5"],
+        "links": [],
+        "seconds": 15,
+        "chart": true
+      }
+    ]
+  }
+}

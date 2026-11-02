@@ -3,6 +3,7 @@
 
     npm ci --ignore-scripts --no-audit --no-fund     # once, in this folder (@resvg/resvg-js 2.6.2)
     python make_onion_raster.py --font-dir <folder with OpenSans-Regular.ttf and OpenSans-Semibold.ttf>
+    python make_onion_raster.py --data onion-layers-v2.json --font-dir <...>   # the onion V2 page
 
 The GIF follows the VisualLearner concept exports: each step's scene is rasterized once, then signal dots
 move along that step's links and a progress bar fills, sampled like VisualLessonExportTimeline (about
@@ -21,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFont, GifImagePlugin
 
 HERE = Path(__file__).resolve().parent
-ART = HERE / "artifacts"
+ART = HERE / "artifacts"  # per data file: artifacts/<data stem>, set in main()
 sys.path.insert(0, str(HERE))
 import make_onion_svg as onion  # noqa: E402
 
@@ -71,9 +72,11 @@ def unchanged_transparent(current, previous):
     return Image.frombytes("P", current.size, merged.tobytes())
 
 
-def make_gif(plan, target: Path) -> dict:
+def make_gif(plan, target: Path, scale_colors=()) -> dict:
     backgrounds = [Image.open(job["png"]).convert("RGB") for job in plan["jobs"]]
-    colors = [onion.BG, onion.ACCENT, "#FFFFFF"] + sorted({r["color"] for s in plan["steps"] for r in s["routes"]})
+    # The colour-scale colours are pinned too: small swatches and bars carry meaning and must not be quantized away.
+    routes = sorted({r["color"] for s in plan["steps"] for r in s["routes"]})
+    colors = [onion.BG, onion.ACCENT, "#FFFFFF"] + routes + [c for c in scale_colors if c not in routes]
     palette = palette_for(backgrounds, colors)
     backgrounds = [b.quantize(palette=palette, dither=Image.Dither.NONE) for b in backgrounds]
     rgb = palette.getpalette()
@@ -136,9 +139,12 @@ def sha(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--font-dir", type=Path, help="folder with OpenSans-Regular.ttf and OpenSans-Semibold.ttf")
+    parser.add_argument("--data", type=Path, default=onion.DATA)
     args = parser.parse_args()
-    subprocess.run([sys.executable, str(HERE / "make_onion_svg.py"), "--frames", str(ART)], check=True)
-    data = onion.load()
+    global ART
+    ART = HERE / "artifacts" / args.data.stem
+    subprocess.run([sys.executable, str(HERE / "make_onion_svg.py"), "--data", str(args.data), "--frames", str(ART)], check=True)
+    data = onion.load(args.data)
     out = {key: (HERE / value).resolve() for key, value in data["outputs"].items()}
     plan = json.loads((ART / "timeline.json").read_text(encoding="utf-8"))
     jobs = plan["jobs"] + [{"svg": str(out["poster_svg"]), "png": str(out["poster_png"])}]
@@ -146,7 +152,8 @@ def main() -> None:
     node = ["node", str(HERE / "rasterize.cjs"), str(ART / "raster-jobs.json")] + ([str(args.font_dir)] if args.font_dir else [])
     subprocess.run(node, check=True, cwd=HERE)
     checked = check_text(args.font_dir) if args.font_dir else 0
-    gif = make_gif(plan, out["animated_gif"])
+    scale = [band["hex"] for band in data["colors"]["time_scale"]] + [data["colors"]["neutral"]]
+    gif = make_gif(plan, out["animated_gif"], scale)
     manifest = {
         "schemaVersion": 1, "generated": data["updated"], "speed": plan["speed"], "endHoldSeconds": plan["end_hold_seconds"],
         "nominalFramesPerSecond": 20, "width": plan["width"], "animationHeight": plan["height"],
@@ -162,7 +169,7 @@ def main() -> None:
             "Fonts are not embedded: the SVGs use Open Sans when installed and fall back to Segoe UI, Helvetica or Arial.",
         ],
     }
-    (HERE / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (HERE / data["outputs"].get("manifest", "manifest.json")).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f'GIF {plan["width"]}x{plan["height"]}: {gif["frames"]} frames, {gif["durationSeconds"]:.2f}s, '
           f'{out["animated_gif"].stat().st_size / 1048576:.2f} MiB; PNG {out["poster_png"].name}; '
           f'{checked} text lines checked with Open Sans' if checked else "text not re-measured (no --font-dir)")
