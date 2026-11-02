@@ -11,7 +11,7 @@ That is why an ESAF call such as `esaf.upsert_project("002")` now gets an answer
 ![AI Factory onion V2: API-2-Pipelines](./images/10-factory-onion-architecture-v2.svg)
 
 <!-- onion:colors:start -->
-Ring colours mark the layers: green L1 Clients, blue L2 Factory REST API, purple L3 Pipelines, orange L4 Bicep + pipeline-called scripts, red L5 Azure Resource Manager. Blue also marks the consumer. Chart bars show time: green fastest, then orange and pink, red slowest. On this page purple marks the pipeline layer, where the work now happens (Joakim, 2026-11-02).
+Colours mark the layers, in the rings and in the chart bars: blue Consumer, green L1 Clients, pink L2 Factory REST API, purple L3 Pipelines, orange L4 Bicep + pipeline-called scripts, red L5 Azure Resource Manager. On this page every layer keeps one colour (Joakim, 2026-11-02): purple marks the pipeline layer, red only the core.
 <!-- onion:colors:end -->
 
 Also as [PNG](./images/10-factory-onion-architecture-v2.png), as an
@@ -78,15 +78,15 @@ work is the deletion worker); **job total** is the
 job's creation to its last update. Evidence: [R1-R3](#evidence).
 
 <!-- onion:runs:start -->
-| Scenario / step | ESAF call | Route | API time before pipeline | Pipeline (wall clock) | Job total |
-|---|---|---|---|---|---|
-| 1. PROJECT 001 deploy, first success (2026-10-30 22:50-23:42Z) | `esaf.init_factory(...)` | API-2-Pipelines | not in catalog jobs | run 41140735956: 51.7 min | - |
-| 2. enroll scale set 002, job bb9086fc (2026-10-31 05:14Z) | `esaf.add_scale_set("002", ...)` | worker | 2 min 18 s, frozen plan, then dispatch | run 41171926400: 10.1 min | 13.9 min |
-| 2. deploy project 002, job c03b0eb4 (2026-10-31 07:09Z) | `esaf.add_scale_set("002", ...)` | API-2-Pipelines | 13 s | run 41179463357: 29.5 min | 30.1 min |
-| 3. project settings change, job ea99c79c (2026-10-31 07:40Z) | `esaf.upsert_project("002", settings=...)` | API-2-Pipelines | 13 s | run 41181519894: 24.4 min | 25.0 min |
-| 4. delete project002, services only, job a8aaf31e (2026-10-31 11:17Z) | `esaf.delete_project("002", include_keyvault_and_resource_group=False)` | API-2-Pipelines | 14 s | run 41196230976: 23.6 min | 25.0 min |
-| 4. delete project002, full, job f16ed1fb (2026-10-31 15:41Z) | `esaf.delete_project("002")` | API-2-Pipelines | 24 s, facade: started after 25 s | run 41216080228: 30.5 min | 31.3 min (facade 32.5 min) |
-| 5. delete scale set 002, attempt m, job db2fa13d (2026-11-01 15:13-15:24Z) | `esaf.delete_scale_set("002")` | worker | 2 min 28 s, prepare, then the deletion worker | ~9 min, deletion worker on the API host, no GitHub run | 11.5 min |
+| Scenario / step | ESAF call | Route | API time before pipeline (L2) | Pipeline (wall clock) | L3 / L4 / L5 (min) | Job total |
+|---|---|---|---|---|---|---|
+| 1. PROJECT 001 deploy, first success (2026-10-30 22:50-23:42Z) | `esaf.init_factory(...)` | API-2-Pipelines | not in catalog jobs | run 41140735956: 51.7 min | 1.1 / 3.4 / 47.2 | - |
+| 2. enroll scale set 002, job bb9086fc (2026-10-31 05:14Z) | `esaf.add_scale_set("002", ...)` | worker | 2 min 18 s, frozen plan, then dispatch | run 41171926400: 10.1 min | 0.5 / 0 / 9.6 | 13.9 min |
+| 2. deploy project 002, job c03b0eb4 (2026-10-31 07:09Z) | `esaf.add_scale_set("002", ...)` | API-2-Pipelines | 13 s | run 41179463357: 29.5 min | 1.2 / 2.6 / 25.7 | 30.1 min |
+| 3. project settings change, job ea99c79c (2026-10-31 07:40Z) | `esaf.upsert_project("002", settings=...)` | API-2-Pipelines | 13 s | run 41181519894: 24.4 min | 1.1 / 2.7 / 20.6 | 25.0 min |
+| 4. delete project002, services only, job a8aaf31e (2026-10-31 11:17Z) | `esaf.delete_project("002", include_keyvault_and_resource_group=False)` | API-2-Pipelines | 14 s | run 41196230976: 23.6 min | 0.8 / 0.9 / 21.9 | 25.0 min |
+| 4. delete project002, full, job f16ed1fb (2026-10-31 15:41Z) | `esaf.delete_project("002")` | API-2-Pipelines | 24 s, facade: started after 25 s | run 41216080228: 30.5 min | 1.3 / 0.9 / 28.3 | 31.3 min (facade 32.5 min) |
+| 5. delete scale set 002, attempt m, job db2fa13d (2026-11-01 15:13-15:24Z) | `esaf.delete_scale_set("002")` | worker | 2 min 28 s, prepare, then the deletion worker | ~9 min, deletion worker on the API host, no GitHub run | 0 / 0 / 9 (estimated) | 11.5 min |
 <!-- onion:runs:end -->
 
 What the numbers say:
@@ -94,7 +94,10 @@ What the numbers say:
 - **The API hands off in 13-24 s** in PROJECT mode, roughly 6 to 11 times faster than the 2 min 18 s of the worker
   route, which reads the live inventory and freezes a plan first.
 - **The pipeline does the work: 24-52 min** per PROJECT run (51.7 min for the first deploy of project 001, 23.6-30.5
-  min for later runs). Bicep and ARM time are inside that wall clock; the split per layer is not measured.
+  min for later runs).
+- **Inside the pipeline, Azure does the work**: split by the runs' step times ([R4](#evidence)), L5 (the
+  `az deployment` steps with their Bicep compile, deletes and waits) takes 84-93% of each PROJECT run, L4 scripts
+  0.9-3.4 min and L3 (runner setup, checkout, gaps between jobs) 0.8-1.3 min.
 - **The job total is the pipeline plus 0.6-1.4 min** in PROJECT mode (25.0 min for a 24.4 min run), so the consumer
   waits for Azure, not for the API. The worker route adds 3.8 min (13.9 min for a 10.1 min run).
 - **Scenario 5 takes the worker route**: deleting scale set 002 spent 148 s preparing (live inventory and ownership
@@ -108,14 +111,17 @@ What the numbers say:
 <!-- onion:evidence:start -->
 - **R1**: Verified 2026-10-31 23:45 CET for the aif-138 end-to-end run through the ESAF facade (consumer repository jostrm/azure-enterprise-scale-byor-138): catalog jobs in the Factory API's catalog-operations.sqlite and gh run list. API time = the catalog job's created_at to the GitHub run's createdAt. Job total = the job's created_at to updated_at. The jobs' pipeline_runs confirm which run belongs to which job.
 - **R2**: Not in the table: two failed attempts with the same 13 s API time, project 002 deploy 6a380c35 (run 41172892614 failed after 59.6 min) and delete 3bd1d25d (run 41194343416 failed after 24.9 min).
+- **R4**: Split of each pipeline run into L3, L4 and L5 (measure_pipeline_split.py, GitHub step times of the runs above): L5 = steps that deploy or delete in Azure (the numbered az deployment steps, with the Bicep compile inside them, deletes, purges, waits, the worker's reviewed-plan execution); L4 = checks, parameter generation and other script steps; L3 = the rest of the run's wall clock (queue, runner setup, checkout, login, gaps between jobs). Scenario 5's deletion worker has no GitHub run: its ~9 min is estimated as L5 (it waits on Azure deletes).
 - **R3**: Scenario 5 (esaf.delete_scale_set, worker route) was blocked when the 2026-10-31 table was verified: four attempts were refused at prepare after about 5 min. After the ownership fixes, attempt m succeeded (update 2026-11-01 16:00 CET): job db2fa13d 15:13-15:24Z, prepare 148 s, then the deletion worker on the API host for about 9 min (no GitHub run), 11.5 min in total. Attempt i (2026-11-01, 91 min, stopped after deleting common-002) is not in the table.
 <!-- onion:evidence:end -->
 
 ## Update the picture and the numbers
 
 All numbers, texts and colors live in [images/onion/onion-layers-v2.json](./images/onion/onion-layers-v2.json): the
-`runs` hold the measured rows, and the ranges in the texts (13-24 s, 24-52 min) and the time colours of the chart bars
-are derived from them. The ring colours are fixed per layer (`colors.layers`). After a new measured run, add or change its row and its evidence, then:
+`runs` hold the measured rows and their L3 / L4 / L5 split, and the ranges in the texts (13-24 s, 24-52 min) are
+derived from them. The colours are fixed per layer (`colors.layers`) and used for the rings and the chart bars alike.
+To split a new run, `python measure_pipeline_split.py --repo <owner/consumer-repository>` prints its L3 / L4 / L5
+minutes from the GitHub step times. After a new measured run, add or change its row and its evidence, then:
 
 ```bash
 cd documentation/v2/10-19/images/onion

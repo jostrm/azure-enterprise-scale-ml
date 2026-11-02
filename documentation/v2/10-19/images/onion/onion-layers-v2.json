@@ -15,13 +15,14 @@
   "evidence": {
     "R1": "Verified 2026-10-31 23:45 CET for the aif-138 end-to-end run through the ESAF facade (consumer repository jostrm/azure-enterprise-scale-byor-138): catalog jobs in the Factory API's catalog-operations.sqlite and gh run list. API time = the catalog job's created_at to the GitHub run's createdAt. Job total = the job's created_at to updated_at. The jobs' pipeline_runs confirm which run belongs to which job.",
     "R2": "Not in the table: two failed attempts with the same 13 s API time, project 002 deploy 6a380c35 (run 41172892614 failed after 59.6 min) and delete 3bd1d25d (run 41194343416 failed after 24.9 min).",
+    "R4": "Split of each pipeline run into L3, L4 and L5 (measure_pipeline_split.py, GitHub step times of the runs above): L5 = steps that deploy or delete in Azure (the numbered az deployment steps, with the Bicep compile inside them, deletes, purges, waits, the worker's reviewed-plan execution); L4 = checks, parameter generation and other script steps; L3 = the rest of the run's wall clock (queue, runner setup, checkout, login, gaps between jobs). Scenario 5's deletion worker has no GitHub run: its ~9 min is estimated as L5 (it waits on Azure deletes).",
     "R3": "Scenario 5 (esaf.delete_scale_set, worker route) was blocked when the 2026-10-31 table was verified: four attempts were refused at prepare after about 5 min. After the ownership fixes, attempt m succeeded (update 2026-11-01 16:00 CET): job db2fa13d 15:13-15:24Z, prepare 148 s, then the deletion worker on the API host for about 9 min (no GitHub run), 11.5 min in total. Attempt i (2026-11-01, 91 min, stopped after deleting common-002) is not in the table."
   },
   "colors": {
-    "note": "On this page purple marks the pipeline layer, where the work now happens (Joakim, 2026-11-02).",
+    "note": "On this page every layer keeps one colour (Joakim, 2026-11-02): purple marks the pipeline layer, red only the core.",
     "neutral": "#5AA9FF",
     "extra": {"purple": "#B07CFF"},
-    "layers": {"l1": "green", "l2": "blue", "l3": "purple", "l4": "orange", "l5": "red"},
+    "layers": {"l1": "green", "l2": "pink", "l3": "purple", "l4": "orange", "l5": "red"},
     "time_scale": [
       {"name": "green", "hex": "#3DDC97", "below_share": 0.05},
       {"name": "orange", "hex": "#FFB84D", "below_share": 0.3},
@@ -135,15 +136,15 @@
     }
   ],
   "chart": {
-    "title": "Where the time goes: API before the pipeline, then the pipeline",
-    "subtitle": "Measured runs on aif-138. API time = job created to GitHub run created (Scenario 5: prepare). Worker = the factory-lifecycle worker route; the other runs are API-2-Pipelines.",
-    "api_header": "API BEFORE PIPELINE",
-    "pipeline_header": "PIPELINE WALL CLOCK"
+    "title": "Where the time goes: minutes per run, by layer",
+    "subtitle": "Measured runs on aif-138, stacked by layer: L2 = job created to GitHub run created (Scenario 5: prepare), L3-L5 = the pipeline split by its step times (R4). Consumer and L1 take seconds. Worker = the factory-lifecycle worker route."
   },
   "runs": [
     {
       "n": 1,
       "id": "deploy-001",
+      "split": {"l3": 1.1, "l4": 3.4, "l5": 47.2},
+      "split_kind": "measured",
       "label": "Deploy project 001",
       "step": "PROJECT 001 deploy, first success",
       "when": "2026-10-30 22:50-23:42Z",
@@ -159,6 +160,8 @@
     {
       "n": 2,
       "id": "enroll-002",
+      "split": {"l3": 0.5, "l4": 0.0, "l5": 9.6},
+      "split_kind": "measured",
       "label": "Enroll scale set 002 (worker)",
       "step": "enroll scale set 002, job bb9086fc",
       "when": "2026-10-31 05:14Z",
@@ -173,6 +176,8 @@
     {
       "n": 2,
       "id": "deploy-002",
+      "split": {"l3": 1.2, "l4": 2.6, "l5": 25.7},
+      "split_kind": "measured",
       "label": "Deploy project 002",
       "step": "deploy project 002, job c03b0eb4",
       "when": "2026-10-31 07:09Z",
@@ -186,6 +191,8 @@
     {
       "n": 3,
       "id": "settings-002",
+      "split": {"l3": 1.1, "l4": 2.7, "l5": 20.6},
+      "split_kind": "measured",
       "label": "Project settings change",
       "step": "project settings change, job ea99c79c",
       "when": "2026-10-31 07:40Z",
@@ -199,6 +206,8 @@
     {
       "n": 4,
       "id": "delete-002-services",
+      "split": {"l3": 0.8, "l4": 0.9, "l5": 21.9},
+      "split_kind": "measured",
       "label": "Delete project 002, services",
       "step": "delete project002, services only, job a8aaf31e",
       "when": "2026-10-31 11:17Z",
@@ -212,6 +221,8 @@
     {
       "n": 4,
       "id": "delete-002-full",
+      "split": {"l3": 1.3, "l4": 0.9, "l5": 28.3},
+      "split_kind": "measured",
       "label": "Delete project 002, full",
       "step": "delete project002, full, job f16ed1fb",
       "when": "2026-10-31 15:41Z",
@@ -227,6 +238,8 @@
     {
       "n": 5,
       "id": "delete-scaleset-002",
+      "split": {"l5": 9},
+      "split_kind": "estimated",
       "label": "Delete scale set 002 (worker)",
       "step": "delete scale set 002, attempt m, job db2fa13d",
       "when": "2026-11-01 15:13-15:24Z",

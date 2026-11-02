@@ -29,7 +29,7 @@
       535
     ]
   },
-  "textLinesCheckedWithOpenSans": 617,
+  "textLinesCheckedWithOpenSans": 625,
   "renderer": {
     "svg": "make_onion_svg.py (standard library), SMIL animation",
     "raster": "@resvg/resvg-js 2.6.2 (CPU, no browser capture)",
@@ -37,20 +37,20 @@
   },
   "files": {
     "10-factory-onion-architecture-v2.svg": {
-      "bytes": 18162,
-      "sha256": "2c9fad0e40b8d227458d7f4c8ac51050fd9f69f48cf3b5843a509b96df88c037"
+      "bytes": 20874,
+      "sha256": "e8e4ac3b4bdaa70cdcd0df716c49379ab804899868a3ffc901367c24a9bfed0e"
     },
     "10-factory-onion-architecture-v2.png": {
-      "bytes": 361205,
-      "sha256": "0a6b93f434e7f5103f14b051a46db9115b43a83164ed56c9f55e3118f1fb16bc"
+      "bytes": 363987,
+      "sha256": "6579ed05db077851338d4c2cb2d7227c15fd372662b9f0bdf939167a0334290d"
     },
     "10-factory-onion-architecture-v2-animated.svg": {
-      "bytes": 99964,
-      "sha256": "09f361abebea0ee99248a474c80f44e898c406a15d9fcf6efa0f06e49f4ca376"
+      "bytes": 102736,
+      "sha256": "499df754229be2ffbcad63214bfe10d2380d8aea30524e5ee1f270a379ebca36"
     },
     "10-factory-onion-architecture-v2.gif": {
-      "bytes": 962488,
-      "sha256": "1ea1e476f6b49b28f3f9f6f6287b34168780b1eec7141ada64e66d44e7bc1c98"
+      "bytes": 965671,
+      "sha256": "8dbc8c114db04333a5c8c2c212b53a5da3649ea01e00387bb035acd389249474"
     }
   },
   "limitations": [

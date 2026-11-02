@@ -171,9 +171,7 @@ def color_legend(data) -> str:
     bands = data["colors"]["time_scale"]
     if data["colors"].get("layers"):
         names = [f'{layer["color_name"]} {layer["label"]} {layer["name"]}' for layer in data["layers"]]
-        return ("Ring colours mark the layers: " + ", ".join(names) + ". Blue also marks the consumer. "
-                f'Chart bars show time: {bands[0]["name"]} fastest, then ' + " and ".join(b["name"] for b in bands[1:-1])
-                + f', {bands[-1]["name"]} slowest.')
+        return "Colours mark the layers, in the rings and in the chart bars: blue Consumer, " + ", ".join(names) + "."
     parts = [f'{b["name"]} under {round(b["below_share"] * 100)}%' for b in bands if b["below_share"] is not None]
     basis = data["colors"].get("basis", "average time in the layer per scenario")
     return (f"Colour = {basis}, relative to the slowest layer: " + ", ".join(parts)
@@ -211,6 +209,8 @@ TOKENS = {
     "pipeline_range": lambda d: _range(_route_runs(d, "API-2-Pipelines", "pipeline_minutes"), "min"),
     "worker_api": lambda d: seconds_text(_route_runs(d, "worker", "api_seconds")[0]),
     "worker_pipeline": lambda d: run_minutes(_route_runs(d, "worker", "pipeline_minutes")[0]),
+    "l5_share": lambda d: _range([100 * r["split"]["l5"] / r["pipeline_minutes"] for r in d["runs"]
+                                  if r["route"] == "API-2-Pipelines"], "%").replace(" %", "%"),
 }
 
 
@@ -419,10 +419,11 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         scene.add(f'<path d="M0,{num(y + 10)} H44" stroke="{color}" stroke-width="2.4"{dash(path["dashed"])}/>')
         scene.text(f'{path["label"]}: {fill(path["text"], data)}', 56, y, DW - 56, 14, color if path["dashed"] else WHITE, True, 20)
         y += 24
-    swatches = [layer["color"] for layer in data["layers"]] if data["colors"].get("layers") else         [band["hex"] for band in data["colors"]["time_scale"]]
+    swatches = [data["consumer"]["color"]] + [layer["color"] for layer in data["layers"]] if data["colors"].get("layers") else         [band["hex"] for band in data["colors"]["time_scale"]]
     for index, color in enumerate(swatches):
         scene.rect(index * 11, y + 6, 10, 10, color, radius=2)
-    y = scene.text(color_legend(data), 56, y, DW - 56, 14, WHITE, True, 20) + 4
+    text_x = max(56, len(swatches) * 11 + 10)
+    y = scene.text(color_legend(data), text_x, y, DW - text_x, 14, WHITE, True, 20) + 4
     return scene, y, routes
 
 
@@ -459,48 +460,51 @@ def time_chart(scene: Scene, data, box) -> None:
         x += 18 + text_width(label, 11.5) + 18
 
 
+def total_label(run) -> str:
+    """API time + pipeline (or worker) time, as measured; the chart prints it right of the stacked bar."""
+    work = work_text(run)
+    return f'{seconds_text(run["api_seconds"])} + {work}' if run.get("api_seconds") is not None else f"{work} (API n/a)"
+
+
 def runs_chart(scene: Scene, data, box) -> float:
-    """Onion V2: per measured run, the API time before the pipeline (seconds) next to the pipeline wall clock
-    (minutes). Bars are coloured on one scale, by share of the slowest value in minutes. Returns the bottom."""
+    """Onion V2: one stacked bar per measured run, segments coloured by layer like the rings. Consumer and L1 take
+    seconds and show as thin slivers so the whole chain is visible. Returns the bottom."""
     x0, y0, x1, _ = box
     chart = data["chart"]
+    layers = [data["consumer"]] + data["layers"]
     y = scene.text(chart["title"], x0, y0, x1 - x0, 15, WHITE, True)
     y = scene.text(fill(chart["subtitle"], data), x0, y + 2, x1 - x0, 11.5, MUTED, leading=16) + 10
-    label_w, api_w = 250, 190
-    api_x, pipe_x, pipe_w = x0 + label_w, x0 + label_w + api_w, x1 - x0 - label_w - api_w
-    for text, width in ((chart["api_header"], api_w - 8), (chart["pipeline_header"], pipe_w)):
-        if len(wrap(text, width, 11, True)) > 1:
-            raise ValueError(f"Chart header does not fit on one line: {text}")
-    scene.text(chart["api_header"], api_x, y, api_w - 8, 11, MUTED, True)
-    scene.text(chart["pipeline_header"], pipe_x, y, pipe_w, 11, MUTED, True)
-    y += 22
+    label_w, total_w, sliver = 214, 136, 3
+    bar_x = x0 + label_w
     runs = data["runs"]
-    api_max = max(r["api_seconds"] for r in runs if r.get("api_seconds") is not None)
-    pipe_max = max(r["pipeline_minutes"] for r in runs if r.get("pipeline_minutes") is not None)
-    slowest = max(api_max / 60, pipe_max)
-    api_scale, pipe_scale = (api_w - 82) / api_max, (pipe_w - 72) / pipe_max
-
-    def bar(x, width, minutes, label):
-        color = band_for(data, minutes / slowest)["hex"]
-        scene.rect(x, y + 2, max(width, 3), 16, color, radius=3)
-        scene.text(label, x + max(width, 3) + 6, y + 1, 80, 12, WHITE, True)
-
+    totals = [(r.get("api_seconds") or 0) / 60 + r["pipeline_minutes"] for r in runs]
+    scale = (x1 - bar_x - total_w - 2 * sliver) / max(totals)
     for run in runs:
         label = f'{run["n"]} · {run["label"]}'
         if text_width(label, 12.5) * 1.03 > label_w - 8:
             raise ValueError(f"Chart label does not fit on one line: {label}")
-        measured = run.get("pipeline_minutes") is not None
-        scene.text(label, x0, y, label_w - 8, 12.5, WHITE if measured else MUTED)
-        if run.get("api_seconds") is not None:
-            bar(api_x, run["api_seconds"] * api_scale, run["api_seconds"] / 60, seconds_text(run["api_seconds"]))
-        else:
-            scene.text(run["api_short"], api_x, y + 2, api_w - 8, 11.5, MUTED)
-        if measured:
-            bar(pipe_x, run["pipeline_minutes"] * pipe_scale, run["pipeline_minutes"], work_text(run))
-        else:
-            scene.text(run["pipeline_short"], pipe_x, y + 2, pipe_w, 11.5, MUTED)
+        scene.text(label, x0, y, label_w - 8, 12.5, WHITE)
+        api = (run.get("api_seconds") or 0) / 60
+        minutes_by_layer = {"consumer": None, "l1": None, data["api_layer"]: api or 0, **run["split"]}
+        x = bar_x
+        for item in layers:
+            value = minutes_by_layer.get(item["id"], 0)
+            if value == 0:
+                continue
+            width = sliver if value is None else max(value * scale, sliver)  # None = seconds
+            scene.rect(x, y + 2, max(width - 1, 1), 16, item["color"], radius=2)
+            if width >= 28:
+                scene.text(item["label"], x + (width - 1) / 2, y + 3, width, 10.5, BG, True, anchor="middle")
+            x += width
+        scene.text(total_label(run), x + 8, y + 1, total_w, 12, MUTED, True)
         y += 27
-    return y
+    x = x0
+    for item in layers:
+        scene.rect(x, y + 6, 12, 12, item["color"], radius=3)
+        name = "Consumer" if item["id"] == "consumer" else f'{item["label"]} {item["name"].split(" ")[0]}'
+        scene.text(name, x + 18, y + 3, 110, 11.5, MUTED)
+        x += 18 + text_width(name, 11.5) + 18
+    return y + 26
 
 
 # ---------------------------------------------------------------- poster
@@ -675,8 +679,8 @@ def cell(t) -> str:
 
 
 def runs_table(data) -> str:
-    rows = ["| Scenario / step | ESAF call | Route | API time before pipeline | Pipeline (wall clock) | Job total |",
-            "|---|---|---|---|---|---|"]
+    rows = ["| Scenario / step | ESAF call | Route | API time before pipeline (L2) | Pipeline (wall clock) | L3 / L4 / L5 (min) | Job total |",
+            "|---|---|---|---|---|---|---|"]
     for run in data["runs"]:
         api = seconds_text(run["api_seconds"]) if run.get("api_seconds") is not None else ""
         api = ", ".join(filter(None, [api, run.get("api_note")]))
@@ -688,7 +692,9 @@ def runs_table(data) -> str:
         job = run_minutes(run["job_minutes"]) if run.get("job_minutes") is not None else run.get("job_note", "-")
         if run.get("job_minutes") is not None and run.get("job_note"):
             job += f' ({run["job_note"]})'
-        rows.append(f'| {run["n"]}. {run["step"]} ({run["when"]}) | `{run["call"]}` | {run["route"]} | {api} | {pipeline} | {job} |')
+        split = " / ".join(f'{run["split"].get(layer, 0):g}' for layer in data["pipeline_layers"])
+        split += "" if run["split_kind"] == "measured" else " (estimated)"
+        rows.append(f'| {run["n"]}. {run["step"]} ({run["when"]}) | `{run["call"]}` | {run["route"]} | {api} | {pipeline} | {split} | {job} |')
     return "\n".join(rows)
 
 

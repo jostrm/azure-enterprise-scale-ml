@@ -145,6 +145,26 @@ class OnionV2(unittest.TestCase):
         self.assertTrue(scenario5["approximate"], "the worker time is only known as about 9 min")
         self.assertAlmostEqual(scenario5["api_seconds"] / 60 + scenario5["pipeline_minutes"], scenario5["job_minutes"], delta=.1)
 
+    def test_each_pipeline_split_adds_up_to_its_wall_clock(self):
+        for run in self.data["runs"]:
+            split = run["split"]
+            self.assertEqual(set(split) <= {"l3", "l4", "l5"}, True, run["id"])
+            self.assertTrue(all(value >= 0 for value in split.values()), run["id"])
+            self.assertAlmostEqual(sum(split.values()), run["pipeline_minutes"], delta=.15, msg=run["id"])
+            self.assertEqual(run["split_kind"], "estimated" if run.get("approximate") else "measured", run["id"])
+
+    def test_every_chart_row_shows_the_whole_chain_and_its_measured_numbers(self):
+        labels = {run["id"]: onion.total_label(run) for run in self.data["runs"]}
+        self.assertEqual(labels, {"deploy-001": "51.7 min (API n/a)", "enroll-002": "2 min 18 s + 10.1 min",
+                                  "deploy-002": "13 s + 29.5 min", "settings-002": "13 s + 24.4 min",
+                                  "delete-002-services": "14 s + 23.6 min", "delete-002-full": "24 s + 30.5 min",
+                                  "delete-scaleset-002": "2 min 28 s + ~9 min"})
+        poster = onion.poster(self.data)[0]
+        for label in labels.values():
+            self.assertIn(f">{onion.esc(label)}<", poster)
+        for layer in self.data["layers"]:
+            self.assertIn(f'fill="{layer["color"]}"', poster, layer["id"])
+
     def test_the_message_ranges_come_from_the_runs(self):
         self.assertEqual(onion.fill("{api_range}", self.data), "13-24 s")
         self.assertEqual(onion.fill("{pipeline_range}", self.data), "24-52 min")
@@ -153,31 +173,20 @@ class OnionV2(unittest.TestCase):
         self.assertEqual(onion.fill("/operations/{id}/confirm", self.data), "/operations/{id}/confirm")
 
     def test_each_layer_has_its_own_fixed_colour_and_only_the_core_is_red(self):
-        """Joakim 2026-11-02: L1 green, L2 blue like the consumer, L3 purple, L4 orange, L5 (ARM) red."""
+        """Joakim 2026-11-02: consumer blue, L1 green, L2 pink, L3 purple, L4 orange, L5 (ARM) red."""
         colors = {layer["id"]: layer["color"] for layer in self.data["layers"]}
         purple = self.raw["colors"]["extra"]["purple"]
-        self.assertEqual(colors, {"l1": self.scale["green"], "l2": self.raw["colors"]["neutral"], "l3": purple,
+        self.assertEqual(colors, {"l1": self.scale["green"], "l2": self.scale["pink"], "l3": purple,
                                   "l4": self.scale["orange"], "l5": self.scale["red"]})
-        self.assertEqual(self.data["consumer"]["color"], colors["l2"])
+        self.assertEqual(self.data["consumer"]["color"], self.raw["colors"]["neutral"])
         self.assertEqual([layer_id for layer_id, color in colors.items() if color == self.scale["red"]], ["l5"])
         for item in [self.raw["consumer"]] + self.raw["layers"]:
             self.assertNotIn("color", item, item["id"])
 
     def test_the_legend_names_every_layer_colour_and_the_time_bars(self):
         legend = onion.color_legend(self.data)
-        for words in ("green L1", "blue L2", "purple L3", "orange L4", "red L5", "green fastest"):
+        for words in ("blue Consumer", "green L1", "pink L2", "purple L3", "orange L4", "red L5", "chart bars"):
             self.assertIn(words, legend)
-
-    def test_the_poster_labels_every_measured_number(self):
-        poster = onion.poster(self.data)[0]
-        for api, pipeline, _, _ in VERIFIED.values():
-            if api is not None:
-                self.assertIn(f">{onion.seconds_text(api)}<", poster)
-        for run in self.data["runs"]:
-            if run.get("pipeline_minutes") is not None:
-                label = f'~{run["pipeline_minutes"]:g} min' if run.get("approximate") else f'{run["pipeline_minutes"]:.1f} min'
-                self.assertIn(f">{label}<", poster)
-        self.assertIn(">~9 min<", poster)
 
     def test_public_text_never_says_esaif(self):
         for path in (V2, self.out["poster_svg"], self.out["animated_svg"], self.out["doc"]):
@@ -185,7 +194,6 @@ class OnionV2(unittest.TestCase):
 
     def test_purple_is_used_only_for_the_pipeline_layer(self):
         purple = self.raw["colors"]["extra"]["purple"]
-        self.assertNotIn(purple, [band["hex"] for band in self.raw["colors"]["time_scale"]], "time bars never purple")
         for key in ("poster_svg", "animated_svg"):
             self.assertIn(purple, self.out[key].read_text(encoding="utf-8"), key)
 
@@ -207,6 +215,8 @@ class OnionV2(unittest.TestCase):
             for page in (doc, v1):
                 self.assertIn(onion.fill("{" + token + "}", self.data), page, token)
         self.assertIn(onion.fill("{worker_api}", self.data), doc)
+        self.assertEqual(onion.fill("{l5_share}", self.data), "84-93%")
+        self.assertIn("takes 84-93% of each PROJECT run", doc)
 
     def test_the_v1_page_links_to_the_v2_page(self):
         v1 = (HERE / onion.load()["outputs"]["doc"]).resolve().read_text(encoding="utf-8")
