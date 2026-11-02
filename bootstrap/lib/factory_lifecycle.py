@@ -254,7 +254,8 @@ def safe_instance_diagnostic(code, value):
         return child_inventory_diagnostic(value)
     if code in (FOOTPRINT_CODE, PREVIEW_INCOMPLETE_CODE):
         return footprint_diagnostic(value)
-    if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
+    if (code not in ("bootstrap-resource-instance-changed", "project-resource-instance-changed",
+                     "scoped-github-run-failed", "scoped-ado-run-failed")
             or type(value) is not dict
             or set(value) != {"resource_id", "failed_comparisons"}):
         return None
@@ -381,9 +382,12 @@ VOLATILE_FIELDS = {
     "microsoft.compute/disks": (
         ("sku",), ("tags",), ("properties", "diskState"), ("properties", "LastOwnershipUpdateTime"),
         ("properties", "diskIOPSReadWrite"), ("properties", "diskMBpsReadWrite"), ("properties", "tier")),
+    # A NIC body copies its etag into each IP configuration, and the configuration child carries it too (aif-138
+    # 2026-11-01: the factory deletion's project stage); "*" is every item of a list. Subnet and address still count.
     "microsoft.network/networkinterfaces": (
         ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
-        ("properties", "dnsSettings", "internalDomainNameSuffix")),
+        ("properties", "dnsSettings", "internalDomainNameSuffix"), ("properties", "ipConfigurations", "*", "etag")),
+    "microsoft.network/networkinterfaces/ipconfigurations": (("etag",),),
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),
@@ -437,11 +441,13 @@ def fingerprint_body(body, kind=None):
         return body
     result = copy.deepcopy(body)
     for path in VOLATILE_FIELDS[kind]:
-        parent = result
+        parents = [result]
         for field in path[:-1]:
-            parent = parent.get(field) if isinstance(parent, dict) else None
-        if isinstance(parent, dict):
-            parent.pop(path[-1], None)
+            parents = ([item for parent in parents if isinstance(parent, list) for item in parent] if field == "*"
+                       else [parent.get(field) for parent in parents if isinstance(parent, dict)])
+        for parent in parents:
+            if isinstance(parent, dict):
+                parent.pop(path[-1], None)
     return result
 
 
@@ -2607,7 +2613,9 @@ def verify_project_inventory(cloud, document, removed=()):
             require(fingerprint_body(_without_deleted_children(_without_removed_backlinks(body, removed), removed))
                     == fingerprint_body(_without_deleted_children(stripped, removed)), "project-retained-parent-changed")
         else:
-            require(resource_digest(body) == resource_digest(before), "project-resource-instance-changed")
+            if resource_digest(body) != resource_digest(before):
+                raise Blocked("project-resource-instance-changed", error_diagnostic={
+                    "resource_id": key, "failed_comparisons": ["body_hash"]})
     expected_collections = {key: value for key, value in expected["collections"].items()
                             if not any(key == item or key.startswith(item + "/") for item in removed)}
     require(set(closure["collections"]) == set(expected_collections), "project-child-collections-changed")
