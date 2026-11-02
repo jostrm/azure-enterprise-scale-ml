@@ -19,8 +19,8 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 <table>
 <tr>
 <td width="50%" rowspan="2" valign="top">
-<div align="center"><a href="./documentation/v2/10-19/10-factory-onion-architecture.md"><img src="./documentation/v2/10-19/images/10-factory-onion-architecture.gif" width="72%" alt="AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, with the time spent in each layer"></a></div>
-<sub><b>Architecture</b> · five layers, one direction, time per layer</sub><br><br>
+<div align="center"><a href="./documentation/v2/10-19/10-factory-onion-architecture-v2.md"><img src="./documentation/v2/10-19/images/10-factory-onion-architecture-v2.gif" width="72%" alt="AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, with the time spent in each layer"></a></div>
+<sub><b>Architecture</b> · Onion layers: five ways to deploy: Choose either Azure portal, Factory API/SDK/Pipelines/Bicep. See time spent per layer</sub><br><br>
 <a href="./documentation/v2/10-19/11-architecture-diagrams.md"><img src="./documentation/v2/10-19/images/10-two-architectures-v2-small.png" width="100%" alt="AI Factory architectures: each team gets its own private floor with architecture 01 or 02"></a><br>
 <sub><b>Project architectures</b> · a private floor per team, services on or off</sub>
 </td>
