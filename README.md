@@ -12,7 +12,7 @@
 
 <p align="center">
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
-Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources for full-stack development for every team, isolated across Dev, Stage and Prod environment. Reusable "Use Case Templates via "agent-factory" and "ml-factory" compatible with the already automated setup of the landingzones by the Azure factory.
+Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources for full-stack development for every team, isolated across Dev, Stage and Prod environment.  [Choose among +147 reusable usecase templates](usecase_code/readme.md) via "agent-factory" and "ml-factory" compatible with the automated setup of the landingzones by the Azure factory.
 <br>A template way of working & Project way of working - plug and play.
 </p>
 
