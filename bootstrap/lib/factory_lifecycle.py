@@ -1789,8 +1789,12 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             elif classify(full_type) != "resource":
                 yield "metadata", key + "/" + tail, full_type, None, None
             else:
-                # The last field names the type whose schema version this is, so the read may fall back.
-                yield "collection", resource_id + "/" + tail, version(full_type), singleton.get(full_type), full_type
+                # The last field names the type whose schema version this is, so the read may fall back; a reviewed
+                # (pinned) version never falls back.
+                path = resource_id + "/" + tail
+                pinned = resource_versions.get(path.lower())
+                yield ("collection", path, pinned or version(full_type), singleton.get(full_type),
+                       None if pinned else full_type)
 
     def extension_steps(scope):
         for kind, api in EXTENSION_COLLECTIONS:
@@ -2573,11 +2577,24 @@ def _without_removed_backlinks(body, removed):
     return result
 
 
+def frozen_resource_versions(data):
+    """The api-versions a reviewed inventory was read at, by resource id and child-collection path. Execution re-reads
+    at them: during a provider's api-version rollout ARM front ends list different newest versions, and an older
+    version answers with fewer fields (aif-138 2026-11-02: Microsoft.ContainerRegistry 2026-11-01)."""
+    closure = data["closure"]
+    versions = {key: row["api_version"] for key, row in closure["resources"].items()
+                if isinstance(row, dict) and isinstance(row.get("api_version"), str)}
+    versions.update({path: entry["api_version"] for path, entry in closure["collections"].items()
+                     if isinstance(entry, dict) and isinstance(entry.get("api_version"), str)
+                     and not path.endswith("/resources")})
+    return versions
+
+
 def verify_project_inventory(cloud, document, removed=()):
     data = document["deletion"]
     removed = {item.lower() for item in removed}
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
-    closure, bodies = collect_resource_closure(cloud, scopes)
+    closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
     expected = data["closure"]
     # A provider-schema fingerprint is derived and warns, never blocks (as verify_full_inventory, 48b243f8; aif-138
     # 2026-11-01: the factory deletion's project stage under ARM throttling). The live closure decides.
@@ -2713,7 +2730,7 @@ def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=
     if not scopes:
         return {}
     cascades = {}
-    closure, bodies = collect_resource_closure(cloud, scopes)
+    closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
     verify_deletion_identity(document, bodies)
     expected = data["closure"]
     # A provider-schema fingerprint is derived and warns, never blocks: ARM front ends answer schema reads differently
