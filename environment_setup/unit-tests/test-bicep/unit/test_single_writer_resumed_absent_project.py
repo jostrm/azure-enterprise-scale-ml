@@ -55,3 +55,21 @@ def test_a_factory_whose_groups_are_all_gone_is_reviewed_and_released_without_an
     assert cloud.deleted == deleted_before and provider.state()["active"] is None
     child, = result["children"]
     assert child["deleted_resources"] == []
+
+
+def test_scale_set_wide_registrations_and_the_catalog_record_name_the_absent_project_group(workspace, monkeypatch):
+    # aif-138 2026-11-02 run22: pink registers the scale set's owned groups for every project, so with both groups gone
+    # the project's group is ambiguous; the catalog's ownership record (owner project_id) names it.
+    from .test_factory_lifecycle import COMMON, OWNER
+    document, cloud, projects = factory_prepared()
+    everything_gone(cloud)
+    single_writer(document, cloud, "gha")
+    projects = [{**projects[0], "registered_resource_ids": [GROUP, COMMON]}]
+    records = {GROUP.lower(): {"owner": dict(OWNER)}}
+    data = fl.freeze_factory_deletion_pipeline(cloud, document, records, projects)
+    assert data["projects"][0]["resource_group_id"] == GROUP.lower()
+    groups = {row["id"].lower(): row for row in data["resource_groups"]}
+    assert groups[COMMON.lower()]["project_number"] is None and groups[GROUP.lower()]["project_number"] == "017"
+    import pytest
+    with pytest.raises(fl.Blocked, match="factory-delete-exact-project-group-required"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)

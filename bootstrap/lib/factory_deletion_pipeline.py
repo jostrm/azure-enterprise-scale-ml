@@ -529,6 +529,13 @@ def freeze(cloud, document, ownership_records, registered_projects):
         matches = [key for key in closure["groups"] if entries[key]["owner"] == owner
                    and key in project["registered_resource_ids"]]
         gone = sorted(absent & set(project["registered_resource_ids"]))
+        # Registrations are scale-set wide, so a gone common group is "registered" by every project; the catalog's
+        # ownership record (owner project_id) names the project's own group (aif-138 2026-11-02 run22). It only labels
+        # a group that is gone: never a delete.
+        recorded = [key for key in gone
+                    if ((records.get(key) or {}).get("owner") or {}).get("project_id") == project["project_number"]]
+        if matches or len(gone) > 1 or recorded:
+            gone = recorded
         fl.require(len(matches) + len(gone) == 1, "factory-delete-exact-project-group-required")
         if gone:
             project["resource_group_id"] = gone[0]
@@ -581,8 +588,6 @@ def freeze(cloud, document, ownership_records, registered_projects):
         item["delete_via_parent"] = max(parents, key=len)
     for key in sorted(absent - set(absent_rows)):
         # A common group a resumed run already removed (aif-138 2026-11-02 run21) is gone like a project's.
-        fl.require(not any(key in project["registered_resource_ids"] for project in projects),
-                   "factory-delete-exact-project-group-required")
         absent_rows[key] = absent_group_row(document, key, None)
     resources = [entries[key] for key in sorted(closure["resources"])]
     groups = [entries.get(key) or absent_rows[key] for key in sorted(set(closure["groups"]) | absent)]
