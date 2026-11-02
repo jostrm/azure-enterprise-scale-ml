@@ -69,6 +69,21 @@ def phase(item):
     return 2
 
 
+# Children the platform maintains leave with their parent and are never sent a DELETE of their own, even where the
+# provider lists one (aif-138 2026-11-02: ARM answered 400 to the registry's built-in _repositories_admin scope map).
+# A type maps to the name prefix of its platform-maintained items ("" is every item).
+PLATFORM_CHILDREN = {
+    "microsoft.containerregistry/registries/scopemaps": "_repositories_",
+    "microsoft.network/privateendpoints/privatelinkserviceproxies": "",
+    "microsoft.network/virtualnetworks/taggedtrafficconsumers": "",
+}
+
+
+def platform_child(item):
+    prefix = PLATFORM_CHILDREN.get(str(item.get("type", "")).lower())
+    return prefix is not None and item["id"].rsplit("/", 1)[-1].lower().startswith(prefix)
+
+
 # A private endpoint may outlive the service it connects to: deleting the service only disconnects it, and the
 # endpoint still leaves in the network phase (aif-138 2026-11-01: the common group's Key Vault, storage and ACR PEs).
 OUTLIVING_TYPES = {"microsoft.network/privateendpoints", "microsoft.network/privateendpoints/privatelinkserviceproxies"}
@@ -543,7 +558,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
         namespace = item["type"].split("/", 1)[0]
         if namespace not in operations:
             operations[namespace] = set(cloud.provider_operations(namespace))
-        item["independent_delete"] = item["type"].lower() + "/delete" in operations[namespace]
+        item["independent_delete"] = (item["type"].lower() + "/delete" in operations[namespace]
+                                      and not platform_child(item))
     for key, item in entries.items():
         if not item["delete"] or key in closure["groups"] or item["independent_delete"]:
             continue
@@ -662,6 +678,8 @@ def validate(document):
                        if other.startswith(key + "/")), "factory-delete-retained-child")
         if not fl.RG_ID.fullmatch(key):
             fl.require(type(row.get("independent_delete")) is bool, "factory-delete-provider-delete-proof-required")
+            fl.require(not (row["independent_delete"] and platform_child(row)),
+                       "factory-delete-platform-child-delete-forbidden")
             if not row["independent_delete"]:
                 parent = row.get("delete_via_parent", "")
                 fl.require(parent in entries and key.startswith(parent + "/")
@@ -734,6 +752,8 @@ def group_cascaded_grants(document, rows):
     """The deployment identity's own enrollment grants (fl.enrollment_grant) on a group these rows delete. They go with
     the group delete, never one by one: its Contributor grant deletes the group and its RBAC Administrator grant deletes
     role assignments, so deleting either first locks the stage out (aif-138 2026-11-02, project-delete-permission-required)."""
+    if not (document.get("identity") or {}).get("deployment_object_id"):
+        return set()  # a bootstrap teardown runs as the operator and has no deployment principal's grants
     groups = [row["id"] for row in rows if row["delete"] and fl.RG_ID.fullmatch(row["id"])]
     bodies = document["deletion"].get("bodies", {})
     return {row["id"].lower() for row in rows
@@ -1406,7 +1426,8 @@ def freeze_teardown(cloud, document):
         namespace = item["type"].split("/", 1)[0]
         if namespace not in operations:
             operations[namespace] = set(cloud.provider_operations(namespace))
-        item["independent_delete"] = item["type"].lower() + "/delete" in operations[namespace]
+        item["independent_delete"] = (item["type"].lower() + "/delete" in operations[namespace]
+                                      and not platform_child(item))
     # Whole groups go, so a child resource (NSG rule, subnet, zone link, VM extension) leaves with
     # its nearest deleted parent instead of one checked delete each. Ancestors are decided first.
     for key in sorted(entries, key=len):
@@ -1480,6 +1501,8 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                    "bootstrap-teardown-unowned-resource")
         if not fl.RG_ID.fullmatch(key):
             fl.require(type(row.get("independent_delete")) is bool, "factory-delete-provider-delete-proof-required")
+            fl.require(not (row["independent_delete"] and platform_child(row)),
+                       "factory-delete-platform-child-delete-forbidden")
             if not row["independent_delete"] or "delete_via_parent" in row:
                 parent = row.get("delete_via_parent", "")
                 fl.require(parent in entries and key.startswith(parent + "/")
