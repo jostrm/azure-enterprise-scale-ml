@@ -404,7 +404,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
     hub, links = access_hub(document), shared_hub_links(document)
-    closure, bodies = fl.collect_resource_closure(cloud, scopes)
+    # Idempotent like fl.freeze_deletion_inventory: a registered project's group that an earlier run of this deletion
+    # already removed (aif-138 2026-11-02: its project stage succeeded, the common stage stopped) is recorded as already
+    # absent, never read as a closure; its project stage then only re-proves the absence.
+    absent = {scope.lower() for scope in fl.absent_groups(cloud, document["locks"]["scopes"])}
+    closure, bodies = fl.collect_resource_closure(cloud, [scope for scope in scopes if scope.lower() not in absent])
     connectivity = set(connectivity_groups(document, bodies))
     # The operator executes common teardown; it must never sit on anything in scope.
     fl.verify_deletion_identity(document, bodies)
@@ -492,11 +496,17 @@ def freeze(cloud, document, ownership_records, registered_projects):
             fl.require(not str(metadata["type"]).lower() in
                        ("microsoft.authorization/locks", "microsoft.authorization/denyassignments"),
                        "factory-delete-lock-or-deny-present")
+    absent_rows = {}
     for project in projects:
         owner = {**core_owner, "project_id": project["project_number"]}
         matches = [key for key in closure["groups"] if entries[key]["owner"] == owner
                    and key in project["registered_resource_ids"]]
-        fl.require(len(matches) == 1, "factory-delete-exact-project-group-required")
+        gone = sorted(absent & set(project["registered_resource_ids"]))
+        fl.require(len(matches) + len(gone) == 1, "factory-delete-exact-project-group-required")
+        if gone:
+            project["resource_group_id"] = gone[0]
+            absent_rows[gone[0]] = absent_group_row(document, gone[0], project["project_number"])
+            continue
         project["resource_group_id"] = matches[0]
         fl.require(all(entry["owner"] == owner or protected(bodies[key], explicit, hub) for key, entry in entries.items()
                        if fl.arm_scope(key) == matches[0]), "factory-delete-project-group-shared-or-unowned")
@@ -541,8 +551,9 @@ def freeze(cloud, document, ownership_records, registered_projects):
                    and candidate["delete"] and candidate.get("independent_delete") is True]
         fl.require(parents and phase(item) not in (0, 1), "factory-delete-service-lifecycle-unsupported")
         item["delete_via_parent"] = max(parents, key=len)
+    fl.require(set(absent_rows) == absent, "factory-delete-exact-project-group-required")
     resources = [entries[key] for key in sorted(closure["resources"])]
-    groups = [entries[key] for key in sorted(closure["groups"])]
+    groups = [entries.get(key) or absent_rows[key] for key in sorted(set(closure["groups"]) | absent)]
     data = {"inventory_mode": CONTRACT, "inventory_complete": True, "revision": document["manifest_revision"],
             "flags": dict.fromkeys(DELETE_FLAGS, True), "projects": projects, "resource_groups": groups,
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
@@ -557,10 +568,19 @@ def freeze(cloud, document, ownership_records, registered_projects):
         data["shared_hub_links_hash"] = fl.digest(links)
     validate({**document, "deletion": data})
     for scope in scopes:
-        cloud.assert_no_active_deployments(scope)
-    verify_permissions(cloud, data)
+        if scope.lower() not in absent:
+            cloud.assert_no_active_deployments(scope)
+    verify_permissions(cloud, data, absent)
     verify_link_permissions(cloud, data.get("hub_links", []))
     return data
+
+
+def absent_group_row(document, key, number):
+    """The frozen row of a registered project's group that is already gone: deleted, never read or sent a DELETE."""
+    owner = {**{field: document["target"][field] for field in ("factory_id", "scaleset_id")}, "project_id": number}
+    scope = next(value for value in document["locks"]["scopes"] if value.lower() == key)
+    return {"id": scope, "etag": None, "body_hash": fl.digest({"already_absent": key}), "delete": True, "owner": owner,
+            "project_number": number, "already_absent": True, "managed_group_ids": [], "depends_on": []}
 
 
 def validate(document):
@@ -587,14 +607,24 @@ def validate(document):
     expected_scopes = {scope.lower() for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
     fl.require({row["id"].lower() for row in groups} == expected_scopes, "factory-delete-scope-mismatch")
     entries = {row["id"].lower(): row for row in groups + resources}
-    fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
-               "factory-delete-complete-inventory-required")
+    absent = {row["id"].lower() for row in groups if row.get("already_absent") is not None}
+    fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]) | absent
+               and not absent & set(data["bodies"]), "factory-delete-complete-inventory-required")
+    project_groups = {row["project_number"]: row.get("resource_group_id") for row in data["projects"]}
+    for key in absent:
+        row = entries[key]
+        fl.require(row == absent_group_row(document, key, row.get("project_number"))
+                   and project_groups.get(row["project_number"]) == key
+                   and not any(other.startswith(key + "/") for other in entries),
+                   "factory-delete-absent-group-unreviewed")
     fl.require(data.get("connectivity_resource_group_ids") == connectivity_groups(document, data["bodies"]),
                "factory-delete-connectivity-scopes-changed")
     fl.protect_coordination_storage(document)
     verify_access_hub_network(hub, data["bodies"], links)
     validate_shared_hub_links(data, links, entries)
     for key, row in entries.items():
+        if key in absent:
+            continue
         # The type the closure recorded: a listed Log Analytics table has no "type" in its body (as fl.verify_fingerprint).
         fl.require(type(row.get("delete")) is bool
                    and row.get("body_hash") == fl.resource_digest(data["bodies"][key], row.get("type")),
