@@ -368,9 +368,24 @@ VOLATILE_FIELDS = {
         ("properties", "diskIOPSReadWrite"), ("properties", "diskMBpsReadWrite"), ("properties", "tier")),
     # A NIC body copies its etag into each IP configuration, and the configuration child carries it too (aif-138
     # 2026-11-01: the factory deletion's project stage); "*" is every item of a list. Subnet and address still count.
+    # A private endpoint's NIC loses its privateLinkConnectionProperties.fqdns when the service side deletes the
+    # connection (aif-138 2026-11-02: the factory deletion's common stage deleted the registry's connection).
     "microsoft.network/networkinterfaces": (
         ("etag",), ("properties", "defaultOutboundConnectivityEnabled"),
-        ("properties", "dnsSettings", "internalDomainNameSuffix"), ("properties", "ipConfigurations", "*", "etag")),
+        ("properties", "dnsSettings", "internalDomainNameSuffix"), ("properties", "ipConfigurations", "*", "etag"),
+        ("properties", "ipConfigurations", "*", "properties", "privateLinkConnectionProperties", "fqdns")),
+    # The same deletion sets the endpoint's connection state to Disconnected; the service sets it on approval too.
+    # Its etag copies roll with it. Target service, group ids and subnet still count.
+    "microsoft.network/privateendpoints": (
+        ("etag",), ("properties", "privateLinkServiceConnections", "*", "etag"),
+        ("properties", "privateLinkServiceConnections", "*", "properties", "privateLinkServiceConnectionState"),
+        ("properties", "manualPrivateLinkServiceConnections", "*", "etag"),
+        ("properties", "manualPrivateLinkServiceConnections", "*", "properties", "privateLinkServiceConnectionState")),
+    # An NSG copies its etag into every rule it embeds, and the rule children carry it (as a VNet into its subnets).
+    "microsoft.network/networksecuritygroups": (
+        ("etag",), ("properties", "securityRules", "*", "etag"), ("properties", "defaultSecurityRules", "*", "etag")),
+    "microsoft.network/networksecuritygroups/securityrules": (("etag",),),
+    "microsoft.network/networksecuritygroups/defaultsecurityrules": (("etag",),),
     "microsoft.network/networkinterfaces/ipconfigurations": (("etag",),),
     # A VNet copies its etag into every embedded subnet, delegation and peering, and its subnet children carry it
     # (aif-138 2026-11-02: the resumed factory deletion's common stage). Addresses, delegations and settings still count.
