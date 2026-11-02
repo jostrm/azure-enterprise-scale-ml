@@ -1819,6 +1819,10 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         fallback = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)), reverse=True)
         if not stable and not fallback and parent_api and classify(kind) != "operation":
             return parent_api
+        if not stable and not fallback and "/" in relative and classify(kind) != "operation":
+            # A child type the schema leaves out is served at its parent type's versions, as a walked child is above
+            # (aif-138 2026-11-02: a private endpoint proxy named a deleted Key Vault connection, from Microsoft.Network).
+            return version(namespace + "/" + relative.rsplit("/", 1)[0])
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
 
