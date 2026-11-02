@@ -76,6 +76,10 @@ PLATFORM_CHILDREN = {
     "microsoft.containerregistry/registries/scopemaps": "_repositories_",
     "microsoft.network/privateendpoints/privatelinkserviceproxies": "",
     "microsoft.network/virtualnetworks/taggedtrafficconsumers": "",
+    # NSG rules leave with their NSG, after the subnets that reference it: ARM refuses a required Bastion rule's DELETE
+    # (aif-138 2026-11-02 run15, NetworkSecurityGroupNotCompliantForAzureBastionSubnet), and one NSG delete replaces
+    # dozens of rule deletes.
+    "microsoft.network/networksecuritygroups/securityrules": "",
 }
 
 
