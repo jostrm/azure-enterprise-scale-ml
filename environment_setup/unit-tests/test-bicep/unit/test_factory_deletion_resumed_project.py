@@ -64,21 +64,17 @@ def test_the_resumed_factory_deletion_deletes_the_common_resources_and_never_the
     monkeypatch.setattr(fl, "verify_source", lambda *args: source)
     monkeypatch.setattr(fl, "_verify_source", lambda *args, **kwargs: source)
 
-    def dispatch(actual_cloud, locks, actual, source_root, receipt, persist):
-        receipt["remote_run"] = {"kind": "ado", "pipeline_id": 8, "run_id": 44}
-        persist()
-        result = fl.run_deployment_worker(json.loads(fl.protected_worker_envelope(actual, locks)),
-                                         source_root, actual["run_id"], actual["manifest_hash"],
-                                         cloud=actual_cloud, sleep=lambda _: None)
-        assert result["status"] == "succeeded", result
-        assert [value.lower() for value in result["deleted_resources"]] == [GROUP.lower()]
-        receipt["remote_terminal"] = True
-
-    monkeypatch.setattr(fl, "ado_scoped", dispatch)
+    dispatched = []
+    # aif-138 run20: a project stage that would only re-prove an absent group is never dispatched (its runner VM may
+    # already be gone); the common stage re-proves the absence (verify_absent) before deleting anything.
+    monkeypatch.setattr(fl, "ado_scoped", lambda *args: dispatched.append(args))
     run = workspace / "execution"
     result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
                                                 cloud_factory=lambda _: cloud)
     assert result["status"] == "succeeded", result
+    assert not dispatched
+    child, = result["children"]
+    assert child["projects_succeeded"] is True and "remote_run" not in child
     assert cloud.deleted[-1].endswith("/common-ip")
     assert GROUP not in cloud.deleted and GROUP.lower() not in {value.lower() for value in cloud.deleted}
 

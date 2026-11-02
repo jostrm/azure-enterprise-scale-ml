@@ -1126,7 +1126,10 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         aggregate["status"] = "running"
         for cloud, locks, document, receipt in zip(clouds, members, documents, aggregate["children"]):
             locks.authorize(document)
-            if not document["target"]["project_ids"]:
+            if not document["target"]["project_ids"] or all(
+                    row.get("already_absent") is True for row in project_rows(document)):
+                # Nothing left but groups the review proved gone (aif-138 2026-11-02 run20: the runner VM that runs
+                # project pipelines had been deleted too); verify_absent below re-proves them before common teardown.
                 receipt["projects_succeeded"] = True
                 continue
             resumed = resume_dispatch(cloud, locks, document, receipt, persist)
@@ -1149,7 +1152,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             rows = [row for row in document["deletion"]["resources"] + document["deletion"]["resource_groups"]
                     if row["delete"] and row.get("project_number") is None]
             delete_rows(cloud, locks, document, receipt, persist, rows)
-            fl.verify_project_inventory(cloud, document, receipt["deleted_resources"])
+            fl.verify_project_inventory(cloud, document, receipt["deleted_resources"] + receipt.get("observed_absent", []))
             receipt["deletion_complete"] = True
         # Last, once every spoke VNet of the cohort is gone: this factory's own links in a shared hub.
         for cloud, locks, document, receipt in zip(clouds, members, documents, aggregate["children"]):
