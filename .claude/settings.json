@@ -4,7 +4,7 @@
       {
         "matcher": "Bash|PowerShell",
         "hooks": [
-          {"type": "command", "command": "python .claude/hooks/no_idle_wait.py"}
+          {"type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_idle_wait.py\""}
         ]
       }
     ]
