@@ -6958,7 +6958,9 @@ class _RepositoryDeletionCohort:
             receipt = value["records"].get(name + ".json", {})
             rows = [row for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]
                     if row["delete"]]
-            expected = {row["id"].lower() for row in rows}
+            # A group the review recorded as already absent is observed, not deleted (aif-138 2026-11-02 run21); the 404
+            # check below proves every row, it included.
+            expected = {row["id"].lower() for row in rows if row.get("already_absent") is not True}
             deleted = receipt.get("deleted_resources", [])
             require(receipt.get("status") == "succeeded" and receipt.get("operation") == "delete"
                     and receipt == child and receipt.get("run_id") == document["run_id"]

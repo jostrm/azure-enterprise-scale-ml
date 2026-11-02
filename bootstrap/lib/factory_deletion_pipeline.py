@@ -579,7 +579,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
                    and candidate["delete"] and candidate.get("independent_delete") is True]
         fl.require(parents and phase(item) not in (0, 1), "factory-delete-service-lifecycle-unsupported")
         item["delete_via_parent"] = max(parents, key=len)
-    fl.require(set(absent_rows) == absent, "factory-delete-exact-project-group-required")
+    for key in sorted(absent - set(absent_rows)):
+        # A common group a resumed run already removed (aif-138 2026-11-02 run21) is gone like a project's.
+        fl.require(not any(key in project["registered_resource_ids"] for project in projects),
+                   "factory-delete-exact-project-group-required")
+        absent_rows[key] = absent_group_row(document, key, None)
     resources = [entries[key] for key in sorted(closure["resources"])]
     groups = [entries.get(key) or absent_rows[key] for key in sorted(set(closure["groups"]) | absent)]
     data = {"inventory_mode": CONTRACT, "inventory_complete": True, "revision": document["manifest_revision"],
@@ -605,7 +609,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
 
 def absent_group_row(document, key, number):
     """The frozen row of a registered project's group that is already gone: deleted, never read or sent a DELETE."""
-    owner = {**{field: document["target"][field] for field in ("factory_id", "scaleset_id")}, "project_id": number}
+    owner = {**{field: document["target"][field] for field in ("factory_id", "scaleset_id")},
+             **({"project_id": number} if number else {})}
     scope = next(value for value in document["locks"]["scopes"] if value.lower() == key)
     return {"id": scope, "etag": None, "body_hash": fl.digest({"already_absent": key}), "delete": True, "owner": owner,
             "project_number": number, "already_absent": True, "managed_group_ids": [], "depends_on": []}
@@ -641,8 +646,9 @@ def validate(document):
     project_groups = {row["project_number"]: row.get("resource_group_id") for row in data["projects"]}
     for key in absent:
         row = entries[key]
-        fl.require(row == absent_group_row(document, key, row.get("project_number"))
-                   and project_groups.get(row["project_number"]) == key
+        number = row.get("project_number")
+        fl.require(row == absent_group_row(document, key, number)
+                   and (project_groups.get(number) == key if number else key not in project_groups.values())
                    and not any(other.startswith(key + "/") for other in entries),
                    "factory-delete-absent-group-unreviewed")
     fl.require(data.get("connectivity_resource_group_ids") == connectivity_groups(document, data["bodies"]),
@@ -781,6 +787,9 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
     cascaded = group_cascaded_grants(document, rows)
     for row in teardown_order(document, rows):
         key = row["id"].lower()
+        if row.get("already_absent") is True:
+            verify_absent(cloud, [row])  # the review proved it gone: re-proved, never deleted or counted as deleted
+            continue
         if key in removed:
             verify_absent(cloud, [row])
             if key not in {value.lower() for value in receipt.get("deleted_resources", [])}:
