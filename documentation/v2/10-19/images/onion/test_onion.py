@@ -114,7 +114,8 @@ class OnionOutputs(unittest.TestCase):
 V2 = HERE / "onion-layers-v2.json"
 
 # The verified rows of the aif-138 timing table (handover 2026-10-31 23:45 CET): API time in seconds, pipeline and
-# job wall clock in minutes. Scenario 5 was blocked when the table was verified, so it is not measured on this page.
+# job wall clock in minutes. Scenario 5 comes from the 2026-11-01 16:00 CET update (attempt m, job db2fa13d): prepare
+# 148 s, then the deletion worker on the API host (no GitHub run, about 9 min), 11.5 min in total.
 VERIFIED = {
     "deploy-001": (None, 51.7, None, "41140735956"),
     "enroll-002": (138, 10.1, 13.9, "41171926400"),
@@ -122,7 +123,7 @@ VERIFIED = {
     "settings-002": (13, 24.4, 25.0, "41181519894"),
     "delete-002-services": (14, 23.6, 25.0, "41196230976"),
     "delete-002-full": (24, 30.5, 31.3, "41216080228"),
-    "delete-scaleset-002": (None, None, None, None),
+    "delete-scaleset-002": (148, 9, 11.5, None),
 }
 
 
@@ -139,8 +140,10 @@ class OnionV2(unittest.TestCase):
         runs = {run["id"]: (run.get("api_seconds"), run.get("pipeline_minutes"), run.get("job_minutes"), run.get("run_id"))
                 for run in self.data["runs"]}
         self.assertEqual(runs, VERIFIED)
-        blocked = next(run for run in self.data["runs"] if run["id"] == "delete-scaleset-002")
-        self.assertIn("not yet measured", blocked["api_note"])
+        scenario5 = next(run for run in self.data["runs"] if run["id"] == "delete-scaleset-002")
+        self.assertEqual(scenario5["route"], "worker")
+        self.assertTrue(scenario5["approximate"], "the worker time is only known as about 9 min")
+        self.assertAlmostEqual(scenario5["api_seconds"] / 60 + scenario5["pipeline_minutes"], scenario5["job_minutes"], delta=.1)
 
     def test_the_message_ranges_come_from_the_runs(self):
         self.assertEqual(onion.fill("{api_range}", self.data), "13-24 s")
@@ -163,9 +166,11 @@ class OnionV2(unittest.TestCase):
         for api, pipeline, _, _ in VERIFIED.values():
             if api is not None:
                 self.assertIn(f">{onion.seconds_text(api)}<", poster)
-            if pipeline is not None:
-                self.assertIn(f">{pipeline:.1f} min<", poster)
-        self.assertIn("not yet measured", poster)
+        for run in self.data["runs"]:
+            if run.get("pipeline_minutes") is not None:
+                label = f'~{run["pipeline_minutes"]:g} min' if run.get("approximate") else f'{run["pipeline_minutes"]:.1f} min'
+                self.assertIn(f">{label}<", poster)
+        self.assertIn(">~9 min<", poster)
 
     def test_public_text_never_says_esaif(self):
         for path in (V2, self.out["poster_svg"], self.out["animated_svg"], self.out["doc"]):

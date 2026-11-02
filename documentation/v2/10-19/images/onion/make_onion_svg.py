@@ -173,6 +173,11 @@ def run_minutes(value: float) -> str:
     return f"{value:.1f} min"
 
 
+def work_text(run) -> str:
+    """Pipeline (or worker) wall clock; a time known only roughly is shown as ~N min."""
+    return f'~{run["pipeline_minutes"]:g} min' if run.get("approximate") else run_minutes(run["pipeline_minutes"])
+
+
 def _route_runs(data, route: str, field: str) -> list[float]:
     return [run[field] for run in data["runs"] if run["route"] == route and run.get(field) is not None]
 
@@ -473,7 +478,7 @@ def runs_chart(scene: Scene, data, box) -> float:
         else:
             scene.text(run["api_short"], api_x, y + 2, api_w - 8, 11.5, MUTED)
         if measured:
-            bar(pipe_x, run["pipeline_minutes"] * pipe_scale, run["pipeline_minutes"], run_minutes(run["pipeline_minutes"]))
+            bar(pipe_x, run["pipeline_minutes"] * pipe_scale, run["pipeline_minutes"], work_text(run))
         else:
             scene.text(run["pipeline_short"], pipe_x, y + 2, pipe_w, 11.5, MUTED)
         y += 27
@@ -657,8 +662,11 @@ def runs_table(data) -> str:
     for run in data["runs"]:
         api = seconds_text(run["api_seconds"]) if run.get("api_seconds") is not None else ""
         api = ", ".join(filter(None, [api, run.get("api_note")]))
-        pipeline = (f'run {run["run_id"]}: {run_minutes(run["pipeline_minutes"])}' if run.get("pipeline_minutes") is not None
-                    else run["pipeline_short"])
+        if run.get("pipeline_minutes") is None:
+            pipeline = run["pipeline_short"]
+        else:
+            pipeline = ", ".join(filter(None, [run.get("run_id") and f'run {run["run_id"]}: {work_text(run)}' or work_text(run),
+                                               run.get("pipeline_note")]))
         job = run_minutes(run["job_minutes"]) if run.get("job_minutes") is not None else run.get("job_note", "-")
         if run.get("job_minutes") is not None and run.get("job_note"):
             job += f' ({run["job_note"]})'

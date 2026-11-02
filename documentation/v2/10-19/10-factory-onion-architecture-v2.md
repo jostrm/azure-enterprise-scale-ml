@@ -27,7 +27,7 @@ The pictures and the tables on this page are generated from one data file,
 | What the API does | Reads the live inventory, freezes a deployment plan, starts the factory-lifecycle worker that deploys the plan | Writes the reviewed configuration and starts the consumer's `infra-project.yml` |
 | API time before the pipeline | 2 min 18 s (scale-set enroll, 2026-10-31) | 13-24 s (four PROJECT runs, 2026-10-31) |
 | Who runs the Bicep | The worker, from the frozen plan | The consumer's pipeline, as separate `az deployment` steps on the factory's runner |
-| Where it still applies | COMMON (`common=API-2-ARM`), scale-set enroll and deletion | Every PROJECT deploy, settings change and project deletion |
+| Where it still applies | COMMON (`common=API-2-ARM`), scale-set enroll and deletion (Scenario 5: 148 s prepare, then the deletion worker) | Every PROJECT deploy, settings change and project deletion |
 
 Two paths go through the onion:
 
@@ -73,7 +73,8 @@ deletions). There the API needs minutes before the pipeline starts: 2 min 18 s f
 ## Measured: API time and pipeline time (aif-138)
 
 Each row is one catalog job of the aif-138 end-to-end run through the ESAF facade. **API time** is the job's creation
-to the creation of the GitHub run; **pipeline** is the run's wall clock (L3, L4 and L5 together); **job total** is the
+to the creation of the GitHub run; **pipeline** is the run's wall clock (L3, L4 and L5 together; for Scenario 5 the API time is its prepare and the
+work is the deletion worker); **job total** is the
 job's creation to its last update. Evidence: [R1-R3](#evidence).
 
 <!-- onion:runs:start -->
@@ -85,7 +86,7 @@ job's creation to its last update. Evidence: [R1-R3](#evidence).
 | 3. project settings change, job ea99c79c (2026-10-31 07:40Z) | `esaf.upsert_project("002", settings=...)` | API-2-Pipelines | 13 s | run 41181519894: 24.4 min | 25.0 min |
 | 4. delete project002, services only, job a8aaf31e (2026-10-31 11:17Z) | `esaf.delete_project("002", include_keyvault_and_resource_group=False)` | API-2-Pipelines | 14 s | run 41196230976: 23.6 min | 25.0 min |
 | 4. delete project002, full, job f16ed1fb (2026-10-31 15:41Z) | `esaf.delete_project("002")` | API-2-Pipelines | 24 s, facade: started after 25 s | run 41216080228: 30.5 min | 31.3 min (facade 32.5 min) |
-| 5. delete scale set 002 (2026-10-31 20:20-22:35Z) | `esaf.delete_scale_set("002")` | worker | not yet measured (blocked at prepare) | not yet measured | not yet measured |
+| 5. delete scale set 002, attempt m, job db2fa13d (2026-11-01 15:13-15:24Z) | `esaf.delete_scale_set("002")` | worker | 2 min 28 s, prepare, then the deletion worker | ~9 min, deletion worker on the API host, no GitHub run | 11.5 min |
 <!-- onion:runs:end -->
 
 What the numbers say:
@@ -96,15 +97,18 @@ What the numbers say:
   min for later runs). Bicep and ARM time are inside that wall clock; the split per layer is not measured.
 - **The job total is the pipeline plus 0.6-1.4 min** in PROJECT mode (25.0 min for a 24.4 min run), so the consumer
   waits for Azure, not for the API. The worker route adds 3.8 min (13.9 min for a 10.1 min run).
-- **Not yet measured**: Scenario 5 (`esaf.delete_scale_set`, worker route) was blocked at prepare when these timings
-  were verified, and Scenario 6 (`esaf.delete_factory`) had not run. Row 1's API time is not in the catalog jobs.
+- **Scenario 5 takes the worker route**: deleting scale set 002 spent 148 s preparing (live inventory and ownership
+  proof), then about 9 min in the deletion worker on the API host, without a GitHub run: 11.5 min in total
+  (2026-11-01, after the ownership fixes; the 2026-10-31 attempts were refused at prepare).
+- **Not yet measured**: Scenario 6 (`esaf.delete_factory`) has not finished yet. Row 1's API time is not in the
+  catalog jobs.
 
 ## Evidence
 
 <!-- onion:evidence:start -->
 - **R1**: Verified 2026-10-31 23:45 CET for the aif-138 end-to-end run through the ESAF facade (consumer repository jostrm/azure-enterprise-scale-byor-138): catalog jobs in the Factory API's catalog-operations.sqlite and gh run list. API time = the catalog job's created_at to the GitHub run's createdAt. Job total = the job's created_at to updated_at. The jobs' pipeline_runs confirm which run belongs to which job.
 - **R2**: Not in the table: two failed attempts with the same 13 s API time, project 002 deploy 6a380c35 (run 41172892614 failed after 59.6 min) and delete 3bd1d25d (run 41194343416 failed after 24.9 min).
-- **R3**: Scenario 5 (esaf.delete_scale_set) was blocked when the table was verified: four attempts on 2026-10-31 were refused at prepare after about 5 min, before any pipeline. It goes through the worker route, not API-2-Pipelines.
+- **R3**: Scenario 5 (esaf.delete_scale_set, worker route) was blocked when the 2026-10-31 table was verified: four attempts were refused at prepare after about 5 min. After the ownership fixes, attempt m succeeded (update 2026-11-01 16:00 CET): job db2fa13d 15:13-15:24Z, prepare 148 s, then the deletion worker on the API host for about 9 min (no GitHub run), 11.5 min in total. Attempt i (2026-11-01, 91 min, stopped after deleting common-002) is not in the table.
 <!-- onion:evidence:end -->
 
 ## Update the picture and the numbers

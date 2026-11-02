@@ -3,7 +3,7 @@
   "updated": "2026-11-02",
   "title": "AI Factory onion V2: API-2-Pipelines",
   "summary": "In PROJECT mode the Factory API writes the reviewed configuration and starts the consumer's own infra-project pipeline: {api_range} in the API, {pipeline_range} in the pipeline.",
-  "poster_note": "Measured on aif-138, 2026-10-30 and 2026-10-31: documentation/v2/10-19/10-factory-onion-architecture-v2.md",
+  "poster_note": "Measured on aif-138, 2026-10-30 to 2026-11-01: documentation/v2/10-19/10-factory-onion-architecture-v2.md",
   "outputs": {
     "poster_svg": "../10-factory-onion-architecture-v2.svg",
     "poster_png": "../10-factory-onion-architecture-v2.png",
@@ -15,7 +15,7 @@
   "evidence": {
     "R1": "Verified 2026-10-31 23:45 CET for the aif-138 end-to-end run through the ESAF facade (consumer repository jostrm/azure-enterprise-scale-byor-138): catalog jobs in the Factory API's catalog-operations.sqlite and gh run list. API time = the catalog job's created_at to the GitHub run's createdAt. Job total = the job's created_at to updated_at. The jobs' pipeline_runs confirm which run belongs to which job.",
     "R2": "Not in the table: two failed attempts with the same 13 s API time, project 002 deploy 6a380c35 (run 41172892614 failed after 59.6 min) and delete 3bd1d25d (run 41194343416 failed after 24.9 min).",
-    "R3": "Scenario 5 (esaf.delete_scale_set) was blocked when the table was verified: four attempts on 2026-10-31 were refused at prepare after about 5 min, before any pipeline. It goes through the worker route, not API-2-Pipelines."
+    "R3": "Scenario 5 (esaf.delete_scale_set, worker route) was blocked when the 2026-10-31 table was verified: four attempts were refused at prepare after about 5 min. After the ownership fixes, attempt m succeeded (update 2026-11-01 16:00 CET): job db2fa13d 15:13-15:24Z, prepare 148 s, then the deletion worker on the API host for about 9 min (no GitHub run), 11.5 min in total. Attempt i (2026-11-01, 91 min, stopped after deleting common-002) is not in the table."
   },
   "colors": {
     "note": "Purple is the AI Factory color, which always means the best, so the onion does not use it.",
@@ -135,7 +135,7 @@
   ],
   "chart": {
     "title": "Where the time goes: API before the pipeline, then the pipeline",
-    "subtitle": "Measured runs on aif-138. API time = job created to GitHub run created. Worker = the factory-lifecycle worker route; the other runs are API-2-Pipelines.",
+    "subtitle": "Measured runs on aif-138. API time = job created to GitHub run created (Scenario 5: prepare). Worker = the factory-lifecycle worker route; the other runs are API-2-Pipelines.",
     "api_header": "API BEFORE PIPELINE",
     "pipeline_header": "PIPELINE WALL CLOCK"
   },
@@ -227,18 +227,17 @@
       "n": 5,
       "id": "delete-scaleset-002",
       "label": "Delete scale set 002 (worker)",
-      "step": "delete scale set 002",
-      "when": "2026-10-31 20:20-22:35Z",
+      "step": "delete scale set 002, attempt m, job db2fa13d",
+      "when": "2026-11-01 15:13-15:24Z",
       "call": "esaf.delete_scale_set(\"002\")",
       "route": "worker",
-      "api_seconds": null,
-      "api_note": "not yet measured (blocked at prepare)",
-      "api_short": "not yet measured",
+      "api_seconds": 148,
+      "api_note": "prepare, then the deletion worker",
       "run_id": null,
-      "pipeline_minutes": null,
-      "pipeline_short": "not yet measured",
-      "job_minutes": null,
-      "job_note": "not yet measured"
+      "pipeline_minutes": 9,
+      "approximate": true,
+      "pipeline_note": "deletion worker on the API host, no GitHub run",
+      "job_minutes": 11.5
     }
   ],
   "animation": {
@@ -312,7 +311,7 @@
         "id": "time",
         "chapter": "06 / WHERE THE TIME GOES",
         "title": "Seconds in the API, minutes in the pipeline.",
-        "explanation": "Measured on aif-138 on 2026-10-30 and 2026-10-31. Scenario 5 (delete scale set) is not yet measured.",
+        "explanation": "Measured on aif-138 from 2026-10-30 to 2026-11-01. Scenario 6 (delete the factory) is not yet measured.",
         "key": "The API answers in {api_range}; the pipeline needs {pipeline_range}.",
         "active": ["consumer", "l1", "l2", "l3", "l4", "l5"],
         "links": [],

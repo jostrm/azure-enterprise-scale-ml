@@ -37,20 +37,20 @@
   },
   "files": {
     "10-factory-onion-architecture-v2.svg": {
-      "bytes": 17849,
-      "sha256": "fe10e13a7e5f9a6dba5872b13e202e880de3990232a2786f70592998011e7f91"
+      "bytes": 18029,
+      "sha256": "5b2b1cf48d939eaeac6fc9dbce6a56df095c9b8df09912e05048688c639fc507"
     },
     "10-factory-onion-architecture-v2.png": {
-      "bytes": 343641,
-      "sha256": "28488d99a121042e84bc3b9690bae3ca2bc05977e1d7f7933aff87029d921792"
+      "bytes": 344634,
+      "sha256": "122e864f93100a9ccb89f04c23d86461acbd9b09e3d864b80eeb83248d646f7e"
     },
     "10-factory-onion-architecture-v2-animated.svg": {
-      "bytes": 98982,
-      "sha256": "f5b8feb59f517123ba74eb148f25d5bfb736a499e9ae7130fee1b0bed4896fa7"
+      "bytes": 99166,
+      "sha256": "23c7842c930f3651a1da836ed40468875f58346afafb38acfa974344e2799687"
     },
     "10-factory-onion-architecture-v2.gif": {
-      "bytes": 963482,
-      "sha256": "0667f4c17ebd2bd2ff03b82fee1483711580433c43c77b680b3618ce2dba0b34"
+      "bytes": 963709,
+      "sha256": "408ada22a584dc54175d4618993bd165b14bb6cd3f01b0aeef3d0d5128ddde6a"
     }
   },
   "limitations": [
