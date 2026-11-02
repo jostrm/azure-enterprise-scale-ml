@@ -83,3 +83,43 @@ def test_the_fingerprint_never_changes_the_body_it_reads():
     before = copy.deepcopy(body)
     fl.resource_digest(body)
     assert body == before
+
+
+def test_the_nic_ip_configuration_child_whose_private_link_fqdns_were_cleared_keeps_its_fingerprint():
+    # aif-138 2026-11-02 (attempt jj): the child resource carries the same privateLinkConnectionProperties as the NIC body.
+    child = nic()["properties"]["ipConfigurations"][0]
+    child["type"] = "Microsoft.Network/networkInterfaces/ipConfigurations"
+    cleared = copy.deepcopy(child)
+    cleared["properties"]["privateLinkConnectionProperties"]["fqdns"] = []
+    assert fl.resource_digest(cleared) == fl.resource_digest(child)
+    moved = copy.deepcopy(child)
+    moved["properties"]["privateIPAddress"] = "10.0.0.6"
+    assert fl.resource_digest(moved) != fl.resource_digest(child)
+
+
+def proxy(connected=True, group="vault", remote=None):
+    proxy_id = PE + "/privateLinkServiceProxies/pend.proxy.e2a2b45f"
+    info = {"groupId": group, "memberName": "default", "privateLinkServiceArmRegion": "" if connected else "swedencentral",
+            "customerVisibleFqdns": ["kv.vaultcore.azure.net"] if connected else [],
+            "internalFqdn": "kv.vault.azure.net" if connected else "", "internalFqdnType": "", "redirectMapId": ""}
+    if connected:
+        info["explicitDnsSettings"] = [{"aRecord": "kv", "dnsZoneName": "privatelink.vaultcore.azure.net"}]
+    guid = "11111111-1111-1111-1111-111111111111" if connected else "00000000-0000-0000-0000-000000000000"
+    return {"id": proxy_id, "name": "pend.proxy.e2a2b45f", "etag": 'W/"1"' if connected else 'W/"2"',
+            "type": "Microsoft.Network/privateEndpoints/privateLinkServiceProxies",
+            "properties": {"groupConnectivityInformation": [info], "provisioningState": "Succeeded",
+                           "remotePrivateEndpointConnection": {"id": remote or ACR + "/privateEndpointConnections/c"},
+                           "remotePrivateEndpointConnectionResourceGuid": guid,
+                           "remotePrivateLinkServiceConnectionState": {"status": "Approved" if connected else "Disconnected"},
+                           "remotePrivateLinkServiceResourceGuid": guid, "remoteRegionExpansionOrContraction": False,
+                           "remoteVipAddresses": ["10.0.0.9"] if connected else []}}
+
+
+def test_a_disconnected_private_link_service_proxy_keeps_its_fingerprint():
+    # aif-138 2026-11-02 (attempt jj): after the vault's connection was deleted the proxy's DNS, GUIDs and VIPs reset.
+    assert fl.resource_digest(proxy(connected=False)) == fl.resource_digest(proxy())
+
+
+def test_a_proxy_to_another_group_or_connection_still_changes_its_fingerprint():
+    assert fl.resource_digest(proxy(group="registry")) != fl.resource_digest(proxy())
+    assert fl.resource_digest(proxy(remote=ACR + "/privateEndpointConnections/other")) != fl.resource_digest(proxy())
