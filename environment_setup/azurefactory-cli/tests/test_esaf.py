@@ -1,246 +1,170 @@
-"""ESAF facade: the six scenario methods a junior developer calls with few parameters (Joakim, 2026-10-31)."""
+"""ESAF facade: six scenario methods over /api/v1/esaf/* (Joakim, 2026-11-02).
+
+The connection (ESAF_FOLDER, AIFACTORY_API_URL, AIFACTORY_API_KEY or esaf.connect) is set once; calls carry only the
+target. Environment is required on scale-set and project scenarios. The orchestration runs in the Factory API.
+"""
 
 import copy
+import json
 
 import pytest
 
-from azurefactory import esaf
-from azurefactory.errors import BlockedError
+from azurefactory import cli, esaf
+from azurefactory.client import AzureFactoryClient
+from azurefactory.errors import APIError, BlockedError, ConfigError, FailureError
 
 FOLDER = r"C:\factory\azurefactory"
-FACTORY = "4c3dd622-10fb-4cd0-9899-43fca758cce3"
-SCALE1 = "949c7a2b-936f-4178-b4cc-e1a0f0b29099"
-SCALE2 = "39d2afa3-a320-4abc-a694-eb123792a3a9"
-PROJECT1 = "fd972238-3b16-43f3-a327-2040f0bf64ab"
-PROJECT2 = "2629a442-5546-4836-a278-46f5cf912ea1"
-SUB = "f0fe8b33-73bf-41e4-9997-e3920d793c06"
-TENANT = "c157e61b-4a1e-488c-9a0c-d9a23e864a65"
-OK = {"can_execute": True, "blockers": [], "confirmation_id": "c-1", "preview_hash": "h" * 64,
-      "confirmation_phrase": "PHRASE"}
+JOB = "0b7d6c84-3a52-4f05-9a27-52a1c3f8e0d1"
 
 
-def catalog(scales=("001",), projects=(("001", "001"),)):
-    ids = {"001": SCALE1, "002": SCALE2}
-    pids = {"001": PROJECT1, "002": PROJECT2}
-    return {"revision": "r" * 64, "factories": [{
-        "id": FACTORY, "key": "aif-138", "aifactory_version": "125",
-        "scale_sets": [{"id": ids[s], "suffix": s, "environment": "dev", "subscription_id": SUB,
-                        "tenant_id": TENANT, "orchestrator": "gha"} for s in scales],
-        "projects": [{"id": pids[n], "number": n, "placements": [{"scale_set_id": ids[s], "environment": "dev"}]}
-                     for n, s in projects]}]}
+class Transport(AzureFactoryClient):
+    """The real client with only the HTTP transport replaced."""
+
+    def __init__(self, states=("succeeded",), error=None):
+        super().__init__("http://127.0.0.1:8766", "unit-test-key")
+        self.calls, self.states, self.error = [], list(states), error
+
+    def request(self, method, path, *, body=None, query=None, **kwargs):
+        self.calls.append((method, path, copy.deepcopy(body), query))
+        if self.error is not None:
+            raise self.error
+        if method == "POST" and path.startswith("/api/v1/esaf/"):
+            return {"contract_version": 1, "job_id": JOB, "status_url": f"/api/v1/esaf/jobs/{JOB}?folder=x"}
+        if method == "GET" and path == f"/api/v1/esaf/jobs/{JOB}":
+            status = self.states.pop(0) if len(self.states) > 1 else self.states[0]
+            return {"job_id": JOB, "status": status, "child": {"kind": "catalog", "id": "run-1"}}
+        if path == "/api/v1/operations/delete-aifactory/status":
+            return {"id": query["job_id"], "action": "delete-factory", "status": "running"}
+        raise AssertionError(f"Unexpected API call: {method} {path}")
 
 
-class Client:
-    """Records the SDK calls the facade composes, like the real AzureFactoryClient answers them."""
-
-    def __init__(self, document, refuse=None):
-        self.document, self.calls, self.refuse, self.pending = document, [], refuse or {}, None
-
-    def _call(self, name, *args, **kwargs):
-        self.calls.append(name)
-        if name in self.refuse:
-            refused = self.refuse[name]
-            if isinstance(refused, Exception):
-                raise refused
-            return {"can_execute": False, "blockers": [refused]}
-        return copy.deepcopy(OK)
-
-    def catalog_list(self, folder):
-        self.calls.append("catalog_list")
-        return copy.deepcopy(self.document)
-
-    def scaleset_add_prepare(self, folder, factory_id, scale_sets, *, expected_revision=None):
-        self.scale_sets = scale_sets
-        self.pending = ("scale_sets", {**scale_sets[0], "id": SCALE2})
-        return self._call("scaleset_add_prepare")
-
-    def project_add_prepare(self, folder, factory_id, *, number, display_name="", placements=None,
-                            environments=None, settings=None, expected_revision=None):
-        self.placements = placements
-        self.pending = ("projects", {"id": PROJECT2, "number": number, "placements": placements})
-        return self._call("project_add_prepare")
-
-    def catalog_settings_prepare(self, folder, factory_id, settings, *, scale_set_id=None, project_id=None,
-                                 expected_revision=None):
-        self.settings = (settings, scale_set_id, project_id)
-        return self._call("catalog_settings_prepare")
-
-    def catalog_prepare(self, body):
-        self.body = body
-        review = self._call("catalog_prepare:" + body["action"])
-        if review["can_execute"] and body.get("project_id") is not None:
-            review["runtime_scope_authorization"] = self._runtime_proof(
-                body["factory_id"], body["scale_set_id"], body["project_id"])
-        return review
-
-    def _runtime_proof(self, factory_id, scale_set_id, project_id):
-        factory = next(f for f in self.document["factories"] if f["id"] == factory_id)
-        scale = next(s for s in factory["scale_sets"] if s["id"] == scale_set_id)
-        project = next(p for p in factory["projects"] if p["id"] == project_id)
-        assert {"environment": scale["environment"], "scale_set_id": scale_set_id} in project["placements"]
-        group = f"{factory['key']}-esml-project{project['number']}-sdc-{scale['environment']}-{scale['suffix']}-rg"
-        return {"factory_id": factory_id, "scale_set_id": scale_set_id, "project_id": project_id,
-                "resource_group_id": f"/subscriptions/{scale['subscription_id']}/resourcegroups/{group}",
-                "enrolled": True, "delete_authorized": True}
-
-    def catalog_confirm(self, folder, confirmation_id):
-        self.calls.append("catalog_confirm")
-        if self.pending:  # the server saves a confirmed configuration change
-            key, item = self.pending
-            self.document["factories"][0][key].append(item)
-            self.pending = None
-        return {"contract_version": 1, "job": {"id": "job-1", "status": "queued"}}
-
-    def enroll_scale_set_prepare(self, body):
-        return self._call("enroll_scale_set_prepare")
-
-    def enroll_scale_set_confirm(self, *, folder, confirmation_id, preview_hash, confirmation_phrase):
-        self.calls.append("enroll_scale_set_confirm:" + confirmation_phrase)
-        return {"status": "enrolled"}
-
-    def authorize_deletion_prepare(self, body):
-        return self._call("authorize_deletion_prepare")
-
-    def authorize_deletion_confirm(self, *, folder, confirmation_id, preview_hash, confirmation_phrase):
-        self.calls.append("authorize_deletion_confirm")
-        return {"status": "authorized"}
-
-    def project_delete_prepare(self, folder, factory_id, project_id, *, environments, include_project_subnets,
-                               include_keyvault_and_resource_group, expected_revision, scale_set_id=None,
-                               version_ref=None):
-        self.deletion = (project_id, environments, include_project_subnets, include_keyvault_and_resource_group)
-        review = self._call("project_delete_prepare")
-        if review["can_execute"]:
-            review["runtime_scope_authorization"] = self._runtime_proof(factory_id, scale_set_id, project_id)
-        return review
-
-    def scaleset_delete_prepare(self, folder, factory_id, scale_set_id, *, expected_revision, version_ref=None):
-        self.deleted_scale = scale_set_id
-        return self._call("scaleset_delete_prepare")
-
-    def delete_aifactory_prepare(self, body):
-        self.factory_body = body
-        return self._call("delete_aifactory_prepare")
-
-    def delete_aifactory_confirm(self, *, folder, confirmation_id, preview_hash, confirmation_phrase):
-        self.calls.append("delete_aifactory_confirm:" + confirmation_phrase)
-        return {"job": {"id": "teardown-1", "status": "queued"}}
-
-    def catalog_job(self, folder, job_id):
-        self.calls.append("catalog_job")
-        return {"id": job_id, "status": "succeeded", "message": "done"}
-
-    def delete_aifactory_status(self, folder, job_id):
-        self.calls.append("delete_aifactory_status")
-        return {"job": {"id": job_id, "status": "succeeded"}}
+@pytest.fixture
+def api(monkeypatch):
+    transport = Transport()
+    monkeypatch.setattr(esaf.time, "sleep", lambda seconds: transport.calls.append(("sleep", seconds)))
+    esaf.connect(folder=FOLDER, client=transport)
+    return transport
 
 
-def session(document, **kwargs):
-    return esaf.connect(folder=FOLDER, client=Client(document, **kwargs))
+def posted(transport):
+    method, path, body, _ = next(call for call in transport.calls if call[0] == "POST")
+    return path, body
 
 
 def test_code_completion_lists_the_six_scenarios():
     assert {"init_factory", "add_scale_set", "upsert_project", "delete_project", "delete_scale_set",
             "delete_factory"} <= set(esaf.__all__)
+    assert esaf.apply_project is esaf.upsert_project
 
 
-def test_add_scale_set_registers_enrolls_and_deploys_its_common():
-    s = session(catalog())
-    job = esaf.add_scale_set("002", cidr="10.141.0.0/16")
-    client = s.client
-    assert client.calls[:4] == ["catalog_list", "scaleset_add_prepare", "catalog_confirm", "catalog_list"]
-    assert "enroll_scale_set_prepare" in client.calls and "enroll_scale_set_confirm:PHRASE" in client.calls
-    assert client.calls[-2:] == ["catalog_prepare:deploy", "catalog_confirm"]
-    added = client.scale_sets[0]
-    # Defaults come from the factory's existing scale set of the same environment.
-    assert added == {"environment": "dev", "suffix": "002", "tenant_id": TENANT, "subscription_id": SUB,
-                     "orchestrator": "gha", "network": {"vnet_cidr": "10.141.0.0/16", "max_projects": 3}}
-    assert client.body["version_ref"] == "125" and client.body["project_id"] is None
-    assert job.id == "job-1" and job.kind == "catalog"
+@pytest.mark.parametrize("call,route,fields", [
+    (lambda: esaf.init_factory(), "init-factory", {}),
+    (lambda: esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16"), "add-scale-set",
+     {"scale_set": "002", "environment": "dev", "cidr": "10.141.0.0/16"}),
+    (lambda: esaf.upsert_project("002", "dev"), "upsert-project", {"project": "002", "environment": "dev"}),
+    (lambda: esaf.delete_project("002", "dev"), "delete-project", {"project": "002", "environment": "dev"}),
+    (lambda: esaf.delete_scale_set("002", "dev"), "delete-scale-set", {"scale_set": "002", "environment": "dev"}),
+    (lambda: esaf.delete_factory(), "delete-factory", {}),
+], ids=["init_factory", "add_scale_set", "upsert_project", "delete_project", "delete_scale_set", "delete_factory"])
+def test_each_scenario_is_one_post_with_only_its_target(api, call, route, fields):
+    job = call()
+    assert posted(api) == ("/api/v1/esaf/" + route, {"folder": FOLDER, "approved": True, **fields})
+    assert job.id == JOB and job.kind == "esaf"
 
 
-def test_add_scale_set_resumes_an_existing_enrolled_scale_set():
-    s = session(catalog(scales=("001", "002")),
-                refuse={"enroll_scale_set_prepare": "The selected scale set already has a binding target."})
-    esaf.add_scale_set("002", cidr="10.141.0.0/16")
-    assert "scaleset_add_prepare" not in s.client.calls
-    assert not any(call.startswith("enroll_scale_set_confirm") for call in s.client.calls)
-    assert s.client.calls[-2:] == ["catalog_prepare:deploy", "catalog_confirm"]
+def test_environment_is_required_so_a_delete_names_exactly_what_it_removes(api):
+    for call in (lambda: esaf.delete_project("002"), lambda: esaf.delete_scale_set("002"),
+                 lambda: esaf.upsert_project("002"), lambda: esaf.add_scale_set("002")):
+        with pytest.raises(TypeError):
+            call()
+    with pytest.raises(ConfigError, match="dev, stage or prod"):
+        esaf.delete_project("002", "qa")
+    assert not api.calls
 
 
-def test_upsert_project_adds_a_new_project_then_deploys_it():
-    s = session(catalog(scales=("001", "002")))
-    job = esaf.upsert_project("002", scale_set="002", settings={"tag_costcenter": "lab"})
-    assert s.client.placements == [{"environment": "dev", "scale_set_id": SCALE2}]
-    assert s.client.calls.count("catalog_confirm") == 3  # add, settings, deploy
-    assert s.client.body["action"] == "deploy" and s.client.body["scale_set_id"] == SCALE2
-    assert job.id == "job-1"
+def test_the_connection_comes_from_the_environment_and_names_the_factory(monkeypatch):
+    transport = Transport()
+    monkeypatch.setenv("ESAF_FOLDER", FOLDER)
+    monkeypatch.setattr(esaf, "_default", None)
+    monkeypatch.setattr(esaf, "AzureFactoryClient", lambda **kwargs: transport)
+    esaf.upsert_project("001", "dev", settings={"tag_costcenter": "lab"})
+    assert posted(transport)[1] == {"folder": FOLDER, "approved": True, "project": "001", "environment": "dev",
+                                    "settings": {"tag_costcenter": "lab"}}
+    esaf.connect(folder=FOLDER, factory="aif-138", client=transport)
+    esaf.delete_factory()
+    assert transport.calls[-1][2]["factory"] == "aif-138"
 
 
-def test_upsert_project_updates_an_existing_project_in_place():
-    s = session(catalog())
-    esaf.upsert_project("001", settings={"tag_costcenter": "lab"})
-    assert "project_add_prepare" not in s.client.calls
-    assert s.client.settings == ({"tag_costcenter": "lab"}, SCALE1, PROJECT1)
-    assert s.client.body["project_id"] == PROJECT1 and s.client.body["scale_set_id"] == SCALE1
+def test_the_lifecycle_functions_call_shapes_still_work(api):
+    """The Azure Function's SDK adapter passes these exact shapes (aif_lifecycle/adapters/sdk_backend.py)."""
+    s = esaf.Session(FOLDER, api, "unit-sdc")
+    esaf.init_factory(creation_request={"mode": "full-bootstrap"}, poll=1, session=s)
+    esaf.add_scale_set("002", cidr="10.20.64.0/18", environment="dev", max_projects=7,
+                       subscription_id="44444444-4444-4444-8444-444444444444", session=s)
+    esaf.apply_project("002", scale_set="001", environment="dev", settings={}, display_name="Project 002", session=s)
+    esaf.delete_project("002", scale_set="001", environment="dev", include_project_subnets=False,
+                        include_keyvault_and_resource_group=True, session=s)
+    esaf.delete_scale_set("002", environment="dev", session=s)
+    esaf.delete_factory(session=s)
+    bodies = [(path.rsplit("/", 1)[1], body) for method, path, body, _ in api.calls if method == "POST"]
+    common = {"folder": FOLDER, "approved": True, "factory": "unit-sdc"}
+    assert bodies == [
+        ("init-factory", {**common, "creation_request": {"mode": "full-bootstrap"}}),
+        ("add-scale-set", {**common, "scale_set": "002", "environment": "dev", "cidr": "10.20.64.0/18",
+                           "max_projects": 7, "subscription_id": "44444444-4444-4444-8444-444444444444"}),
+        ("upsert-project", {**common, "project": "002", "environment": "dev", "scale_set": "001", "settings": {},
+                            "display_name": "Project 002"}),
+        ("delete-project", {**common, "project": "002", "environment": "dev", "scale_set": "001",
+                            "include_project_subnets": False, "include_keyvault_and_resource_group": True}),
+        ("delete-scale-set", {**common, "scale_set": "002", "environment": "dev"}),
+        ("delete-factory", common)]
 
 
-def test_delete_project_allows_deletion_once_and_deletes_the_project_group():
-    s = session(catalog(scales=("001", "002"), projects=(("001", "001"), ("002", "002"))),
-                refuse={"authorize_deletion_prepare": BlockedError(
-                    "Deletion authorization is blocked: Nothing to change: deletion is already allowed")})
-    job = esaf.delete_project("002")
-    assert "authorize_deletion_confirm" not in s.client.calls  # already allowed is not a failure
-    assert s.client.deletion == (PROJECT2, ["dev"], False, True)
-    assert job.id == "job-1"
-
-
-def test_delete_scale_set_and_delete_factory_confirm_with_the_servers_phrase():
-    s = session(catalog(scales=("001", "002")))
-    esaf.delete_scale_set("002")
-    assert s.client.deleted_scale == SCALE2 and s.client.calls[-1] == "catalog_confirm"
-    job = esaf.delete_factory()
-    assert s.client.factory_body == {"contract_version": 1, "folder": FOLDER, "factory_id": FACTORY,
-                                     "expected_revision": "r" * 64}
-    assert s.client.calls[-1] == "delete_aifactory_confirm:PHRASE"
-    assert job.kind == "factory-deletion" and job.id == "teardown-1"
-    assert job.wait(poll=0)["status"] == "succeeded"
-
-
-def test_a_refused_review_raises_with_the_servers_blockers():
-    session(catalog(), refuse={"catalog_prepare:deploy": "Missing resolved parameters: adminPassword"})
-    with pytest.raises(BlockedError, match="adminPassword"):
-        esaf.upsert_project("001")
-
-
-def test_wait_follows_a_catalog_job_to_its_end():
-    s = session(catalog())
-    job = esaf.upsert_project("001")
-    assert job.wait(poll=0) == {"id": "job-1", "status": "succeeded", "message": "done"}
-    assert esaf.upsert_project("001", wait=True).result["status"] == "succeeded"
-
-
-class WorkflowClient(Client):
-    def __init__(self):
-        super().__init__(catalog())
-        self.stages = ["prerequisites", "project-deployment", "complete"]
-
-    def creation_workflow_next(self, folder, workflow_id):
-        self.calls.append("next:" + self.stages[0])
-        return {"stage": self.stages[0], "can_execute": True, "blockers": [], "confirmation_id": "w-1"}
-
-    def creation_workflow_start(self, folder, workflow_id, confirmation_id, **kwargs):
-        self.calls.append("start:" + self.stages.pop(0))
-        return {"status": "queued"}
-
-    def creation_workflow_status(self, folder, workflow_id):
-        return {"status": "succeeded" if not self.stages else "awaiting-review", "stage": "complete"}
-
-
-def test_init_factory_drives_every_stage_of_the_creation_workflow():
-    client = WorkflowClient()
-    esaf.connect(folder=FOLDER, client=client)
-    job = esaf.init_factory("ee60a809-891a-4c04-96ff-d406c6eb8d7f", wait=True, poll=0)
-    assert [call for call in client.calls if call.startswith("start:")] == [
-        "start:prerequisites", "start:project-deployment", "start:complete"]
+def test_wait_reads_the_job_every_second_until_it_ends(api):
+    api.states = ["accepted", "preparing", "running", "succeeded"]
+    job = esaf.delete_project("002", "dev", wait=True)
     assert job.result["status"] == "succeeded"
+    reads = [call for call in api.calls if call[0] == "GET"]
+    assert [call[3] for call in reads] == [{"folder": FOLDER}] * 4
+    assert [call for call in api.calls if call[0] == "sleep"] == [("sleep", 1)] * 3
+
+
+def test_a_job_stored_by_an_earlier_sdk_is_still_readable(api):
+    s = esaf.Session(FOLDER, api, None)
+    assert esaf.EsafJob("delete_factory", "factory-deletion", "teardown-1", s).status()["status"] == "running"
+
+
+@pytest.mark.parametrize("code,error", [("config", ConfigError), ("blocked", BlockedError),
+                                        ("conflict", BlockedError), ("failure", FailureError)])
+def test_problem_json_refusals_raise_the_sdk_errors(monkeypatch, code, error):
+    details = {"type": "urn:aifactory:esaf:problem:" + code, "status": 409, "code": code,
+               "detail": "deploy was refused: Missing adminPassword", "blockers": ["Missing adminPassword"]}
+    transport = Transport(error=APIError("deploy was refused: Missing adminPassword", status=409, details=details))
+    esaf.connect(folder=FOLDER, client=transport)
+    with pytest.raises(error, match="adminPassword") as raised:
+        esaf.upsert_project("001", "dev")
+    assert raised.value.details["blockers"] == ["Missing adminPassword"]
+
+
+def test_an_api_without_the_esaf_routes_is_reported_not_worked_around():
+    transport = Transport(error=APIError("Not Found", status=404, details={"detail": "Not Found"}))
+    esaf.connect(folder=FOLDER, client=transport)
+    with pytest.raises(ConfigError, match="/api/v1/esaf"):
+        esaf.delete_factory()
+    assert len(transport.calls) == 1
+
+
+def test_the_cli_runs_each_scenario_and_prints_the_job(monkeypatch, capsys):
+    transport = Transport(states=["running", "succeeded"])
+    monkeypatch.setattr(cli, "AzureFactoryClient", lambda *args, **kwargs: transport)
+    monkeypatch.setattr(esaf.time, "sleep", lambda seconds: None)
+    monkeypatch.setenv("ESAF_FOLDER", FOLDER)
+    assert cli.main(["esaf", "delete-scale-set", "002", "dev"]) == 0
+    assert json.loads(capsys.readouterr().out)["job_id"] == JOB
+    assert cli.main(["esaf", "add-scale-set", "003", "dev", "--cidr", "10.142.0.0/16", "--wait"]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "succeeded"
+    assert posted(transport)[1] == {"folder": FOLDER, "approved": True, "scale_set": "002", "environment": "dev"}
+    second = [call for call in transport.calls if call[0] == "POST"][1]
+    assert second[2] == {"folder": FOLDER, "approved": True, "scale_set": "003", "environment": "dev",
+                         "cidr": "10.142.0.0/16"}
+    assert cli.main(["esaf", "job", JOB]) == 0

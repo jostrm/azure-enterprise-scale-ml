@@ -240,6 +240,7 @@ def build_parser() -> argparse.ArgumentParser:
                                  help="Maximum read-only reconnects (default 6).")
             command.add_argument("--backoff-initial", type=positive_float, default=0.5)
             command.add_argument("--backoff-max", type=positive_float, default=8.0)
+    add_esaf_commands(sub)
     api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
     api_sub = api.add_subparsers(dest="api_command", required=True)
     add_simple(api_sub, "instructions", cmd_api_instructions,
@@ -914,6 +915,109 @@ def cmd_authorize_deletion_confirm(args):
                              "current permission before any further action. No retry was attempted.") from None
     validate_authorization(result, receipt)
     return emit(result)
+
+
+ESAF_HELP = ("The six lifecycle scenarios, one call each; calling one is the approval. The Factory API runs it as a "
+             "resilient job and answers with a job id. Connection: ESAF_FOLDER (or --folder), --api-url, --api-key.")
+
+
+def add_esaf_commands(sub) -> None:
+    esaf_parser = sub.add_parser("esaf", help=ESAF_HELP, description=ESAF_HELP)
+    esaf_sub = esaf_parser.add_subparsers(dest="esaf_command", required=True)
+    environments = ("dev", "stage", "prod")
+
+    def scenario(name, help_text, *, scale_set=False, project=False):
+        command = add_simple(esaf_sub, name, cmd_esaf, help=help_text)
+        command.set_defaults(esaf_route=name)
+        if project:
+            command.add_argument("project", help="Project number, for example 002.")
+        if scale_set:
+            command.add_argument("scale_set", help="Scale-set suffix, for example 002.")
+        if project or scale_set:
+            command.add_argument("environment", choices=environments)
+        command.add_argument("--folder", default=os.getenv("ESAF_FOLDER"),
+                             help="The azurefactory folder on the API host (env ESAF_FOLDER).")
+        command.add_argument("--factory", help="Factory key or id; only when the folder has more than one.")
+        command.add_argument("--version-ref", help="Optional approved source version.")
+        command.add_argument("--retries", type=int, help="Re-runs after a failed run (0-5, default 2).")
+        command.add_argument("--wait", action="store_true", help="Read the job every second until it ends.")
+        return command
+
+    scenario("init-factory", "Scenario 1: submit the folder's saved factory draft.").add_argument(
+        "--creation-request-json", help="Optional full-bootstrap creation body JSON file instead of the saved draft.")
+    added = scenario("add-scale-set", "Scenario 2: add (or resume) a scale set and deploy its common.", scale_set=True)
+    added.add_argument("--cidr", help="The new scale set's VNet range; the pipeline computes the subnets.")
+    added.add_argument("--max-projects", type=int)
+    upsert = scenario("upsert-project", "Scenario 3: add or update a project and deploy it.", project=True)
+    upsert.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
+    upsert.add_argument("--settings-json", help="Optional JSON file of project settings to replace.")
+    deleted = scenario("delete-project", "Scenario 4: delete a project in one environment.", project=True)
+    deleted.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
+    deleted.add_argument("--include-project-subnets", action="store_true", default=None)
+    deleted.add_argument("--keep-keyvault-and-resource-group", action="store_true",
+                         help="Delete the project's services only; keep its Key Vault and resource group.")
+    scenario("delete-scale-set", "Scenario 5: delete a scale set in one environment.", scale_set=True)
+    scenario("delete-factory", "Scenario 6: delete the whole factory.")
+    job = add_simple(esaf_sub, "job", cmd_esaf_job, help="Read an ESAF job; --wait follows it to its end.")
+    job.add_argument("job_id")
+    job.add_argument("--folder", default=os.getenv("ESAF_FOLDER"))
+    job.add_argument("--wait", action="store_true")
+
+
+def _esaf_session(args):
+    from . import esaf
+
+    if not args.folder:
+        raise ConfigError("Set ESAF_FOLDER or pass --folder (the azurefactory folder on the API host).")
+    return esaf.Session(args.folder, client(args, default_timeout=POLL_TIMEOUT_SECONDS), getattr(args, "factory", None))
+
+
+def _esaf_finished(job) -> int:
+    state = job.result if job.result is not None else job.status()
+    status = state.get("status")
+    if status == "blocked":
+        return emit(state, EXIT_BLOCKED)
+    if status in ("accepted", "preparing", "confirming", "retrying"):
+        return emit(state, EXIT_OK)
+    return emit(state, status_exit(status))
+
+
+def cmd_esaf(args):
+    from . import esaf
+
+    session = _esaf_session(args)
+    common = {"version_ref": args.version_ref, "retries": args.retries, "wait": args.wait, "session": session}
+    route = args.esaf_route
+    if route == "init-factory":
+        creation = read_json_file(args.creation_request_json) if args.creation_request_json else None
+        job = esaf.init_factory(creation_request=creation, retries=args.retries, wait=args.wait, session=session)
+    elif route == "add-scale-set":
+        job = esaf.add_scale_set(args.scale_set, args.environment, cidr=args.cidr, max_projects=args.max_projects,
+                                 **common)
+    elif route == "upsert-project":
+        settings = read_json_file(args.settings_json) if args.settings_json else None
+        job = esaf.upsert_project(args.project, args.environment, scale_set=args.scale_set, settings=settings, **common)
+    elif route == "delete-project":
+        keep = True if args.keep_keyvault_and_resource_group else None
+        job = esaf.delete_project(args.project, args.environment, scale_set=args.scale_set,
+                                  include_project_subnets=args.include_project_subnets,
+                                  include_keyvault_and_resource_group=False if keep else None, **common)
+    elif route == "delete-scale-set":
+        job = esaf.delete_scale_set(args.scale_set, args.environment, **common)
+    else:
+        job = esaf.delete_factory(**common)
+    if args.wait:
+        return _esaf_finished(job)
+    return emit({"job_id": job.id, "scenario": job.scenario, "folder": session.folder})
+
+
+def cmd_esaf_job(args):
+    from . import esaf
+
+    job = esaf.EsafJob("", "esaf", args.job_id, _esaf_session(args))
+    if args.wait:
+        job.wait()
+    return _esaf_finished(job)
 
 
 def cmd_delete_aifactory_status(args):

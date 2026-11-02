@@ -69,7 +69,10 @@ operations over the Factory API. `AIF_BACKEND=sdk` calls one `azurefactory.esaf`
   `apply_project`, `delete_project`, `delete_scale_set` or `delete_factory`. Any facade failure may follow partial
   configuration/permission writes, so it is uncertain rather than safely retryable.
 - **SDK adapter** (`adapters/sdk_backend.py`) implements the port directly; it does not inherit the REST orchestration.
-  The facade owns preparation, API confirmation phrases, enrollment and deletion permission. Explicit per-call sessions
+  Since 2026-11-02 the facade is a thin client of the Factory API's `/api/v1/esaf/*` routes, which own preparation,
+  API confirmation phrases, enrollment, deletion permission and retries; it requires `environment` on scale-set and
+  project scenarios, and returns `EsafJob` kind `esaf` (earlier kinds stay readable). Updating this adapter and its
+  tests to that contract is pending (Joakim, in parallel). Explicit per-call sessions
   select the resolved factory, environment and scale-set suffix. The adapter checks actual target identities again
   before execution, but does not block unrelated revision drift. Job ID, kind and factory are persisted and rebuilt
   as `EsafJob` for status reads, including the dedicated factory-deletion endpoint.

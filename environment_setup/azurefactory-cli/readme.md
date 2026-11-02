@@ -33,28 +33,31 @@ identity on the host and a user's approval to save or deploy.
 
 ## Scenario facade for Python consumers
 
-`from azurefactory import esaf` provides `init_factory`, `add_scale_set`, `apply_project`,
-`delete_project`, `delete_scale_set` and `delete_factory`. `upsert_project` remains a compatible
-alias for `apply_project`. These calls are **execution approval**, not prepare-only commands:
-the facade checks and confirms the underlying API reviews.
+```python
+from azurefactory import esaf
+# Connection, once: ESAF_FOLDER, AIFACTORY_API_URL, AIFACTORY_API_KEY (or esaf.connect(folder=..., factory=...))
+esaf.init_factory()                                     # 1: submit the folder's saved factory draft
+esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")  # 2: the VNet range; the pipeline computes the subnets
+esaf.upsert_project("002", "dev")                       # 3: add or update, then deploy (scale_set=, settings=)
+esaf.delete_project("002", "dev")                       # 4
+esaf.delete_scale_set("002", "dev")                     # 5
+esaf.delete_factory()                                   # 6
+job.wait()                                              # reads the job every second until it ends
+```
 
-Pass an explicit `esaf.Session(folder, client, factory=<factory ID or key>)` in concurrent consumers.
-Project/scale-set selection accepts `environment` and `scale_set`/suffix so repeated project numbers
-and suffixes cannot silently select another physical scope. Ambiguous selections fail before writes.
-Applying a project saves its settings, refreshes the scale set's enrollment (including its registered
-projects), then deploys it. Adding a scale set deploys common resources, not an implicit project001.
+Each call is one POST to the Factory API's `/api/v1/esaf/<scenario>` route, which runs the scenario as a resilient
+server-side job and answers 202 with a job id (see the API guide's ESAF section). These calls are **execution
+approval**, not prepare-only commands. `environment` (`dev`, `stage` or `prod`) is required on scale-set and project
+scenarios, so a delete never reaches another environment. The factory is needed only when the folder holds more
+than one (`esaf.connect(factory=...)`). Pass an explicit `esaf.Session(folder, client, factory)` in concurrent
+consumers. `apply_project` remains an alias of `upsert_project`.
 
-Project deployment/deletion reviews must contain `runtime_scope_authorization`: exact scope IDs, live enrollment,
-explicit deletion permission and a normalized resource-group ARM ID in the selected subscription. The facade refuses
-missing/mismatched evidence before confirmation, and deletion also requires live `delete_authorized=true`.
-Use an API build with existing-target enrollment extension and guarded project-pipeline dispatch; a new SDK alone
-cannot upgrade an older server. Reconcile any earlier configuration save after a blocked scenario.
+Refusals raise the SDK errors with the server's problem details: `ConfigError` (unknown, ambiguous or invalid target),
+`BlockedError` (the server's review refused it, or another ESAF job holds the factory), `AuthError` and `FailureError`.
+An API without the ESAF routes raises `ConfigError`; no other route is tried.
 
-For a fresh full bootstrap, `esaf.init_factory(creation_request=body, session=session)` accepts the
-creation API's full-bootstrap body, saves the new catalog scope and starts one bounded whole-workflow
-approval. The API owns continuation; no client daemon must remain alive. The returned `EsafJob` has
-a persistable ID and kind; reconstruct it with the same session and call `status()` after a restart.
-Existing `workflow_id`/`request` callers retain their local stage-driver behavior.
+The same scenarios are CLI commands: `azurefactory esaf delete-project 002 dev [--wait]`,
+`azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16` and `azurefactory esaf job <job id> --wait`.
 
 See the [lifecycle Function consumer](../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md)
 for all six routes, scope approval, protected targets, delete opt-in and restart-safe job tracking.

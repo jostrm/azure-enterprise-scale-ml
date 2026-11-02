@@ -12,11 +12,11 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable, Generator
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlunparse
 from uuid import UUID
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from .errors import APIError, AuthError, ConfigError, FailureError, RedirectError, RequestTimeout
+from .errors import APIError, AuthError, BlockedError, ConfigError, FailureError, RedirectError, RequestTimeout
 from . import catalog_requests
 from .monitoring_saved import SavedMonitoringClient
 from .operation_results import legacy_execution_result
@@ -28,6 +28,10 @@ API_KEY_ENV = "AIFACTORY_API_KEY"
 _OMITTED = object()
 
 SAFE_UNAUTHENTICATED_PATHS = {"/health", "/openapi.json"}
+ESAF_SCENARIOS = ("init-factory", "add-scale-set", "upsert-project", "delete-project", "delete-scale-set",
+                  "delete-factory")
+ESAF_TOO_OLD = ("The Factory API has no /api/v1/esaf routes; update the API host to a release with the ESAF routes and restart it. "
+                "No other route was tried.")
 
 
 def _is_loopback(host: str) -> bool:
@@ -253,6 +257,34 @@ class AzureFactoryClient(SavedMonitoringClient):
 
     def delete_aifactory_status(self, folder: str, job_id: str) -> dict[str, Any]:
         return self._factory_deletion_request("status", query={"folder": folder, "job_id": job_id})
+
+    def esaf_submit(self, scenario: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Start one ESAF scenario (POST /api/v1/esaf/<scenario>); the server answers 202 with a job id."""
+        if scenario not in ESAF_SCENARIOS:
+            raise ConfigError("Unknown ESAF scenario: " + str(scenario) + ".")
+        accepted = self._esaf_request("POST", "/api/v1/esaf/" + scenario, body=body)
+        job_id = accepted.get("job_id")
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise FailureError("The API accepted the scenario but returned no job ID; inspect its ESAF jobs.")
+        return accepted
+
+    def esaf_job(self, folder: str, job_id: str) -> dict[str, Any]:
+        """Read an ESAF job (GET /api/v1/esaf/jobs/<id>)."""
+        return self._esaf_request("GET", "/api/v1/esaf/jobs/" + quote(str(job_id), safe=""), query={"folder": folder})
+
+    def _esaf_request(self, method: str, path: str, **kwargs) -> dict[str, Any]:
+        try:
+            return self._object(self.request(method, path, **kwargs), "ESAF")
+        except APIError as exc:
+            details = exc.details if isinstance(exc.details, dict) else {}
+            code = details.get("code")
+            if code is None and exc.status in (404, 405):
+                raise ConfigError(ESAF_TOO_OLD, status=exc.status, details=exc.details) from None
+            error = {"config": ConfigError, "blocked": BlockedError, "conflict": BlockedError, "auth": AuthError,
+                     "failure": FailureError, "storage-unavailable": FailureError}.get(code)
+            if error is None:
+                raise
+            raise error(exc.message, status=exc.status, details=exc.details) from None
 
     def delete_aifactory_reconcile(self, folder: str, job_id: str) -> dict[str, Any]:
         """Server-side local completion from existing verified receipts; never redispatches pipelines."""
