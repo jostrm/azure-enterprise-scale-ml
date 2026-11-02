@@ -327,6 +327,16 @@ SEARCH_SERVICE_KINDS = frozenset({"microsoft.search/searchservices", "microsoft.
 SEARCH_SHARED_LINK_KINDS = frozenset(kind + "/sharedprivatelinkresources" for kind in SEARCH_SERVICE_KINDS)
 
 
+def arm_error_code(raw):
+    """The ARM error code of an error answer's body, or None."""
+    try:
+        body = json.loads(raw or b"{}")
+        candidate = (body.get("error") or {}).get("code") if isinstance(body.get("error"), dict) else body.get("code")
+    except Exception:  # an unreadable answer has no code
+        return None
+    return candidate if isinstance(candidate, str) and ARM_ERROR_CODE.fullmatch(candidate) else None
+
+
 def refused_request_event(method, parsed, error):
     """A non-secret record of a refused remote call: method, host, path, api-version, status and the error code."""
     api = parse_qs(parsed.query).get("api-version", [])
@@ -1353,6 +1363,14 @@ class Cloud:
                 try:
                     response = self.opener.open(request, timeout=timeout)
                 except HTTPError as error:
+                    if error.code not in allowed:
+                        answer = error.read(MAX_DOCUMENT + 1)
+                        error.read = lambda *_: answer  # each check below reads the same one answer
+                    if (error.code not in allowed and readonly and error.code == 400 and 404 in allowed
+                            and arm_error_code(answer) == "ResourceNotFound"):
+                        # Storage answers a deleted child with 400 ResourceNotFound, not 404 (aif-138 2026-11-02: a
+                        # storage account's private endpoint connection after its DELETE): a read accepting absence has it.
+                        error.code = 404
                     if error.code not in allowed:
                         not_served = readonly and http_error_api_version_not_served(error, url)
                         failure = ApiVersionNotServed if not_served else Blocked
