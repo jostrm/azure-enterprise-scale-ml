@@ -83,6 +83,14 @@ PLATFORM_CHILDREN = {
 }
 
 
+def delete_condition(body):
+    """If-Match on the live etag, only where that etag is stable (fl.resource_etag): a private endpoint's or NIC's
+    rolls while the platform tears it down, and its delete then ends Failed with PreconditionFailed (aif-138
+    2026-11-02 run16)."""
+    etag = fl.resource_etag(body, {})
+    return {"If-Match": etag} if etag else None
+
+
 def platform_child(item):
     prefix = PLATFORM_CHILDREN.get(str(item.get("type", "")).lower())
     return prefix is not None and item["id"].rsplit("/", 1)[-1].lower().startswith(prefix)
@@ -308,7 +316,7 @@ def unlink_shared_hub(cloud, locks, document, receipt, persist, sleep=time.sleep
             receipt.update(mutation_started=True, pending_resource=link["id"])
             persist()
             cloud.arm("DELETE", link["id"], link["api_version"], allowed=(200, 202, 204, 404),
-                      headers={"If-Match": body["etag"]} if body.get("etag") else None)
+                      headers=delete_condition(body))
             fl.wait_absent(cloud, locks, link["id"], link["api_version"], sleep)
             receipt.pop("pending_resource", None)
         receipt["deleted_hub_links"].append(link["id"])
@@ -826,7 +834,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
         receipt.update(mutation_started=True, pending_resource=row["id"])
         persist()
         cloud.arm("DELETE", row["id"], api, allowed=(200, 202, 204, 404),
-                  headers={"If-Match": body["etag"]} if body.get("etag") else None)
+                  headers=delete_condition(body))
         fl.wait_absent(cloud, locks, row["id"], api, sleep)
         removed.add(key)
         receipt.setdefault("deleted_resources", []).append(row["id"])
@@ -1596,7 +1604,7 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
                 receipt.update(mutation_started=True, pending_resource=link["id"])
                 persist()
                 cloud.arm("DELETE", link["id"], link["api_version"], allowed=(200, 202, 204, 404),
-                          headers={"If-Match": body["etag"]} if body.get("etag") else None)
+                          headers=delete_condition(body))
                 fl.wait_absent(cloud, lease, link["id"], link["api_version"], sleep)
                 receipt.pop("pending_resource", None)
             receipt["deleted_hub_links"].append(link["id"])
