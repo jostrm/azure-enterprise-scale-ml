@@ -2656,19 +2656,29 @@ def _without_removed_backlinks(body, removed):
         return bool(references) and all(any(ref == item or ref.startswith(item + "/") for item in removed)
                                         for ref in references)
 
-    result = copy.deepcopy(body)
-    for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
-        for holder in (result, result.get("properties") if isinstance(result.get("properties"), dict) else {}):
-            value = holder.get(field)
-            if isinstance(value, list):
-                # A list of dependents loses exactly the entries whose dependent was deleted.
-                kept = [entry for entry in value if not gone(entry)]
-                if kept:
-                    holder[field] = kept
-                else:
+    def strip(item, fields):
+        for field in fields:
+            for holder in (item, item.get("properties") if isinstance(item.get("properties"), dict) else {}):
+                value = holder.get(field)
+                if isinstance(value, list):
+                    # A list of dependents loses exactly the entries whose dependent was deleted.
+                    kept = [entry for entry in value if not gone(entry)]
+                    if kept:
+                        holder[field] = kept
+                    else:
+                        holder.pop(field)
+                elif gone(value):
                     holder.pop(field)
-            elif gone(value):
-                holder.pop(field)
+
+    result = copy.deepcopy(body)
+    kind = str(body.get("type", "")).lower()
+    strip(result, REVERSE_LINKS.get(kind, ()))
+    if kind == "microsoft.network/virtualnetworks":
+        # A VNet embeds its subnets with the same back-references (aif-138 2026-11-02 run17: a deleted private
+        # endpoint's NIC left subnets[].properties.ipConfigurations).
+        for subnet in (result.get("properties") or {}).get("subnets") or []:
+            if isinstance(subnet, dict):
+                strip(subnet, REVERSE_LINKS["microsoft.network/virtualnetworks/subnets"])
     return result
 
 
