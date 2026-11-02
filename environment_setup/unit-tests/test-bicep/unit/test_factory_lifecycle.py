@@ -1083,7 +1083,7 @@ def owned_group_manifest(cloud):
     evidence_run = str(uuid4())
     evidence = {"schema": 1, "status": "succeeded", "run_id": evidence_run, "manifest_hash": "e" * 64,
                 "target": CORE_OWNER, "ownership": [{"resource_id": RULE, "owner": CORE_OWNER,
-                                                    "body_hash": fl.digest(cloud.bodies[RULE.lower()])}]}
+                                                    "body_hash": fl.resource_digest(cloud.bodies[RULE.lower()])}]}
     cloud.runs["runs/" + evidence_run + ".worker.json"] = evidence
     resources = []
     for resource_id, row in closure["resources"].items():
