@@ -128,11 +128,16 @@ PY
 }
 
 aif_runner_microsoft_repository() {
-  local kind="$1" codename="$2" version="$3" work="$4" apt="${5:-/etc/apt}"
-  local key="$apt/keyrings/aifactory-microsoft.gpg"
+  local kind="$1" codename="$2" version="$3" work="$4" apt="${5:-/etc/apt}" keyrings="${6:-/usr/share/keyrings}"
+  # The keyring path Defender for Endpoint (MDE.Linux) and packages.microsoft.com's own prod.list use: a Defender install
+  # after this one then sets the same signed-by, not a second one apt refuses (aif-144, 2026-11-03: MDE.Linux Failed).
+  local key="$keyrings/microsoft-prod.gpg"
   local source="$apt/sources.list.d/aifactory-${kind}.list"
   local url="https://packages.microsoft.com/ubuntu/$version/prod"
   [[ "$kind" != azure-cli ]] || url=https://packages.microsoft.com/repos/azure-cli/
+  local line="deb [arch=amd64 signed-by=$key] $url $codename main"
+  # What this script wrote before: an exact copy is its own file, so it is retired or rewritten, never reviewed.
+  local legacy="deb [arch=amd64 signed-by=$apt/keyrings/aifactory-microsoft.gpg] $url $codename main"
   # apt rejects one repository with two signed-by keyrings. Defender for Endpoint (MDE.Linux) adds microsoft-prod,
   # so reuse an existing entry whose keyring holds only the Microsoft key; never edit files this script did not create.
   local entries file keyring reused="" reused_file=""
@@ -148,24 +153,31 @@ aif_runner_microsoft_repository() {
     reused="$keyring" reused_file="$file"
   done <<< "$entries"
   if [[ -n "$reused" ]]; then
-    [[ ! -e "$source" || "$reused" == "$key" ]] ||
+    if [[ -e "$source" && "$(cat "$source")" == "$legacy" ]]; then
+      rm -f -- "$source" || return
+      printf 'retired: %s (its signed-by conflicted with %s)\n' "$source" "$reused_file"
+    fi
+    [[ ! -e "$source" || "$(cat "$source")" == "$line" ]] ||
       { printf 'Existing apt source %s conflicts with %s (signed-by=%s) for %s %s; review them explicitly.\n' \
           "$source" "$reused_file" "$reused" "$url" "$codename" >&2; return 1; }
     printf 'reusing: %s %s from %s (signed-by=%s)\n' "$url" "$codename" "$reused_file" "$reused"
     return 0
   fi
   # Signed apt metadata supplies the package version and integrity, not a curl-to-shell installer.
-  if [[ ! -f "$key" ]]; then
+  if [[ -f "$key" ]]; then
+    aif_runner_microsoft_key "$key" ||
+      { printf 'Existing keyring %s holds more than the Microsoft key %s; review it explicitly.\n' \
+          "$key" BC528686B50D79E339D3721CEB3E94ADBE1229CF >&2; return 1; }
+  else
     curl --fail --silent --show-error --location 'https://packages.microsoft.com/keys/microsoft.asc' \
       --output "$work/microsoft.asc" || return
     aif_runner_microsoft_key "$work/microsoft.asc" ||
       { printf '%s\n' 'Microsoft apt signing-key fingerprint mismatch.' >&2; return 1; }
     gpg --batch --yes --dearmor --output "$work/microsoft.gpg" "$work/microsoft.asc" || return
-    install -d -m 755 "$apt/keyrings" || return
+    install -d -m 755 "$keyrings" || return
     install -m 644 "$work/microsoft.gpg" "$key" || return
   fi
-  local line="deb [arch=amd64 signed-by=$key] $url $codename main"
-  if [[ -e "$source" ]]; then
+  if [[ -e "$source" && "$(cat "$source")" != "$legacy" ]]; then
     [[ "$(cat "$source")" == "$line" ]] || { printf 'Refusing to replace %s\n' "$source" >&2; return 1; }
   else
     printf '%s\n' "$line" > "$source"
