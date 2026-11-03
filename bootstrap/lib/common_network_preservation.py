@@ -789,11 +789,26 @@ def _drop_parent_etag_rollover(previous, current, old_parent, new_parent):
             right.pop("etag")
 
 
-def verify_common_network(plan, *, before, after, expected_resources=None, endpoint_scope=None):
-    """Post-deploy native GET proof; retain evidence and do not roll back on failure."""
+def verify_common_network(plan, *, before, after, expected_resources=None, endpoint_scope=None,
+                          seed_vault_endpoint=None):
+    """Post-deploy native GET proof; retain evidence and do not roll back on failure.
+
+    seed_vault_endpoint: the planned seed vault endpoint whose own reverse references the common subnet may carry
+    once it exists (the finalization proof after execute_seed_vault_endpoint); nothing else is tolerated."""
     require(digest(before) == plan["snapshot_sha256"], "network-before-evidence-mismatch")
     require(after.get("complete") is True, "complete-post-deployment-inventory-required")
     identifier = resource_id(plan["desired"]["vnet_id"])
+    if seed_vault_endpoint:
+        after = copy.deepcopy(after)
+        subnet = seed_vault_endpoint["subnet_id"]
+        if subnet in after["resources"]:
+            after["resources"][subnet] = without_seed_endpoint_associations(after["resources"][subnet], seed_vault_endpoint)
+        parent = after["resources"].get(identifier)
+        if isinstance(parent, dict) and isinstance(parent.get("properties", {}).get("subnets"), list):
+            parent["properties"]["subnets"] = [
+                without_seed_endpoint_associations(row, seed_vault_endpoint)
+                if isinstance(row, dict) and str(row.get("id", "")).lower() == subnet else row
+                for row in parent["properties"]["subnets"]]
     actual = after["resources"]
     old_parent, new_parent = before["resources"].get(identifier), actual.get(identifier)
     _validate_existing(new_parent, identifier)
@@ -848,8 +863,11 @@ def _deployment_parameters(template, parameters):
 
 
 def prepare_common_network(*, source_root, desired, inventory, expected_payload_sha256=None, bicep=None,
-                           regional_capabilities=None, endpoint_scope=None):
-    """Coordinator hook after it resolves its saved scope into template parameters."""
+                           regional_capabilities=None, endpoint_scope=None, seed_vault=None):
+    """Coordinator hook after it resolves its saved scope into template parameters.
+
+    seed_vault ({vault_id, owner_tags, existing}) adds the seeding Key Vault's private endpoint as a planned effect,
+    created by execute_common_network after the network is verified (plan_seed_vault_endpoint)."""
     template, proof = _compile_capability(source_root, expected_payload_sha256=expected_payload_sha256, bicep=bicep)
     identifier = resource_id(desired["vnet_id"])
     require(identifier in inventory["resources"], "incomplete-network-inventory")
@@ -860,10 +878,17 @@ def prepare_common_network(*, source_root, desired, inventory, expected_payload_
     regional = (validate_common_network_region(desired, regional_capabilities,
                 subnets=plan["deployment_parameters"]["preservationPlan"]["createSubnets"])
                 if regional_capabilities is not None else None)
+    endpoint = (plan_seed_vault_endpoint(
+        vault_id=seed_vault["vault_id"], vnet_id=identifier,
+        subnet_name=plan["deployment_parameters"]["common_subnet_name"],
+        location=plan["deployment_parameters"]["location"], owner_tags=seed_vault["owner_tags"],
+        existing=seed_vault.get("existing")) if seed_vault else None)
     return {"can_execute": regional["can_execute"] if regional is not None else True,
             "blockers": regional["blockers"] if regional is not None else [], "commands": [],
-            "effects": [{"kind": "create-network-resource", "resource_id": key}
-                        for key in plan["mutation_resource_ids"]],
+            "effects": [*({"kind": "create-network-resource", "resource_id": key}
+                          for key in plan["mutation_resource_ids"]),
+                        *([seed_vault_endpoint_effect(endpoint)] if endpoint else [])],
+            **({"seed_vault_endpoint": endpoint} if endpoint else {}),
             "regional_service_endpoints": regional, "endpoint_scope": copy.deepcopy(endpoint_scope),
             "frozen_plan": plan, "expected_resources": expected_resource_bodies(template, plan), "source": proof}
 
@@ -938,10 +963,120 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     evidence = verify_common_network(plan, before=before, after=inventory_collector(), expected_resources=expected,
                                      endpoint_scope=endpoint_scope)
     common_subnet_id = identifier + "/subnets/" + plan["deployment_parameters"]["common_subnet_name"].lower()
+    seed = prepared.get("seed_vault_endpoint")
+    endpoint = (execute_seed_vault_endpoint(seed, cloud=cloud, assert_lease=assert_lease, poll_interval=poll_interval,
+                                            sleeper=sleeper) if seed else None)
     return {"succeeded": True, "outputs": {"vnet_id": identifier, "admin_subnet_id": common_subnet_id,
             "owned_resource_ids": plan["owned_resource_ids"], "preservation_evidence": evidence,
             "regional_service_endpoints": regional,
+            **({"seed_vault_endpoint": endpoint} if endpoint else {}),
             "deployment_id": deployment_id if plan["mutation_resource_ids"] else None}}
+
+
+SEED_ENDPOINT_GROUP = "vault"
+SEED_ENDPOINT_POLLS = 180          # x 5 s = 15 min
+SEED_VAULT_ID = re.compile(r"/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\.KeyVault/"
+                           r"vaults/[A-Za-z0-9-]{3,24}", re.I)
+
+
+def plan_seed_vault_endpoint(*, vault_id, vnet_id, subnet_name, location, owner_tags, existing=None):
+    """The seeding Key Vault's private endpoint as a planned network-foundation effect (aif-145, 2026-11-04).
+
+    Named as the legacy bootstrap names it (create-new-aifactory-scaleset.sh aif_ensure_private_network_access):
+    pend-<vault>-to-<common VNet> in the common subnet, group `vault`. PROJECT step 02b then only approves a pending
+    connection and links DNS. An endpoint already at that name that targets this vault from the common subnet is
+    reused, never duplicated; any other body there is refused. A created one carries the owner's tags."""
+    require(isinstance(vault_id, str) and SEED_VAULT_ID.fullmatch(vault_id), "seed-vault-id-required")
+    vnet = resource_id(vnet_id)
+    require(resource_type(vnet) == "microsoft.network/virtualnetworks", "parent-vnet-id-required")
+    require(isinstance(owner_tags, dict) and owner_tags and all(
+        isinstance(key, str) and isinstance(value, str) and value for key, value in owner_tags.items()),
+        "seed-vault-endpoint-owner-tags-required")
+    name = "pend-" + vault_id.rsplit("/", 1)[1].lower() + "-to-" + vnet.rsplit("/", 1)[1]
+    require(len(name) <= 76, "seed-vault-endpoint-name-too-long")
+    group = vnet.split("/providers/")[0]
+    subnet = resource_id(vnet + "/subnets/" + str(subnet_name).lower())
+    planned = {"resource_id": group + "/providers/microsoft.network/privateendpoints/" + name,
+               "vault_id": vault_id.lower(), "subnet_id": subnet, "action": "create", "body": None,
+               "nic_id": group + "/providers/microsoft.network/networkinterfaces/" + name + "-nic"}
+    if existing is not None:
+        planned.update(action="reuse", nic_id=_seed_endpoint_nic(existing, planned))
+        return planned
+    planned["body"] = {"location": location, "tags": dict(owner_tags), "properties": {
+        "subnet": {"id": subnet}, "customNetworkInterfaceName": name + "-nic",
+        "privateLinkServiceConnections": [{"name": name + "-connection", "properties": {
+            "privateLinkServiceId": vault_id, "groupIds": [SEED_ENDPOINT_GROUP]}}]}}
+    return planned
+
+
+def _seed_endpoint_nic(body, planned):
+    """The NIC of an endpoint that is exactly the planned one; anything else at its name is a conflict."""
+    properties = body.get("properties") if isinstance(body, dict) else None
+    connections = [] if not isinstance(properties, dict) else [
+        *(properties.get("privateLinkServiceConnections") or []),
+        *(properties.get("manualPrivateLinkServiceConnections") or [])]
+    targets = [(str((item.get("properties") or {}).get("privateLinkServiceId", "")).lower(),
+                (item.get("properties") or {}).get("groupIds")) for item in connections if isinstance(item, dict)]
+    nics = [str(item.get("id", "")).lower() for item in (properties or {}).get("networkInterfaces") or []
+            if isinstance(item, dict)]
+    require(str(body.get("id", "")).lower() == planned["resource_id"]
+            and properties.get("provisioningState") == "Succeeded"
+            and str((properties.get("subnet") or {}).get("id", "")).lower() == planned["subnet_id"]
+            and targets == [(planned["vault_id"], [SEED_ENDPOINT_GROUP])] and len(nics) == 1
+            and nics[0].startswith(planned["resource_id"].split("/providers/")[0] + "/providers/microsoft.network/networkinterfaces/"),
+            "seed-vault-endpoint-conflict")
+    return nics[0]
+
+
+def seed_vault_endpoint_effect(planned):
+    return {"kind": planned["action"] + "-private-endpoint", "resource_id": planned["resource_id"],
+            "target_resource_id": planned["vault_id"], "group_id": SEED_ENDPOINT_GROUP}
+
+
+def execute_seed_vault_endpoint(planned, *, cloud, assert_lease, poll_interval=5, max_polls=SEED_ENDPOINT_POLLS,
+                                sleeper=time.sleep):
+    """Create (or prove the reused) seed vault endpoint after the network is verified; never delete or replace.
+    A create interrupted after its PUT finds its own exact endpoint on retry and does not write again."""
+    def current():
+        status, _, body = cloud.arm("GET", planned["resource_id"], API_VERSION, allowed=(200, 404))
+        require(status in (200, 404), "seed-vault-endpoint-read-failed")
+        return body if status == 200 else None
+    body = current()
+    if planned["action"] == "reuse" or body is not None:
+        require(body is not None, "seed-vault-endpoint-reuse-target-absent")
+        nic = _seed_endpoint_nic(body, planned)
+        require(planned["action"] == "create" or nic == planned["nic_id"], "seed-vault-endpoint-conflict")
+        return {"resource_id": planned["resource_id"], "nic_id": nic, "created": planned["action"] == "create"}
+    require(assert_lease() is True, "shared-hub-lease-required")
+    status, _, _ = cloud.arm("PUT", planned["resource_id"], API_VERSION, data=planned["body"], allowed=(200, 201))
+    require(status in (200, 201), "seed-vault-endpoint-outcome-unknown")
+    for _ in range(max_polls):
+        body = current()
+        state = ((body or {}).get("properties") or {}).get("provisioningState")
+        if state == "Succeeded":
+            return {"resource_id": planned["resource_id"], "nic_id": _seed_endpoint_nic(body, planned), "created": True}
+        require(state not in ("Failed", "Canceled", "Cancelled"), "seed-vault-endpoint-failed-retain-evidence")
+        sleeper(poll_interval)
+    raise PreservationError("seed-vault-endpoint-pending-retain-evidence")
+
+
+def without_seed_endpoint_associations(body, planned):
+    """A subnet body without the reverse references Azure adds for the planned seed endpoint (its endpoint and its
+    NIC's IP configurations); every other association stays and is still checked."""
+    if not planned or not isinstance(body, dict) or not isinstance(body.get("properties"), dict):
+        return body
+    body = copy.deepcopy(body)
+    properties = body["properties"]
+    for key, own in (("privateEndpoints", lambda value: value == planned["resource_id"]),
+                     ("ipConfigurations", lambda value: value.startswith(planned["nic_id"] + "/"))):
+        if isinstance(properties.get(key), list):
+            rows = [row for row in properties[key]
+                    if not (isinstance(row, dict) and own(str(row.get("id", "")).lower()))]
+            if rows:
+                properties[key] = rows
+            else:
+                properties.pop(key)
+    return body
 
 
 def plan_peerings(*, hub, spoke, hub_gateway, spoke_gateways, hub_peering_name, spoke_peering_name,

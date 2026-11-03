@@ -141,6 +141,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_resource_closure_parallel_reads.py",
         "unit/test_resource_fingerprint_churn.py",
         "unit/test_runner_bootstrap.py",
+        "unit/test_seed_vault_endpoint.py",
         "unit/test_selective_project_deletion.py",
         "unit/test_simple_bootstrap.py",
         "unit/test_single_writer_coordination.py",
