@@ -5725,27 +5725,32 @@ def validate_preservation_permit(document):
             and hash_value(runner.get("body_hash"))
             and runner["body_hash"] == foundation["resources"][vm].get("body_hash")
             and runner.get("receipt_hash") == digest(foundation["resources"][vm].get("receipt"))
-            and isinstance(resources, dict) and len(resources) == 2
-            and all(isinstance(key, str) and isinstance(row, dict) for key, row in resources.items()),
+            and isinstance(resources, dict) and len(resources) in (1, 2)
+            and all(isinstance(key, str) and key.startswith(vm + "/") and isinstance(row, dict)
+                    for key, row in resources.items()),
             "reviewed-preservation-runner-proof-required")
     extension = vm + "/extensions/mde.linux"
     commands = [key for key in resources if re.fullmatch(
         re.escape(vm) + r"/runcommands/register-aifactory-gha-\d{14}-\d+", key)]
-    require(len(commands) == 1 and set(resources) == {extension, commands[0]},
+    # Defender installs MDE.Linux on its own schedule, about 40 minutes after a new runner (aif-145, 2026-11-03: COMMON
+    # was reviewed before it existed), so the permit preserves the registration command alone or with that extension.
+    defender = extension in resources
+    require(len(commands) == 1 and set(resources) == {commands[0], *([extension] if defender else [])},
             "reviewed-preservation-exact-children-required")
-    ext, command = resources[extension], resources[commands[0]]
-    require(ext.get("type") == "microsoft.compute/virtualmachines/extensions"
-            and ext.get("publisher") == "Microsoft.Azure.AzureDefenderForServers"
-            and ext.get("extension_type") == "MDE.Linux" and ext.get("provisioning_state") in ("Failed", "Succeeded")
+    ext, command = resources.get(extension), resources[commands[0]]
+    require((not defender
+             or ext.get("type") == "microsoft.compute/virtualmachines/extensions"
+             and ext.get("publisher") == "Microsoft.Azure.AzureDefenderForServers"
+             and ext.get("extension_type") == "MDE.Linux" and ext.get("provisioning_state") in ("Failed", "Succeeded"))
             and command.get("type") == "microsoft.compute/virtualmachines/runcommands"
             and command.get("provisioning_state") == command.get("execution_state") == "Succeeded"
             and type(command.get("exit_code")) is int and command["exit_code"] == 0
             and hash_value(command.get("script_sha256"))
             and all(row.get("scope") == arm_scope(vm) for row in resources.values())
             and isinstance(proposal.get("warnings"), list)
-            and all(isinstance(row, dict) for row in proposal["warnings"]) and any(
+            and all(isinstance(row, dict) for row in proposal["warnings"]) and (not defender or any(
                 row.get("resource_id") == extension and row.get("code") == "defender-security-readiness-unverified"
-                and row.get("provisioning_state") == ext["provisioning_state"] for row in proposal["warnings"]),
+                and row.get("provisioning_state") == ext["provisioning_state"] for row in proposal["warnings"])),
             "reviewed-preservation-state-or-security-warning-required")
     return permit
 
