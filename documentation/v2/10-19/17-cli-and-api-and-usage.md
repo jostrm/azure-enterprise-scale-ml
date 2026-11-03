@@ -13,16 +13,65 @@ implementations of Azure provisioning logic.
 ## 6 common scenarios all tools support
 
 The Configuration Wizard, CLI, REST API and Python SDK cover the same six
-common scenarios. Each SDK call below is a client of the same Config Wizard API.
+common scenarios. The simplest way is **one call per scenario**: the ESAF methods
+(`from azurefactory import esaf`), the `azurefactory esaf` CLI commands and the
+`/api/v1/esaf/*` routes are the same contract, and the Config Wizard API runs each
+call as one job. The step-by-step calls remain for when you review every change
+yourself before it is applied.
 
-| Scenario | SDK call | Outcome |
+| Scenario | Python SDK (one call) | Step-by-step SDK calls | Outcome |
+|---|---|---|---|
+| 1. Init AI Factory | `esaf.init_factory()` | `factory_create_prepare` / `bootstrap_*` | Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones. |
+| 2. Add scaleset | `esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")` | `scaleset_add_prepare` | Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group. |
+| 3. Add or update project | `esaf.upsert_project("002", "dev")` | `project_add_prepare` + `project_deployment_*` | Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists. |
+| 4. Delete project | `esaf.delete_project("002", "dev")` | `project_delete_prepare` | The project resource group is deleted. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`); `esaf.delete_project` grants it for you. |
+| 5. Delete scaleset | `esaf.delete_scale_set("002", "dev")` | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`); `esaf.delete_scale_set` grants it for you. |
+| 6. Delete AI Factory | `esaf.delete_factory()` | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. Under single-writer coordination it needs the `authorize-deletion` permission, which `esaf.delete_factory` grants; whole-factory deletion ran end to end on aif-138 (2026-11-02). |
+
+## The one-call methods (ESAF) and their parameters
+
+Each method is one request to `POST /api/v1/esaf/<scenario>`. The API prepares,
+checks and confirms every review behind it, waits for a busy configuration lock,
+prepares again after a transient refusal and runs the scenario again after a
+failed run. **Calling a method is the approval**: it changes Azure.
+
+| Python SDK | CLI | REST | C# (MAUI apps) |
+|---|---|---|---|
+| `esaf.init_factory()` | `azurefactory esaf init-factory` | `POST /api/v1/esaf/init-factory` | `InitFactoryAsync()` |
+| `esaf.add_scale_set(scale_set, environment, cidr=...)` | `azurefactory esaf add-scale-set 002 dev --cidr ...` | `POST /api/v1/esaf/add-scale-set` | `AddScaleSetAsync("002", "dev", ...)` |
+| `esaf.upsert_project(project, environment)` | `azurefactory esaf upsert-project 002 dev` | `POST /api/v1/esaf/upsert-project` | `UpsertProjectAsync("002", "dev")` |
+| `esaf.delete_project(project, environment)` | `azurefactory esaf delete-project 002 dev` | `POST /api/v1/esaf/delete-project` | `DeleteProjectAsync("002", "dev")` |
+| `esaf.delete_scale_set(scale_set, environment)` | `azurefactory esaf delete-scale-set 002 dev` | `POST /api/v1/esaf/delete-scale-set` | `DeleteScaleSetAsync("002", "dev")` |
+| `esaf.delete_factory()` | `azurefactory esaf delete-factory` | `POST /api/v1/esaf/delete-factory` | `DeleteFactoryAsync()` |
+
+**The connection is set once**, not passed to every call: `ESAF_FOLDER` (the
+absolute `azurefactory` folder on the API host), `AIFACTORY_API_URL` (default
+`http://127.0.0.1:8765`) and `AIFACTORY_API_KEY`, or `esaf.connect(folder=..., url=...,
+api_key=..., factory=...)`. `factory` (key or id) is needed only when the folder
+holds more than one factory.
+
+| Parameter | Used by | Meaning |
 |---|---|---|
-| 1. Init AI Factory | `factory_create_prepare` / `bootstrap_*` | Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones. |
-| 2. Add scaleset | `scaleset_add_prepare` | Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group. |
-| 3. Add or update project | `project_add_prepare` + `project_deployment_*` | Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists. |
-| 4. Delete project | `project_delete_prepare` | The project resource group is deleted. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`). |
-| 5. Delete scaleset | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`). |
-| 6. Delete AI Factory | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. Under single-writer coordination, named whole-factory deletion is being added (blocked on the API's current runtime pin); it will also need the `authorize-deletion` permission. |
+| `scale_set` | add/delete scale set; optional on project calls | The scale-set suffix, three digits as a string: `"002"`. On project calls only when the environment has more than one scale set. |
+| `project` | project calls | The project number: `"002"`. |
+| `environment` | scale-set and project calls (**required**) | `"dev"`, `"stage"` or `"prod"`. The same suffix or number can exist in several environments; a delete never reaches another one. |
+| `cidr` | `add_scale_set`, new scale sets | The VNet range, for example `"10.141.0.0/16"`. The deployment pipeline computes the subnets; with BYOSubnet they already exist. |
+| `max_projects` | `add_scale_set` | Project capacity of a new scale set; default `7`. |
+| `subscription_id`, `tenant_id`, `orchestrator` | `add_scale_set` | Default to the environment's existing scale set. |
+| `settings` | `upsert_project` | Project settings to replace, for example `{"tag_costcenter": "lab"}`; omitted keys keep their value. |
+| `display_name` | `upsert_project` | Display name of a new project. |
+| `include_project_subnets` | `delete_project` | Default `False`. |
+| `include_keyvault_and_resource_group` | `delete_project` | Default `True`; `False` deletes only the project's services. |
+| `creation_request` | `init_factory` | Omit to submit the folder's saved factory draft; or the full-bootstrap creation body to save and start it in one call. |
+| `retries` | all | Re-runs after a failed run (0-5, default 2). |
+| `version_ref` | all | An explicit accelerator version to deploy; default the factory's version. |
+| `wait`, `poll` | Python | `wait=True` follows the job to its end, reading it every `poll` seconds (default 1). |
+
+Each call returns a job at once (202 + `job_id` over REST): `job.wait()` follows it,
+`job.status()` reads it once. Refusals raise `ConfigError` (unknown or ambiguous
+target), `BlockedError` (the server's review refused it, with its blockers) or
+`AuthError`. The step-by-step setup, every method and a complete script are in the
+[ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md).
 
 ## Shared API: Tkinter and MAUI
 
