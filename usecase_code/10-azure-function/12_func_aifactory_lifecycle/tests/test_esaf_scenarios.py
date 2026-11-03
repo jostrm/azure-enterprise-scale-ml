@@ -41,16 +41,16 @@ CATALOG = {
 }
 CASES = (
     ("init-factory", {"factoryId": "new-sdc-dev", "bootstrapConfig": {"subscription_id": "subscription"}},
-     "init_factory", (), "workflow"),
+     "init_factory", (), "esaf"),
     ("add-scaleset", {"scalesetId": "sample-sdc-dev-002", "scaleSet": {"vnetCidr": "10.20.0.0/16"}},
-     "add_scale_set", ("002",), "catalog"),
+     "add_scale_set", ("002",), "esaf"),
     ("add-or-update-project", {"projectId": "sample-esml-project001-sdc-dev-001-rg",
                                "settings": {"enableAISearch": "true"}},
-     "upsert_project", ("001",), "catalog"),
+     "upsert_project", ("001",), "esaf"),
     ("delete-project", {"projectId": "sample-esml-project001-sdc-dev-001-rg", "includeProjectSubnets": False},
-     "delete_project", ("001",), "catalog"),
-    ("delete-scaleset", {"scalesetId": "sample-sdc-dev-001"}, "delete_scale_set", ("001",), "catalog"),
-    ("delete-factory", {"factoryId": "sample-sdc-dev"}, "delete_factory", (), "factory-deletion"),
+     "delete_project", ("001",), "esaf"),
+    ("delete-scaleset", {"scalesetId": "sample-sdc-dev-001"}, "delete_scale_set", ("001",), "esaf"),
+    ("delete-factory", {"factoryId": "sample-sdc-dev"}, "delete_factory", (), "esaf"),
 )
 
 
@@ -68,6 +68,10 @@ class ReadClient:
         self.reads.append(("catalog-job", folder, identifier))
         return {"job": dict(self.state)}
 
+    def esaf_job(self, folder, identifier):
+        self.reads.append(("esaf-job", folder, identifier))
+        return dict(self.state)
+
     def creation_workflow_status(self, folder, identifier):
         self.reads.append(("workflow", folder, identifier))
         return dict(self.state)
@@ -80,10 +84,8 @@ class ReadClient:
 def fake_facade():
     facade = SimpleNamespace(Session=esaf.Session, EsafJob=esaf.EsafJob)
     for method in METHODS:
-        kind = "workflow" if method == "init_factory" else "factory-deletion" if method == "delete_factory" else "catalog"
-
-        def start(*args, _method=method, _kind=kind, **kwargs):
-            return esaf.EsafJob(_method, _kind, "job-" + _method, kwargs["session"])
+        def start(*args, _method=method, **kwargs):
+            return esaf.EsafJob(_method, "esaf", "job-" + _method, kwargs["session"])
 
         setattr(facade, method, Mock(side_effect=start))
     return facade
@@ -198,13 +200,14 @@ def test_facade_preserves_self_protection(clock, monkeypatch):
     assert h.client.reads == []
 
 
-@pytest.mark.parametrize("error", [BlockedError("deployment blocked after configuration"), RequestTimeout("timeout")])
-def test_facade_partial_failures_are_uncertain_and_never_retried(clock, monkeypatch, error):
+@pytest.mark.parametrize("error,status", [
+    (BlockedError("submission refused"), "failed"), (RequestTimeout("timeout"), "uncertain")])
+def test_facade_partial_failures_are_uncertain_and_never_retried(clock, monkeypatch, error, status):
     h = harness(clock, monkeypatch)
     h.facade.upsert_project.side_effect = error
     operation = h.service.prepare(CASES[2][0], CASES[2][1])
     operation = confirm_current(h.service, operation)
-    assert operation.status.value == "uncertain"
+    assert operation.status.value == status
     clock.advance(1)
     h.service.reconcile()
     assert h.facade.upsert_project.call_count == 1
@@ -302,7 +305,7 @@ def test_sdk_simulated_deletion_does_not_invoke_facade(clock, monkeypatch):
     assert h.client.payload == CATALOG
 
 
-def test_a_server_refusal_is_uncertain_with_the_servers_reason(clock):
+def test_a_server_refusal_fails_with_the_servers_reason(clock):
     """Enrollment no-ops and live scope proof are the Factory API's ESAF rules now (pink tests/test_esaf_service.py);
     the Function reports the refusal it is given and never submits again."""
     from fake_factory_api import FakeFactoryApi, Problem
@@ -316,7 +319,7 @@ def test_a_server_refusal_is_uncertain_with_the_servers_reason(clock):
         operation = service.prepare("add-or-update-project",
                                     {"projectId": "aif-121-esml-project001-sdc-dev-001-rg"})
         operation = confirm_current(service, operation)
-        assert operation.status.value == "uncertain"
+        assert operation.status.value == "failed"
         assert "missing live scope authorization" in operation.step.failure["detail"]
         clock.advance(1)
         service.reconcile()
@@ -332,7 +335,7 @@ def test_an_api_without_the_esaf_routes_is_reported_not_worked_around(clock):
                                    guard=SelfProtection(()), clock=clock, runner_timeout_seconds=4200)
         operation = confirm_current(service, service.prepare(
             "add-or-update-project", {"projectId": "aif-121-esml-project001-sdc-dev-001-rg"}))
-        assert operation.status.value in ("failed", "uncertain")
+        assert operation.status.value == "failed"
         assert "/api/v1/esaf" in operation.step.failure["detail"]
         assert not any(call["path"].startswith("/api/v1/factory-catalog/") and call["method"] == "POST"
                        for call in upstream.calls)

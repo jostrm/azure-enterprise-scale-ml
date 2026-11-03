@@ -1,4 +1,4 @@
-"""One esaf facade call per approved scenario; the SDK owns API reviews, confirmations and deletion grants."""
+"""One thin L1 esaf call per approved scenario; the L2 API owns orchestration and durable jobs."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from ..application.planner import plan
-from ..domain.errors import LifecycleError, UnknownId, UpstreamError, UpstreamTimeout, ValidationFailed
+from ..domain.errors import UnknownId, UpstreamError, UpstreamTimeout, ValidationFailed
 from ..domain.ids import parse_any
 from ..domain.operation import Preview, StepKind
 from ..domain.scenarios import Scenario
@@ -84,8 +84,8 @@ class SdkFactoryBackend:
             affected_resource_groups=[], blockers=[], can_execute=True, expires_at=now.timestamp() + self._ttl,
             backend_ref={"kind": "esaf", "method": method, "args": list(args), "kwargs": kwargs,
                          "scope": dict(request.resolved)},
-            warnings=["Scope approval only, not an Azure dry-run: the Factory API's ESAF job prepares and confirms the "
-                      "live reviews during execution. One confirmation authorizes the entire scenario."])
+            warnings=["Scope approval only, not an Azure dry-run: the L1 SDK submits one approved scenario; the L2 API "
+                      "owns live reviews and execution. One confirmation authorizes the entire scenario."])
 
     def confirm(self, request: StepRequest, preview: Preview, phrase: str | None) -> ConfirmResult:
         refuse_deletes(self.delete_mode, request)
@@ -102,12 +102,8 @@ class SdkFactoryBackend:
                 raise ValidationFailed("The target's catalog identity changed; prepare a new scope approval.",
                                        code="scope-changed")
         session = self._facade.Session(self.folder, self._client, request.resolved.get("factory_id"))
-        try:
-            handle = _translated(lambda: getattr(self._facade, method)(*args, **kwargs, session=session))
-        except LifecycleError as error:
-            # A facade call can already have saved configuration or granted deletion before a later review fails.
-            raise UpstreamError(f"{error.detail} The scenario may have partially changed the factory; reconcile its "
-                                "state before starting another operation.") from None
+        # Typed refusals precede acceptance; transport/server failures remain uncertain, never resubmitted.
+        handle = _translated(lambda: getattr(self._facade, method)(*args, **kwargs, session=session))
         if not handle.id or handle.kind not in HANDLE_KINDS:
             raise UpstreamError("The SDK returned no usable job handle; reconcile the Factory API before acting again.")
         return ConfirmResult(

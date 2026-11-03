@@ -4,9 +4,10 @@ The [README](README.md) describes the template. This page puts every secret, ide
 solution in one place, with examples you can copy. All names and IDs below are examples (`contoso`, dummy GUIDs):
 replace them with your own.
 
-Use `AIF_BACKEND=sdk` for the simplified design: one Function confirmation invokes one `esaf` scenario method.
-The Function's prepare is a **scope approval**, not a live Azure deployment review. The SDK owns the underlying
-API prepare/confirm sequence. `AIF_BACKEND=rest` remains the legacy, separately reviewed per-step alternative.
+Use `AIF_BACKEND=sdk` for **Consumer → L1 Python ESAF SDK → L2 Factory API**: one Function confirmation invokes
+one `esaf` method, which sends one approved POST to `/api/v1/esaf/<scenario>`. The Function's prepare is a
+**scope approval**, not a live Azure deployment review. L2 owns the underlying reviews, configuration, enrollment,
+deletion authorization, dispatch and retries. `AIF_BACKEND=rest` remains the legacy per-step alternative.
 
 | Example | Meaning |
 |---|---|
@@ -79,9 +80,10 @@ API prepare/confirm sequence. `AIF_BACKEND=rest` remains the legacy, separately 
    ```
 
    With `sdk`, there is one `scenario` step: confirm once to configure and deploy through `esaf.upsert_project`.
-   Read the operation until it succeeds or stops. A facade failure can occur after partial changes and becomes
-   `uncertain`: inspect the Factory API before another attempt. The `rest` alternative still confirms configure and
-   deploy separately.
+   Read the operation until it succeeds or stops. Definite submission refusals fail the operation; unknown outcomes
+   (transport/server failures or missing job receipts) become `uncertain`: inspect the Factory API before another
+   attempt. The Function never resubmits; L2 can perform bounded retries inside an accepted job. The `rest`
+   alternative still confirms configure and deploy separately.
 
 <details>
 <summary><b>More info: every secret and identity</b></summary>
@@ -137,15 +139,18 @@ az network vnet list --subscription 11111111-1111-1111-1111-111111111111 `
 <details>
 <summary><b>More info: the management VM (Factory API host and runner)</b></summary>
 
-The Factory API answers catalog and deployment routes on loopback only, so the Function never calls it over the
-network: it dispatches `aif-ops.yml` to the management runner, which calls the API on `127.0.0.1:8765` and posts a
+The Factory API answers catalog, deployment and ESAF routes on loopback only, so the hosted Function never calls
+those routes over the network: it dispatches `aif-ops.yml` to a management runner on the **same host as the API**,
+which calls the explicitly configured API loopback URL and posts a
 signed result back. Keep the VM outside every factory the Function can create or delete, and protect its scale set
 with `AIF_PROTECTED_IDS`.
 
-Use the runner for slow real operations. `inprocess` is bounded by the Function's 10-minute host timeout, while
-one live runtime prepare/confirm can take longer. The runner's API timeout defaults to 2700 seconds per API call;
-its 60-minute workflow job is bounded by the Function's 4200-second hand-off timeout. A timed-out confirmation is
-uncertain, never a reason to submit the facade method again.
+`inprocess` is only for a local Function on that API host. The L1 submission returns an ESAF job receipt; L2
+continues orchestration independently, and subsequent runner calls only read its status. The legacy REST mode
+can still require long prepare/confirm calls. The runner's API timeout defaults to 2700 seconds per call; its
+60-minute workflow job is bounded by the Function's 4200-second hand-off timeout. A timed-out confirmation is
+uncertain, never a reason to submit the facade method again. `127.0.0.1:8765` below is an example, not discovery
+of a live endpoint; use the operator-configured host URL.
 
 1. **No manual Azure CLI login**: the installer gives the Factory API its own `az` profile (`C:\aif-api\azure-cli`)
    and signs it in with the VM's managed identity at every start, so an Azure DevOps agent or another job running as
@@ -159,6 +164,8 @@ uncertain, never a reason to submit the facade method again.
 
    Pass `Release` explicitly: v0.47.32 or later federates the OIDC subject GitHub signs for repositories created after
    July 15, 2026, and reads a new Entra group back until Microsoft Graph has replicated it.
+   That historical release example is **not** proof of ESAF compatibility. SDK mode additionally needs the live
+   `/api/v1/esaf/*` facade and scope guards described below; select an operator-verified compatible build.
    Logs: `C:\aif-api\logs`. The API's `folder` is the factory repository's `azurefactory` subfolder, for example
    `C:\aif\aif-factory-contoso-ai\azurefactory`.
 3. **The management runner** for the ops repository, with a label of its own (never the factory runner's label):
@@ -243,23 +250,24 @@ authentication on and sets `AIF_REQUIRED_ROLE`. Register the app first:
 
 `POST /api/v1/lifecycle/<scenario>/prepare` answers 202 with `Location` (the operation) and `Retry-After`. The
 Function resolves the target and prepares one scope approval for `sdk`. No mutating facade call is made until you
-confirm. The SDK then prepares/checks/confirms the actual API operations and returns an `EsafJob`.
+confirm. The SDK submits one scenario and returns an `EsafJob(kind="esaf")`; L2 orchestrates the actual operations.
 
 | # | Route segment | Body | One SDK invocation |
 |---|---|---|---|
 | 1 | `init-factory` | `{"factoryId":"contoso-ai-sdc-dev","bootstrapConfig":{...}}` | `esaf.init_factory(creation_request=...)`: save the factory and start server-owned full bootstrap |
-| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"vnetCidr":"10.20.64.0/18","maxProjects":7}}` | `esaf.add_scale_set("002", cidr=...)`: register, enroll and deploy common resources |
+| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"vnetCidr":"10.20.64.0/18","maxProjects":7}}` | `esaf.add_scale_set("002", "dev", cidr=...)`: register, enroll and deploy common resources |
 | 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | `esaf.upsert_project("002", scale_set="001", environment="dev", settings=...)` |
 | 4 | `delete-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg"}` | `esaf.delete_project("002", scale_set="001", environment="dev", ...)` |
 | 5 | `delete-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002"}` | `esaf.delete_scale_set("002", environment="dev")` |
 | 6 | `delete-factory` | `{"factoryId":"contoso-ai-sdc-dev"}` | `esaf.delete_factory()`: every scale set must be in the requested environment |
 
 Every call also receives an explicit session with the configured folder and resolved factory ID; no global session
-is used by the Function. `scaleSet` can additionally override `subscriptionId`, `tenantId` and `orchestrator`; omitted
+is used by the Function. Scale-set/project methods require `dev`, `stage` or `prod`; the Function maps Azure `test`
+to catalog `stage`. `scaleSet` can additionally override `subscriptionId`, `tenantId` and `orchestrator`; omitted
 values come from the factory. SDK mode rejects unsupported `scaleSet` fields such as `commonSubnets`, rather than
 ignoring them. Scenario 2 does not implicitly create project001; call Scenario 3 separately for that project.
 Scenario 4 preserves the Function defaults `includeProjectSubnets=true` and `includeKeyvaultAndResourceGroup=true`,
-passing both explicitly instead of inheriting the SDK's different subnet default.
+passing both explicitly instead of inheriting server defaults.
 
 With `rest`, the legacy steps remain: Scenario 1 configure/bootstrap, Scenario 2 configure/add-project001/enroll/
 deploy-common/deploy-project001, Scenario 3 configure/deploy-project, and one delete step for Scenarios 4-6.
@@ -278,7 +286,8 @@ Scenario 1 against the real API: `bootstrapConfig` is the API's full bootstrap c
 
 The API then runs repository-initialization, minimum-foundation, prerequisites, network-foundation, runner,
 connection, provider-handoff, publication, common-deployment, project-deployment and complete by itself under that
-one approval. If it asks for a new human review on the way (`requires_review`), the Function's step stops with
+one approval. New SDK jobs are followed through the outer ESAF status, not individual child workflow phases.
+For saved legacy workflow jobs only, `awaiting-review` with `requires_review=true` stops the Function step with
 `action_required` and the API's message.
 
 Deletes depend on `AIF_DELETES`:
@@ -291,8 +300,8 @@ Deletes depend on `AIF_DELETES`:
 
 Confirm a delete with its phrase:
 
-For `sdk` the Function phrase is `DELETE <readable target ID>`; the SDK itself supplies the API's reviewed
-confirmation phrases and grants deletion permission once. Do not duplicate those calls in the Function.
+For `sdk` the Function phrase is `DELETE <readable target ID>`; L1 submits `approved=true` only after that approval.
+L2 owns reviewed confirmation phrases and deletion grants. Do not duplicate those calls in the Function or L1.
 
 ```powershell
 $step = (Invoke-RestMethod "$base/v1/operations/$id" -Headers $h).steps[0]
@@ -347,7 +356,8 @@ Errors are `application/problem+json`, for example:
 
 `adapters/sdk_backend.py` implements the backend port directly: it no longer inherits the REST step-to-call
 orchestration. The composition root selects it for `AIF_BACKEND=sdk` both in-process and on the management runner.
-The Function retains its safety and persistence layer; only the lifecycle orchestration moves into the SDK.
+The Function retains its safety and persistence layer. L1 is only the Python HTTP client; lifecycle orchestration
+runs in L2, not in the SDK or a Function background thread.
 
 On the API host:
 
@@ -363,33 +373,41 @@ print(job.id)
 print(job.status())  # one read; no polling thread required
 ```
 
-The Function persists the returned ID, kind (`esaf`; `catalog`, `workflow` or `factory-deletion` for jobs an earlier
-SDK returned) and selected factory. `EsafJob.status()` reads `/api/v1/esaf/jobs/{id}`, or the older endpoints. It can be
-reconstructed after a Function restart or a separate runner invocation. The bootstrap path uses `creation_request`
-and whole-workflow server continuation, not the SDK's legacy local background driver.
+The Function persists the returned ID, `job_kind="esaf"` and selected factory. `EsafJob.status()` performs
+`GET /api/v1/esaf/jobs/{id}?folder=...` and can be reconstructed after a Function restart or separate runner invocation.
+`accepted`, `preparing`, `confirming`, `running` and `retrying` keep the operation active; `succeeded` completes it,
+while `blocked`, `failed` and `interrupted` fail it with the server message. A child's failure is not terminal while
+the outer job is retrying. Saved `catalog`, `workflow` and `factory-deletion` handles still use their original
+status endpoints, including records labelled `apply_project`; no scenario is redispatched to read them.
+
+`job.wait()` defaults to one-second polling in direct SDK clients. The Function does not call `wait()` or hold an
+invocation open: its existing reconciler uses `AIF_POLL_AFTER_SECONDS` (default 120 seconds, also bounded by its
+timer/runner scheduling). L2 owns bounded retries inside the accepted job (currently two by default); the Function
+does not submit another job or duplicate prepare/confirm steps.
 
 Use the exact SDK pin in `requirements.txt`; an older installed SDK does not acquire new methods merely because
 purple main changed. Update both the Function and runner packages together. Reconcile/finish old SDK operations
 before upgrading; unconfirmed old step requests are refused with `sdk-operation-upgrade`, not replayed.
-`upsert_project` is the scenario spelling; `apply_project` remains an alias. The SDK is a thin client of the Factory
-API's `/api/v1/esaf/*` routes: an API without them is refused (`/api/v1/esaf`), never worked around.
+`upsert_project` is the canonical scenario method; `apply_project` remains a compatibility alias for existing callers.
 
-The Factory API must also support extending an already-bound scale set's enrollment with newly registered project
-resource groups, and enforce project enrollment coverage and deletion permission before its `API-2-Pipelines`
-dispatch. Older servers may report a bound scale set as enrolled without covering a new project, and the old
-project-pipeline path may queue work without those guards. They are not a supported target for this SDK rollout.
-**Update the API first**, then the Function and runner, with real deletes still refused. Installing the new SDK
-does not upgrade the server. Reconcile any partially saved project before retrying on the updated API.
+**A running, compatible L2 API is required**, on the same host as L1. It must provide the six `/api/v1/esaf/*`
+submission routes and durable job GET route, enforce exact environment/scale-set/project selection, extend
+enrollment for newly registered project groups and enforce deployment/deletion guards before dispatch.
+The thin SDK no longer performs these reviews locally. A missing facade route fails with `sdk-config` and no
+legacy-route fallback. **Update/verify the API first**, then the Function and runner, with real deletes refused.
+Installing the SDK pin does not upgrade the server or prove its installed version.
 
-The SDK requires `runtime_scope_authorization` from each project runtime review: the exact factory/scale-set/project
-IDs, a normalized resource-group ARM ID in the selected subscription, live enrollment and explicit deletion permission.
-Missing or mismatched evidence stops SDK confirmation; project deletion additionally requires `delete_authorized=true`.
-This checks actual reviewed scope/permission, not an API version or hash. A prior configuration save may already have
-occurred, so the Function still records the interrupted scenario as `uncertain`, never success or an automatic retry.
+Typed config/auth/blocked/conflict submission refusals fail the Function operation before an accepted job.
+Transport/server failures and malformed receipts are uncertain, never success or an automatic resubmission.
+After acceptance, follow the server's outer job status; inspect any partial changes before preparing another operation.
 
 ### Read-only consumer check
 
-On the API host, `client.catalog_list(folder)` and `job.status()` are reads. The Function's SDK `/prepare` only
+Read `GET /api/v1/health`, `GET /api/v1/operations` and `GET /api/v1/operations/{id}` on the configured Function endpoint
+with the required authentication; do not infer the installed SDK from the health backend label. On the API host,
+`GET /health`, `GET /openapi.json`, `client.catalog_list(folder)` and an existing `job.status()` are reads.
+Use the configured API URL/key; never probe unrelated API instances. Check the OpenAPI paths for ESAF support,
+and verify installed package/build provenance separately. The Function's SDK `/prepare` only
 produces a scope approval and does not prove that the API will permit a deployment. Do not call any of the six
 facade methods for a read-only check, including `upsert_project` with empty settings: it deploys.
 Check the installed Factory API's support for the consumer's Azure DevOps organization before live execution;
@@ -412,8 +430,12 @@ the Spider consumer's cross-tenant ADO setup has previously been refused by cata
 | Scenario 1 stops as `uncertain` after a verified stage, diagnostic `stage-execution-interrupted`, phase `authorization-continuation` | The API's own continuation failed before the next stage started, for example the network-foundation review got an ARM 403 reading a peered network in another subscription | Grant the missing access (Reader on that network), then recover at the verified boundary below |
 | The same stop after `publication` (single-writer), and a read-only `POST /api/v1/factory-catalog/prepare` with `action: deploy` for the scale set shows "Bootstrap ownership handoff blocked: unregistered actual resources lack bootstrap receipt proof" | The private DNS zones' SOA records and the runner's registration run command have no creation receipt. The whole-workflow continuation pauses for these consents before PROJECT, not before COMMON | Recover at the verified boundary, then confirm `bootstrap-dns-soa-preservation` (stage `common-deployment`) and `bootstrap-preservation` (the runner's `MDE.Linux` extension and its registration command), then prepare-next and start. The runner review needs the Defender extension: on a subscription with Defender for Servers it appears about an hour after the runner VM is created |
 
-**Recover a whole-workflow bootstrap at its verified boundary** (on the API host, loopback, `X-API-Key`; nothing
-runs until the last call):
+**Legacy workflow recovery only:** the examples below describe the older workflow contract. For a new ESAF job,
+first inspect its outer status and L2 diagnostics; do not recover or restart a child while L2 is still active or
+retrying. A new accepted ESAF failure is recorded as `failed`, not as an unknown submission outcome.
+
+**Recover a legacy whole-workflow bootstrap at its verified boundary** (on the API host, loopback, `X-API-Key`;
+nothing runs until the last call):
 
 ```powershell
 $api = 'http://127.0.0.1:8765/api/v1/creation/workflows'; $id = '<workflow id>'

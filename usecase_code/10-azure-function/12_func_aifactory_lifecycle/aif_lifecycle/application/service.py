@@ -266,7 +266,8 @@ class LifecycleService:
                                                   conclusion=observed.get("conclusion"), run_id=observed.get("run_id"),
                                                   html_url=observed.get("html_url"), source="poller", now=now)
                     if change == "step-failed":
-                        operation.attach_failure_excerpt(self._excerpt(observed.get("run_id")))
+                        operation.attach_failure_excerpt(self._excerpt(observed.get("run_id")) or
+                                                         observed.get("message", ""))
             self._drive(operation)
             if operation.to_record() != before and self._save_quietly(operation):
                 summary["updated"] += 1
