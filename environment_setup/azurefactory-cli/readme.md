@@ -45,6 +45,9 @@ esaf.delete_factory()                                   # 6
 job.wait()                                              # reads the job every second until it ends
 ```
 
+Step by step, locally: [ESAF usage guide](docs/esaf/readme.md) (start the API, install, connect, every method and
+its parameters, jobs, errors, CLI).
+
 Each call is one POST to the Factory API's `/api/v1/esaf/<scenario>` route, which runs the scenario as a resilient
 server-side job and answers 202 with a job id (see the API guide's ESAF section). These calls are **execution
 approval**, not prepare-only commands. `environment` (`dev`, `stage` or `prod`) is required on scale-set and project
