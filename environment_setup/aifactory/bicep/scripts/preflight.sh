@@ -1519,13 +1519,15 @@ for t in "${TARGETS[@]:-}"; do
   fi
   if is_true "$ENABLE_AI_SEARCH"; then
     if ai_search_candidates="$(aif_ai_search_candidate_order "$AI_SEARCH_TIER" "$ai_search_retry_array" "$AI_SEARCH_RETRY_CAPACITY_ARRAY")"; then
+      # The retry deploys the first candidate that has capacity, so one confirmed SKU/region is enough;
+      # a candidate without quota stays a finding (aif-145: standard2 has limit 0 in every region).
+      search_any_headroom="false"
       while IFS= read -r search_region; do
         while IFS= read -r ai_search_candidate; do
-          if ! check_ai_search_quota "$sub" "$ai_search_candidate" "$search_region"; then
-            if [ "$SEARCH_RETRY_REQUIRED" = "true" ]; then AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"; fi
-          fi
+          if check_ai_search_quota "$sub" "$ai_search_candidate" "$search_region"; then search_any_headroom="true"; fi
         done <<< "$ai_search_candidates"
       done <<< "${!search_regions_var}"
+      if [ "$SEARCH_RETRY_REQUIRED" = "true" ] && [ "$search_any_headroom" != "true" ]; then AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"; fi
     else
       add_finding FAIL SEARCH_RETRY_CONFIG_INVALID \
         "Azure AI Search retry candidates must be one to three unique SKUs and include the selected SKU." \
@@ -1565,7 +1567,7 @@ if [ "$KV_PRINCIPAL_INVALID" = "true" ]; then
   exit 1
 fi
 if [ "$AI_SEARCH_RETRY_PREFLIGHT_FAILED" = "true" ]; then
-  ci_error "Azure AI Search retry capacity preflight failed; every configured candidate must have confirmed quota headroom before deployment."
+  ci_error "Azure AI Search retry capacity preflight failed; no configured SKU/region candidate has confirmed quota headroom."
   echo "preflight FAILED: Search candidate quota headroom was not confirmed (exit 1)."
   exit 1
 fi
