@@ -15,10 +15,13 @@ from ..ports import Catalog, ConfirmResult, StepRequest
 from .api_errors import UpstreamRefused, error_for_status
 from .factory_api import bootstrap_config, refuse_deletes, repository_root
 
+# "esaf": the Factory API's /api/v1/esaf job (SDK thin client); the others are jobs an earlier SDK returned.
+HANDLE_KINDS = ("esaf", "catalog", "workflow", "factory-deletion")
+
 SCENARIO_METHODS = {
     Scenario.INIT_FACTORY: "init_factory",
     Scenario.ADD_SCALESET: "add_scale_set",
-    Scenario.ADD_OR_UPDATE_PROJECT: "apply_project",
+    Scenario.ADD_OR_UPDATE_PROJECT: "upsert_project",
     Scenario.DELETE_PROJECT: "delete_project",
     Scenario.DELETE_SCALESET: "delete_scale_set",
     Scenario.DELETE_FACTORY: "delete_factory",
@@ -81,8 +84,8 @@ class SdkFactoryBackend:
             affected_resource_groups=[], blockers=[], can_execute=True, expires_at=now.timestamp() + self._ttl,
             backend_ref={"kind": "esaf", "method": method, "args": list(args), "kwargs": kwargs,
                          "scope": dict(request.resolved)},
-            warnings=["Scope approval only, not an Azure dry-run: the SDK prepares and confirms the live API reviews "
-                      "during execution. One confirmation authorizes the entire scenario."])
+            warnings=["Scope approval only, not an Azure dry-run: the Factory API's ESAF job prepares and confirms the "
+                      "live reviews during execution. One confirmation authorizes the entire scenario."])
 
     def confirm(self, request: StepRequest, preview: Preview, phrase: str | None) -> ConfirmResult:
         refuse_deletes(self.delete_mode, request)
@@ -105,7 +108,7 @@ class SdkFactoryBackend:
             # A facade call can already have saved configuration or granted deletion before a later review fails.
             raise UpstreamError(f"{error.detail} The scenario may have partially changed the factory; reconcile its "
                                 "state before starting another operation.") from None
-        if not handle.id or handle.kind not in ("catalog", "workflow", "factory-deletion"):
+        if not handle.id or handle.kind not in HANDLE_KINDS:
             raise UpstreamError("The SDK returned no usable job handle; reconcile the Factory API before acting again.")
         return ConfirmResult(
             job={"kind": "esaf", "scenario": method, "job_kind": handle.kind, "job_id": handle.id,
@@ -119,7 +122,7 @@ class SdkFactoryBackend:
             # Existing persisted jobs remain readable after upgrading; old unconfirmed steps must be re-prepared.
             kind = "workflow" if job.get("kind") == "workflow" else "catalog"
             identifier = job.get("workflow_id") if kind == "workflow" else job.get("job_id")
-        if kind not in ("catalog", "workflow", "factory-deletion") or not identifier:
+        if kind not in HANDLE_KINDS or not identifier:
             raise ValidationFailed("The saved SDK job handle is not valid.")
         session = self._facade.Session(self.folder, self._client, job.get("factory_id"))
         handle = self._facade.EsafJob(job.get("scenario", ""), kind, identifier, session)

@@ -78,7 +78,7 @@ API prepare/confirm sequence. `AIF_BACKEND=rest` remains the legacy, separately 
          -ContentType application/json -Body (@{ confirmationToken = $step.preview.confirmationToken } | ConvertTo-Json)
    ```
 
-   With `sdk`, there is one `scenario` step: confirm once to configure and deploy through `esaf.apply_project`.
+   With `sdk`, there is one `scenario` step: confirm once to configure and deploy through `esaf.upsert_project`.
    Read the operation until it succeeds or stops. A facade failure can occur after partial changes and becomes
    `uncertain`: inspect the Factory API before another attempt. The `rest` alternative still confirms configure and
    deploy separately.
@@ -249,7 +249,7 @@ confirm. The SDK then prepares/checks/confirms the actual API operations and ret
 |---|---|---|---|
 | 1 | `init-factory` | `{"factoryId":"contoso-ai-sdc-dev","bootstrapConfig":{...}}` | `esaf.init_factory(creation_request=...)`: save the factory and start server-owned full bootstrap |
 | 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"vnetCidr":"10.20.64.0/18","maxProjects":7}}` | `esaf.add_scale_set("002", cidr=...)`: register, enroll and deploy common resources |
-| 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | `esaf.apply_project("002", scale_set="001", environment="dev", settings=...)` |
+| 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | `esaf.upsert_project("002", scale_set="001", environment="dev", settings=...)` |
 | 4 | `delete-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg"}` | `esaf.delete_project("002", scale_set="001", environment="dev", ...)` |
 | 5 | `delete-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002"}` | `esaf.delete_scale_set("002", environment="dev")` |
 | 6 | `delete-factory` | `{"factoryId":"contoso-ai-sdc-dev"}` | `esaf.delete_factory()`: every scale set must be in the requested environment |
@@ -358,20 +358,21 @@ client = AzureFactoryClient(base_url="http://127.0.0.1:8765", api_key=api_key)  
 folder = r"C:\aif\aif-factory-contoso-ai\azurefactory"
 session = esaf.Session(folder, client, factory="<resolved factory ID>")
 # This call IS approval and can mutate Azure. It is not a read-only test.
-job = esaf.apply_project("002", scale_set="001", environment="dev", settings={}, session=session)
+job = esaf.upsert_project("002", "dev", scale_set="001", settings={}, session=session)
 print(job.id)
 print(job.status())  # one read; no polling thread required
 ```
 
-The Function persists the returned ID, kind (`catalog`, `workflow` or `factory-deletion`) and selected factory.
-`EsafJob.status()` chooses the correct endpoint, including the dedicated factory-deletion endpoint. It can be
+The Function persists the returned ID, kind (`esaf`; `catalog`, `workflow` or `factory-deletion` for jobs an earlier
+SDK returned) and selected factory. `EsafJob.status()` reads `/api/v1/esaf/jobs/{id}`, or the older endpoints. It can be
 reconstructed after a Function restart or a separate runner invocation. The bootstrap path uses `creation_request`
 and whole-workflow server continuation, not the SDK's legacy local background driver.
 
 Use the exact SDK pin in `requirements.txt`; an older installed SDK does not acquire new methods merely because
 purple main changed. Update both the Function and runner packages together. Reconcile/finish old SDK operations
 before upgrading; unconfirmed old step requests are refused with `sdk-operation-upgrade`, not replayed.
-`upsert_project` remains available for existing SDK callers; `apply_project` is the scenario spelling used here.
+`upsert_project` is the scenario spelling; `apply_project` remains an alias. The SDK is a thin client of the Factory
+API's `/api/v1/esaf/*` routes: an API without them is refused (`/api/v1/esaf`), never worked around.
 
 The Factory API must also support extending an already-bound scale set's enrollment with newly registered project
 resource groups, and enforce project enrollment coverage and deletion permission before its `API-2-Pipelines`
@@ -390,7 +391,7 @@ occurred, so the Function still records the interrupted scenario as `uncertain`,
 
 On the API host, `client.catalog_list(folder)` and `job.status()` are reads. The Function's SDK `/prepare` only
 produces a scope approval and does not prove that the API will permit a deployment. Do not call any of the six
-facade methods for a read-only check, including `apply_project` with empty settings: it deploys.
+facade methods for a read-only check, including `upsert_project` with empty settings: it deploys.
 Check the installed Factory API's support for the consumer's Azure DevOps organization before live execution;
 the Spider consumer's cross-tenant ADO setup has previously been refused by catalog runtime.
 

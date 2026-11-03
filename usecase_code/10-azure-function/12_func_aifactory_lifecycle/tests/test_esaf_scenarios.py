@@ -28,7 +28,7 @@ FOLDER = r"C:\repos\consumer\azurefactory"
 FACTORY = "11111111-1111-4111-8111-111111111111"
 SCALE = "22222222-2222-4222-8222-222222222222"
 PROJECT = "33333333-3333-4333-8333-333333333333"
-METHODS = ("init_factory", "add_scale_set", "apply_project", "delete_project", "delete_scale_set", "delete_factory")
+METHODS = ("init_factory", "add_scale_set", "upsert_project", "delete_project", "delete_scale_set", "delete_factory")
 CATALOG = {
     "revision": "revision-1",
     "factories": [{
@@ -46,7 +46,7 @@ CASES = (
      "add_scale_set", ("002",), "catalog"),
     ("add-or-update-project", {"projectId": "sample-esml-project001-sdc-dev-001-rg",
                                "settings": {"enableAISearch": "true"}},
-     "apply_project", ("001",), "catalog"),
+     "upsert_project", ("001",), "catalog"),
     ("delete-project", {"projectId": "sample-esml-project001-sdc-dev-001-rg", "includeProjectSubnets": False},
      "delete_project", ("001",), "catalog"),
     ("delete-scaleset", {"scalesetId": "sample-sdc-dev-001"}, "delete_scale_set", ("001",), "catalog"),
@@ -156,10 +156,10 @@ def test_scenario_routes_invoke_one_facade_method_and_persist_job(clock, monkeyp
     if method == "add_scale_set":
         assert kwargs["cidr"] == "10.20.0.0/16"
         assert kwargs["environment"] == "dev"
-    if method in ("apply_project", "delete_project"):
+    if method in ("upsert_project", "delete_project"):
         assert kwargs["scale_set"] == "001"
         assert kwargs["environment"] == "dev"
-    if method == "apply_project":
+    if method == "upsert_project":
         assert kwargs["settings"] == body["settings"]
     if method == "delete_project":
         assert kwargs["include_project_subnets"] is False
@@ -201,13 +201,13 @@ def test_facade_preserves_self_protection(clock, monkeypatch):
 @pytest.mark.parametrize("error", [BlockedError("deployment blocked after configuration"), RequestTimeout("timeout")])
 def test_facade_partial_failures_are_uncertain_and_never_retried(clock, monkeypatch, error):
     h = harness(clock, monkeypatch)
-    h.facade.apply_project.side_effect = error
+    h.facade.upsert_project.side_effect = error
     operation = h.service.prepare(CASES[2][0], CASES[2][1])
     operation = confirm_current(h.service, operation)
     assert operation.status.value == "uncertain"
     clock.advance(1)
     h.service.reconcile()
-    assert h.facade.apply_project.call_count == 1
+    assert h.facade.upsert_project.call_count == 1
 
 
 def test_facade_refuses_scope_changes_but_not_revision_drift(clock, monkeypatch):
@@ -215,14 +215,14 @@ def test_facade_refuses_scope_changes_but_not_revision_drift(clock, monkeypatch)
     operation = h.service.prepare(CASES[2][0], CASES[2][1])
     h.client.payload["revision"] = "unrelated-revision"
     assert confirm_current(h.service, operation).status.value == "running"
-    assert h.facade.apply_project.call_count == 1
+    assert h.facade.upsert_project.call_count == 1
     h = harness(clock, monkeypatch)
     operation = h.service.prepare(CASES[2][0], CASES[2][1])
     h.client.payload["factories"][0]["id"] = "different-factory"
     operation = confirm_current(h.service, operation)
     assert operation.status.value == "failed"
     assert operation.step.failure["code"] == "scope-changed"
-    h.facade.apply_project.assert_not_called()
+    h.facade.upsert_project.assert_not_called()
 
 
 @pytest.mark.parametrize("body", [
@@ -242,43 +242,51 @@ def test_facade_invalid_inputs_fail_before_execution(clock, monkeypatch, body):
 
 def test_facade_missing_job_handle_is_not_reported_as_success(clock, monkeypatch):
     h = harness(clock, monkeypatch)
-    h.facade.apply_project.side_effect = None
-    h.facade.apply_project.return_value = esaf.EsafJob("apply_project", "catalog", None,
+    h.facade.upsert_project.side_effect = None
+    h.facade.upsert_project.return_value = esaf.EsafJob("upsert_project", "catalog", None,
                                                      esaf.Session(FOLDER, h.client, FACTORY))
     operation = confirm_current(h.service, h.service.prepare(CASES[2][0], CASES[2][1]))
     assert operation.status.value == "uncertain"
 
 
-@pytest.mark.parametrize("slug,body,expected", [
+@pytest.mark.parametrize("slug,body,route,fields", [
     ("add-or-update-project", {"projectId": "aif-121-esml-project001-sdc-dev-001-rg",
-                               "settings": {"enableAISearch": "true"}}, ["configure-settings", "deploy"]),
-    ("add-or-update-project", {"projectId": "aif-121-esml-project002-sdc-dev-001-rg"}, ["add-project", "deploy"]),
+                               "settings": {"enableAISearch": "true"}},
+     "upsert-project", {"project": "001", "environment": "dev", "scale_set": "001",
+                        "settings": {"enableAISearch": "true"}, "display_name": "Project 001"}),
+    ("add-or-update-project", {"projectId": "aif-121-esml-project002-sdc-dev-001-rg"},
+     "upsert-project", {"project": "002", "environment": "dev", "scale_set": "001", "settings": {},
+                        "display_name": "Project 002"}),
     ("add-scaleset", {"scalesetId": "aif-121-sdc-dev-002", "scaleSet": {"vnetCidr": "10.121.64.0/18",
                       "subscriptionId": "f0fe8b33-73bf-41e4-9997-e3920d793c06",
                       "tenantId": "c157e61b-4a1e-488c-9a0c-d9a23e864a65", "orchestrator": "gha"}},
-     ["create-scale-set", "deploy"]),
+     "add-scale-set", {"scale_set": "002", "environment": "dev", "cidr": "10.121.64.0/18", "max_projects": 7,
+                       "subscription_id": "f0fe8b33-73bf-41e4-9997-e3920d793c06",
+                       "tenant_id": "c157e61b-4a1e-488c-9a0c-d9a23e864a65", "orchestrator": "gha"}),
 ])
-def test_sdk_scenario_uses_real_facade_and_http_client(clock, slug, body, expected):
-    from fake_factory_api import FakeFactoryApi
+def test_sdk_scenario_uses_real_facade_and_http_client(clock, slug, body, route, fields):
+    """One confirmation is one POST to the Factory API's ESAF route; the API owns the reviews behind it."""
+    from fake_factory_api import FACTORY_ID, FakeFactoryApi
 
     with FakeFactoryApi(stateful=True) as upstream:
         backend = SdkFactoryBackend(upstream.url, upstream.api_key, FOLDER, clock=clock)
         service = LifecycleService(backend=backend, tracker=ApiJobTracker(backend), store=MemoryStore(),
-                                   guard=SelfProtection(()), clock=clock, runner_timeout_seconds=4200)
+                                   guard=SelfProtection(()), clock=clock, poll_after_seconds=1,
+                                   runner_timeout_seconds=4200)
         operation = service.prepare(slug, body)
         assert operation.status.value == "awaiting_confirmation"
         assert not any(call["method"] == "POST" for call in upstream.calls)
         operation = confirm_current(service, operation)
         assert operation.status.value == "running", operation.step.failure
-        bodies = [call["body"] for call in upstream.calls if call["path"] == "/api/v1/factory-catalog/prepare"]
-        assert [body["action"] for body in bodies] == expected
+        assert upstream.state.esaf_requests == [
+            (route, {"folder": FOLDER, "approved": True, "factory": FACTORY_ID, **fields})]
+        assert not any(call["path"].startswith("/api/v1/factory-catalog/") and call["method"] == "POST"
+                       for call in upstream.calls)
+        assert operation.step.job["job_kind"] == "esaf"
         assert backend.job_status(operation.step.job)["status"] == "succeeded"
-        if body.get("settings"):
-            assert upstream.state.document["configurations"][PROJECT] == body["settings"]
-        if slug == "add-scaleset":
-            new_scale = next(s for s in upstream.state.factory["scale_sets"] if s["suffix"] == "002")
-            assert bodies[-1]["scale_set_id"] == new_scale["id"]
-            assert bodies[-1].get("project_id") is None
+        clock.advance(1)
+        service.reconcile()
+        assert service.get(operation.id).status.value == "succeeded"
 
 
 def test_sdk_simulated_deletion_does_not_invoke_facade(clock, monkeypatch):
@@ -294,38 +302,14 @@ def test_sdk_simulated_deletion_does_not_invoke_facade(clock, monkeypatch):
     assert h.client.payload == CATALOG
 
 
-def test_enrollment_noop_does_not_override_a_runtime_coverage_refusal(clock, monkeypatch):
-    from fake_factory_api import ENROLLED_BLOCKER, FakeFactoryApi
+def test_a_server_refusal_is_uncertain_with_the_servers_reason(clock):
+    """Enrollment no-ops and live scope proof are the Factory API's ESAF rules now (pink tests/test_esaf_service.py);
+    the Function reports the refusal it is given and never submits again."""
+    from fake_factory_api import FakeFactoryApi, Problem
 
-    with FakeFactoryApi(stateful=True) as upstream:
-        original = upstream.state.enroll_prepare
-        monkeypatch.setattr(upstream.state, "enroll_prepare", lambda body: {
-            **original(body), "can_execute": False, "blockers": [ENROLLED_BLOCKER]})
-        backend = SdkFactoryBackend(upstream.url, upstream.api_key, FOLDER, clock=clock)
-        service = LifecycleService(backend=backend, tracker=ApiJobTracker(backend), store=MemoryStore(),
-                                   guard=SelfProtection(()), clock=clock, runner_timeout_seconds=4200)
-        operation = service.prepare("add-or-update-project",
-                                    {"projectId": "aif-121-esml-project002-sdc-dev-001-rg"})
-        operation = confirm_current(service, operation)
-        assert operation.status.value == "uncertain"
-        assert any(p["number"] == "002" for p in upstream.state.factory["projects"])
-        assert all(body["action"] != "deploy" for body in upstream.state.pending.values()
-                   if "action" in body)
-        assert "do not cover" in operation.step.failure["detail"]
-
-
-def test_guardless_server_cannot_dispatch_project_through_function(clock, monkeypatch):
-    from fake_factory_api import FakeFactoryApi
-
-    with FakeFactoryApi(stateful=True) as upstream:
-        original = upstream.state.prepare
-
-        def guardless(body):
-            preview = original(body)
-            preview.pop("runtime_scope_authorization", None)
-            return preview
-
-        monkeypatch.setattr(upstream.state, "prepare", guardless)
+    refusal = Problem("blocked", 409, "project deploy was refused: Project runtime review is missing live scope "
+                      "authorization.", ["Project runtime review is missing live scope authorization."])
+    with FakeFactoryApi(stateful=True, esaf_refusal=refusal) as upstream:
         backend = SdkFactoryBackend(upstream.url, upstream.api_key, FOLDER, clock=clock)
         service = LifecycleService(backend=backend, tracker=ApiJobTracker(backend), store=MemoryStore(),
                                    guard=SelfProtection(()), clock=clock, runner_timeout_seconds=4200)
@@ -334,5 +318,21 @@ def test_guardless_server_cannot_dispatch_project_through_function(clock, monkey
         operation = confirm_current(service, operation)
         assert operation.status.value == "uncertain"
         assert "missing live scope authorization" in operation.step.failure["detail"]
-        assert upstream.state.jobs == 0
-        assert not any(call["path"] == "/api/v1/factory-catalog/confirm" for call in upstream.calls)
+        clock.advance(1)
+        service.reconcile()
+        assert len(upstream.state.esaf_requests) == 1
+
+
+def test_an_api_without_the_esaf_routes_is_reported_not_worked_around(clock):
+    from fake_factory_api import FakeFactoryApi
+
+    with FakeFactoryApi(stateful=True, esaf_routes=False) as upstream:
+        backend = SdkFactoryBackend(upstream.url, upstream.api_key, FOLDER, clock=clock)
+        service = LifecycleService(backend=backend, tracker=ApiJobTracker(backend), store=MemoryStore(),
+                                   guard=SelfProtection(()), clock=clock, runner_timeout_seconds=4200)
+        operation = confirm_current(service, service.prepare(
+            "add-or-update-project", {"projectId": "aif-121-esml-project001-sdc-dev-001-rg"}))
+        assert operation.status.value in ("failed", "uncertain")
+        assert "/api/v1/esaf" in operation.step.failure["detail"]
+        assert not any(call["path"].startswith("/api/v1/factory-catalog/") and call["method"] == "POST"
+                       for call in upstream.calls)

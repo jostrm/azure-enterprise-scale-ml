@@ -26,7 +26,10 @@ _JOB_STATES = {"queued": ("queued", None), "running": ("in_progress", None), "su
                "failed": ("completed", "failure"), "interrupted": ("completed", "failure"),
                # creation workflow states (CreationWorkflowStatus)
                "blocked": ("completed", "failure"), "uncertain": ("completed", "failure"),
-               "superseded": ("completed", "failure")}
+               "superseded": ("completed", "failure"),
+               # ESAF job states (Factory API /api/v1/esaf/jobs/{id}); blocked, failed, interrupted map above
+               "accepted": ("queued", None), "preparing": ("in_progress", None),
+               "confirming": ("in_progress", None), "retrying": ("in_progress", None)}
 
 
 def job_observation(status: dict[str, Any]) -> dict[str, Any] | None:

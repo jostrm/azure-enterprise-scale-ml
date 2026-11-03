@@ -65,6 +65,23 @@ def test_key_vault_principal_guard_runs_on_every_push_with_identity_tests():
     assert MANIFEST.tier_of("unit/test_kv_access_policy_principals.py") == 3
 
 
+def test_github_oidc_refresh_runs_with_pipeline_contracts():
+    assert MANIFEST.tier_of("unit/test_github_oidc_refresh.py") == 2
+
+
+@pytest.mark.parametrize("path", [
+    "unit/test_enrollment_grant_ownership.py",
+    "unit/test_factory_deletion_phase_order.py",
+    "unit/test_inventory_frozen_api_versions.py",
+    "unit/test_nic_detach_churn.py",
+    "unit/test_single_writer_resumed_absent_project.py",
+    "unit/test_state_read_retry.py",
+    "unit/test_vnet_embedded_subnet_backlinks.py",
+])
+def test_lifecycle_regressions_run_with_lifecycle_contracts(path):
+    assert MANIFEST.tier_of(path) == 4, path
+
+
 def test_this_contract_and_the_ci_runner_contract_are_core():
     assert MANIFEST.tier_of("unit/test_tiers.py") == 1
     assert MANIFEST.tier_of("unit/test_ci_runner.py") == 1
