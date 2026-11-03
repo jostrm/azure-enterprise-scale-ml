@@ -66,13 +66,13 @@ operations over the Factory API. `AIF_BACKEND=sdk` calls one `azurefactory.esaf`
 - **Operations** (`domain/operation.py`) retain a token bound to the exact preview, CAS-saved `confirming` before the
   non-idempotent call, and terminal `uncertain` outcomes that are never retried. SDK mode has one `scenario` step
   and one local scope approval (not a live Azure preview). Confirm invokes `init_factory`, `add_scale_set`,
-  `apply_project`, `delete_project`, `delete_scale_set` or `delete_factory`. Any facade failure may follow partial
+  `upsert_project`, `delete_project`, `delete_scale_set` or `delete_factory`. Any facade failure may follow partial
   configuration/permission writes, so it is uncertain rather than safely retryable.
 - **SDK adapter** (`adapters/sdk_backend.py`) implements the port directly; it does not inherit the REST orchestration.
   Since 2026-11-02 the facade is a thin client of the Factory API's `/api/v1/esaf/*` routes, which own preparation,
   API confirmation phrases, enrollment, deletion permission and retries; it requires `environment` on scale-set and
-  project scenarios, and returns `EsafJob` kind `esaf` (earlier kinds stay readable). Updating this adapter and its
-  tests to that contract is pending (Joakim, in parallel). Explicit per-call sessions
+  project scenarios, and returns `EsafJob` kind `esaf` (earlier kinds stay readable). The adapter accepts that kind
+  (`HANDLE_KINDS`) and pins the SDK at that thin client in `requirements.txt`. Explicit per-call sessions
   select the resolved factory, environment and scale-set suffix. The adapter checks actual target identities again
   before execution, but does not block unrelated revision drift. Job ID, kind and factory are persisted and rebuilt
   as `EsafJob` for status reads, including the dedicated factory-deletion endpoint.
@@ -82,7 +82,7 @@ operations over the Factory API. `AIF_BACKEND=sdk` calls one `azurefactory.esaf`
   Scenario 1 supplies `creation_request`: the facade saves the factory and starts a bounded whole-workflow approval
   whose continuation is server-owned, not a Function/runner daemon thread. A mid-workflow human review stops the step
   (`action_required`). SDK Scenario 2 deploys only the scale set's common resources; Scenario 3 adds projects explicitly.
-  `apply_project` retains `upsert_project` compatibility.
+  `apply_project` remains an alias of `upsert_project`.
 - **REST compatibility** keeps the step-to-call mapping in `adapters/factory_api.py`. A mock backend keeps a persistent
   catalog for offline operation. REST Scenario 2 is configure -> add-project001 -> enroll-scaleset
   -> deploy-common -> deploy-project001: `enroll-scaleset` (step kind `enroll`) is the reviewed provider-state

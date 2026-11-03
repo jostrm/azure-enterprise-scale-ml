@@ -52,7 +52,7 @@ Deletes also need `confirmationPhrase` (shown in the preview, for example `DELET
 expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application/problem+json` with a stable `code`.
 
 SDK mode calls `esaf.add_scale_set` once to register, enroll and deploy common resources; add project001 explicitly
-with Scenario 3 (`esaf.apply_project`). New bootstrap uses `esaf.init_factory(creation_request=...)`, with continuation
+with Scenario 3 (`esaf.upsert_project`). New bootstrap uses `esaf.init_factory(creation_request=...)`, with continuation
 owned by the API rather than a Function background thread. Jobs are persisted by ID and kind for later status reads.
 
 In REST mode, adding a scale set runs `configure`, `add-project001`, `enroll-scaleset`, `deploy-common` and `deploy-project001`. In

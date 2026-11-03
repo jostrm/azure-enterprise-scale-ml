@@ -1,21 +1,22 @@
 # AI Factory lifecycle Function
 
 An Azure Functions Python consumer of `from azurefactory import esaf`. Set **`AIF_BACKEND=sdk`** to run each
-scenario through **one facade method**, with one Function scope approval. The SDK owns the Factory API's
-prepare/confirm calls, enrollment, deletion authorization and server confirmation phrases.
+scenario through **one facade method**, with one Function scope approval. Each method is one call to the Factory
+API's `/api/v1/esaf/*` routes, which own the prepare/confirm calls, enrollment, deletion authorization, server
+confirmation phrases and retries (Factory API with the ESAF routes, pink 1b1fed5 or later).
 
 | # | Function route segment | SDK method | Result |
 |---|---|---|---|
 | 1 | `init-factory` | `esaf.init_factory(creation_request=..., session=...)` | Save a new factory and start its server-owned full-bootstrap workflow |
-| 2 | `add-scaleset` | `esaf.add_scale_set(suffix, cidr=..., session=...)` | Register, enroll and deploy the scale set's common resources |
-| 3 | `add-or-update-project` | `esaf.apply_project(number, scale_set=..., session=...)` | Add or update the selected project, then deploy it |
-| 4 | `delete-project` | `esaf.delete_project(number, scale_set=..., session=...)` | Delete the project in the selected environment and scale set |
+| 2 | `add-scaleset` | `esaf.add_scale_set(suffix, environment=..., cidr=..., session=...)` | Register, enroll and deploy the scale set's common resources |
+| 3 | `add-or-update-project` | `esaf.upsert_project(number, environment=..., scale_set=..., session=...)` | Add or update the selected project, then deploy it |
+| 4 | `delete-project` | `esaf.delete_project(number, environment=..., scale_set=..., session=...)` | Delete the project in the selected environment and scale set |
 | 5 | `delete-scaleset` | `esaf.delete_scale_set(suffix, environment=..., session=...)` | Delete the scale set's registered resources |
 | 6 | `delete-factory` | `esaf.delete_factory(session=...)` | Delete the factory's registered resources; shared hubs and subscriptions stay |
 
-`apply_project` retains `upsert_project` as a compatible spelling. The folder belongs to an explicit `esaf.Session`,
-not the first positional argument of every method. Each session selects the resolved factory ID; project and scale-set
-calls also carry the environment. Scenario 2 does **not** create project001 implicitly: use Scenario 3 for it.
+`apply_project` remains an alias of `upsert_project`. The folder belongs to an explicit `esaf.Session`, not an argument
+of every method. Each session selects the resolved factory ID; project and scale-set calls always carry the
+environment, which the SDK requires. Scenario 2 does **not** create project001 implicitly: use Scenario 3 for it.
 
 ## Call the Function
 

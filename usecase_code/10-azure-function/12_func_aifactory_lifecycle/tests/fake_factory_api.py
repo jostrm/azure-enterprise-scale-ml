@@ -130,6 +130,16 @@ class Refused(Exception):
     """The API's 409 answer (a pink CatalogError) with its detail."""
 
 
+class Problem(Exception):
+    """An /api/v1/esaf refusal: application/problem+json with the server's code and blockers."""
+
+    def __init__(self, code: str, status: int, detail: str, blockers=()):
+        super().__init__(detail)
+        self.status = status
+        self.payload = {"type": "urn:aifactory:esaf:problem:" + code, "title": code, "status": status,
+                        "detail": detail, "code": code, **({"blockers": list(blockers)} if blockers else {})}
+
+
 class StatefulCatalog:
     """Pink's catalog prepare/confirm semantics (Factory API v0.47.45, src/factory_catalog.py) for the one factory.
 
@@ -145,7 +155,13 @@ class StatefulCatalog:
     set's common group plus the group of every project placed on it when it is prepared, never a later one.
     """
 
-    def __init__(self, coordination: str = "single-writer", enroll_routes: bool = True, enroll_blockers=()):
+    def __init__(self, coordination: str = "single-writer", enroll_routes: bool = True, enroll_blockers=(),
+                 esaf_routes: bool = True, esaf_refusal: Problem | None = None):
+        # ESAF (pink 1b1fed5): /api/v1/esaf/<scenario> accepts one scenario and answers 202 with a job id; the
+        # orchestration behind it is pink's and tested there. esaf_routes=False is an older API (404).
+        self.esaf_routes = esaf_routes
+        self.esaf_refusal = esaf_refusal
+        self.esaf_requests: list[tuple[str, dict]] = []
         self.document = copy.deepcopy(CATALOG)
         self.pending: dict[str, dict] = {}
         self.jobs = 0
@@ -293,7 +309,23 @@ class StatefulCatalog:
             self._bump()
         return {"contract_version": 1, "catalog": copy.deepcopy(self.document), "job": job}
 
+    def esaf(self, method: str, path: str, body):
+        if not self.esaf_routes:
+            return None
+        if method == "GET" and path.startswith("/api/v1/esaf/jobs/"):
+            job_id = path.rsplit("/", 1)[1]
+            return {"contract_version": 1, "job_id": job_id, "status": "succeeded", "message": "Succeeded.",
+                    "child": {"kind": "catalog", "id": JOB_ID, "status": "succeeded", "message": None}}
+        scenario = path.rsplit("/", 1)[1]
+        self.esaf_requests.append((scenario, copy.deepcopy(body)))
+        if self.esaf_refusal is not None:
+            raise self.esaf_refusal
+        job_id = str(uuid.UUID(int=0xE5AF0000 + len(self.esaf_requests)))
+        return {"contract_version": 1, "job_id": job_id, "status_url": f"/api/v1/esaf/jobs/{job_id}?folder=x"}
+
     def respond(self, method: str, path: str, body):
+        if path.startswith("/api/v1/esaf/"):
+            return self.esaf(method, path, body)
         if method == "GET" and path == "/api/v1/factory-catalog":
             return copy.deepcopy(self.document)
         if method == "GET" and path.startswith("/api/v1/factory-catalog/jobs/"):
@@ -338,9 +370,12 @@ class FakeFactoryApi:
                     payload = respond(self.command, parts.path, json.loads(raw) if raw else None)
                 except Refused as refusal:
                     payload, status = {"detail": str(refusal)}, 409
+                except Problem as problem:
+                    payload, status = problem.payload, problem.status
                 if outer.missing_catalog and parts.path == "/api/v1/factory-catalog":
                     payload = None
-                status = status if payload is not None else 404
+                status = (202 if self.command == "POST" and parts.path.startswith("/api/v1/esaf/") and status == 200
+                          else status) if payload is not None else 404
                 data = json.dumps(payload if payload is not None else {"detail": "not found"}).encode()
                 time.sleep(outer.slow.get(parts.path, 0))
                 try:
