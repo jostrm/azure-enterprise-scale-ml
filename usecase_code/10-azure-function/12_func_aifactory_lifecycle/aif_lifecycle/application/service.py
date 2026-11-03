@@ -82,7 +82,9 @@ class LifecycleService:
             raise ValidationFailed("settings must be a JSON object of catalog setting names to values.")
         options = self._options(body)
         self._guard.check(target)
-        steps, resolved = plan(scenario, target, self._backend.catalog(), options)
+        single_scenario = self._backend.name == "sdk" and not (
+            scenario.destructive and self._backend.delete_mode == "simulate")
+        steps, resolved = plan(scenario, target, self._backend.catalog(), options, single_scenario=single_scenario)
         operation = Operation.create(operation_id=self._ids(), scenario=scenario, target=str(target), settings=settings,
                                      steps=steps, backend=self._backend.name, executor=self._tracker.name,
                                      now=self._clock.now(), options=options, resolved=resolved)
@@ -264,7 +266,8 @@ class LifecycleService:
                                                   conclusion=observed.get("conclusion"), run_id=observed.get("run_id"),
                                                   html_url=observed.get("html_url"), source="poller", now=now)
                     if change == "step-failed":
-                        operation.attach_failure_excerpt(self._excerpt(observed.get("run_id")))
+                        operation.attach_failure_excerpt(self._excerpt(observed.get("run_id")) or
+                                                         observed.get("message", ""))
             self._drive(operation)
             if operation.to_record() != before and self._save_quietly(operation):
                 summary["updated"] += 1
@@ -308,6 +311,11 @@ class LifecycleService:
         self._review(operation, preview, now)
 
     def _review(self, operation: Operation, preview: Preview, now: datetime) -> None:
+        not_needed = preview.backend_ref.get("not_needed")
+        if not_needed:  # the backend recognized the API's exact "this factory does not need it" answer
+            operation.step_not_needed(preview, str(not_needed), now)
+            _info(operation, f"a step was not needed: {not_needed}")
+            return
         if operation.scenario.destructive and not preview.confirmation_phrase:
             preview.confirmation_phrase = f"DELETE {operation.target}"
         operation.review_ready(preview, now)

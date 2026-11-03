@@ -19,12 +19,37 @@
     "M6": "Measured 2026-10-24: one fix iteration, composite of pink v0.47.38 and v0.47.39 (aif-125).",
     "E": "Estimated from the code path and earlier factories; replace with measured values after real runs. Scenarios 4-6 ran simulated only (AIF_DELETES=simulate): the Factory API never saw a delete."
   },
+  "colors": {
+    "note": "Purple is the AI Factory color, which always means the best, so the onion does not use it.",
+    "neutral": "#5AA9FF",
+    "time_scale": [
+      {
+        "name": "green",
+        "hex": "#3DDC97",
+        "below_share": 0.05
+      },
+      {
+        "name": "orange",
+        "hex": "#FFB84D",
+        "below_share": 0.3
+      },
+      {
+        "name": "pink",
+        "hex": "#FF6FD8",
+        "below_share": 0.75
+      },
+      {
+        "name": "red",
+        "hex": "#FF4545",
+        "below_share": null
+      }
+    ]
+  },
   "consumer": {
     "id": "consumer",
     "label": "Consumer",
     "name": "External consumer: lifecycle Azure Function",
     "tag": "PURPLE TEMPLATE",
-    "color": "#DCE6F2",
     "where": "usecase_code/10-azure-function/12_func_aifactory_lifecycle, copied to the consumer repository",
     "what": "Private Function on Flex Consumption that offers the 6 scenarios as reviewed REST operations and follows the GitHub runs.",
     "example": "POST /api/v1/lifecycle/add-scaleset/prepare, then /operations/{id}/confirm",
@@ -46,7 +71,6 @@
       "ring_top": "L1 · CLIENTS · CLI · SDK · WIZARDS",
       "ring_bottom": "PURPLE · PINK · MAUI",
       "tag": "PURPLE · PINK · MAUI",
-      "color": "#79DCED",
       "where": "azurefactory CLI and Python SDK AzureFactoryClient (purple environment_setup/azurefactory-cli) · Tkinter wizard (pink) · MAUI ESAIF.ConfigWizard (jostrm/maui-apps)",
       "what": "Thin clients: they build requests, show reviews, confirm and poll. No deployment logic lives here.",
       "example": "factory_create_prepare · scaleset_add_prepare · project_deployment_start",
@@ -67,7 +91,6 @@
       "ring_top": "L2 · FACTORY REST API",
       "ring_bottom": "PINK",
       "tag": "PINK",
-      "color": "#FF7185",
       "where": "jostrm/azure-aifactory-config: FastAPI routes src/*_api.py and the service layer in src/ · runs as SYSTEM on 127.0.0.1:8765 on the admin VM",
       "what": "Owns every decision: catalog, reviews, whole-workflow consent, recoveries and reconciliation, frozen deployment planner, cost preview, DPAPI-sealed SQLite state.",
       "example": "creation_workflow_api.py · catalog_runtime.py · project_deployments.py · creation_cost_preview.py",
@@ -89,7 +112,6 @@
       "ring_top": "L3 · PIPELINES + API SCRIPTS",
       "ring_bottom": "PURPLE · RUNS IN CONSUMER REPO",
       "tag": "PURPLE · VENDORED IN PINK",
-      "color": "#FFD48A",
       "where": "purple bootstrap/ (launchers, lib/ helpers) and bootstrap/templates/factory-lifecycle-*.yml · pink vendors byte-exact copies in template-files/creation-workflow/bootstrap/lib",
       "what": "What the API starts: Bash and PowerShell launchers on the API host, and GitHub Actions or ADO pipelines on the factory's self-hosted runner.",
       "example": "GHA-update-aifactory-and-run-project.sh · create-new-aifactory-scaleset.sh · runner-registration.ps1 · runner-prerequisites.ps1",
@@ -154,7 +176,6 @@
       "ring_top": "L4 · BICEP + SCRIPTS",
       "ring_bottom": "PURPLE",
       "tag": "PURPLE",
-      "color": "#C49BFF",
       "where": "purple environment_setup/aifactory/bicep (esml-common/main, esml-genai-1, modules) and bicep/scripts · executed at the pinned purple commit",
       "what": "Infrastructure as code the pipeline compiles and deploys, plus the PowerShell and Bash scripts the pipelines run around it.",
       "example": "11-rgCommon · 12-networkCommon · 13-rgLevel · 31-network … 11-integration · preflight.sh · subnetCalc_v2.ps1",
@@ -225,7 +246,6 @@
       "ring_top": "L5 · AZURE RESOURCE MANAGER",
       "ring_bottom": "AZURE",
       "tag": "AZURE · CORE",
-      "color": "#61F3B1",
       "where": "management.azure.com: deployments, resource groups, resources, role assignments, locks",
       "what": "The only layer that changes Azure. Most wall-clock time is spent here: networks, VPN gateway, private endpoints and DNS zones.",
       "example": "group and subscription deployments · resource-group deletes · provider registration",
@@ -652,7 +672,7 @@
         "id": "onion",
         "chapter": "01 / THE ONION",
         "title": "Five layers, one direction.",
-        "explanation": "A lifecycle request travels from the outside in. Each layer calls only the layer inside it, and only the core, Azure Resource Manager, changes Azure. The outer layers are thin and quick to change; the inner layers do the slow work.",
+        "explanation": "A lifecycle request travels from the outside in. Each layer calls only the layer inside it, and only the core, Azure Resource Manager, changes Azure. The colours show where the time goes: green layers are fast, red is the slowest.",
         "key": "Outer layers are fast to change. Inner layers are slow to run.",
         "active": [
           "consumer",

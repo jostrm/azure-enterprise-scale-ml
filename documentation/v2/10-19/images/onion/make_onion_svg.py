@@ -23,7 +23,10 @@ DATA = HERE / "onion-layers.json"
 
 # VisualLearner palette (AsomRecordsAB.Base/VisualLearner/VisualLearnerScene.cs).
 W, M = 1400, 48
-BG, SURFACE, GRID, MUTED, WHITE, ACCENT, KEY = "#080E1B", "#14243A", "#304565", "#A0B5D0", "#ECF6FF", "#79DCED", "#FFD48A"
+# Colors carry meaning: layer colors come from onion-layers.json "colors" (green fastest .. red slowest,
+# blue neutral) and are assigned by load(); the base UI colors below stay neutral. No purple in the onion.
+BG, SURFACE, GRID, MUTED, WHITE, ACCENT = "#080E1B", "#14243A", "#304565", "#A0B5D0", "#ECF6FF", "#79DCED"
+RING_BASE = "#0B0D12"  # near-neutral dark: tinting toward the navy BG would turn pink rings purple
 FONT = '"Open Sans","Segoe UI","Helvetica Neue",Arial,sans-serif'
 
 # Diagram geometry, in diagram coordinates (width W - 2M).
@@ -90,11 +93,11 @@ class Scene:
                 (f' opacity="{num(opacity)}"' if opacity is not None else "")
         self.add(f'<rect x="{num(x)}" y="{num(y)}" width="{num(w)}" height="{num(h)}" rx="{radius}" fill="{fill}"{extra}/>')
 
-    def text(self, text, x, y, width, size=20, color=WHITE, bold=False, leading=None, anchor="start") -> float:
+    def text(self, text, x, y, width, size=20, color=WHITE, bold=False, leading=None, anchor="start", opacity=None) -> float:
         leading = leading or math.ceil(size * 1.38)
         lines = wrap(text, width, size, bold)
         weight = ' font-weight="600"' if bold else ""
-        align = f' text-anchor="{anchor}"' if anchor != "start" else ""
+        align = (f' text-anchor="{anchor}"' if anchor != "start" else "") + (f' fill-opacity="{opacity}"' if opacity else "")
         for index, line in enumerate(lines):
             top = y + index * leading
             TEXT_CHECKS.append({"scene": self.name, "text": line, "size": size, "bold": bold, "allowed": width})
@@ -110,6 +113,113 @@ def document(body: str, height: int, title: str, description: str) -> str:
             f'<title>{esc(title)}</title><desc>{esc(description)}</desc>'
             f'<style>text{{font-family:{FONT};font-kerning:normal}}</style>'
             f'<rect width="{W}" height="{height}" fill="{BG}"/>{body}</svg>\n')
+
+
+# ---------------------------------------------------------------- data and colors
+
+def load(path: Path = DATA) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assign_colors(data)
+    return data
+
+
+def layer_minutes(data, node_id: str) -> list[float]:
+    """Minutes in this layer: per scenario (middle of the range), or per measured run (onion V2)."""
+    if "scenarios" in data:
+        return [(s["times"][node_id]["min"] + s["times"][node_id]["max"]) / 2 for s in data["scenarios"]]
+    if node_id == data["api_layer"]:
+        return [run["api_seconds"] / 60 for run in data["runs"] if run.get("api_seconds") is not None]
+    if node_id in data["pipeline_layers"]:  # one wall clock covers these layers together
+        return [run["pipeline_minutes"] for run in data["runs"] if run.get("pipeline_minutes") is not None]
+    return [0.0]  # seconds
+
+
+def average_minutes(data, node_id: str) -> float:
+    """Middle of each scenario's range for this layer, averaged over the scenarios (or over the measured runs)."""
+    times = layer_minutes(data, node_id)
+    return sum(times) / len(times)
+
+
+def band_for(data, share: float) -> dict:
+    return next(b for b in data["colors"]["time_scale"] if b["below_share"] is None or share < b["below_share"])
+
+
+def palette(data) -> dict[str, str]:
+    colors = data["colors"]
+    return {**{b["name"]: b["hex"] for b in colors["time_scale"]}, **colors.get("extra", {}), "blue": colors["neutral"]}
+
+
+def assign_colors(data) -> None:
+    """Green for the fastest layers .. red for the slowest, by share of the slowest layer; consumer neutral.
+    A data file may instead fix one colour per layer (colors.layers, onion V2)."""
+    colors = data["colors"]
+    data["consumer"]["color"], data["consumer"]["color_name"] = colors["neutral"], "blue"
+    if colors.get("layers"):
+        named = palette(data)
+        for layer in data["layers"]:
+            layer["color_name"] = colors["layers"][layer["id"]]
+            layer["color"] = named[layer["color_name"]]
+        return
+    slowest = max(average_minutes(data, layer["id"]) for layer in data["layers"]) or 1
+    for layer in data["layers"]:
+        band = band_for(data, average_minutes(data, layer["id"]) / slowest)
+        layer["color"], layer["color_name"] = band["hex"], band["name"]
+    data["consumer"]["color"], data["consumer"]["color_name"] = colors["neutral"], "blue"
+
+
+def color_legend(data) -> str:
+    bands = data["colors"]["time_scale"]
+    if data["colors"].get("layers"):
+        names = [f'{layer["color_name"]} {layer["label"]} {layer["name"]}' for layer in data["layers"]]
+        return "Colours mark the layers, in the rings and in the chart bars: blue Consumer, " + ", ".join(names) + "."
+    parts = [f'{b["name"]} under {round(b["below_share"] * 100)}%' for b in bands if b["below_share"] is not None]
+    basis = data["colors"].get("basis", "average time in the layer per scenario")
+    return (f"Colour = {basis}, relative to the slowest layer: " + ", ".join(parts)
+            + f', {bands[-1]["name"]} the slowest. Blue = neutral (the consumer, outside the AI Factory).')
+
+
+# ---------------------------------------------------------------- measured runs (onion V2)
+
+def seconds_text(seconds: float) -> str:
+    whole, rest = divmod(round(seconds), 60)
+    return f"{whole} min {rest} s" if whole else f"{rest} s"
+
+
+def run_minutes(value: float) -> str:
+    return f"{value:.1f} min"
+
+
+def work_text(run) -> str:
+    """Pipeline (or worker) wall clock; a time known only roughly is shown as ~N min."""
+    return f'~{run["pipeline_minutes"]:g} min' if run.get("approximate") else run_minutes(run["pipeline_minutes"])
+
+
+def _route_runs(data, route: str, field: str) -> list[float]:
+    return [run[field] for run in data["runs"] if run["route"] == route and run.get(field) is not None]
+
+
+def _range(values, unit: str) -> str:
+    low, high = round(min(values)), round(max(values))
+    return f"{low}-{high} {unit}" if low != high else f"{low} {unit}"
+
+
+TOKENS = {
+    "totals": lambda d: totals_sentence(d),
+    "api_range": lambda d: _range(_route_runs(d, "API-2-Pipelines", "api_seconds"), "s"),
+    "pipeline_range": lambda d: _range(_route_runs(d, "API-2-Pipelines", "pipeline_minutes"), "min"),
+    "worker_api": lambda d: seconds_text(_route_runs(d, "worker", "api_seconds")[0]),
+    "worker_pipeline": lambda d: run_minutes(_route_runs(d, "worker", "pipeline_minutes")[0]),
+    "l5_share": lambda d: _range([100 * r["split"]["l5"] / r["pipeline_minutes"] for r in d["runs"]
+                                  if r["route"] == "API-2-Pipelines"], "%").replace(" %", "%"),
+}
+
+
+def fill(text: str, data) -> str:
+    """Replace the known {token}s with numbers derived from the data; any other braces stay as written."""
+    for key, make in TOKENS.items():
+        if "{" + key + "}" in text:
+            text = text.replace("{" + key + "}", make(data))
+    return text
 
 
 # ---------------------------------------------------------------- diagram
@@ -212,9 +322,9 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
     for index, layer in enumerate(data["layers"]):
         on = lit(layer["id"])
         color = layer["color"]
-        fill = mix(color, BG, .16 if on else .05)
+        ring_fill = mix(color, RING_BASE, .2 if on else .07)
         stroke = color if on else GRID
-        scene.add(f'<circle cx="{num(cx)}" cy="{num(cy)}" r="{RADII[index]}" fill="{fill}" stroke="{stroke}" '
+        scene.add(f'<circle cx="{num(cx)}" cy="{num(cy)}" r="{RADII[index]}" fill="{ring_fill}" stroke="{stroke}" '
                   f'stroke-width="{2.4 if on and focus is not None else 1.6}"/>')
     for index, layer in enumerate(data["layers"][:4]):
         on = lit(layer["id"])
@@ -224,9 +334,10 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         defs.append(f'<path id="{top}" d="M{num(cx - r_top)},{num(cy)} A{num(r_top)},{num(r_top)} 0 0 1 {num(cx + r_top)},{num(cy)}"/>')
         defs.append(f'<path id="{bottom}" d="M{num(cx - r_bottom)},{num(cy)} A{num(r_bottom)},{num(r_bottom)} 0 0 0 {num(cx + r_bottom)},{num(cy)}"/>')
         for path_id, label, size, color in ((top, layer["ring_top"], 14, layer["color"] if on else MUTED),
-                                            (bottom, layer["ring_bottom"], 11, mix(layer["color"], MUTED, .55) if on else GRID)):
+                                            (bottom, layer["ring_bottom"], 11, layer["color"] if on else GRID)):
             TEXT_CHECKS.append({"scene": name, "text": label, "size": size, "bold": True, "allowed": math.pi * mid * .62})
-            scene.add(f'<text font-size="{size}" font-weight="600" letter-spacing="1" fill="{color}">'
+            faded = ' fill-opacity=".8"' if path_id == bottom else ""
+            scene.add(f'<text font-size="{size}" font-weight="600" letter-spacing="1" fill="{color}"{faded}>'
                       f'<textPath href="#{path_id}" startOffset="50%" text-anchor="middle">{esc(label)}</textPath></text>')
     core = data["layers"][4]
     on = lit(core["id"])
@@ -242,14 +353,14 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
     scene.rect(x, y, w, h, SURFACE, consumer["color"] if on else GRID, 14, 2.4 if on and focus is not None else 1)
     scene.rect(x + 14, y + 15, 22, 4, consumer["color"], radius=2)
     scene.text("EXTERNAL CONSUMER", x + 46, y + 9, w - 56, 10, consumer["color"] if on else MUTED, True)
-    scene.text("Azure Function", x + 14, y + 30, w - 28, 17, WHITE, True)
-    scene.text("lifecycle Function > Python SDK", x + 14, y + 58, w - 28, 12, MUTED)
+    scene.text(consumer.get("card_title", "Azure Function"), x + 14, y + 30, w - 28, 17, WHITE, True)
+    scene.text(consumer.get("card_subtitle", "lifecycle Function > Python SDK"), x + 14, y + 58, w - 28, 12, MUTED)
 
     # Paths: markers on every band they cross; arrows for the poster or for the step's links.
     by_id = nodes(data)
     for path in data["paths"]:
         points = path_points(data, center, path["id"])
-        color = KEY if path["dashed"] else WHITE
+        color = MUTED if path["dashed"] else WHITE
         if focus is None:
             sequence = [points["consumer"], points["consumer-join"]] if path["via"][0] == "consumer" else []
             sequence += [points[node_id] for node_id in path["via"] if node_id != "consumer"]
@@ -265,7 +376,7 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
             if not skipped:
                 scene.add(f'<circle cx="{num(px)}" cy="{num(py)}" r="3" fill="{ring if lit(node_id) else GRID}"/>')
             else:
-                scene.text(f'skips {by_id[node_id]["label"]}', px + 12, py + 2, 70, 11, KEY if lit(path["via"][0]) else GRID, True)
+                scene.text(f'skips {by_id[node_id]["label"]}', px + 12, py + 2, 70, 11, MUTED if lit(path["via"][0]) else GRID, True)
     routes = []
     for index, link in enumerate(links):
         points = route(data, center, link)
@@ -290,19 +401,29 @@ def draw_diagram(data, active=None, links=(), name="poster", chart=True) -> tupl
         title = item["name"] if item["id"] == "consumer" else f'{item["label"]} · {item["name"]}'
         y = scene.text(title, CARD_X + 16, top + 31, inner, 16, WHITE if on else MUTED, True, 22)
         y = scene.text(item["where"], CARD_X + 16, y + 4, inner, 11.5, MUTED, leading=16)
-        y = scene.text(item["what"], CARD_X + 16, y + 4, inner, 13, WHITE if on else MUTED, leading=18)
-        scene.text("e.g. " + item["example"], CARD_X + 16, y + 4, inner, 11.5, mix(color, MUTED, .7) if on else GRID, True, 16)
+        y = scene.text(fill(item["what"], data), CARD_X + 16, y + 4, inner, 13, WHITE if on else MUTED, leading=18)
+        scene.text("e.g. " + item["example"], CARD_X + 16, y + 4, inner, 11.5, color if on else GRID, True, 16, opacity=.8 if on else None)
 
+    bottom = height
     if chart:
-        time_chart(scene, data, (0, center[1] + RADII[0] + 44, CARD_X - 40, height))
+        box = (0, center[1] + RADII[0] + 44, CARD_X - 40, height)
+        if "runs" in data:
+            bottom = max(height, runs_chart(scene, data, box))
+        else:
+            time_chart(scene, data, box)
 
     # Path legend under the diagram.
-    y = height + 18
+    y = bottom + 18
     for path in data["paths"]:
-        color = KEY if path["dashed"] else WHITE
+        color = MUTED if path["dashed"] else WHITE
         scene.add(f'<path d="M0,{num(y + 10)} H44" stroke="{color}" stroke-width="2.4"{dash(path["dashed"])}/>')
-        scene.text(f'{path["label"]}: {path["text"]}', 56, y, DW - 56, 14, color if path["dashed"] else WHITE, True, 20)
+        scene.text(f'{path["label"]}: {fill(path["text"], data)}', 56, y, DW - 56, 14, color if path["dashed"] else WHITE, True, 20)
         y += 24
+    swatches = [data["consumer"]["color"]] + [layer["color"] for layer in data["layers"]] if data["colors"].get("layers") else         [band["hex"] for band in data["colors"]["time_scale"]]
+    for index, color in enumerate(swatches):
+        scene.rect(index * 11, y + 6, 10, 10, color, radius=2)
+    text_x = max(56, len(swatches) * 11 + 10)
+    y = scene.text(color_legend(data), text_x, y, DW - text_x, 14, WHITE, True, 20) + 4
     return scene, y, routes
 
 
@@ -339,11 +460,58 @@ def time_chart(scene: Scene, data, box) -> None:
         x += 18 + text_width(label, 11.5) + 18
 
 
+def total_label(run) -> str:
+    """API time + pipeline (or worker) time, as measured; the chart prints it right of the stacked bar."""
+    work = work_text(run)
+    return f'{seconds_text(run["api_seconds"])} + {work}' if run.get("api_seconds") is not None else f"{work} (API n/a)"
+
+
+def runs_chart(scene: Scene, data, box) -> float:
+    """Onion V2: one stacked bar per measured run, segments coloured by layer like the rings. Consumer and L1 take
+    seconds and show as thin slivers so the whole chain is visible. Returns the bottom."""
+    x0, y0, x1, _ = box
+    chart = data["chart"]
+    layers = [data["consumer"]] + data["layers"]
+    y = scene.text(chart["title"], x0, y0, x1 - x0, 15, WHITE, True)
+    y = scene.text(fill(chart["subtitle"], data), x0, y + 2, x1 - x0, 11.5, MUTED, leading=16) + 10
+    label_w, total_w, sliver = 214, 136, 3
+    bar_x = x0 + label_w
+    runs = data["runs"]
+    totals = [(r.get("api_seconds") or 0) / 60 + r["pipeline_minutes"] for r in runs]
+    scale = (x1 - bar_x - total_w - 2 * sliver) / max(totals)
+    for run in runs:
+        label = f'{run["n"]} · {run["label"]}'
+        if text_width(label, 12.5) * 1.03 > label_w - 8:
+            raise ValueError(f"Chart label does not fit on one line: {label}")
+        scene.text(label, x0, y, label_w - 8, 12.5, WHITE)
+        api = (run.get("api_seconds") or 0) / 60
+        minutes_by_layer = {"consumer": None, "l1": None, data["api_layer"]: api or 0, **run["split"]}
+        x = bar_x
+        for item in layers:
+            value = minutes_by_layer.get(item["id"], 0)
+            if value == 0:
+                continue
+            width = sliver if value is None else max(value * scale, sliver)  # None = seconds
+            scene.rect(x, y + 2, max(width - 1, 1), 16, item["color"], radius=2)
+            if width >= 28:
+                scene.text(item["label"], x + (width - 1) / 2, y + 3, width, 10.5, BG, True, anchor="middle")
+            x += width
+        scene.text(total_label(run), x + 8, y + 1, total_w, 12, MUTED, True)
+        y += 27
+    x = x0
+    for item in layers:
+        scene.rect(x, y + 6, 12, 12, item["color"], radius=3)
+        name = "Consumer" if item["id"] == "consumer" else f'{item["label"]} {item["name"].split(" ")[0]}'
+        scene.text(name, x + 18, y + 3, 110, 11.5, MUTED)
+        x += 18 + text_width(name, 11.5) + 18
+    return y + 26
+
+
 # ---------------------------------------------------------------- poster
 
 def header(scene: Scene, data) -> float:
     y = scene.text(data["title"], M, 26, DW, 32, WHITE, True)
-    return scene.text(data["summary"], M, y + 10, DW, 19, MUTED) + 22
+    return scene.text(fill(data["summary"], data), M, y + 10, DW, 19, MUTED) + 22
 
 
 def poster(data) -> tuple[str, int]:
@@ -352,10 +520,10 @@ def poster(data) -> tuple[str, int]:
     diagram, bottom, _ = draw_diagram(data)
     scene.add(f'<g transform="translate({M} {num(y)})">{diagram.body()}</g>')
     height = math.ceil(y + bottom + 24)
-    note = "Measured and estimated times per layer: documentation/v2/10-19/10-factory-onion-architecture.md"
+    note = data.get("poster_note", "Measured and estimated times per layer: documentation/v2/10-19/10-factory-onion-architecture.md")
     scene.text(note, M, height - 12, DW, 12, MUTED)
     height += 16
-    return document(scene.body(), height, data["title"], data["summary"]), height
+    return document(scene.body(), height, data["title"], fill(data["summary"], data)), height
 
 
 # ---------------------------------------------------------------- animation
@@ -441,11 +609,12 @@ def animation(data, frames_dir: Path | None):
         y = header(scene, data)
         y = scene.text(f'{step["chapter"]}  ·  STEP {index + 1} / {len(steps)}', M, y, DW, 15, ACCENT, True)
         y = scene.text(step["title"], M, y + 10, DW, 27, WHITE, True)
-        y = scene.text(step["explanation"].replace("{totals}", totals_sentence(data)), M, y + 14, DW, 20)
+        y = scene.text(fill(step["explanation"], data), M, y + 14, DW, 20)
         y += 16
-        key_height = len(wrap(step["key"], DW - 36, 17, True)) * 24 + 32
+        key = fill(step["key"], data)
+        key_height = len(wrap(key, DW - 36, 17, True)) * 24 + 32
         scene.rect(M, y, DW, key_height, SURFACE, GRID)
-        scene.text(step["key"], M + 18, y + 14, DW - 36, 17, KEY, True, 24)
+        scene.text(key, M + 18, y + 14, DW - 36, 17, WHITE, True, 24)
         text_bottoms.append(y + key_height + 18)
         prepared.append(scene)
     fixed_y = max(text_bottoms)  # stable diagram position across steps
@@ -474,7 +643,7 @@ def animation(data, frames_dir: Path | None):
         if frames_dir:
             frames_dir.mkdir(parents=True, exist_ok=True)
             background = frames_dir / f"step-{index:02}.svg"
-            background.write_text(document(body, height, data["title"], step["explanation"]), encoding="utf-8")
+            background.write_text(document(body, height, data["title"], fill(step["explanation"], data)), encoding="utf-8")
             jobs.append({"svg": str(background), "png": str(background.with_suffix(".png"))})
         times, widths = timed(start, end, total, 0, DW)
         body += (f'<rect x="{M}" y="{progress_y}" width="{DW if index == 0 else 0}" height="5" rx="2" fill="{ACCENT}">'
@@ -485,7 +654,8 @@ def animation(data, frames_dir: Path | None):
                       + visibility(start, until, total, index == 0) + body + "</g>")
         start = end
     svg = document("".join(groups), height, data["title"],
-                   data["summary"] + " Illustrative animation; times are measured where marked, otherwise estimated.")
+                   fill(data["summary"], data) + " " + data["animation"].get(
+                       "note", "Illustrative animation; times are measured where marked, otherwise estimated."))
     if frames_dir:
         plan = {"width": W, "height": height, "progress_y": progress_y, "progress_x": M, "progress_w": DW,
                 "speed": speed, "end_hold_seconds": info["end_hold_seconds"],
@@ -508,45 +678,73 @@ def cell(t) -> str:
     return f'{value} {KIND[t["kind"]]}'.strip()
 
 
+def runs_table(data) -> str:
+    rows = ["| Scenario / step | ESAF call | Route | API time before pipeline (L2) | Pipeline (wall clock) | L3 / L4 / L5 (min) | Job total |",
+            "|---|---|---|---|---|---|---|"]
+    for run in data["runs"]:
+        api = seconds_text(run["api_seconds"]) if run.get("api_seconds") is not None else ""
+        api = ", ".join(filter(None, [api, run.get("api_note")]))
+        if run.get("pipeline_minutes") is None:
+            pipeline = run["pipeline_short"]
+        else:
+            pipeline = ", ".join(filter(None, [run.get("run_id") and f'run {run["run_id"]}: {work_text(run)}' or work_text(run),
+                                               run.get("pipeline_note")]))
+        job = run_minutes(run["job_minutes"]) if run.get("job_minutes") is not None else run.get("job_note", "-")
+        if run.get("job_minutes") is not None and run.get("job_note"):
+            job += f' ({run["job_note"]})'
+        split = " / ".join(f'{run["split"].get(layer, 0):g}' for layer in data["pipeline_layers"])
+        split += "" if run["split_kind"] == "measured" else " (estimated)"
+        rows.append(f'| {run["n"]}. {run["step"]} ({run["when"]}) | `{run["call"]}` | {run["route"]} | {api} | {pipeline} | {split} | {job} |')
+    return "\n".join(rows)
+
+
 def tables(data) -> dict[str, str]:
+    """Every generated table the data supports; update_doc() requires a marker for each one."""
     layers = [data["consumer"]] + data["layers"]
     head = lambda item: "Consumer" if item["id"] == "consumer" else f'{item["label"]} {item["name"]}'
     out = {}
     rows = ["| Layer | What it is | Repository and paths | Called by | Calls |", "|---|---|---|---|---|"]
     for item in layers:
-        rows.append(f'| **{head(item)}** | {item["what"]} | {item["where"]} | {item["called_by"]} | {item["calls"]} |')
+        rows.append(f'| **{head(item)}** | {fill(item["what"], data)} | {item["where"]} | {item["called_by"]} | {item["calls"]} |')
     out["layers"] = "\n".join(rows)
     for layer in data["layers"]:
         if layer.get("scripts"):
             rows = ["| Script | Language | Called by | Does |", "|---|---|---|---|"]
             rows += [f'| `{s["name"]}` | {s["lang"]} | {s["by"]} | {s["does"]} |' for s in layer["scripts"]]
             out[f'scripts-{layer["id"]}'] = "\n".join(rows)
-    rows = ["| Scenario | SDK call | " + " | ".join(head(i) for i in layers) + " | Total |", "|---" * (len(layers) + 3) + "|"]
-    for s in data["scenarios"]:
-        low, high = scenario_total(s)
-        rows.append(f'| {s["n"]}. {s["name"]} | `{s["sdk"]}` | ' + " | ".join(cell(s["times"][i["id"]]) for i in layers)
-                    + f" | **{low:g}-{high:g}**" + (f" ({span(low, high)})" if high >= 90 else "") + " |")
-    out["scenario-times"] = "\n".join(rows)
-    rows = ["| Scenario | Layer | Minutes | Basis |", "|---|---|---|---|"]
-    for s in data["scenarios"]:
-        for item in layers:
-            t = s["times"][item["id"]]
-            if t.get("note") or t.get("evidence"):
-                basis = ", ".join(filter(None, [t.get("note"), t.get("evidence") and "evidence " + t["evidence"]]))
-                rows.append(f'| {s["n"]} | {head(item)} | {cell(t)} | {basis} |')
-    out["scenario-notes"] = "\n".join(rows)
-    rows = ["| Layer | Time for a code change (min) | What the loop contains |", "|---|---|---|"]
-    rows += [f'| **{head(i)}** | {cell(i["change"])} | {i["change"]["note"]} |' for i in layers]
-    out["change-times"] = "\n".join(rows)
-    fix = data["fix_iteration"]["steps"]
-    now, future = sum(s["now"] for s in fix), sum(s["future"] for s in fix)
-    rows = ["| # | Step | Now (min) | % | Future (min, estimated) | How |", "|---|---|---|---|---|---|"]
-    rows += [f'| {s["n"]} | {s["step"]} | {s["now"]} | {round(100 * s["now"] / now)}% | {s["future"]} | {s["how"]} |' for s in fix]
-    rows.append(f"| | **Total** | **{now}** | 100% | **{future}** ({round(100 * (future - now) / now)}%) | |")
-    out["fix-iteration"] = "\n".join(rows)
-    loops = data["prevention"]["loops_minutes"]
-    out["loops"] = " + ".join(f"{v} {k}" for k, v in loops.items()) + f" = **{sum(loops.values())} min**"
-    out["fifth-bug"] = data["prevention"]["fifth_bug"]
+    if "scenarios" in data:
+        rows = ["| Scenario | SDK call | " + " | ".join(head(i) for i in layers) + " | Total |", "|---" * (len(layers) + 3) + "|"]
+        for s in data["scenarios"]:
+            low, high = scenario_total(s)
+            rows.append(f'| {s["n"]}. {s["name"]} | `{s["sdk"]}` | ' + " | ".join(cell(s["times"][i["id"]]) for i in layers)
+                        + f" | **{low:g}-{high:g}**" + (f" ({span(low, high)})" if high >= 90 else "") + " |")
+        out["scenario-times"] = "\n".join(rows)
+        rows = ["| Scenario | Layer | Minutes | Basis |", "|---|---|---|---|"]
+        for s in data["scenarios"]:
+            for item in layers:
+                t = s["times"][item["id"]]
+                if t.get("note") or t.get("evidence"):
+                    basis = ", ".join(filter(None, [t.get("note"), t.get("evidence") and "evidence " + t["evidence"]]))
+                    rows.append(f'| {s["n"]} | {head(item)} | {cell(t)} | {basis} |')
+        out["scenario-notes"] = "\n".join(rows)
+    if "runs" in data:
+        out["runs"] = runs_table(data)
+    if all("change" in i for i in layers):
+        rows = ["| Layer | Time for a code change (min) | What the loop contains |", "|---|---|---|"]
+        rows += [f'| **{head(i)}** | {cell(i["change"])} | {i["change"]["note"]} |' for i in layers]
+        out["change-times"] = "\n".join(rows)
+    if "fix_iteration" in data:
+        fix = data["fix_iteration"]["steps"]
+        now, future = sum(s["now"] for s in fix), sum(s["future"] for s in fix)
+        rows = ["| # | Step | Now (min) | % | Future (min, estimated) | How |", "|---|---|---|---|---|---|"]
+        rows += [f'| {s["n"]} | {s["step"]} | {s["now"]} | {round(100 * s["now"] / now)}% | {s["future"]} | {s["how"]} |' for s in fix]
+        rows.append(f"| | **Total** | **{now}** | 100% | **{future}** ({round(100 * (future - now) / now)}%) | |")
+        out["fix-iteration"] = "\n".join(rows)
+    if "prevention" in data:
+        loops = data["prevention"]["loops_minutes"]
+        out["loops"] = " + ".join(f"{v} {k}" for k, v in loops.items()) + f" = **{sum(loops.values())} min**"
+        out["fifth-bug"] = data["prevention"]["fifth_bug"]
+    out["colors"] = color_legend(data) + " " + data["colors"]["note"]
     out["evidence"] = "\n".join(f"- **{key}**: {text}" for key, text in data["evidence"].items())
     return out
 
@@ -567,7 +765,7 @@ def main() -> None:
     parser.add_argument("--update-doc", action="store_true", help="rewrite the generated tables in the markdown page")
     parser.add_argument("--frames", type=Path, help="write per-step scenes and timeline.json for make_onion_raster.py")
     args = parser.parse_args()
-    data = json.loads(args.data.read_text(encoding="utf-8"))
+    data = load(args.data)
     out = {key: (args.data.parent / value).resolve() for key, value in data["outputs"].items()}
     svg, height = poster(data)
     out["poster_svg"].write_text(svg, encoding="utf-8")

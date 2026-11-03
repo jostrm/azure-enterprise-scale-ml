@@ -7,17 +7,20 @@ from typing import Any
 from ..domain.errors import AlreadyExists, ScopeNotSupported, UnknownId
 from ..domain.ids import AnyId, FactoryId, ProjectId, ScalesetId
 from ..domain.operation import Step, StepKind
-from ..domain.scenarios import Scenario
+from ..domain.scenarios import ADD_PROJECT001_STEP, ENROLL_SCALESET_STEP, Scenario
 from ..ports import Catalog
 from . import resolver
 
 DEFAULT_PROJECT_NUMBER = "001"
 
 
-def plan(scenario: Scenario, target: AnyId, catalog: Catalog, options: dict[str, Any]) -> tuple[list[Step], dict[str, Any]]:
+def plan(scenario: Scenario, target: AnyId, catalog: Catalog, options: dict[str, Any], *,
+         single_scenario: bool = False) -> tuple[list[Step], dict[str, Any]]:
     builder = _BUILDERS[scenario]
     steps, resolved = builder(target, catalog, options)
     resolved["expected_revision"] = catalog.revision
+    if single_scenario:
+        steps = [Step.new(scenario.value, StepKind.SCENARIO)]
     return steps, resolved
 
 
@@ -48,7 +51,13 @@ def _add_scaleset(target: ScalesetId, catalog: Catalog, options):
         raise AlreadyExists(f"Scale set {target} is already in the catalog.")
     resolved = {"factory_id": factory.id, "factory_key": factory.key, "environment": target.factory.catalog_env,
                 "suffix": target.suffix, "project_number": DEFAULT_PROJECT_NUMBER}
-    steps = [_configure(), Step.new("deploy-common", StepKind.DEPLOY), Step.new("deploy-project001", StepKind.DEPLOY)]
+    # The new scale set gets no project when it is created. Place project001 on it first (configuration only, with
+    # an explicit placement, so nothing needs the common part deployed), then enroll the scale set: a single-writer
+    # factory's binding covers only what was enrolled, and the enrollment covers only projects placed by then. A
+    # Blob-coordinated factory's enrollment review answers "not needed" and the step is skipped. Then deploy.
+    steps = [_configure(), Step.new(ADD_PROJECT001_STEP, StepKind.CONFIGURE),
+             Step.new(ENROLL_SCALESET_STEP, StepKind.ENROLL), Step.new("deploy-common", StepKind.DEPLOY),
+             Step.new("deploy-project001", StepKind.DEPLOY)]
     return steps, resolved
 
 

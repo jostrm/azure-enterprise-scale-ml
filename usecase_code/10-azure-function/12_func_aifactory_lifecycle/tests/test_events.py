@@ -31,17 +31,23 @@ def service(clock, github):
     return service
 
 
+COMMON = 3  # scenario 2: configure, add-project001, enroll-scaleset, deploy-common, deploy-project001
+
+
 def running_scaleset(service, **options):
+    """Confirm scenario 2 up to deploy-common, the first step with a run."""
     operation = service.prepare("add-scaleset", {"scalesetId": SCALESET_2, **options})
-    operation = confirm_current(service, operation)
-    return confirm_current(service, operation)
+    for _ in range(COMMON + 1):
+        operation = confirm_current(service, operation)
+    assert operation.step.name == "deploy-common"
+    return operation
 
 
 def test_confirm_dispatches_one_dummy_run_with_the_correlation_inputs(service, github):
     operation = running_scaleset(service)
     assert operation.status is Status.RUNNING
     assert github.dispatches == [{"workflow": "aif-dummy-step.yml", "ref": "main", "inputs": {
-        "operation_id": operation.id, "step": "1", "target": "aif-121-esml-common-sdc-dev-002",
+        "operation_id": operation.id, "step": str(COMMON), "target": "aif-121-esml-common-sdc-dev-002",
         "outcome": "success", "duration_seconds": "60", "relay": "true"}}]
 
 
@@ -50,9 +56,9 @@ def test_a_success_event_completes_the_step_and_prepares_the_next_review(service
     result = service.handle_event("workflow_run", "d-1", github.complete(0))
     assert result == {"result": "applied", "operationId": operation.id, "change": "step-succeeded"}
     operation = service.get(operation.id)
-    assert operation.steps[1].status is Status.SUCCEEDED
-    assert operation.steps[1].runs[0].html_url.endswith("/actions/runs/1001")
-    assert operation.status is Status.AWAITING_CONFIRMATION and operation.current == 2
+    assert operation.steps[COMMON].status is Status.SUCCEEDED
+    assert operation.steps[COMMON].runs[0].html_url.endswith("/actions/runs/1001")
+    assert operation.status is Status.AWAITING_CONFIRMATION and operation.current == COMMON + 1
 
 
 def test_a_duplicate_delivery_is_ignored(service, github):
@@ -68,8 +74,8 @@ def test_a_failure_event_stops_the_chain_with_the_run_link_and_a_log_excerpt(ser
     service.handle_event("workflow_run", "d-2", github.complete(0, conclusion="failure"))
     operation = service.get(operation.id)
     assert operation.status is Status.FAILED
-    assert operation.steps[1].failure["runUrl"].endswith("/actions/runs/1001")
-    assert operation.steps[1].failure["logExcerpt"] == "Simulated failure for aif-121-esml-common-sdc-dev-002"
+    assert operation.steps[COMMON].failure["runUrl"].endswith("/actions/runs/1001")
+    assert operation.steps[COMMON].failure["logExcerpt"] == "Simulated failure for aif-121-esml-common-sdc-dev-002"
 
 
 def test_the_poller_recovers_a_lost_event(service, github, clock):
@@ -80,8 +86,8 @@ def test_the_poller_recovers_a_lost_event(service, github, clock):
     summary = service.reconcile()
     assert summary["polled"] == 1
     operation = service.get(operation.id)
-    assert operation.steps[1].runs[0].source == "poller"
-    assert operation.status is Status.AWAITING_CONFIRMATION and operation.current == 2
+    assert operation.steps[COMMON].runs[0].source == "poller"
+    assert operation.status is Status.AWAITING_CONFIRMATION and operation.current == COMMON + 1
 
 
 def test_events_that_belong_to_no_operation_are_reported_as_uncorrelated(service):
@@ -146,7 +152,7 @@ def test_a_bound_run_id_is_never_replaced_by_another_run(service, github):
     service.handle_event("workflow_run", "d-s", started)
     impostor = forged(github.complete(0), id=999999)
     assert service.handle_event("workflow_run", "d-i", impostor)["result"] == "ignored"
-    assert service.get(operation.id).steps[1].runs[0].run_id == started["workflow_run"]["id"]
+    assert service.get(operation.id).steps[COMMON].runs[0].run_id == started["workflow_run"]["id"]
 
 
 def test_a_delivery_is_recorded_only_after_it_was_applied(service, github, monkeypatch):

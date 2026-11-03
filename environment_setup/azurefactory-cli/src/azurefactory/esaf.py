@@ -1,37 +1,42 @@
-"""ESAF - Enterprise Scale Azure Factory: the six scenario methods (Facade over AzureFactoryClient).
+"""ESAF - Enterprise Scale Azure Factory: the six lifecycle scenarios, one call each.
 
     from azurefactory import esaf
 
-    esaf.init_factory(workflow_id)                       # Scenario 1: drive a creation workflow to the end
-    esaf.add_scale_set("002", cidr="10.141.0.0/16")      # Scenario 2: register, enroll and deploy its common
-    esaf.upsert_project("002", scale_set="002")          # Scenario 3: add or update a project and deploy it
-    esaf.delete_project("002")                           # Scenario 4
-    esaf.delete_scale_set("002")                         # Scenario 5
-    esaf.delete_factory()                                # Scenario 6
+    esaf.init_factory()                                      # Scenario 1: submit the folder's saved factory draft
+    esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")   # Scenario 2: the VNet range; the pipeline makes subnets
+    esaf.upsert_project("002", "dev")                        # Scenario 3: add or update a project and deploy it
+    esaf.delete_project("002", "dev")                        # Scenario 4
+    esaf.delete_scale_set("002", "dev")                      # Scenario 5
+    esaf.delete_factory()                                    # Scenario 6
+    job.wait()                                               # reads the job every second until it ends
 
-Connection: the environment variables AIFACTORY_API_URL, AIFACTORY_API_KEY and ESAF_FOLDER (the azurefactory folder
-on the API host), or esaf.connect(folder=..., url=..., api_key=...). Each call prepares the server's review, checks
-it, and confirms it at once: calling the method is the approval, so call it only for what you mean to change. It
-returns an EsafJob immediately (fire and forget); job.wait() follows the server-side job to its end, or pass
-wait=True. Defaults (subscription, tenant, orchestrator, version, environment) come from the factory itself.
+Connection, set once: the environment variables ESAF_FOLDER (the azurefactory folder on the API host),
+AIFACTORY_API_URL and AIFACTORY_API_KEY, or esaf.connect(folder=..., url=..., api_key=..., factory=...). The factory
+is needed only when the folder holds more than one.
+
+Environment (dev, stage or prod) is required on scale-set and project scenarios: the same suffix or project number
+can exist in several environments, and a delete must never reach another one.
+
+Each call is one POST to the Factory API's /api/v1/esaf/<scenario> route, which runs the scenario as a resilient
+server-side job and answers 202 with a job id. Calling the method is the approval, so call it only for what you mean
+to change. apply_project remains an alias of upsert_project.
 """
 
 from __future__ import annotations
 
 import os
-import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .client import AzureFactoryClient
-from .errors import APIError, BlockedError, ConfigError
+from .errors import ConfigError
 
-__all__ = ["connect", "init_factory", "add_scale_set", "upsert_project", "delete_project", "delete_scale_set",
-           "delete_factory", "EsafJob", "Session"]
+__all__ = ["connect", "init_factory", "add_scale_set", "upsert_project", "apply_project", "delete_project",
+           "delete_scale_set", "delete_factory", "EsafJob", "Session"]
 
-ACTIVE = {"queued", "running", "pending"}
-_ALREADY = ("already has a binding target", "Nothing to change", "already allowed")
+ENVIRONMENTS = ("dev", "stage", "prod")
+ACTIVE = {"queued", "running", "pending", "accepted", "preparing", "confirming", "retrying"}
 
 
 @dataclass
@@ -60,16 +65,17 @@ def connect(folder: str | None = None, url: str | None = None, api_key: str | No
 
 @dataclass
 class EsafJob:
-    """A started scenario. status() reads it once; wait() follows it to its end."""
+    """A started scenario. status() reads it once; wait() reads it every `poll` seconds until it ends."""
     scenario: str
-    kind: str  # catalog | factory-deletion | workflow
+    kind: str  # esaf; catalog | factory-deletion | workflow for jobs an earlier SDK stored
     id: str | None
     session: Session
     result: dict | None = None
-    _thread: threading.Thread | None = field(default=None, repr=False)
 
     def status(self) -> dict:
         client, folder = self.session.client, self.session.folder
+        if self.kind == "esaf":
+            return client.esaf_job(folder, self.id)
         if self.kind == "catalog":
             state = client.catalog_job(folder, self.id)
         elif self.kind == "factory-deletion":
@@ -78,248 +84,105 @@ class EsafJob:
             state = client.creation_workflow_status(folder, self.id)
         return state["job"] if isinstance(state.get("job"), dict) else state
 
-    def wait(self, timeout: float = 8 * 3600, poll: float = 30) -> dict:
-        if self._thread is not None:
-            self._thread.join(timeout)
-            return self.result
+    def wait(self, timeout: float = 8 * 3600, poll: float = 1) -> dict:
         deadline = time.monotonic() + timeout
         while True:
             state = self.status()
-            if state.get("status") not in ACTIVE or time.monotonic() > deadline:
+            continuing = (self.kind == "workflow" and state.get("status") == "awaiting-review"
+                          and state.get("requires_review") is False)
+            if (state.get("status") not in ACTIVE and not continuing) or time.monotonic() > deadline:
                 self.result = state
                 return state
             time.sleep(poll)
 
 
-# Private helpers ---------------------------------------------------------------------------------------------------
 def _session(session: Session | None) -> Session:
     return session or _default or connect()
 
 
-def _catalog(s: Session) -> tuple[dict, dict]:
-    document = s.client.catalog_list(s.folder)
-    factories = document.get("factories", [])
-    if s.factory:
-        matches = [f for f in factories if s.factory in (f.get("id"), f.get("key"))]
-    else:
-        matches = factories
-    if len(matches) != 1:
-        raise ConfigError("Select the factory with esaf.connect(factory=<key>); the folder has "
-                          + str(len(factories)) + " factories.")
-    return document, matches[0]
+def _environment(environment: str) -> str:
+    if environment not in ENVIRONMENTS:
+        raise ConfigError("environment must be dev, stage or prod, not " + repr(environment) + ".")
+    return environment
 
 
-def _scale(factory: dict, suffix: str | None) -> dict | None:
-    scales = factory.get("scale_sets", [])
-    if suffix is None:
-        return scales[0] if scales else None
-    return next((s for s in scales if s.get("suffix") == suffix), None)
-
-
-def _project(factory: dict, number: str) -> dict | None:
-    return next((p for p in factory.get("projects", []) if p.get("number") == number), None)
-
-
-def _field(review: dict, key: str):
-    preview = review.get("preview") if isinstance(review.get("preview"), dict) else {}
-    return review.get(key, preview.get(key))
-
-
-def _blockers(review: dict) -> list:
-    return list(_field(review, "blockers") or [])
-
-
-def _require(review: dict, what: str) -> dict:
-    if _field(review, "can_execute") is not True:
-        raise BlockedError(what + " was refused: " + "; ".join(map(str, _blockers(review) or ["no executable review"])))
-    return review
-
-
-def _already(text: str) -> bool:
-    return any(marker in text for marker in _ALREADY)
-
-
-def _confirm(s: Session, review: dict, what: str) -> dict:
-    return s.client.catalog_confirm(s.folder, _require(review, what)["confirmation_id"])
-
-
-def _job(s: Session, scenario: str, confirmed: dict, wait: bool, kind: str = "catalog") -> EsafJob:
-    job = confirmed.get("job") or {}
-    handle = EsafJob(scenario, kind, job.get("id"), s)
-    if wait and handle.id:
-        handle.wait()
-    return handle
-
-
-def _deploy(s: Session, document: dict, factory: dict, scale: dict, project: dict | None, version_ref: str | None,
-            wait: bool, scenario: str) -> EsafJob:
-    body = {"folder": s.folder, "contract_version": 1, "action": "deploy", "expected_revision": document["revision"],
-            "factory_id": factory["id"], "scale_set_id": scale["id"], "project_id": project["id"] if project else None,
-            "version_ref": version_ref or factory.get("aifactory_version") or factory.get("version_ref")}
-    review = s.client.catalog_prepare(body)
-    return _job(s, scenario, _confirm(s, review, scenario + " deploy"), wait)
-
-
-def _allow_deletion(s: Session, factory: dict) -> None:
-    """Grant the factory's deletion permission once; already allowed is not a failure (idempotent)."""
-    try:
-        review = s.client.authorize_deletion_prepare({"contract_version": 1, "folder": s.folder,
-                                                       "factory_id": factory["id"], "mode": "allow"})
-    except APIError as error:
-        if _already(str(error)):
-            return
-        raise
-    if _field(review, "can_execute") is not True and any(_already(str(b)) for b in _blockers(review)):
-        return
-    _require(review, "authorize deletion")
-    s.client.authorize_deletion_confirm(folder=s.folder, confirmation_id=_field(review, "confirmation_id"),
-                                        preview_hash=_field(review, "preview_hash"),
-                                        confirmation_phrase=_field(review, "confirmation_phrase"))
+def _submit(scenario: str, route: str, fields: dict, *, wait: bool, poll: float, session: Session | None) -> EsafJob:
+    s = _session(session)
+    body = {"folder": s.folder, "approved": True, **({"factory": s.factory} if s.factory else {}),
+            **{key: value for key, value in fields.items() if value is not None}}
+    accepted = s.client.esaf_submit(route, body)
+    job = EsafJob(scenario, "esaf", accepted.get("job_id"), s)
+    if wait:
+        job.wait(poll=poll)
+    return job
 
 
 # The six scenarios -------------------------------------------------------------------------------------------------
-def init_factory(workflow_id: str | None = None, *, request: dict | None = None, wait: bool = False,
-                 poll: float = 30, session: Session | None = None) -> EsafJob:
-    """Scenario 1: drive a creation workflow through every stage (new with request=..., or resume workflow_id)."""
-    s = _session(session)
-    if workflow_id is None:
-        if request is None:
-            raise ConfigError("init_factory needs the workflow_id to resume, or request= for a new creation workflow.")
-        workflow_id = s.client.creation_workflow_prepare(request)["workflow_id"]
-    handle = EsafJob("init_factory", "workflow", workflow_id, s)
+def init_factory(*, creation_request: dict | None = None, retries: int | None = None, wait: bool = False,
+                 poll: float = 1, session: Session | None = None) -> EsafJob:
+    """Scenario 1: submit the connected folder's saved factory draft as one whole-workflow approval.
 
-    def drive():
-        while True:
-            state = s.client.creation_workflow_status(s.folder, workflow_id)
-            while state.get("status") in ACTIVE:
-                time.sleep(poll)
-                state = s.client.creation_workflow_status(s.folder, workflow_id)
-            if state.get("status") not in ("awaiting-review", "blocked"):
-                handle.result = state
-                return
-            review = s.client.creation_workflow_next(s.folder, workflow_id)
-            if _field(review, "can_execute") is not True:
-                handle.result = {**state, "status": "blocked", "blockers": _blockers(review)}
-                return
-            s.client.creation_workflow_start(s.folder, workflow_id, review["confirmation_id"])
-
-    if wait:
-        drive()
-    else:
-        handle._thread = threading.Thread(target=drive, name="esaf-init-factory", daemon=True)
-        handle._thread.start()
-    return handle
+    creation_request (the creation API's full-bootstrap body) saves the factory and starts it in one call instead.
+    """
+    return _submit("init_factory", "init-factory", {"creation_request": creation_request, "retries": retries},
+                   wait=wait, poll=poll, session=session)
 
 
-def add_scale_set(suffix: str, cidr: str, *, environment: str = "dev", max_projects: int = 3,
+def add_scale_set(scale_set: str, environment: str, *, cidr: str | None = None, max_projects: int | None = None,
                   subscription_id: str | None = None, tenant_id: str | None = None, orchestrator: str | None = None,
-                  version_ref: str | None = None, wait: bool = False, session: Session | None = None) -> EsafJob:
-    """Scenario 2: register scale set <suffix> (if new), enroll it and deploy its common."""
-    s = _session(session)
-    document, factory = _catalog(s)
-    if _scale(factory, suffix) is None:
-        like = next((x for x in factory.get("scale_sets", []) if x.get("environment") == environment),
-                    _scale(factory, None)) or {}
-        added = {"environment": environment, "suffix": suffix,
-                 "tenant_id": tenant_id or like.get("tenant_id"),
-                 "subscription_id": subscription_id or like.get("subscription_id"),
-                 "orchestrator": orchestrator or like.get("orchestrator"),
-                 "network": {"vnet_cidr": cidr, "max_projects": max_projects}}
-        review = s.client.scaleset_add_prepare(s.folder, factory["id"], [added], expected_revision=document["revision"])
-        _confirm(s, review, "add scale set")
-        document, factory = _catalog(s)
-    scale = _scale(factory, suffix)
-    review = s.client.enroll_scale_set_prepare({"contract_version": 1, "folder": s.folder,
-                                                "factory_id": factory["id"], "scale_set_id": scale["id"]})
-    if not (_field(review, "can_execute") is not True and any(_already(str(b)) for b in _blockers(review))):
-        _require(review, "enroll scale set")
-        s.client.enroll_scale_set_confirm(folder=s.folder, confirmation_id=_field(review, "confirmation_id"),
-                                          preview_hash=_field(review, "preview_hash"),
-                                          confirmation_phrase=_field(review, "confirmation_phrase"))
-        document, factory = _catalog(s)
-        scale = _scale(factory, suffix)
-    return _deploy(s, document, factory, scale, None, version_ref, wait, "add_scale_set")
+                  version_ref: str | None = None, retries: int | None = None, wait: bool = False, poll: float = 1,
+                  session: Session | None = None) -> EsafJob:
+    """Scenario 2: register scale set <scale_set> in <environment> (if new), enroll it and deploy its common.
+
+    cidr is the new scale set's VNet range; the pipeline computes the subnets (with BYOSubnet they already exist).
+    Tenant, subscription and orchestrator default to the environment's existing scale set.
+    """
+    return _submit("add_scale_set", "add-scale-set", {
+        "scale_set": scale_set, "environment": _environment(environment), "cidr": cidr,
+        "max_projects": max_projects, "subscription_id": subscription_id, "tenant_id": tenant_id,
+        "orchestrator": orchestrator, "version_ref": version_ref, "retries": retries},
+        wait=wait, poll=poll, session=session)
 
 
-def upsert_project(number: str, *, scale_set: str | None = None, settings: dict | None = None,
-                   display_name: str = "", version_ref: str | None = None, wait: bool = False,
+def upsert_project(project: str, environment: str, *, scale_set: str | None = None, settings: dict | None = None,
+                   display_name: str | None = None, version_ref: str | None = None, retries: int | None = None,
+                   wait: bool = False, poll: float = 1, session: Session | None = None) -> EsafJob:
+    """Scenario 3: add project <project> in <environment> (or update it), enroll its scale set and deploy it.
+
+    scale_set is needed only when the environment has more than one scale set.
+    """
+    return _submit("upsert_project", "upsert-project", {
+        "project": project, "environment": _environment(environment), "scale_set": scale_set,
+        "settings": settings, "display_name": display_name, "version_ref": version_ref, "retries": retries},
+        wait=wait, poll=poll, session=session)
+
+
+apply_project = upsert_project
+
+
+def delete_project(project: str, environment: str, *, scale_set: str | None = None,
+                   include_project_subnets: bool | None = None, include_keyvault_and_resource_group: bool | None = None,
+                   version_ref: str | None = None, retries: int | None = None, wait: bool = False, poll: float = 1,
                    session: Session | None = None) -> EsafJob:
-    """Scenario 3: add project <number> (placed on scale_set, default the first) or update it, then deploy it."""
-    s = _session(session)
-    document, factory = _catalog(s)
-    project = _project(factory, number)
-    if project is None:
-        scale = _scale(factory, scale_set)
-        if scale is None:
-            raise ConfigError("Scale set " + str(scale_set) + " is not registered; run esaf.add_scale_set first.")
-        review = s.client.project_add_prepare(
-            s.folder, factory["id"], number=number, display_name=display_name,
-            placements=[{"environment": scale["environment"], "scale_set_id": scale["id"]}],
-            expected_revision=document["revision"])
-        _confirm(s, review, "add project")
-        document, factory = _catalog(s)
-        project = _project(factory, number)
-    placed = {item["scale_set_id"] for item in project.get("placements", [])}
-    scale = _scale(factory, scale_set) if scale_set else next(
-        (x for x in factory.get("scale_sets", []) if x["id"] in placed), None)
-    if scale is None or scale["id"] not in placed:
-        raise ConfigError("Project " + number + " is not placed on scale set " + str(scale_set) + ".")
-    if settings:
-        review = s.client.catalog_settings_prepare(s.folder, factory["id"], settings, scale_set_id=scale["id"],
-                                                   project_id=project["id"], expected_revision=document["revision"])
-        _confirm(s, review, "project settings")
-        document, factory = _catalog(s)
-    return _deploy(s, document, factory, scale, project, version_ref, wait, "upsert_project")
+    """Scenario 4: delete project <project>'s resources in <environment> (its resource group by default)."""
+    return _submit("delete_project", "delete-project", {
+        "project": project, "environment": _environment(environment), "scale_set": scale_set,
+        "include_project_subnets": include_project_subnets,
+        "include_keyvault_and_resource_group": include_keyvault_and_resource_group,
+        "version_ref": version_ref, "retries": retries}, wait=wait, poll=poll, session=session)
 
 
-def delete_project(number: str, *, include_project_subnets: bool = False,
-                   include_keyvault_and_resource_group: bool = True, version_ref: str | None = None,
-                   wait: bool = False, session: Session | None = None) -> EsafJob:
-    """Scenario 4: delete project <number>'s resources (its resource group by default)."""
-    s = _session(session)
-    _, factory = _catalog(s)
-    _allow_deletion(s, factory)
-    document, factory = _catalog(s)
-    project = _project(factory, number)
-    if project is None:
-        raise ConfigError("Project " + number + " is not registered.")
-    placement = project["placements"][0]
-    review = s.client.project_delete_prepare(
-        s.folder, factory["id"], project["id"], environments=[placement["environment"]],
-        include_project_subnets=include_project_subnets,
-        include_keyvault_and_resource_group=include_keyvault_and_resource_group,
-        expected_revision=document["revision"], scale_set_id=placement["scale_set_id"], version_ref=version_ref)
-    return _job(s, "delete_project", _confirm(s, review, "delete project"), wait)
-
-
-def delete_scale_set(suffix: str, *, version_ref: str | None = None, wait: bool = False,
+def delete_scale_set(scale_set: str, environment: str, *, version_ref: str | None = None,
+                     retries: int | None = None, wait: bool = False, poll: float = 1,
                      session: Session | None = None) -> EsafJob:
-    """Scenario 5: delete scale set <suffix>'s registered resources."""
-    s = _session(session)
-    _, factory = _catalog(s)
-    _allow_deletion(s, factory)
-    document, factory = _catalog(s)
-    scale = _scale(factory, suffix)
-    if scale is None:
-        raise ConfigError("Scale set " + suffix + " is not registered.")
-    review = s.client.scaleset_delete_prepare(s.folder, factory["id"], scale["id"],
-                                              expected_revision=document["revision"], version_ref=version_ref)
-    return _job(s, "delete_scale_set", _confirm(s, review, "delete scale set"), wait)
+    """Scenario 5: delete scale set <scale_set>'s registered resources in <environment>."""
+    return _submit("delete_scale_set", "delete-scale-set", {
+        "scale_set": scale_set, "environment": _environment(environment), "version_ref": version_ref,
+        "retries": retries}, wait=wait, poll=poll, session=session)
 
 
-def delete_factory(*, version_ref: str | None = None, wait: bool = False,
-                   session: Session | None = None) -> EsafJob:
+def delete_factory(*, version_ref: str | None = None, retries: int | None = None, wait: bool = False,
+                   poll: float = 1, session: Session | None = None) -> EsafJob:
     """Scenario 6: delete the whole factory (every registered resource; shared hubs and subscriptions stay)."""
-    s = _session(session)
-    _, factory = _catalog(s)
-    _allow_deletion(s, factory)
-    document, factory = _catalog(s)
-    body = {"contract_version": 1, "folder": s.folder, "factory_id": factory["id"],
-            "expected_revision": document["revision"]}
-    if version_ref:
-        body["version_ref"] = version_ref
-    review = _require(s.client.delete_aifactory_prepare(body), "delete factory")
-    confirmed = s.client.delete_aifactory_confirm(
-        folder=s.folder, confirmation_id=_field(review, "confirmation_id"),
-        preview_hash=_field(review, "preview_hash"), confirmation_phrase=_field(review, "confirmation_phrase"))
-    return _job(s, "delete_factory", confirmed, wait, kind="factory-deletion")
+    return _submit("delete_factory", "delete-factory", {"version_ref": version_ref, "retries": retries},
+                   wait=wait, poll=poll, session=session)

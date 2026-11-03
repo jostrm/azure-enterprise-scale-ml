@@ -31,6 +31,40 @@ Obtain the actual URL/key from your operator and run `doctor`
 against that host. Local API authentication is distinct from both the Azure CLI
 identity on the host and a user's approval to save or deploy.
 
+## Scenario facade for Python consumers
+
+```python
+from azurefactory import esaf
+# Connection, once: ESAF_FOLDER, AIFACTORY_API_URL, AIFACTORY_API_KEY (or esaf.connect(folder=..., factory=...))
+esaf.init_factory()                                     # 1: submit the folder's saved factory draft
+esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")  # 2: the VNet range; the pipeline computes the subnets
+esaf.upsert_project("002", "dev")                       # 3: add or update, then deploy (scale_set=, settings=)
+esaf.delete_project("002", "dev")                       # 4
+esaf.delete_scale_set("002", "dev")                     # 5
+esaf.delete_factory()                                   # 6
+job.wait()                                              # reads the job every second until it ends
+```
+
+Step by step, locally: [ESAF usage guide](docs/esaf/readme.md) (start the API, install, connect, every method and
+its parameters, jobs, errors, CLI).
+
+Each call is one POST to the Factory API's `/api/v1/esaf/<scenario>` route, which runs the scenario as a resilient
+server-side job and answers 202 with a job id (see the API guide's ESAF section). These calls are **execution
+approval**, not prepare-only commands. `environment` (`dev`, `stage` or `prod`) is required on scale-set and project
+scenarios, so a delete never reaches another environment. The factory is needed only when the folder holds more
+than one (`esaf.connect(factory=...)`). Pass an explicit `esaf.Session(folder, client, factory)` in concurrent
+consumers. `apply_project` remains an alias of `upsert_project`.
+
+Refusals raise the SDK errors with the server's problem details: `ConfigError` (unknown, ambiguous or invalid target),
+`BlockedError` (the server's review refused it, or another ESAF job holds the factory), `AuthError` and `FailureError`.
+An API without the ESAF routes raises `ConfigError`; no other route is tried.
+
+The same scenarios are CLI commands: `azurefactory esaf delete-project 002 dev [--wait]`,
+`azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16` and `azurefactory esaf job <job id> --wait`.
+
+See the [lifecycle Function consumer](../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md)
+for all six routes, scope approval, protected targets, delete opt-in and restart-safe job tracking.
+
 ## Quickstart: CONFIGURE a factory with default project001 locally
 
 Use **this existing CLI**, not another CLI or a deployment shell fallback. The
@@ -341,6 +375,30 @@ An API without the `authorize-deletion` routes (404/405 without the operation's
 own detail) is reported as requiring them; there is no fallback. SDK:
 `authorize_deletion_prepare` and `authorize_deletion_confirm`, with the same
 client checks in `azurefactory.authorization`.
+
+### Enroll an added scale set (single-writer)
+
+A single-writer factory's binding and live enrollment cover only what was
+enrolled, so the Factory API refuses to deploy a newly added scale set until the
+reviewed operation `enroll-scale-set` (capability `enroll-scale-set-v1`,
+`operation_mode` `provider-state-and-arm`) extends them. It covers the scale
+set's common resource group plus the group of every project already placed on
+it at prepare time, creates missing groups (tagged), assigns Contributor and
+Role Based Access Control Administrator to the deployment identity on exactly
+those groups, writes the enrollment with one compare-and-swap and re-pins the
+saved binding. Place the scale set's projects first, then enroll, then deploy.
+SDK only (no CLI command yet): `enroll_scale_set_prepare({"contract_version": 1,
+"folder", "factory_id", "scale_set_id"})` (closed request) and
+`enroll_scale_set_confirm(folder=, confirmation_id=, preview_hash=,
+confirmation_phrase=)` with the phrase `ENROLL SCALE SET <factory key> <suffix>`
+(the factory key is the prefix without its trailing dash, for example
+`ENROLL SCALE SET aif-128 002`); the review expires after 10 minutes and a confirm
+is never retried. `azurefactory.scale_set_enrollment` holds the client checks
+(`validate_preview`, `validate_result`, `blob_blocked`). A Blob-coordinated
+factory's review is blocked with exactly "Blob-coordinated factories are not
+supported yet; nothing was changed." A 404/405 without the operation's own
+"Scale-set enrollment blocked: " detail is reported as "Factory API too old for
+enroll-scale-set"; there is no fallback.
 
 ### Shell-first registered onboarding
 
@@ -779,7 +837,8 @@ that configuration, then refresh `catalog list`. Pass the returned DEV/002 UUID
 to `project add --number 003 --placement dev=<new-scale-set-uuid>` when the earlier
 existing-scale example already created 002. If running only the new-scale
 scenario, 002 is available instead. For existing DEV/001 use that scale set's
-UUID. Project numbers are unique across the factory; the two writes are not atomic.
+UUID. Project numbers are unique within each physical scale set, not across the whole factory;
+the same number can identify different logical projects on different scale sets. The two writes are not atomic.
 
 ### Latest-successful placement selection
 
@@ -856,6 +915,7 @@ These supported methods return a prepare preview only:
 | `scaleset_delete_prepare(folder, factory_id, scale_set_id, *, expected_revision, version_ref=None)` | `delete-scale-set` |
 | `draft_remove_prepare(folder, factory_id, *, kind, expected_revision, scale_set_id=None, project_id=None)` | `delete-draft-factory`, `delete-draft-scale-set`, `delete-draft-project` |
 | `authorize_deletion_prepare(body)` | none: the named `authorize-deletion` provider-state operation (`mode` `allow` or `revoke`); confirm with `authorize_deletion_confirm` |
+| `enroll_scale_set_prepare(body)` | none: the named `enroll-scale-set` provider-state-and-ARM operation for a single-writer factory's added scale set; confirm with `enroll_scale_set_confirm` |
 
 CLI and SDK use shared request builders. Project helpers require nonempty
 `placements` **or** `environments`, never both; omitted scale IDs stay omitted on

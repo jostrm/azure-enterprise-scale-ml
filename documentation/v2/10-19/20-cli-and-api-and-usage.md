@@ -3,7 +3,11 @@
 Use this page to remove saved settings, remove a draft, or review resource deletion.
 Complete the core installation in [18 — setup](18-cli-and-api-and-usage.md) first.
 [19 — ADD and UPDATE](19-cli-and-api-and-usage.md) covers configuration and deployment.
-Choose **one tab** and stay in it: each has its own setup, review, confirmation and observation steps.
+Choose **one tab** and stay in it. Each tab starts with the simplest way to delete:
+**Scenarios 4-6 in one call each** (ESAF: `delete_project`, `delete_scale_set`,
+`delete_factory`), where the API grants the deletion permission, prepares, checks
+and confirms every review for you. The step-by-step operations follow, each with
+its own setup, review, confirmation and observation steps.
 On GitHub, expand the matching tool section. The documentation website presents
 the same content as a single linked tab selector.
 
@@ -20,6 +24,47 @@ the same content as a single linked tab selector.
 
 <details markdown="1" data-factory-tool="CLI (PowerShell)">
 <summary>CLI (PowerShell)</summary>
+
+## Scenarios 4-6 in one command each (ESAF)
+
+Each deletion is **one `azurefactory esaf` command**, and **running it is the
+approval**: it deletes Azure resources. Before deleting, the API grants the
+factory's single-writer deletion permission itself (`ALLOW DELETE`), so you need no
+separate `authorize-deletion` step. Connect once, as in guide 19:
+
+```powershell
+$env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
+$env:AIFACTORY_API_KEY = (Get-Content -Raw (Join-Path $env:USERPROFILE '.aifactory\api.key')).Trim()
+$env:ESAF_FOLDER = (Resolve-Path (Read-Host 'Absolute azurefactory folder on the API host')).Path
+```
+
+```powershell
+azurefactory esaf delete-project 002 dev --wait
+azurefactory esaf delete-scale-set 002 dev --wait
+azurefactory esaf delete-factory --wait
+```
+
+| Command | Arguments and options |
+|---|---|
+| `delete-project NUMBER ENVIRONMENT` | Deletes the project's resources in that environment only. `--scale-set` only when the project is on more than one scale set there. By default the project's resource group and Key Vault are deleted; `--keep-keyvault-and-resource-group` deletes only its services. `--include-project-subnets` also deletes its subnets. |
+| `delete-scale-set SUFFIX ENVIRONMENT` | Deletes that scale set's registered resources; other scale sets stay. |
+| `delete-factory` | Deletes every registered resource group of the factory and removes its local configuration. Hubs, subscriptions, Entra groups and Git history stay. |
+| All | `--folder`, `--factory`, `--retries` (0-5, default 2), `--version-ref`, `--wait`. |
+
+The environment (`dev`, `stage`, `prod`) is required, so a deletion never reaches
+another environment. Exit code `0` means succeeded, `3` blocked (the server's
+blockers are printed), `5` failed. Follow a job later with
+`azurefactory esaf job <job id> --wait`.
+
+Unlike the step-by-step confirmation below, an ESAF job is resilient by design: it
+waits for a busy configuration lock, prepares again after a transient refusal, and
+after a failed run releases that run's lock through the reviewed path and runs the
+deletion again (`retries`, default 2). Deletions that are already done are skipped.
+
+**Step-by-step alternative.** Everything below in this tab prepares one change,
+stops for your review and confirms it separately, exactly once. Use it to review a
+deletion before it runs, to remove settings or drafts without deleting Azure
+resources, or to recover a job.
 
 ## 1. Connect and select the exact factory
 
@@ -485,6 +530,60 @@ have purpose `delete-aifactory-confirm`.
 
 <details markdown="1" data-factory-tool="Python SDK">
 <summary>Python SDK</summary>
+
+## Scenarios 4-6 in one call each (ESAF)
+
+Each deletion is **one method** of `from azurefactory import esaf`, and **calling
+it is the approval**: it deletes Azure resources. Before deleting, the API grants
+the factory's single-writer deletion permission itself (`ALLOW DELETE`), so you need
+no separate `authorize_deletion_prepare` step. Save this as
+**`esaf_scenarios_4_6.py`** and run it:
+
+```python
+from pathlib import Path
+
+from azurefactory import esaf
+
+folder = input("Absolute azurefactory folder on the API host: ").strip()
+key = (Path.home() / ".aifactory" / "api.key").read_text(encoding="utf-8").strip()
+esaf.connect(folder=folder, url="http://127.0.0.1:8765", api_key=key)
+
+
+def run(label, job):
+    print(label, "ESAF job", job.id)
+    state = job.wait()  # reads the job every second until it ends
+    print(label, state["status"], "-", state["message"])
+    if state["status"] != "succeeded":
+        raise SystemExit(f"{label} stopped: {state.get('blockers') or state.get('problem')}")
+
+
+run("Scenario 4", esaf.delete_project("002", "dev"))
+run("Scenario 5", esaf.delete_scale_set("002", "dev"))
+run("Scenario 6", esaf.delete_factory())
+```
+
+| Method | Parameters |
+|---|---|
+| `esaf.delete_project(project, environment)` | Deletes the project's resources in that environment only. `scale_set=` only when the project is on more than one scale set there. `include_keyvault_and_resource_group=` defaults to `True`; `False` deletes only its services. `include_project_subnets=` defaults to `False`. |
+| `esaf.delete_scale_set(scale_set, environment)` | Deletes that scale set's registered resources; other scale sets stay. |
+| `esaf.delete_factory()` | Deletes every registered resource group of the factory and removes its local configuration. Hubs, subscriptions, Entra groups and Git history stay. |
+| All methods | `wait=True`, `retries=` (0-5, default 2), `version_ref=`, `session=`. |
+
+`environment` (`"dev"`, `"stage"`, `"prod"`) is required, so a deletion never
+reaches another environment. Each method returns an `EsafJob`; `job.status()` reads
+it once and `job.wait()` follows it. A refusal raises `ConfigError` (unknown or
+ambiguous target) or `BlockedError` (the server's review refused it; its blockers
+are in `error.details["blockers"]`).
+
+Unlike the step-by-step confirmation below, an ESAF job is resilient by design: it
+waits for a busy configuration lock, prepares again after a transient refusal, and
+after a failed run releases that run's lock through the reviewed path and runs the
+deletion again (`retries`, default 2). Deletions that are already done are skipped.
+
+**Step-by-step alternative.** Everything below in this tab prepares one change,
+stops for your review and confirms it separately, exactly once. Use it to review a
+deletion before it runs, to remove settings or drafts without deleting Azure
+resources, or to recover a job.
 
 ## 1. Connect and select the exact factory
 
@@ -992,6 +1091,41 @@ The named removal methods above are implemented, not generic-only.
 
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
+
+## Scenarios 4-6 in one request each (ESAF)
+
+Each deletion is **one POST** to `/api/v1/esaf/<scenario>` with `"approved": true`,
+answered with `202 Accepted` and a job id. **Sending it is the approval**: it
+deletes Azure resources. Before deleting, the API grants the factory's
+single-writer deletion permission itself (`ALLOW DELETE`). Define the helpers
+`esaf_post` and `esaf_wait` from guide 19's REST tab (*Scenarios 1-3 in one request
+each*), then:
+
+```bash
+esaf_wait "$(esaf_post delete-project '{"project": "002", "environment": "dev"}')"
+esaf_wait "$(esaf_post delete-scale-set '{"scale_set": "002", "environment": "dev"}')"
+esaf_wait "$(esaf_post delete-factory '{}')"
+```
+
+| Route | Body fields (besides `folder` and `"approved": true`) |
+|---|---|
+| `POST /api/v1/esaf/delete-project` | `project` and `environment` are required. `scale_set` only when the project is on more than one scale set there. `include_keyvault_and_resource_group` (default `true`; `false` deletes only its services) and `include_project_subnets` (default `false`). |
+| `POST /api/v1/esaf/delete-scale-set` | `scale_set` and `environment` are required. |
+| `POST /api/v1/esaf/delete-factory` | None. |
+| All | `factory` (key or id) when the folder holds several factories; `retries` (0-5, default 2); `version_ref`. |
+
+Errors are `application/problem+json` with a `code` (`config`, `blocked`,
+`conflict`, `auth`, `failure`) and the server's `blockers`.
+
+Unlike the step-by-step confirmation below, an ESAF job is resilient by design: it
+waits for a busy configuration lock, prepares again after a transient refusal, and
+after a failed run releases that run's lock through the reviewed path and runs the
+deletion again (`retries`, default 2). Deletions that are already done are skipped.
+
+**Step-by-step alternative.** Everything below in this tab prepares one change,
+stops for your review and confirms it separately, exactly once. Use it to review a
+deletion before it runs, to remove settings or drafts without deleting Azure
+resources, or to recover a job.
 
 ## 1. Connect using Bash or Git Bash
 

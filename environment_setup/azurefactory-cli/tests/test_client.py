@@ -381,3 +381,45 @@ def test_authorize_deletion_missing_route_is_explicit_and_never_falls_back(serve
     assert error.value.status == status
     assert ("requires an API supporting the authorize-deletion routes" in str(error.value)) is missing_route
     assert [record["path"] for record in Handler.records] == [f"/api/v1/operations/authorize-deletion/{action}"]
+
+
+ENROLL_REQUEST = {"contract_version": 1, "folder": r"C:\factory", "factory_id": "11d7fc57-56ee-46d6-919c-3a3d4c8cbb4b",
+                  "scale_set_id": "22222222-2222-4222-8222-222222222222"}
+
+
+def test_enroll_scale_set_posts_the_closed_request_and_the_exact_confirmation(server):
+    api = AzureFactoryClient(server, "test-key")
+    api.enroll_scale_set_prepare(dict(ENROLL_REQUEST))
+    api.enroll_scale_set_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                 preview_hash="c" * 64, confirmation_phrase="ENROLL SCALE SET aif-128 002")
+    assert [(record["path"], record["body"], record["key"]) for record in Handler.records] == [
+        ("/api/v1/operations/enroll-scale-set/prepare", ENROLL_REQUEST, "test-key"),
+        ("/api/v1/operations/enroll-scale-set/confirm", {
+            "contract_version": 1, "folder": r"C:\factory", "confirmation_id": "55555555-5555-4555-8555-555555555555",
+            "preview_hash": "c" * 64, "confirmation_phrase": "ENROLL SCALE SET aif-128 002"}, "test-key")]
+
+
+def test_enroll_scale_set_refuses_an_open_request_before_any_call(server):
+    with pytest.raises(ConfigError):
+        AzureFactoryClient(server, "test-key").enroll_scale_set_prepare({**ENROLL_REQUEST, "expected_revision": "a"})
+    assert Handler.records == []
+
+
+@pytest.mark.parametrize("action", ["prepare", "confirm"])
+@pytest.mark.parametrize(("status", "detail", "missing_route"), [
+    (404, "Not Found", True), (405, "Method Not Allowed", True),
+    (404, "Scale-set enrollment blocked: the review belongs to another caller.", False),
+    (409, "Scale-set enrollment blocked: the provider head moved.", False),
+])
+def test_enroll_scale_set_missing_route_is_reported_as_a_too_old_api(server, action, status, detail, missing_route):
+    Handler.responses[("POST", f"/api/v1/operations/enroll-scale-set/{action}")] = (status, {"detail": detail}, {})
+    api = AzureFactoryClient(server, "test-key")
+    with pytest.raises(APIError) as error:
+        if action == "prepare":
+            api.enroll_scale_set_prepare(dict(ENROLL_REQUEST))
+        else:
+            api.enroll_scale_set_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                         preview_hash="c" * 64, confirmation_phrase="ENROLL SCALE SET aif-128 002")
+    assert error.value.status == status
+    assert ("Factory API too old for enroll-scale-set" in str(error.value)) is missing_route
+    assert len(Handler.records) == 1

@@ -167,3 +167,9 @@ class RestFactoryBackend(FactoryApiBackend):
 
     def _job(self, job_id):
         return self._http.call("GET", f"/api/v1/factory-catalog/jobs/{job_id}", query={"folder": self.folder})
+
+    def _enroll_scale_set_prepare(self, body):
+        return self._http.call("POST", "/api/v1/operations/enroll-scale-set/prepare", body=body)
+
+    def _enroll_scale_set_confirm(self, body):
+        return self._http.call("POST", "/api/v1/operations/enroll-scale-set/confirm", body=body)

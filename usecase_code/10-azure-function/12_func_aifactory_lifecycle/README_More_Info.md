@@ -1,8 +1,13 @@
-# AI Factory lifecycle Function: secrets and the full solution
+# AI Factory lifecycle Function: SDK setup, identities and operations
 
 The [README](README.md) describes the template. This page puts every secret, identity and step of the complete
 solution in one place, with examples you can copy. All names and IDs below are examples (`contoso`, dummy GUIDs):
 replace them with your own.
+
+Use `AIF_BACKEND=sdk` for **Consumer → L1 Python ESAF SDK → L2 Factory API**: one Function confirmation invokes
+one `esaf` method, which sends one approved POST to `/api/v1/esaf/<scenario>`. The Function's prepare is a
+**scope approval**, not a live Azure deployment review. L2 owns the underlying reviews, configuration, enrollment,
+deletion authorization, dispatch and retries. `AIF_BACKEND=rest` remains the legacy per-step alternative.
 
 | Example | Meaning |
 |---|---|
@@ -30,9 +35,11 @@ replace them with your own.
    | Function key | App Service (created for you) | Read it with `az functionapp keys list` when you call the Function |
 
    ```powershell
+   $subscription = '11111111-1111-1111-1111-111111111111'
    $kv = 'kv-p001-sdc-dev-abcde01'
    $secret = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
-   az keyvault secret set --vault-name $kv --name aif-lifecycle-event-secret --value $secret --output none
+   $expires = (Get-Date).ToUniversalTime().AddYears(1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+   az keyvault secret set --subscription $subscription --vault-name $kv --name aif-lifecycle-event-secret --value $secret --expires $expires --output none
    gh secret set AIF_LIFECYCLE_EVENT_SECRET --repo contoso/aif-ops --body $secret
    $secret = $null
    ```
@@ -45,13 +52,19 @@ replace them with your own.
    .\deploy.ps1 -SettingsFile .\settings.contoso.json
    ```
 
+   Use a dedicated Function app: deployment replaces every function in that app. Keep its name outside purple's
+   `func-prj<NNN>-...` pattern so project deployments do not treat it as the project's managed Function.
+   The template uses Flex Consumption, a private endpoint and VNet integration; its separate /27-or-larger
+   integration subnet must be delegated to `Microsoft.App/environments`, not occupied by Container Apps or private
+   endpoints. Deployment and calls need the VPN/private DNS. Flex starts timers without Always On.
+
 3. **Call it.** Every lifecycle route needs the function key and an Entra token with the app role
    `Lifecycle.Operator`:
 
    ```powershell
    $base = 'https://aiflc-prj001-sdc-dev-abcde-001.azurewebsites.net/api'
-   $key = az functionapp keys list -g contoso-esml-project001-sdc-dev-001-rg -n aiflc-prj001-sdc-dev-abcde-001 --query functionKeys.default -o tsv
-   $token = az account get-access-token --resource api://22222222-2222-2222-2222-222222222222 --query accessToken -o tsv
+   $key = az functionapp keys list --subscription $subscription -g contoso-esml-project001-sdc-dev-001-rg -n aiflc-prj001-sdc-dev-abcde-001 --query functionKeys.default -o tsv
+   $token = az account get-access-token --subscription $subscription --resource api://22222222-2222-2222-2222-222222222222 --query accessToken -o tsv
    $h = @{ 'x-functions-key' = $key; Authorization = "Bearer $token" }
 
    Invoke-RestMethod "$base/v1/health"                                   # anonymous: status, backend, executor, deletes
@@ -66,8 +79,11 @@ replace them with your own.
          -ContentType application/json -Body (@{ confirmationToken = $step.preview.confirmationToken } | ConvertTo-Json)
    ```
 
-   Each step waits for its own confirmation: configure (the catalog), then deploy-project (the resource groups).
-   Read the operation again until it is `succeeded`, or `failed` with the run link and the last lines of its log.
+   With `sdk`, there is one `scenario` step: confirm once to configure and deploy through `esaf.upsert_project`.
+   Read the operation until it succeeds or stops. Definite submission refusals fail the operation; unknown outcomes
+   (transport/server failures or missing job receipts) become `uncertain`: inspect the Factory API before another
+   attempt. The Function never resubmits; L2 can perform bounded retries inside an accepted job. The `rest`
+   alternative still confirms configure and deploy separately.
 
 <details>
 <summary><b>More info: every secret and identity</b></summary>
@@ -106,8 +122,8 @@ can read the ops repository can see. They hold reviews and catalog IDs only, sig
 
 ```powershell
 # Reader on one peered hub network only (least privilege), for the management VM's identity
-$vmIdentity = az vm show -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --query identity.principalId -o tsv
-az role assignment create --assignee-object-id $vmIdentity --assignee-principal-type ServicePrincipal --role Reader `
+$vmIdentity = az vm show --subscription $subscription -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --query identity.principalId -o tsv
+az role assignment create --subscription 33333333-3333-3333-3333-333333333333 --assignee-object-id $vmIdentity --assignee-principal-type ServicePrincipal --role Reader `
    --scope /subscriptions/33333333-3333-3333-3333-333333333333/resourceGroups/contoso-connectivity/providers/Microsoft.Network/virtualNetworks/vnet-contoso-access-hub-sdc-001
 ```
 
@@ -123,10 +139,18 @@ az network vnet list --subscription 11111111-1111-1111-1111-111111111111 `
 <details>
 <summary><b>More info: the management VM (Factory API host and runner)</b></summary>
 
-The Factory API answers catalog and deployment routes on loopback only, so the Function never calls it over the
-network: it dispatches `aif-ops.yml` to the management runner, which calls the API on `127.0.0.1:8765` and posts a
+The Factory API answers catalog, deployment and ESAF routes on loopback only, so the hosted Function never calls
+those routes over the network: it dispatches `aif-ops.yml` to a management runner on the **same host as the API**,
+which calls the explicitly configured API loopback URL and posts a
 signed result back. Keep the VM outside every factory the Function can create or delete, and protect its scale set
 with `AIF_PROTECTED_IDS`.
+
+`inprocess` is only for a local Function on that API host. The L1 submission returns an ESAF job receipt; L2
+continues orchestration independently, and subsequent runner calls only read its status. The legacy REST mode
+can still require long prepare/confirm calls. The runner's API timeout defaults to 2700 seconds per call; its
+60-minute workflow job is bounded by the Function's 4200-second hand-off timeout. A timed-out confirmation is
+uncertain, never a reason to submit the facade method again. `127.0.0.1:8765` below is an example, not discovery
+of a live endpoint; use the operator-configured host URL.
 
 1. **No manual Azure CLI login**: the installer gives the Factory API its own `az` profile (`C:\aif-api\azure-cli`)
    and signs it in with the VM's managed identity at every start, so an Azure DevOps agent or another job running as
@@ -134,12 +158,14 @@ with `AIF_PROTECTED_IDS`.
 2. **The Factory API**, a pinned AI Factory Config Wizard release in API-only mode, as SYSTEM:
 
    ```powershell
-   az vm run-command invoke -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
+   az vm run-command invoke --subscription $subscription -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
       --scripts '@scripts/install-factory-api-host.ps1' --parameters KeyVaultName=kv-p001-sdc-dev-abcde01 Release=v0.47.32 SubscriptionId=<factory subscription ID>
    ```
 
    Pass `Release` explicitly: v0.47.32 or later federates the OIDC subject GitHub signs for repositories created after
    July 15, 2026, and reads a new Entra group back until Microsoft Graph has replicated it.
+   That historical release example is **not** proof of ESAF compatibility. SDK mode additionally needs the live
+   `/api/v1/esaf/*` facade and scope guards described below; select an operator-verified compatible build.
    Logs: `C:\aif-api\logs`. The API's `folder` is the factory repository's `azurefactory` subfolder, for example
    `C:\aif\aif-factory-contoso-ai\azurefactory`.
 3. **The management runner** for the ops repository, with a label of its own (never the factory runner's label):
@@ -152,7 +178,7 @@ with `AIF_PROTECTED_IDS`.
 4. **The lifecycle runner entry point** at a pinned commit of this template:
 
    ```powershell
-   az vm run-command invoke -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
+   az vm run-command invoke --subscription $subscription -g contoso-esml-common-sdc-dev-001 -n dsvm-cmn-sdc-dev-001 --command-id RunPowerShellScript `
       --scripts '@scripts/install-lifecycle-runner.ps1' `
       --parameters Commit=<40-character sha> FactoryFolder=C:\aif\aif-factory-contoso-ai\azurefactory KeyVaultName=kv-p001-sdc-dev-abcde01
    ```
@@ -196,7 +222,7 @@ Function settings for the real API (in `settings.contoso.json` `appSettings`):
 
 ```json
 {
-  "AIF_BACKEND": "rest",
+  "AIF_BACKEND": "sdk",
   "AIF_EXECUTOR": "github-runner",
   "AIF_EVENT_PROCESSING": "queue",
   "AIF_DELETES": "simulate",
@@ -223,16 +249,28 @@ authentication on and sets `AIF_REQUIRED_ROLE`. Register the app first:
 <summary><b>More info: the six scenarios</b></summary>
 
 `POST /api/v1/lifecycle/<scenario>/prepare` answers 202 with `Location` (the operation) and `Retry-After`. The
-Function plans the steps; each step waits in `awaiting_confirmation` with its review until you confirm it.
+Function resolves the target and prepares one scope approval for `sdk`. No mutating facade call is made until you
+confirm. The SDK submits one scenario and returns an `EsafJob(kind="esaf")`; L2 orchestrates the actual operations.
 
-| # | Route segment | Body | Steps (one confirmation each) |
+| # | Route segment | Body | One SDK invocation |
 |---|---|---|---|
-| 1 | `init-factory` | `{"factoryId":"contoso-ai-sdc-dev","wholeWorkflow":true,"bootstrapConfig":{...}}` | configure (saves the factory), bootstrap (one bounded approval for every stage) |
-| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"subscriptionId":"11111111-1111-1111-1111-111111111111","tenantId":"00000000-0000-0000-0000-000000000000","orchestrator":"gha","vnetCidr":"10.20.64.0/18","maxProjects":7}}` | configure, deploy-common, deploy-project001 |
-| 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | configure (add-project for a new number, configure-settings for an existing one), deploy-project |
-| 4 | `delete-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg"}` | delete-project (phrase `DELETE <factory key>`) |
-| 5 | `delete-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002"}` | delete-scaleset (phrase) |
-| 6 | `delete-factory` | `{"factoryId":"contoso-ai-sdc-dev"}` | delete-factory (phrase); every scale set of the factory must be in that environment |
+| 1 | `init-factory` | `{"factoryId":"contoso-ai-sdc-dev","bootstrapConfig":{...}}` | `esaf.init_factory(creation_request=...)`: save the factory and start server-owned full bootstrap |
+| 2 | `add-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002","scaleSet":{"vnetCidr":"10.20.64.0/18","maxProjects":7}}` | `esaf.add_scale_set("002", "dev", cidr=...)`: register, enroll and deploy common resources |
+| 3 | `add-or-update-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg","settings":{...}}` | `esaf.upsert_project("002", scale_set="001", environment="dev", settings=...)` |
+| 4 | `delete-project` | `{"projectId":"contoso-ai-esml-project002-sdc-dev-001-rg"}` | `esaf.delete_project("002", scale_set="001", environment="dev", ...)` |
+| 5 | `delete-scaleset` | `{"scalesetId":"contoso-ai-sdc-dev-002"}` | `esaf.delete_scale_set("002", environment="dev")` |
+| 6 | `delete-factory` | `{"factoryId":"contoso-ai-sdc-dev"}` | `esaf.delete_factory()`: every scale set must be in the requested environment |
+
+Every call also receives an explicit session with the configured folder and resolved factory ID; no global session
+is used by the Function. Scale-set/project methods require `dev`, `stage` or `prod`; the Function maps Azure `test`
+to catalog `stage`. `scaleSet` can additionally override `subscriptionId`, `tenantId` and `orchestrator`; omitted
+values come from the factory. SDK mode rejects unsupported `scaleSet` fields such as `commonSubnets`, rather than
+ignoring them. Scenario 2 does not implicitly create project001; call Scenario 3 separately for that project.
+Scenario 4 preserves the Function defaults `includeProjectSubnets=true` and `includeKeyvaultAndResourceGroup=true`,
+passing both explicitly instead of inheriting server defaults.
+
+With `rest`, the legacy steps remain: Scenario 1 configure/bootstrap, Scenario 2 configure/add-project001/enroll/
+deploy-common/deploy-project001, Scenario 3 configure/deploy-project, and one delete step for Scenarios 4-6.
 
 Scenario 1 against the real API: `bootstrapConfig` is the API's full bootstrap configuration, for example
 
@@ -248,7 +286,8 @@ Scenario 1 against the real API: `bootstrapConfig` is the API's full bootstrap c
 
 The API then runs repository-initialization, minimum-foundation, prerequisites, network-foundation, runner,
 connection, provider-handoff, publication, common-deployment, project-deployment and complete by itself under that
-one approval. If it asks for a new human review on the way (`requires_review`), the Function's step stops with
+one approval. New SDK jobs are followed through the outer ESAF status, not individual child workflow phases.
+For saved legacy workflow jobs only, `awaiting-review` with `requires_review=true` stops the Function step with
 `action_required` and the API's message.
 
 Deletes depend on `AIF_DELETES`:
@@ -260,6 +299,9 @@ Deletes depend on `AIF_DELETES`:
 | `allow` | Real deletes, and only if the runner's `runner.json` also has `AIF_ALLOW_REAL_DELETES` `true` |
 
 Confirm a delete with its phrase:
+
+For `sdk` the Function phrase is `DELETE <readable target ID>`; L1 submits `approved=true` only after that approval.
+L2 owns reviewed confirmation phrases and deletion grants. Do not duplicate those calls in the Function or L1.
 
 ```powershell
 $step = (Invoke-RestMethod "$base/v1/operations/$id" -Headers $h).steps[0]
@@ -279,18 +321,16 @@ Invoke-RestMethod "$base/v1/operations/$id/confirm" -Method Post -Headers $h -Co
   "operationId": "a1b2c3d4-0000-4000-8000-000000000001",
   "scenario": "add-or-update-project", "scenarioNumber": 3,
   "target": "contoso-ai-esml-project002-sdc-dev-001-rg",
-  "status": "running", "backend": "rest", "executor": "github-runner", "currentStep": 1,
+  "status": "running", "backend": "sdk", "executor": "github-runner", "currentStep": 0,
   "steps": [
-    {"index": 0, "name": "configure", "kind": "configure", "status": "succeeded", "runs": [], "waitingFor": null},
-    {"index": 1, "name": "deploy-project", "kind": "deploy", "status": "running",
+    {"index": 0, "name": "add-or-update-project", "kind": "scenario", "status": "running",
      "preview": {"plan": ["Deploy ..."], "affectedResourceGroups": [], "blockers": [], "canExecute": true,
                  "expiresAt": "2026-01-01T10:10:00+00:00", "confirmationToken": null},
-     "runs": [{"target": "api-job-5e6f7a8b-0000-4000-8000-000000000002", "status": "in_progress",
+     "runs": [{"target": "api-catalog-5e6f7a8b-0000-4000-8000-000000000002", "status": "in_progress",
                "url": "https://github.com/contoso/aif-factory-contoso-ai/actions/runs/1234567890", "source": "runner"}],
      "waitingFor": {"action": "status", "since": "2026-01-01T10:05:00+00:00"}}
   ],
-  "history": [{"at": "2026-01-01T10:04:00+00:00", "event": "confirming", "step": 1, "detail": "deploy-project"},
-              {"at": "2026-01-01T10:04:40+00:00", "event": "running", "step": 1, "detail": "deploy-project: api-job-5e6f7a8b-0000-4000-8000-000000000002"}]
+  "history": [{"at": "2026-01-01T10:04:00+00:00", "event": "confirming", "step": 0, "detail": "add-or-update-project"}]
 }
 ```
 
@@ -312,37 +352,66 @@ Errors are `application/problem+json`, for example:
 </details>
 
 <details>
-<summary><b>More info: option 2, the azurefactory SDK</b></summary>
+<summary><b>More info: the esaf SDK facade</b></summary>
 
-The runner calls the Factory API through REST (`AIF_BACKEND=rest`) or the `azurefactory` SDK (`AIF_BACKEND=sdk`). Both
-make the same calls (`tests/test_adapter_parity.py`):
-
-| Step | SDK method (`AzureFactoryClient`) |
-|---|---|
-| Catalog snapshot | `catalog_list(folder)` |
-| 1 configure, confirm | `creation_prepare(body)`, `creation_confirm(folder, confirmation_id)` |
-| 1 bootstrap | `creation_workflow_prepare(body)`, `creation_workflow_start(folder, workflow_id, confirmation_id, authorization_hash=...)`, `creation_workflow_status(folder, workflow_id)` |
-| 2 configure | `scaleset_add_prepare(folder, factory_id, scale_sets, expected_revision=...)` |
-| 3 configure | `project_add_prepare(...)` or `catalog_settings_prepare(...)` |
-| Deploy | `catalog_prepare({"action": "deploy", ...})` |
-| Confirm, job status | `catalog_confirm(folder, confirmation_id)`, `catalog_job(folder, job_id)` |
-| 4, 5, 6 | `project_delete_prepare(...)`, `scaleset_delete_prepare(...)`, `delete_aifactory_prepare(body)` / `delete_aifactory_confirm(...)` |
+`adapters/sdk_backend.py` implements the backend port directly: it no longer inherits the REST step-to-call
+orchestration. The composition root selects it for `AIF_BACKEND=sdk` both in-process and on the management runner.
+The Function retains its safety and persistence layer. L1 is only the Python HTTP client; lifecycle orchestration
+runs in L2, not in the SDK or a Function background thread.
 
 On the API host:
 
 ```python
-from azurefactory import AzureFactoryClient
+from azurefactory import AzureFactoryClient, esaf
 
 client = AzureFactoryClient(base_url="http://127.0.0.1:8765", api_key=api_key)  # key read from Key Vault
 folder = r"C:\aif\aif-factory-contoso-ai\azurefactory"
-catalog = client.catalog_list(folder)
-factory = next(f for f in catalog["factories"] if f["prefix"] == "contoso-ai-")
-review = client.project_add_prepare(folder, factory["id"], number="002", display_name="Project 002",
-                                    placements=[{"environment": "dev", "scale_set_id": factory["scale_sets"][0]["id"]}],
-                                    expected_revision=catalog["revision"])
-if review["can_execute"] and not review["blockers"]:
-    client.catalog_confirm(folder, review["confirmation_id"])
+session = esaf.Session(folder, client, factory="<resolved factory ID>")
+# This call IS approval and can mutate Azure. It is not a read-only test.
+job = esaf.upsert_project("002", "dev", scale_set="001", settings={}, session=session)
+print(job.id)
+print(job.status())  # one read; no polling thread required
 ```
+
+The Function persists the returned ID, `job_kind="esaf"` and selected factory. `EsafJob.status()` performs
+`GET /api/v1/esaf/jobs/{id}?folder=...` and can be reconstructed after a Function restart or separate runner invocation.
+`accepted`, `preparing`, `confirming`, `running` and `retrying` keep the operation active; `succeeded` completes it,
+while `blocked`, `failed` and `interrupted` fail it with the server message. A child's failure is not terminal while
+the outer job is retrying. Saved `catalog`, `workflow` and `factory-deletion` handles still use their original
+status endpoints, including records labelled `apply_project`; no scenario is redispatched to read them.
+
+`job.wait()` defaults to one-second polling in direct SDK clients. The Function does not call `wait()` or hold an
+invocation open: its existing reconciler uses `AIF_POLL_AFTER_SECONDS` (default 120 seconds, also bounded by its
+timer/runner scheduling). L2 owns bounded retries inside the accepted job (currently two by default); the Function
+does not submit another job or duplicate prepare/confirm steps.
+
+Use the exact SDK pin in `requirements.txt`; an older installed SDK does not acquire new methods merely because
+purple main changed. Update both the Function and runner packages together. Reconcile/finish old SDK operations
+before upgrading; unconfirmed old step requests are refused with `sdk-operation-upgrade`, not replayed.
+`upsert_project` is the canonical scenario method; `apply_project` remains a compatibility alias for existing callers.
+
+**A running, compatible L2 API is required**, on the same host as L1. It must provide the six `/api/v1/esaf/*`
+submission routes and durable job GET route, enforce exact environment/scale-set/project selection, extend
+enrollment for newly registered project groups and enforce deployment/deletion guards before dispatch.
+The thin SDK no longer performs these reviews locally. A missing facade route fails with `sdk-config` and no
+legacy-route fallback. **Update/verify the API first**, then the Function and runner, with real deletes refused.
+Installing the SDK pin does not upgrade the server or prove its installed version.
+
+Typed config/auth/blocked/conflict submission refusals fail the Function operation before an accepted job.
+Transport/server failures and malformed receipts are uncertain, never success or an automatic resubmission.
+After acceptance, follow the server's outer job status; inspect any partial changes before preparing another operation.
+
+### Read-only consumer check
+
+Read `GET /api/v1/health`, `GET /api/v1/operations` and `GET /api/v1/operations/{id}` on the configured Function endpoint
+with the required authentication; do not infer the installed SDK from the health backend label. On the API host,
+`GET /health`, `GET /openapi.json`, `client.catalog_list(folder)` and an existing `job.status()` are reads.
+Use the configured API URL/key; never probe unrelated API instances. Check the OpenAPI paths for ESAF support,
+and verify installed package/build provenance separately. The Function's SDK `/prepare` only
+produces a scope approval and does not prove that the API will permit a deployment. Do not call any of the six
+facade methods for a read-only check, including `upsert_project` with empty settings: it deploys.
+Check the installed Factory API's support for the consumer's Azure DevOps organization before live execution;
+the Spider consumer's cross-tenant ADO setup has previously been refused by catalog runtime.
 
 </details>
 
@@ -361,8 +430,12 @@ if review["can_execute"] and not review["blockers"]:
 | Scenario 1 stops as `uncertain` after a verified stage, diagnostic `stage-execution-interrupted`, phase `authorization-continuation` | The API's own continuation failed before the next stage started, for example the network-foundation review got an ARM 403 reading a peered network in another subscription | Grant the missing access (Reader on that network), then recover at the verified boundary below |
 | The same stop after `publication` (single-writer), and a read-only `POST /api/v1/factory-catalog/prepare` with `action: deploy` for the scale set shows "Bootstrap ownership handoff blocked: unregistered actual resources lack bootstrap receipt proof" | The private DNS zones' SOA records and the runner's registration run command have no creation receipt. The whole-workflow continuation pauses for these consents before PROJECT, not before COMMON | Recover at the verified boundary, then confirm `bootstrap-dns-soa-preservation` (stage `common-deployment`) and `bootstrap-preservation` (the runner's `MDE.Linux` extension and its registration command), then prepare-next and start. The runner review needs the Defender extension: on a subscription with Defender for Servers it appears about an hour after the runner VM is created |
 
-**Recover a whole-workflow bootstrap at its verified boundary** (on the API host, loopback, `X-API-Key`; nothing
-runs until the last call):
+**Legacy workflow recovery only:** the examples below describe the older workflow contract. For a new ESAF job,
+first inspect its outer status and L2 diagnostics; do not recover or restart a child while L2 is still active or
+retrying. A new accepted ESAF failure is recorded as `failed`, not as an unknown submission outcome.
+
+**Recover a legacy whole-workflow bootstrap at its verified boundary** (on the API host, loopback, `X-API-Key`;
+nothing runs until the last call):
 
 ```powershell
 $api = 'http://127.0.0.1:8765/api/v1/creation/workflows'; $id = '<workflow id>'

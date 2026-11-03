@@ -12,7 +12,19 @@ class UpstreamRefused(LifecycleError):
     status, code, title = 502, "upstream-refused", "The Factory API refused the call"
 
 
+class UpstreamTooOld(LifecycleError):
+    """The Factory API has no route for the operation (an older version): nothing was done, a definite rejection."""
+
+    status, code, title = 502, "factory-api-too-old", "The Factory API is too old for this operation"
+
+
 def error_for_status(status: int, detail: str) -> LifecycleError:
+    error = _error_for_status(status, detail)
+    error.upstream_status = status  # lets an operation tell a missing route from its own 404
+    return error
+
+
+def _error_for_status(status: int, detail: str) -> LifecycleError:
     text = detail or f"The Factory API answered HTTP {status}."
     if status in (400, 422):
         return ValidationFailed(text, code="upstream-validation-failed")

@@ -107,6 +107,33 @@ separate `azurefactory.exe` installation.
 
 </details>
 
+
+### 4. Next: the six scenarios, one command each
+
+With a real factory folder, each scenario is **one command**. The connection is
+set once: the same `AIFACTORY_API_URL` and `AIFACTORY_API_KEY`, plus
+`ESAF_FOLDER`, the absolute `azurefactory` folder on the API host. List the
+commands, without running any of them on this empty demo folder:
+
+```powershell
+$env:ESAF_FOLDER = $env:FACTORY_FOLDER
+& $Python -m azurefactory esaf --help
+```
+
+| Scenario | Command |
+|---|---|
+| 1. Init AI Factory | `azurefactory esaf init-factory` |
+| 2. Add scaleset | `azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16` |
+| 3. Add or update project | `azurefactory esaf upsert-project 002 dev` |
+| 4. Delete project | `azurefactory esaf delete-project 002 dev` |
+| 5. Delete scaleset | `azurefactory esaf delete-scale-set 002 dev` |
+| 6. Delete AI Factory | `azurefactory esaf delete-factory` |
+
+Each command **is the approval** and changes Azure; add `--wait` to follow the
+job to its end. The environment (`dev`, `stage`, `prod`) is required on
+scale-set and project commands. [Guide 19](19-cli-and-api-and-usage.md) runs
+Scenarios 1-3 and [guide 20](20-cli-and-api-and-usage.md) Scenarios 4-6.
+
 </details>
 <!-- /factory-tool -->
 
@@ -202,6 +229,40 @@ The local temporary folder works because the API runs on the same computer.
 
 </details>
 
+
+### 3. Next: the six scenarios, one call each
+
+With a real factory folder, each scenario is **one method** of
+`from azurefactory import esaf`. The connection is set once with
+`esaf.connect()` (or the variables `ESAF_FOLDER`, `AIFACTORY_API_URL` and
+`AIFACTORY_API_KEY`). Add these lines to the end of `factory_smoke.py` to
+connect `esaf` to the demo folder and read it; they change nothing:
+
+```python
+from azurefactory import esaf
+
+session = esaf.connect(folder=str(folder), url=url, api_key=key)
+print(session.client.catalog_list(session.folder)["factories"])
+print(esaf.__all__)
+```
+
+| Scenario | Method |
+|---|---|
+| 1. Init AI Factory | `esaf.init_factory()` |
+| 2. Add scaleset | `esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")` |
+| 3. Add or update project | `esaf.upsert_project("002", "dev")` |
+| 4. Delete project | `esaf.delete_project("002", "dev")` |
+| 5. Delete scaleset | `esaf.delete_scale_set("002", "dev")` |
+| 6. Delete AI Factory | `esaf.delete_factory()` |
+
+Each method **is the approval** and changes Azure, so do not call them on this
+demo folder. Each returns a job: `job.wait()` follows it to its end. The
+environment (`"dev"`, `"stage"`, `"prod"`) is required on scale-set and project
+calls. [Guide 19](19-cli-and-api-and-usage.md) runs Scenarios 1-3,
+[guide 20](20-cli-and-api-and-usage.md) Scenarios 4-6, and the
+[ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md)
+explains every parameter.
+
 </details>
 <!-- /factory-tool -->
 
@@ -288,6 +349,32 @@ Curl sends HTTP requests; it is not the `azurefactory` CLI.
 Do not send privileged requests from browser JavaScript with an API key.
 
 </details>
+
+
+### 4. Next: the six scenarios, one request each
+
+With a real factory folder, each scenario is **one POST** to `/api/v1/esaf/<scenario>`,
+answered with `202 Accepted` and a job id. List the routes the demo API serves:
+
+```bash
+curl --silent --show-error --fail-with-body --noproxy '*' "$API_URL/openapi.json" \
+  | grep -o '"/api/v1/esaf/[^"]*"' | sort -u
+```
+
+| Scenario | Request body (besides `"folder"` and `"approved": true`) |
+|---|---|
+| `POST /api/v1/esaf/init-factory` | nothing, or `creation_request` |
+| `POST /api/v1/esaf/add-scale-set` | `"scale_set": "002", "environment": "dev", "cidr": "10.141.0.0/16"` |
+| `POST /api/v1/esaf/upsert-project` | `"project": "002", "environment": "dev"` |
+| `POST /api/v1/esaf/delete-project` | `"project": "002", "environment": "dev"` |
+| `POST /api/v1/esaf/delete-scale-set` | `"scale_set": "002", "environment": "dev"` |
+| `POST /api/v1/esaf/delete-factory` | nothing |
+
+`"approved": true` is required: sending the request **is the approval** and
+changes Azure, so do not send them to this demo folder. Read the job with
+`GET /api/v1/esaf/jobs/{job_id}?folder=...` about once a second.
+[Guide 19](19-cli-and-api-and-usage.md) sends Scenarios 1-3 and
+[guide 20](20-cli-and-api-and-usage.md) Scenarios 4-6.
 
 </details>
 <!-- /factory-tool -->

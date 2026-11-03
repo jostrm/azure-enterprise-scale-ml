@@ -37,7 +37,7 @@ def _store(settings: Settings):
 
 
 def factory_api_backend(name: str, url: str, key: str | None, folder: str | None, *, allow_deletes: bool = False,
-                        timeout: float = FACTORY_API_TIMEOUT_SECONDS):
+                        timeout: float = FACTORY_API_TIMEOUT_SECONDS, clock=None, review_ttl_seconds: int = 600):
     """Option 1 (REST) or option 2 (SDK) against a Factory API on this host's loopback (the Function or the runner).
     Deletes are refused unless allow_deletes is set explicitly; one call may take `timeout` seconds."""
     if name == "rest":
@@ -45,7 +45,8 @@ def factory_api_backend(name: str, url: str, key: str | None, folder: str | None
         return RestFactoryBackend(RestTransport(url, key, timeout), folder or "", allow_deletes=allow_deletes)
     if name == "sdk":
         from .adapters.sdk_backend import SdkFactoryBackend
-        return SdkFactoryBackend(url, key, folder or "", timeout, allow_deletes=allow_deletes)
+        return SdkFactoryBackend(url, key, folder or "", timeout, allow_deletes=allow_deletes,
+                                 clock=clock, review_ttl_seconds=review_ttl_seconds)
     raise ValidationFailed(f"'{name}' is not a Factory API backend; use rest or sdk.")
 
 
@@ -79,7 +80,8 @@ def _backend_and_tracker(settings: Settings, store, clock):
     else:
         backend = factory_api_backend(settings.backend, settings.factory_api_url, settings.factory_api_key,
                                       settings.factory_folder, allow_deletes=allow_deletes,
-                                      timeout=settings.factory_api_timeout_seconds)
+                                      timeout=settings.factory_api_timeout_seconds, clock=clock,
+                                      review_ttl_seconds=settings.review_ttl_seconds)
         tracker = _dummy_tracker(settings) if settings.executor == "github-dummy" else trackers.ApiJobTracker(backend)
     if settings.deletes == "simulate":
         from .adapters.simulated_deletes import CatalogMirror, DeleteRoutingTracker, DeleteSimulation

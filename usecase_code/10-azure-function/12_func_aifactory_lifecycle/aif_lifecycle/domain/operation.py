@@ -2,8 +2,8 @@
 
 An operation runs a scenario as ordered steps. Each step is reviewed (prepare -> preview), confirmed once with the
 token bound to that exact preview, then executed as zero or more GitHub runs that complete in order. The model mirrors
-the Agent Factory's reviewed operations: one confirm per Factory API confirmation, CAS-saved before the
-non-idempotent call, and an uncertain confirm is terminal - never retried.
+the Agent Factory's reviewed operations: CAS-saved before the non-idempotent call, and an uncertain confirm is
+terminal - never retried. SDK mode approves one whole scenario; REST mode approves individual API steps.
 """
 
 from __future__ import annotations
@@ -41,7 +41,8 @@ TERMINAL = frozenset({Status.SUCCEEDED, Status.FAILED, Status.UNCERTAIN, Status.
 
 _TRANSITIONS = {
     Status.PENDING: {Status.PREPARING},
-    Status.PREPARING: {Status.AWAITING_CONFIRMATION, Status.BLOCKED, Status.FAILED},
+    # PREPARING -> SUCCEEDED only for a step the API reports as not needed (step_not_needed): nothing to confirm.
+    Status.PREPARING: {Status.AWAITING_CONFIRMATION, Status.BLOCKED, Status.FAILED, Status.SUCCEEDED},
     Status.AWAITING_CONFIRMATION: {Status.CONFIRMING, Status.EXPIRED},
     Status.CONFIRMING: {Status.RUNNING, Status.SUCCEEDED, Status.FAILED, Status.UNCERTAIN},
     Status.RUNNING: {Status.SUCCEEDED, Status.FAILED, Status.UNCERTAIN},
@@ -51,10 +52,12 @@ _RUN_RANK = {"pending": 0, "requested": 1, "queued": 1, "waiting": 1, "in_progre
 
 
 class StepKind(str, Enum):
+    SCENARIO = "scenario"
     CONFIGURE = "configure"
     BOOTSTRAP = "bootstrap"
     DEPLOY = "deploy"
     DELETE = "delete"
+    ENROLL = "enroll"  # a reviewed provider-state change of a single-writer factory's enrollment (no runs)
 
 
 def iso(moment: datetime) -> str:
@@ -188,6 +191,17 @@ class Operation:
         step.plan_hash = plan_hash(self.id, self.current, step)
         self._sync(now)
         self._log(now, "review-ready" if executable else "review-blocked", "; ".join(preview.blockers) or step.name)
+
+    def step_not_needed(self, preview: Preview, reason: str, now: datetime) -> None:
+        """The API's review says this factory does not need the step (for example a Blob-coordinated factory has
+        no single-writer enrollment to extend): keep the review for the record and continue without a confirm."""
+        step = self.step
+        if step.kind is not StepKind.ENROLL or step.status is not Status.PREPARING:
+            raise InvalidState(f"Step '{step.name}' ({step.kind.value}, {step.status.value}) cannot be skipped.")
+        step.preview = preview
+        self._move(step, Status.SUCCEEDED, now)
+        self._log(now, "step-not-needed", f"{step.name}: {reason}")
+        self._advance(now)
 
     def prepare_failed(self, code: str, detail: str, now: datetime) -> None:
         step = self.step
