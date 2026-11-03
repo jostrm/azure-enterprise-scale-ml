@@ -1590,7 +1590,12 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                 "Microsoft.Resources/deployments/operations/read", "Microsoft.Resources/deployments/operationStatuses/read",
                 "Microsoft.Resources/deployments/validate/action", "Microsoft.Resources/deployments/whatIf/action",
                 "Microsoft.Resources/subscriptions/read", "Microsoft.Resources/subscriptions/locations/read",
-                "Microsoft.Resources/subscriptions/resourceGroups/read", "Microsoft.Resources/subscriptions/providers/read"],
+                "Microsoft.Resources/subscriptions/resourceGroups/read", "Microsoft.Resources/subscriptions/providers/read",
+                # The pipeline preflight reads regional quota at subscription scope; without these reads every
+                # Search SKU and OpenAI model looked unlisted and PROJECT never started (aif-145, 2026-11-03).
+                "Microsoft.Search/locations/usages/read", "Microsoft.CognitiveServices/locations/usages/read",
+                "Microsoft.CognitiveServices/locations/models/read", "Microsoft.MachineLearningServices/locations/usages/read",
+                "Microsoft.Compute/locations/usages/read", "Microsoft.Network/locations/usages/read"],
                 "notActions": [], "dataActions": [], "notDataActions": []}]}},
             ownership="subscription-deployment-metadata-role-retain")
         metadata_assignment = subscription + "/providers/Microsoft.Authorization/roleAssignments/" + str(
