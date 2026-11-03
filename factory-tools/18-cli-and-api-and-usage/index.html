@@ -678,6 +678,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#4-next-the-six-scenarios-one-command-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Next: the six scenarios, one command each
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#1-start-the-local-demo-service" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -693,6 +704,17 @@
     <span class="md-ellipsis">
       
         2. Run a real Python example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-next-the-six-scenarios-one-call-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Next: the six scenarios, one call each
       
     </span>
   </a>
@@ -726,6 +748,17 @@
     <span class="md-ellipsis">
       
         3. Read health and the factory list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-next-the-six-scenarios-one-request-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Next: the six scenarios, one request each
       
     </span>
   </a>
@@ -1937,6 +1970,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#4-next-the-six-scenarios-one-command-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Next: the six scenarios, one command each
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#1-start-the-local-demo-service" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1952,6 +1996,17 @@
     <span class="md-ellipsis">
       
         2. Run a real Python example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-next-the-six-scenarios-one-call-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Next: the six scenarios, one call each
       
     </span>
   </a>
@@ -1985,6 +2040,17 @@
     <span class="md-ellipsis">
       
         3. Read health and the factory list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-next-the-six-scenarios-one-request-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Next: the six scenarios, one request each
       
     </span>
   </a>
@@ -2261,6 +2327,52 @@ default is 8765; a desktop app can use a different port.</p>
 Python is used here to launch the existing CLI package without requiring a
 separate <code>azurefactory.exe</code> installation.</p>
 </details>
+<h3 id="4-next-the-six-scenarios-one-command-each">4. Next: the six scenarios, one command each<a class="headerlink" href="#4-next-the-six-scenarios-one-command-each" title="Permanent link">&para;</a></h3>
+<p>With a real factory folder, each scenario is <strong>one command</strong>. The connection is
+set once: the same <code>AIFACTORY_API_URL</code> and <code>AIFACTORY_API_KEY</code>, plus
+<code>ESAF_FOLDER</code>, the absolute <code>azurefactory</code> folder on the API host. List the
+commands, without running any of them on this empty demo folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">$env:ESAF_FOLDER</span> <span class="p">=</span> <span class="nv">$env:FACTORY_FOLDER</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="p">&amp;</span> <span class="nv">$Python</span> <span class="n">-m</span> <span class="n">azurefactory</span> <span class="n">esaf</span> <span class="p">-</span><span class="n">-help</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Init AI Factory</td>
+<td><code>azurefactory esaf init-factory</code></td>
+</tr>
+<tr>
+<td>2. Add scaleset</td>
+<td><code>azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16</code></td>
+</tr>
+<tr>
+<td>3. Add or update project</td>
+<td><code>azurefactory esaf upsert-project 002 dev</code></td>
+</tr>
+<tr>
+<td>4. Delete project</td>
+<td><code>azurefactory esaf delete-project 002 dev</code></td>
+</tr>
+<tr>
+<td>5. Delete scaleset</td>
+<td><code>azurefactory esaf delete-scale-set 002 dev</code></td>
+</tr>
+<tr>
+<td>6. Delete AI Factory</td>
+<td><code>azurefactory esaf delete-factory</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each command <strong>is the approval</strong> and changes Azure; add <code>--wait</code> to follow the
+job to its end. The environment (<code>dev</code>, <code>stage</code>, <code>prod</code>) is required on
+scale-set and project commands. <a href="../19-cli-and-api-and-usage/">Guide 19</a> runs
+Scenarios 1-3 and <a href="../20-cli-and-api-and-usage/">guide 20</a> Scenarios 4-6.</p>
 </div>
 <div class="tabbed-block">
 <p>The <strong>SDK</strong> provides Python helpers for your scripts or applications.
@@ -2270,19 +2382,19 @@ in your Python editor. No PowerShell strings are involved.</p>
 <p>If your platform team already started the demo service, go to step 2.
 Otherwise save this as <code>start_factory_demo.py</code>. In your editor, select the
 prepared API folder's <code>.venv</code> Python interpreter, then run this file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">uvicorn</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">api_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Prepared API source folder: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">api_root</span> <span class="o">/</span> <span class="s2">"src"</span> <span class="o">/</span> <span class="s2">"api.py"</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"Select the prepared API source folder."</span><span class="p">)</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">api_root</span><span class="p">)</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">api_root</span><span class="p">))</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"AIFACTORY_API_KEY"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"example-local-parity-smoke-only"</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">uvicorn</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"src.api:app"</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8876</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">uvicorn</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">api_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Prepared API source folder: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">api_root</span> <span class="o">/</span> <span class="s2">"src"</span> <span class="o">/</span> <span class="s2">"api.py"</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"Select the prepared API source folder."</span><span class="p">)</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">api_root</span><span class="p">)</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">api_root</span><span class="p">))</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"AIFACTORY_API_KEY"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"example-local-parity-smoke-only"</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="n">uvicorn</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"src.api:app"</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8876</span><span class="p">)</span>
 </code></pre></div>
 <p>Leave it running. The key above is <strong>for this empty local demo only</strong>.</p>
 <h3 id="2-run-a-real-python-example">2. Run a real Python example<a class="headerlink" href="#2-run-a-real-python-example" title="Permanent link">&para;</a></h3>
@@ -2290,31 +2402,31 @@ prepared API folder's <code>.venv</code> Python interpreter, then run this file.
 <code>factory_smoke.py</code> and run it with Python 3.10 or later.
 Enter the accelerator source folder and the demo key when asked.
 You can also use the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/api-usage-examples/python/factory_smoke.py">ready-to-run Python file</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">getpass</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">accelerator</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Accelerator source folder: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">sdk_source</span> <span class="o">=</span> <span class="n">accelerator</span> <span class="o">/</span> <span class="s2">"environment_setup"</span> <span class="o">/</span> <span class="s2">"azurefactory-cli"</span> <span class="o">/</span> <span class="s2">"src"</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">sdk_source</span> <span class="o">/</span> <span class="s2">"azurefactory"</span> <span class="o">/</span> <span class="s2">"client.py"</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"The selected folder does not contain the Factory SDK."</span><span class="p">)</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sdk_source</span><span class="p">))</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureFactoryClient</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="n">url</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"Demo API URL [http://127.0.0.1:8876]: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"http://127.0.0.1:8876"</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="n">key</span> <span class="o">=</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getpass</span><span class="p">(</span><span class="s2">"Demo API key: "</span><span class="p">)</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"Enter the local demo key."</span><span class="p">)</span>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AzureFactoryClient</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">health</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="n">folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"factory-smoke-"</span><span class="p">))</span> <span class="o">/</span> <span class="s2">"azurefactory"</span>
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="n">folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Empty local demo folder: </span><span class="si">{</span><span class="n">folder</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">catalog_list</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">folder</span><span class="p">)),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">getpass</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">accelerator</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Accelerator source folder: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">sdk_source</span> <span class="o">=</span> <span class="n">accelerator</span> <span class="o">/</span> <span class="s2">"environment_setup"</span> <span class="o">/</span> <span class="s2">"azurefactory-cli"</span> <span class="o">/</span> <span class="s2">"src"</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">sdk_source</span> <span class="o">/</span> <span class="s2">"azurefactory"</span> <span class="o">/</span> <span class="s2">"client.py"</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"The selected folder does not contain the Factory SDK."</span><span class="p">)</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sdk_source</span><span class="p">))</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureFactoryClient</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">url</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"Demo API URL [http://127.0.0.1:8876]: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"http://127.0.0.1:8876"</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">key</span> <span class="o">=</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getpass</span><span class="p">(</span><span class="s2">"Demo API key: "</span><span class="p">)</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"Enter the local demo key."</span><span class="p">)</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AzureFactoryClient</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">health</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="n">folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"factory-smoke-"</span><span class="p">))</span> <span class="o">/</span> <span class="s2">"azurefactory"</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="n">folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Empty local demo folder: </span><span class="si">{</span><span class="n">folder</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">catalog_list</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">folder</span><span class="p">)),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
 </code></pre></div>
 <p>Expect a healthy service and an empty factory list. <strong>No extra test step is
 required.</strong> Stop your idle demo service when finished.</p>
@@ -2325,15 +2437,68 @@ service. This example imports the reviewed SDK source without installing
 packages. The SDK itself uses Python's standard library.</p>
 <p>If the package is already installed in your selected interpreter, omit the
 source-folder prompt and <code>sys.path</code> setup and start with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureFactoryClient</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AzureFactoryClient</span><span class="p">()</span>  <span class="c1"># Uses AIFACTORY_API_URL and AIFACTORY_API_KEY.</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">health</span><span class="p">())</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureFactoryClient</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AzureFactoryClient</span><span class="p">()</span>  <span class="c1"># Uses AIFACTORY_API_URL and AIFACTORY_API_KEY.</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">health</span><span class="p">())</span>
 </code></pre></div>
 <p>Set those environment variables through your approved secret mechanism.
 Do not put a real API key in a Python file or notebook you share.
 The local temporary folder works because the API runs on the same computer.</p>
 </details>
+<h3 id="3-next-the-six-scenarios-one-call-each">3. Next: the six scenarios, one call each<a class="headerlink" href="#3-next-the-six-scenarios-one-call-each" title="Permanent link">&para;</a></h3>
+<p>With a real factory folder, each scenario is <strong>one method</strong> of
+<code>from azurefactory import esaf</code>. The connection is set once with
+<code>esaf.connect()</code> (or the variables <code>ESAF_FOLDER</code>, <code>AIFACTORY_API_URL</code> and
+<code>AIFACTORY_API_KEY</code>). Add these lines to the end of <code>factory_smoke.py</code> to
+connect <code>esaf</code> to the demo folder and read it; they change nothing:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">session</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">folder</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">folder</span><span class="p">),</span> <span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">catalog_list</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">folder</span><span class="p">)[</span><span class="s2">"factories"</span><span class="p">])</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">esaf</span><span class="o">.</span><span class="n">__all__</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Init AI Factory</td>
+<td><code>esaf.init_factory()</code></td>
+</tr>
+<tr>
+<td>2. Add scaleset</td>
+<td><code>esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")</code></td>
+</tr>
+<tr>
+<td>3. Add or update project</td>
+<td><code>esaf.upsert_project("002", "dev")</code></td>
+</tr>
+<tr>
+<td>4. Delete project</td>
+<td><code>esaf.delete_project("002", "dev")</code></td>
+</tr>
+<tr>
+<td>5. Delete scaleset</td>
+<td><code>esaf.delete_scale_set("002", "dev")</code></td>
+</tr>
+<tr>
+<td>6. Delete AI Factory</td>
+<td><code>esaf.delete_factory()</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each method <strong>is the approval</strong> and changes Azure, so do not call them on this
+demo folder. Each returns a job: <code>job.wait()</code> follows it to its end. The
+environment (<code>"dev"</code>, <code>"stage"</code>, <code>"prod"</code>) is required on scale-set and project
+calls. <a href="../19-cli-and-api-and-usage/">Guide 19</a> runs Scenarios 1-3,
+<a href="../20-cli-and-api-and-usage/">guide 20</a> Scenarios 4-6, and the
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/docs/esaf/readme.md">ESAF usage guide</a>
+explains every parameter.</p>
 </div>
 <div class="tabbed-block">
 <p><strong>REST</strong> lets you send requests directly, without the Factory CLI or Python
@@ -2346,11 +2511,11 @@ startup instructions below. Keep the service running while trying step 2.</p>
 <summary>More info</summary></p>
 <p>To start the prepared API yourself from <strong>Git Bash on Windows</strong>, enter its
 Windows folder path. <code>cygpath</code> converts the path for Git Bash:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Prepared API folder (Windows path): "</span><span class="w"> </span>api_windows
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nv">api_root</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>cygpath<span class="w"> </span>-u<span class="w"> </span><span class="s2">"</span><span class="nv">$api_windows</span><span class="s2">"</span><span class="k">)</span><span class="s2">"</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$api_root</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nv">AIFACTORY_API_KEY</span><span class="o">=</span><span class="s1">'example-local-parity-smoke-only'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>.venv/Scripts/python.exe<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>src.api:app<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8876</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Prepared API folder (Windows path): "</span><span class="w"> </span>api_windows
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">api_root</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>cygpath<span class="w"> </span>-u<span class="w"> </span><span class="s2">"</span><span class="nv">$api_windows</span><span class="s2">"</span><span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$api_root</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nv">AIFACTORY_API_KEY</span><span class="o">=</span><span class="s1">'example-local-parity-smoke-only'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>.venv/Scripts/python.exe<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>src.api:app<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8876</span>
 </code></pre></div>
 <p>Leave this terminal running and use another Git Bash terminal for step 2.
 On Linux/macOS, start the service from its prepared environment instead;
@@ -2359,33 +2524,33 @@ the following curl requests are unchanged.</p>
 <h3 id="2-set-the-address-key-and-empty-local-folder">2. Set the address, key and empty local folder<a class="headerlink" href="#2-set-the-address-key-and-empty-local-folder" title="Permanent link">&para;</a></h3>
 <p>Use the address/key of the <strong>local demo</strong>, not a production factory.
 <code>curl</code> must support <code>--fail-with-body</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Demo API URL [http://127.0.0.1:8876]: "</span><span class="w"> </span>API_URL
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">API_URL</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">API_URL</span><span class="k">:-</span><span class="nv">http</span><span class="p">://127.0.0.1:</span><span class="nv">8876</span><span class="si">}</span><span class="s2">"</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nv">API_URL</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">API_URL</span><span class="p">%/</span><span class="si">}</span><span class="s2">"</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-s<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Demo API key: "</span><span class="w"> </span>API_KEY
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nb">test</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">"</span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="nb">printf</span><span class="w"> </span><span class="s1">'An API key is required.\n'</span><span class="w"> </span>&gt;<span class="p">&amp;</span><span class="m">2</span><span class="p">;</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="o">}</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="nv">demo_root</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>mktemp<span class="w"> </span>-d<span class="k">)</span><span class="s2">"</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>mkdir<span class="w"> </span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="k">if</span><span class="w"> </span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>cygpath<span class="w"> </span>&gt;/dev/null<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nv">FACTORY_FOLDER</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>cygpath<span class="w"> </span>-w<span class="w"> </span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span><span class="k">)</span><span class="s2">"</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="k">else</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="nv">FACTORY_FOLDER</span><span class="o">=</span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="k">fi</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Demo API URL [http://127.0.0.1:8876]: "</span><span class="w"> </span>API_URL
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">API_URL</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">API_URL</span><span class="k">:-</span><span class="nv">http</span><span class="p">://127.0.0.1:</span><span class="nv">8876</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nv">API_URL</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">API_URL</span><span class="p">%/</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-s<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Demo API key: "</span><span class="w"> </span>API_KEY
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nb">test</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">"</span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="nb">printf</span><span class="w"> </span><span class="s1">'An API key is required.\n'</span><span class="w"> </span>&gt;<span class="p">&amp;</span><span class="m">2</span><span class="p">;</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="o">}</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="nv">demo_root</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>mktemp<span class="w"> </span>-d<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>mkdir<span class="w"> </span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="k">if</span><span class="w"> </span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>cygpath<span class="w"> </span>&gt;/dev/null<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">  </span><span class="nv">FACTORY_FOLDER</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>cygpath<span class="w"> </span>-w<span class="w"> </span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span><span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="k">else</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="nv">FACTORY_FOLDER</span><span class="o">=</span><span class="s2">"</span><span class="nv">$demo_root</span><span class="s2">/azurefactory"</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="k">fi</span>
 </code></pre></div>
 <p>This folder is on the same computer as the demo API. A real operation uses
 the actual folder on the computer running the API.</p>
 <h3 id="3-read-health-and-the-factory-list">3. Read health and the factory list<a class="headerlink" href="#3-read-health-and-the-factory-list" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>--noproxy<span class="w"> </span><span class="s1">'*'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/health"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>--noproxy<span class="w"> </span><span class="s1">'*'</span><span class="w"> </span>--get<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/factory-catalog"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--data-urlencode<span class="w"> </span><span class="s2">"folder=</span><span class="nv">$FACTORY_FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>--noproxy<span class="w"> </span><span class="s1">'*'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/health"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>--noproxy<span class="w"> </span><span class="s1">'*'</span><span class="w"> </span>--get<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/factory-catalog"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">  </span>--data-urlencode<span class="w"> </span><span class="s2">"folder=</span><span class="nv">$FACTORY_FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'\n'</span>
 </code></pre></div>
 <p>Expect a healthy service and an empty factory list. <strong>You are finished.</strong>
 Stop the idle demo server with Ctrl+C in its terminal when done.</p>
@@ -2396,6 +2561,51 @@ The exact HTTP definitions are at <code>/openapi.json</code>.
 Curl sends HTTP requests; it is not the <code>azurefactory</code> CLI.
 Do not send privileged requests from browser JavaScript with an API key.</p>
 </details>
+<h3 id="4-next-the-six-scenarios-one-request-each">4. Next: the six scenarios, one request each<a class="headerlink" href="#4-next-the-six-scenarios-one-request-each" title="Permanent link">&para;</a></h3>
+<p>With a real factory folder, each scenario is <strong>one POST</strong> to <code>/api/v1/esaf/&lt;scenario&gt;</code>,
+answered with <code>202 Accepted</code> and a job id. List the routes the demo API serves:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>--noproxy<span class="w"> </span><span class="s1">'*'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/openapi.json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">'"/api/v1/esaf/[^"]*"'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-u
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Request body (besides <code>"folder"</code> and <code>"approved": true</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/v1/esaf/init-factory</code></td>
+<td>nothing, or <code>creation_request</code></td>
+</tr>
+<tr>
+<td><code>POST /api/v1/esaf/add-scale-set</code></td>
+<td><code>"scale_set": "002", "environment": "dev", "cidr": "10.141.0.0/16"</code></td>
+</tr>
+<tr>
+<td><code>POST /api/v1/esaf/upsert-project</code></td>
+<td><code>"project": "002", "environment": "dev"</code></td>
+</tr>
+<tr>
+<td><code>POST /api/v1/esaf/delete-project</code></td>
+<td><code>"project": "002", "environment": "dev"</code></td>
+</tr>
+<tr>
+<td><code>POST /api/v1/esaf/delete-scale-set</code></td>
+<td><code>"scale_set": "002", "environment": "dev"</code></td>
+</tr>
+<tr>
+<td><code>POST /api/v1/esaf/delete-factory</code></td>
+<td>nothing</td>
+</tr>
+</tbody>
+</table>
+<p><code>"approved": true</code> is required: sending the request <strong>is the approval</strong> and
+changes Azure, so do not send them to this demo folder. Read the job with
+<code>GET /api/v1/esaf/jobs/{job_id}?folder=...</code> about once a second.
+<a href="../19-cli-and-api-and-usage/">Guide 19</a> sends Scenarios 1-3 and
+<a href="../20-cli-and-api-and-usage/">guide 20</a> Scenarios 4-6.</p>
 </div>
 </div>
 </div>
