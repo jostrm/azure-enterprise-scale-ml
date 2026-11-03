@@ -592,14 +592,18 @@ check_ai_search_quota() { # $1 subId $2 sku
   fi
 }
 
+# Writes JSON for the embedded Python checks to a temp file (printf is a builtin: no 128 KiB exec limit
+# on one environment string, which large usage lists exceed) and prints its path.
+pf_json_file() { local f; f="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/pf-json.XXXXXX")"; printf '%s' "$1" > "$f"; printf '%s' "$f"; }
+
 # Emit "limit currentValue valid"; malformed data never establishes quota headroom.
 az_jq_search() { # stdin=json  $1=sku(lower)
   local _in; _in="$(cat)"
-  PF_JSON="$_in" "$PYBIN" - "$1" <<'PY' 2>/dev/null || true
+  PF_JSON_FILE="$(pf_json_file "$_in")" "$PYBIN" - "$1" <<'PY' 2>/dev/null || true
 import os, sys, json, math
 sku = sys.argv[1].lower()
 try:
-    data = json.loads(os.environ.get("PF_JSON", "") or "")
+    data = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
     items = data.get("value") if isinstance(data, dict) else None
     if not isinstance(items, list):
         raise ValueError("Missing usage catalogue")
@@ -669,11 +673,11 @@ check_model_quota() { # $1 subId
 # helper: from cognitiveservices usage JSON find name.value==quotaName -> "limit currentValue"
 az_jq_model() { # stdin=json  $1=quotaName
   local _in; _in="$(cat)"
-  PF_JSON="$_in" "$PYBIN" - "$1" <<'PY' 2>/dev/null || true
+  PF_JSON_FILE="$(pf_json_file "$_in")" "$PYBIN" - "$1" <<'PY' 2>/dev/null || true
 import os, sys, json
 qn = sys.argv[1]
 try:
-    data = json.loads(os.environ.get("PF_JSON", "") or "")
+    data = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception:
     sys.exit(0)
 for it in data:
@@ -696,9 +700,9 @@ check_cs_headroom() { # $1 subId
   fi
   [ -n "$payload" ] || { add_finding WARN CS_QUOTA_LOOKUP "Could not read Cognitive Services usage for '$LOCATION'." \
       "Verify Microsoft.CognitiveServices is registered and identity has Reader."; return 0; }
-  res="$(PF_JSON="$payload" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
+  res="$(PF_JSON_FILE="$(pf_json_file "$payload")" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
 import os, sys, json
-try: data = json.loads(os.environ.get("PF_JSON", "") or "")
+try: data = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception: sys.exit(0)
 items = data.get("value", [])
 if not items: sys.exit(0)
@@ -724,9 +728,9 @@ list_policy_assignments() { # $1 subId  (informational + elastic deny heuristic)
       "Verify the identity has Microsoft.Authorization/policyAssignments/read."
     return 0
   fi
-  count="$(PF_JSON="$json" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
+  count="$(PF_JSON_FILE="$(pf_json_file "$json")" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
 import os, json
-try: data = json.loads(os.environ.get("PF_JSON", "") or "")
+try: data = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception: data = []
 names = [ (a.get("displayName") or a.get("name") or "?") for a in data ]
 print(len(names))
@@ -752,9 +756,9 @@ check_elasticsearch_block() { # $1 subId
   # 2) Deny-policy heuristic: any assignment whose definition denies the Elastic
   #    resource type / Marketplace offer would block the deployment.
   json="$(az policy assignment list -o json 2>/dev/null)"
-  blocked="$(PF_JSON="$json" "$PYBIN" - <<'PY' 2>/dev/null
+  blocked="$(PF_JSON_FILE="$(pf_json_file "$json")" "$PYBIN" - <<'PY' 2>/dev/null
 import os, sys, json
-try: data = json.loads(os.environ.get("PF_JSON", "") or "")
+try: data = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception: sys.exit(0)
 hits=[]
 for a in data:
@@ -1317,12 +1321,12 @@ _provider_region_status() { # $1 ns  $2 resourceType
   az_capture provider show --namespace "$1" -o json
   [ -n "$AZ_TRANSIENT" ] && { echo "TRANSIENT"; return; }
   [ -z "$AZ_OUT" ] && { echo ""; return; }
-  PF_JSON="$AZ_OUT" "$PYBIN" - "$2" "$LOCATION" <<'PY' 2>/dev/null | tr -d '\r'
+  PF_JSON_FILE="$(pf_json_file "$AZ_OUT")" "$PYBIN" - "$2" "$LOCATION" <<'PY' 2>/dev/null | tr -d '\r'
 import os, sys, json, re
 rt_want = sys.argv[1]
 loc = re.sub(r'[^a-z0-9]', '', sys.argv[2].lower())
 try:
-    d = json.loads(os.environ.get("PF_JSON", "") or "")
+    d = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception:
     print(""); sys.exit(0)
 state = str(d.get("registrationState", ""))
@@ -1361,9 +1365,9 @@ check_cosmos_region() {
     add_finding WARN COSMOS_LOC_LOOKUP "Could not read Cosmos DB region metadata for '$LOCATION'."
     return 0
   fi
-  local res; res="$(PF_JSON="$AZ_OUT" "$PYBIN" - <<'PY' 2>/dev/null
+  local res; res="$(PF_JSON_FILE="$(pf_json_file "$AZ_OUT")" "$PYBIN" - <<'PY' 2>/dev/null
 import os, sys, json
-try: d = json.loads(os.environ.get("PF_JSON", "") or "")
+try: d = json.loads(open(os.environ["PF_JSON_FILE"], encoding="utf-8").read() or "")
 except Exception: sys.exit(0)
 online = str(d.get("online", "") or "")
 az = bool(d.get("az"))
