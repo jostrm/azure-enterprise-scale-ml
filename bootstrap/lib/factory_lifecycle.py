@@ -88,6 +88,7 @@ LOCAL_COMMAND_TIMEOUT_SECONDS = 240
 # Polling deadlines, as poll counts: x 5 s unless noted.
 LEAF_DELETE_POLLS = 240                 # 20 min
 RESOURCE_GROUP_DELETE_POLLS = 2880      # 4 h: whole resource groups routinely outlast the leaf budget
+HELD_RECHECK_SECONDS = 60               # a read-only absence wait proves the held claim once a minute
 WHAT_IF_POLLS = 240                     # 20 min
 FOUNDRY_READINESS_POLLS = 360           # 30 min
 ARM_DEPLOYMENT_POLLS = 2880             # 4 h
@@ -3580,15 +3581,28 @@ def delete_resources(cloud, locks, document, receipt, persist, sleep=time.sleep)
     verify_inventory(cloud, document, remaining)
 
 
-def wait_absent(cloud, locks, resource_id, api_version, sleep):
+def wait_absent(cloud, locks, resource_id, api_version, sleep, clock=time.monotonic):
     # Whole resource groups routinely outlast the 20-minute leaf budget.
     for _ in range(RESOURCE_GROUP_DELETE_POLLS if RG_ID.fullmatch(resource_id) else LEAF_DELETE_POLLS):
-        locks.assert_held()
+        assert_held_recently(locks, clock)
         status, _, _ = cloud.arm("GET", resource_id, api_version, allowed=(200, 404))
         if status == 404:
             return
         sleep(5)
     raise Blocked("delete-completion-unverified")
+
+
+def assert_held_recently(locks, clock=time.monotonic):
+    """Prove the held claim at most once per HELD_RECHECK_SECONDS while only waiting for a deletion to finish.
+
+    aif-145 Scenario 5 (2026-11-04): a single-writer claim proof reads the whole GitHub state branch (four GETs of a
+    10.9 MB state.json). Proven on every 5-second poll of a group DELETE and again for each of its 833 children, it
+    spent the 5,000 GitHub requests an hour allows, and the run's next state write failed 403. Every DELETE still
+    re-proves the claim through authorize and assert_held; a lost claim still stops this wait within a minute."""
+    checked = getattr(locks, "held_checked_at", None)
+    if not isinstance(checked, float) or clock() - checked >= HELD_RECHECK_SECONDS:
+        locks.assert_held()
+        locks.held_checked_at = clock()
 
 
 def ado_project(cloud, locks, document, source_root, receipt, persist, sleep=time.sleep):
