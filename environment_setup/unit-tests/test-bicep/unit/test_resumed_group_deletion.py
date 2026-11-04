@@ -73,7 +73,8 @@ def test_a_group_an_interrupted_deletion_removed_is_recorded_absent_and_never_de
     receipt = {"deleted_resources": []}
     fl.delete_owned_groups(cloud, locks(cloud), document, receipt, lambda: None, sleep=lambda _: None)
     assert cloud.group_deletes == [base.GROUP]
-    assert ABSENT in receipt["deleted_resources"] and base.GROUP in receipt["deleted_resources"]
+    assert receipt["observed_absent"] == [ABSENT] and receipt["deleted_resources"].count(base.GROUP) == 1
+    assert ABSENT not in receipt["deleted_resources"]  # observed, never counted as deleted (766d7382)
     assert len(receipt["deleted_resources"]) == len(set(receipt["deleted_resources"]))
 
 
@@ -102,4 +103,5 @@ def test_a_resumed_cohort_executes_without_reading_the_absent_group(monkeypatch,
     result = fl.execute_cohort([document], source, execution, path, cloud_factory=lambda value: cloud)
     assert result["status"] == "succeeded" and not result["lock_retained"], result.get("error_code")
     assert cloud.group_deletes == [base.GROUP]
-    assert ABSENT in result["children"][0]["deleted_resources"]
+    assert result["children"][0]["observed_absent"] == [ABSENT]
+    assert ABSENT not in result["children"][0]["deleted_resources"]
