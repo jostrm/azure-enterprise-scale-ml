@@ -136,6 +136,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_factory_deletion_own_grants.py",
         "unit/test_factory_deletion_phase_order.py",
         "unit/test_factory_deletion_pipeline.py",
+        "unit/test_factory_deletion_project_inventory.py",
         "unit/test_factory_deletion_platform_children.py",
         "unit/test_factory_deletion_receipt_drift.py",
         "unit/test_factory_deletion_recorded_kind.py",
