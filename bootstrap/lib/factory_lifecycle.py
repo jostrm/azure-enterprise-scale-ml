@@ -1982,7 +1982,11 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                     rows, unsupported = [], ("not-listable-" + str(status)
                                              if failure.code == "unsupported-child-inventory-endpoint"
                                              and status in (400, 404, 405) else "unreadable-" + failure.code)
-        if kind in LISTED_ONLY_CHILDREN:
+        try:
+            listed_kind = kind or (None if single or extension else collection_resource_type(path))
+        except ValueError:
+            listed_kind = None
+        if listed_kind in LISTED_ONLY_CHILDREN:
             listed_bodies.update({row["id"].lower(): copy.deepcopy(row) for row in rows
                                   if isinstance(row, dict) and isinstance(row.get("id"), str)})
         if not single and not extension:
