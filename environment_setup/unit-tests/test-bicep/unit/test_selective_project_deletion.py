@@ -725,3 +725,29 @@ def test_an_already_absent_project_group_is_reviewed_and_executed_as_done(worksp
         retained, other = prepared(False, False, cloud_class=AbsentGroupCloud)
         other.bodies = {key: body for key, body in other.bodies.items() if not key.startswith(GROUP.lower())}
         fl.freeze_project_deletion(other, retained, {})
+
+
+class ProviderRolloutCloud(ProjectCloud):
+    """Azure rolls resource-provider manifests out continuously: each read may list one more api-version."""
+
+    def __init__(self):
+        super().__init__()
+        self.rollout = 0
+
+    def provider_schema(self, namespace):
+        schema = copy.deepcopy(super().provider_schema(namespace))
+        for row in schema["resourceTypes"]:
+            row["apiVersions"] = row["apiVersions"] + ["2026-0%d-01-preview" % (1 + self.rollout % 9)]
+        return schema
+
+
+def test_provider_rollouts_between_prepare_and_confirm_change_no_frozen_view():
+    """aif-145 Scenario 4 (2026-11-04): microsoft.storage, .network and .compute schemas changed between prepare and
+    confirm, so every confirmation refused "closure, closure_hash changed". A provider fingerprint is derived and warns,
+    never blocks (48b243f8): the frozen project view keeps none, so the re-frozen view at confirmation is equal."""
+    document, cloud = prepared(False, True, cloud_class=ProviderRolloutCloud)
+    cloud.rollout += 1
+    again = fl.freeze_project_deletion(cloud, document, {})
+    assert again["closure"] == document["deletion"]["closure"]
+    assert again["closure_hash"] == document["deletion"]["closure_hash"]
+    assert document["deletion"]["closure"]["providers"] == {}
