@@ -2480,7 +2480,10 @@ def project_inventory_view(closure, bodies, project_group, deleted, frozen=()):
         return inside(path) or any(owner in kept and owner not in closure["groups"]
                                    for owner in (path.rsplit("/", 1)[0], path.rsplit("/providers/", 1)[0]))
 
-    view = {"providers": closure["providers"], "groups": closure["groups"],
+    # Provider-schema fingerprints are derived and churn with Azure's resource-provider rollouts (aif-145 2026-11-04:
+    # microsoft.storage, .network and .compute changed between prepare and confirm, so every confirmation refused
+    # "closure changed"). They warn, never block (48b243f8): the frozen view keeps none and the live closure decides.
+    view = {"providers": {}, "groups": closure["groups"],
             "resources": {key: row for key, row in closure["resources"].items() if key in kept},
             "references": {key: row for key, row in closure["references"].items() if key in kept},
             "inline": {key: row for key, row in closure["inline"].items() if row["parent_id"] in kept},
