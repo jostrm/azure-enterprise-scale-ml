@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import AzureFactoryClient
-from .errors import ConfigError
+from .errors import APIError, ConfigError
 
 __all__ = ["connect", "init_factory", "add_scale_set", "upsert_project", "apply_project", "delete_project",
            "delete_scale_set", "delete_factory", "EsafJob", "Session"]
@@ -86,8 +86,21 @@ class EsafJob:
 
     def wait(self, timeout: float = 8 * 3600, poll: float = 1) -> dict:
         deadline = time.monotonic() + timeout
+        transient_until = None
         while True:
-            state = self.status()
+            try:
+                state = self.status()
+                transient_until = None
+            except APIError as error:
+                # A status read can meet a transient 5xx (a record being replaced on Windows) while the job
+                # keeps running; keep polling for up to a minute, then let the error surface.
+                if getattr(error, "status", None) is None or error.status < 500:
+                    raise
+                transient_until = transient_until or time.monotonic() + 60
+                if time.monotonic() > transient_until:
+                    raise
+                time.sleep(poll)
+                continue
             continuing = (self.kind == "workflow" and state.get("status") == "awaiting-review"
                           and state.get("requires_review") is False)
             if (state.get("status") not in ACTIVE and not continuing) or time.monotonic() > deadline:
