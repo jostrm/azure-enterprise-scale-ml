@@ -46,6 +46,9 @@ SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
 # Reviewed inventories a single-writer repository cohort may delete; never legacy leaf lists.
 SINGLE_WRITER_DELETION_INVENTORIES = ["arm-provider-closure-v1", "ordered-project-pipelines-v1", SELECTIVE_PROJECT_DELETE]
 PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
+# Their resource IDs are display links (dashboard tiles), never deletion dependencies (aif-145, 2026-11-04: the factory
+# dashboard in the common group charts project resources).
+DISPLAY_ONLY_TYPES = {"microsoft.portal/dashboards"}
 # ARM back-references name a dependent (deleted first), never a dependency of this resource.
 REVERSE_LINKS = {
     "microsoft.network/networkinterfaces": ("virtualMachine", "privateEndpoint", "privateLinkService"),
@@ -2427,12 +2430,20 @@ def project_resource_dependencies(body):
     key = body["id"].lower()
     # Dependency planning, not ownership: a provider-owned malformed ID-looking string (aif-138 2026-11-01: a Container
     # Apps serviceAssociationLink's properties.link has no /providers/) is no resolvable dependency and is skipped.
+    if str(body.get("type", "")).lower() in DISPLAY_ONLY_TYPES:
+        return []
     references = resource_references(body, tolerant=True)
     if str(body.get("type", "")).lower() in PROJECT_NETWORK_TYPES | {"microsoft.network/virtualnetworks"}:
         # Subnets are reverse links or separately inventoried child bodies.
         references -= resource_references((body.get("properties") or {}).get("subnets", []), tolerant=True)
     for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
         references -= resource_references([body.get(field), (body.get("properties") or {}).get(field)], tolerant=True)
+    # Any type: privateEndpointConnections name the endpoints connected to this resource, which are deleted first
+    # (aif-145, 2026-11-04: a project endpoint to a common resource read as a common-before-project dependency).
+    connections = (body.get("properties") or {}).get("privateEndpointConnections")
+    if isinstance(connections, list):
+        references -= resource_references([((row.get("properties") or {}).get("privateEndpoint") if isinstance(row, dict)
+                                            else None) for row in connections], tolerant=True)
     return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
 
 

@@ -153,6 +153,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_nic_ipconfig_etag_churn.py",
         "unit/test_platform_refused_child.py",
         "unit/test_prefix_bootstrap.py",
+        "unit/test_private_endpoint_connection_reverse_link.py",
         "unit/test_private_endpoint_disconnect_churn.py",
         "unit/test_project_deletion_lifecycle.py",
         "unit/test_project_deletion_pipelines.py",
