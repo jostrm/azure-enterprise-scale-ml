@@ -2836,9 +2836,12 @@ def verify_project_inventory(cloud, document, removed=()):
     removed = {item.lower() for item in [*removed, *absent]}
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
-    deleted = {row["id"].lower() for row in data["resource_groups"] + data["resources"] if row["delete"]}
-    closure, bodies = project_inventory_view(closure, bodies, data["project_resource_group"].lower(), deleted,
-                                             data["bodies"])
+    if "project_resource_group" in data:
+        # Only a project deletion freezes the project's view; a whole-factory deletion's data has no project group
+        # and keeps its full closure (aif-144 2026-11-04: KeyError before every factory teardown's run claim).
+        deleted = {row["id"].lower() for row in data["resource_groups"] + data["resources"] if row["delete"]}
+        closure, bodies = project_inventory_view(closure, bodies, data["project_resource_group"].lower(), deleted,
+                                                 data["bodies"])
     expected = data["closure"]
     # A resource the review deletes that the platform removed with another deletion is absent, like one this run
     # deleted (aif-138 2026-11-02: Defender's Event Grid system topic left with its last event subscription). A vanished

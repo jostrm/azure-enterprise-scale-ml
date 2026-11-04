@@ -125,6 +125,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_cloud_keepalive_reads.py",
         "unit/test_factory_deletion_access_hub.py",
         "unit/test_factory_deletion_pipeline.py",
+        "unit/test_factory_deletion_project_inventory.py",
         "unit/test_factory_deletion_shared_hub_links.py",
         "unit/test_factory_enrollment.py",
         "unit/test_factory_lifecycle.py",
