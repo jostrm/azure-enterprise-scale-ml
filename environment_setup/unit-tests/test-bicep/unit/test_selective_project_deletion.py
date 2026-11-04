@@ -689,3 +689,39 @@ def test_a_malformed_service_association_link_never_blocks_the_retained_vnet_che
     result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
     assert result["status"] == "succeeded", result
     assert GROUP.lower() not in cloud.bodies and VNET.lower() in cloud.bodies
+
+
+class AbsentGroupCloud(ProjectCloud):
+    """Like ARM, a deleted group answers 404 ResourceGroupNotFound on its exact id."""
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "GET" and fl.RG_ID.fullmatch(resource_id) and resource_id.lower() not in self.bodies:
+            assert 404 in allowed
+            return 404, {}, {"error": {"code": "ResourceGroupNotFound", "message": "Resource group could not be found."}}
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+def test_an_already_absent_project_group_is_reviewed_and_executed_as_done(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): the project pipeline deleted project002's group, then failed; the retried
+    delete-project read the absent group (remote-request-failed-404). An absent registered project group is done:
+    the review records it already absent, execution re-proves it absent, sends no DELETE and reports it observed absent."""
+    document, cloud = prepared(False, True, cloud_class=AbsentGroupCloud)
+    cloud.bodies = {key: body for key, body in cloud.bodies.items() if not (key == GROUP.lower() or key.startswith(GROUP.lower() + "/"))}
+    document["deletion"] = fl.freeze_project_deletion(cloud, document, {})
+    group = next(row for row in document["deletion"]["resource_groups"] if row["id"].lower() == GROUP.lower())
+    assert group["already_absent"] is True and group["delete"] is True
+    assert not any(row["delete"] for row in document["deletion"]["resources"])
+    document = seal(document)
+    fl.validate_manifest(document)
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert result["deleted_resources"] == [] and result["observed_absent"] == [GROUP]
+    assert not cloud.deleted
+    with pytest.raises(fl.Blocked, match="absent-group-not-the-deleted-project-group"):
+        retained, other = prepared(False, False, cloud_class=AbsentGroupCloud)
+        other.bodies = {key: body for key, body in other.bodies.items() if not key.startswith(GROUP.lower())}
+        fl.freeze_project_deletion(other, retained, {})
