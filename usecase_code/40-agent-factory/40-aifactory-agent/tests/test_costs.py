@@ -120,8 +120,8 @@ class FakeAzure:
 def run(settings, principal, fake, skill=COST_SKILLS[0], args=None, cred=None):
     credential = cred or FakeCredential()
     with httpx.Client(transport=httpx.MockTransport(fake)) as client:
-        result = CostSkills(settings, principal, SCOPE, cred=credential, http_client=client,
-                            clock=lambda: NOW).execute(skill, {} if args is None else args)
+        result = CostSkills(settings, principal, SCOPE, cred=credential, http_client=client, clock=lambda: NOW,
+                            sleep=lambda seconds: None).execute(skill, {} if args is None else args)
     return result["data"], credential
 
 
@@ -537,7 +537,7 @@ def test_forecast_insufficient_history_not_success_zero_or_extrapolation(setting
     assert error.value.code == "forecast_unavailable"
 
 
-@pytest.mark.parametrize("status", [204, 400, 401, 403, 429, 503])
+@pytest.mark.parametrize("status", [204, 400, 401, 403, 503])
 def test_billing_errors_explicit_and_no_synthetic_fallback(settings, principal, status):
     seen = []
     def handler(request):
@@ -547,6 +547,64 @@ def test_billing_errors_explicit_and_no_synthetic_fallback(settings, principal, 
         run(settings, principal, handler, COST_SKILLS[2], {"resource_group": RG})
     assert error.value.code in {"cost_data_unavailable", "cost_access_denied", "cost_service_unavailable"}
     assert len(seen) == 1
+
+
+def throttled_once(headers):
+    fake, calls = FakeAzure(), []
+    def handler(request):
+        calls.append(request)
+        if len(calls) == 1:
+            return httpx.Response(429, headers=headers)
+        return fake(request)
+    return handler, calls
+
+
+def run_with_sleep(settings, principal, handler, skill=COST_SKILLS[2], args=None):
+    sleeps = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        result = CostSkills(settings, principal, SCOPE, cred=FakeCredential(), http_client=client,
+                            clock=lambda: NOW, sleep=sleeps.append).execute(skill, args or {"resource_group": RG})
+    return result["data"], sleeps
+
+
+@pytest.mark.parametrize("headers,expected", [
+    ({"Retry-After": "3"}, 3),
+    ({"x-ms-ratelimit-microsoft.costmanagement-qpu-retry-after": "5",
+      "x-ms-ratelimit-microsoft.costmanagement-clienttype-retry-after": "7"}, 7),
+    ({"Retry-After": "not-a-number"}, 2),
+    ({}, 2),
+])
+def test_cost_management_throttling_is_retried_after_the_requested_wait(settings, principal, headers, expected):
+    handler, calls = throttled_once(headers)
+    data, sleeps = run_with_sleep(settings, principal, handler)
+    assert data["skill"] == COST_SKILLS[2]
+    assert sleeps == [expected]
+    assert calls[0].url == calls[1].url and calls[0].content == calls[1].content
+
+
+def test_persistent_throttling_is_bounded_and_explicit(settings, principal):
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(429, headers={"Retry-After": "1"})
+    with pytest.raises(ToolError) as error:
+        run_with_sleep(settings, principal, handler)
+    assert error.value.code == "cost_service_unavailable"
+    assert "429" in str(error.value) and "throttled" in str(error.value)
+    assert len(calls) == 3
+
+
+def test_throttling_wait_beyond_the_chat_budget_fails_fast(settings, principal):
+    sleeps, calls = [], []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(429, headers={"Retry-After": "120"})
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ToolError) as error:
+            CostSkills(settings, principal, SCOPE, cred=FakeCredential(), http_client=client,
+                       clock=lambda: NOW, sleep=sleeps.append).execute(COST_SKILLS[2], {"resource_group": RG})
+    assert sleeps == [] and len(calls) == 1
+    assert "120" in str(error.value)
 
 
 def test_actual_empty_data_is_not_zero_but_explicit_zero_row_is_valid(settings, principal):
@@ -934,6 +992,12 @@ def test_models_use_repository_names_versions_and_only_applicable_accounts(setti
     assert rows["openai-default-embedding"]["dimensions"]["quota_capacity"] == 25
     assert all(row["estimate"]["monthly"] is None for name, row in rows.items()
                if "deployModel" in name or name == "openai-default-embedding")
+
+
+@pytest.mark.parametrize("flag", ["enableEncryptionAtHost"])
+def test_free_compute_hardening_flags_are_known_and_not_priced(flag):
+    rows = template_components({"dev": {"admin_location": "eastus2", flag: True}}, "dev")
+    assert not any(row.service == "unmapped-enabled-feature" or row.service == flag for row in rows)
 
 
 def test_unapplied_model_flag_is_visible_without_inventing_an_account():

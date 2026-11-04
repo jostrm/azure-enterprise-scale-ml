@@ -32,6 +32,9 @@ class VoiceSettings(BaseModel):
     # Code-level mirror of the pipeline switch enableAIFactoryAgentLiveVoice / ENABLE_AI_FACTORY_AGENT_LIVE_VOICE.
     enabled: bool = False
     mode: Literal["speech_shell", "realtime"] = "speech_shell"
+    # Realtime only, opt-in: understand any spoken language (input_languages become hints, the first one the fallback),
+    # reply in the user's language and use multilingual semantic VAD unless turn_detection is server_vad.
+    multilingual: bool = False
     api_version: str = Field(default="2026-04-10", pattern=r"^\d{4}-\d{2}-\d{2}(?:-preview)?$")
     # Voice Live bills by the tier of this model even though it never writes an answer (speech shell), so use a lite one.
     model: str = Field(default="gpt-4.1-nano", pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -109,8 +112,10 @@ class VoiceSettings(BaseModel):
             raise ValueError("The default language must have a configured profile.")
         if self.mode == "realtime" and self.model not in {"gpt-realtime", "gpt-realtime-mini", "gpt-realtime-datazone"}:
             raise ValueError("Realtime mode requires a native speech-to-speech model.")
-        if self.mode == "realtime" and len(self.input_languages) != 1:
-            raise ValueError("Realtime mode requires one selected profile language.")
+        if self.multilingual and self.mode != "realtime":
+            raise ValueError("Multilingual voice is a realtime mode option.")
+        if self.mode == "realtime" and len(self.input_languages) != 1 and not self.multilingual:
+            raise ValueError("Realtime mode requires one selected profile language unless multilingual is enabled.")
         for name, kind in [(self.voice_name, self.voice_type)] + [
                 (profile.voice_name, profile.voice_type) for profile in self.language_profiles.values()]:
             if kind == "openai" and (self.mode != "realtime" or name not in {
@@ -118,8 +123,21 @@ class VoiceSettings(BaseModel):
                 raise ValueError("Native OpenAI voices require realtime mode and an approved voice name.")
         return self
 
+    def native_turn_detection(self) -> str:
+        """Realtime turn detection: server_vad, or multilingual semantic VAD when multilingual is opted in."""
+        if self.multilingual and self.turn_detection != "server_vad":
+            return "azure_semantic_vad_multilingual"
+        return "server_vad"
+
     def for_language(self, language: str | None) -> VoiceSettings:
         if not self.language_profiles:
+            if self.multilingual:
+                if language is not None and language not in self.input_languages:
+                    raise ValueError("Language is not configured.")
+                first = language or self.input_languages[0]
+                return self.model_copy(update={
+                    "input_languages": [first, *(code for code in self.input_languages if code != first)],
+                    "turn_detection": self.native_turn_detection()})
             if language is not None and language != self.input_languages[0]:
                 raise ValueError("Language is not configured.")
             return self.model_copy(update={"turn_detection": "server_vad"}) if self.mode == "realtime" else self
@@ -128,10 +146,13 @@ class VoiceSettings(BaseModel):
             raise ValueError("Language is not configured.")
         profile = self.language_profiles[selected]
         # Do not apply English semantic VAD to an operator-configured non-English language.
+        if self.mode == "realtime":
+            detection = self.native_turn_detection()
+        else:
+            detection = "server_vad" if not selected.lower().startswith("en-") else self.turn_detection
         return self.model_copy(update={
             "voice_name": profile.voice_name, "input_languages": [selected],
-            "voice_type": profile.voice_type,
-            "turn_detection": "server_vad" if not selected.lower().startswith("en-") or self.mode == "realtime" else self.turn_detection,
+            "voice_type": profile.voice_type, "turn_detection": detection,
             "greeting": profile.greeting, "default_language": selected,
         })
 

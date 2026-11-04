@@ -32,6 +32,8 @@ BYTES_PER_SECOND = SAMPLE_RATE * 2
 MAX_AUDIO_FRAME = 16384
 AUDIO_BURST_SECONDS = 10.0
 AUDIO_SUSTAINED_FACTOR = 2.0
+# Network and worklet buffering between this relay and the speaker; an extra flush of an empty queue is harmless.
+PLAYBACK_MARGIN_SECONDS = 0.5
 MAX_UPSTREAM_MESSAGE = 4 * 1024 * 1024
 PROTOCOL_VERSION = 1
 
@@ -150,6 +152,8 @@ class VoiceSession:
         self._answer_timeout = voice.answer_timeout_seconds if answer_timeout is None else answer_timeout
         self._handshake_timeout = handshake_timeout
         self._budget = _AudioBudget(audio_clock)
+        self._audio_clock = audio_clock
+        self._playback_until: float | None = None
         self._ready = False
         self._state: str | None = None
         self._turn = 0
@@ -337,7 +341,18 @@ class VoiceSession:
         self._touch()
         if self._state != "speaking":
             await self._set_state("speaking")
+        self._queue_playback(len(data))
         await self.channel.send_audio(data)
+
+    def _queue_playback(self, size: int) -> None:
+        """Speech is generated faster than real time; estimate when the browser finishes playing what was relayed."""
+        now = self._audio_clock()
+        self._playback_until = max(now, self._playback_until or now) + size / BYTES_PER_SECOND
+
+    def _take_playback(self) -> bool:
+        """Whether relayed audio may still be playing. Forgets the estimate: the caller flushes the browser."""
+        until, self._playback_until = self._playback_until, None
+        return until is not None and self._audio_clock() < until + PLAYBACK_MARGIN_SECONDS
 
     async def _response_done(self, event: dict) -> None:
         response = event.get("response") or {}
@@ -391,11 +406,12 @@ class VoiceSession:
 
     async def _barge_in(self) -> None:
         self._turn += 1
+        playing = self._take_playback()
         pending = self._cancel_pending_answer()
         speaking = self._response_active
         if speaking:
             await self._cancel_response()
-        if pending or speaking or self._state in ("thinking", "speaking"):
+        if pending or speaking or playing or self._state in ("thinking", "speaking"):
             await self.channel.send_json({"type": "interrupted"})
         await self._set_state("listening")
 

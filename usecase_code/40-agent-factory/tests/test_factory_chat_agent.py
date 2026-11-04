@@ -236,3 +236,39 @@ class IntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecordingAccess:
+    """Records the needs and how many Azure calls happened before them."""
+
+    def __init__(self, azure):
+        self.azure, self.seen = azure, []
+
+    def ensure(self, needs, *, apply):
+        self.seen.append(([need.scope for need in needs], [need.role for need in needs], apply, len(self.azure.calls)))
+        return [{"status": "created" if apply else "would_create", "scope": need.scope} for need in needs]
+
+
+class DeployerAccessTests(unittest.TestCase):
+    def test_apply_grants_foundry_data_access_before_the_first_agent_call(self):
+        from agent_factory import deployer_access
+
+        azure = FakeAzure()
+        recorder = RecordingAccess(azure)
+        result = chat.FactoryChatAgentIntegration(azure, access=recorder).run(request(), apply=True)
+        self.assertEqual(1, len(recorder.seen))
+        scopes, roles, apply, calls_before = recorder.seen[0]
+        self.assertEqual(([ACCOUNT_ID], [deployer_access.FOUNDRY_USER], True), (scopes, roles, apply))
+        first_agent_call = next(i for i, call in enumerate(azure.calls) if call[2] == chat.AI_AUDIENCE)
+        self.assertLessEqual(calls_before, first_agent_call)
+        self.assertEqual("created", result["deployer_access"][0]["status"])
+
+    def test_an_unchanged_agent_still_reports_the_deployer_access(self):
+        azure = FakeAzure()
+        chat.FactoryChatAgentIntegration(azure).run(request(), apply=True)
+        owned = FakeAzure(agent={"versions": {"latest": {"metadata": {
+            "aifactory.managed_by": chat.OWNER,
+            "aifactory.definition_hash": chat.definition_hash(chat.agent_definition(MODEL))}}}})
+        result = chat.FactoryChatAgentIntegration(owned, access=RecordingAccess(owned)).run(request(), apply=True)
+        self.assertEqual("unchanged", result["status"])
+        self.assertEqual("created", result["deployer_access"][0]["status"])

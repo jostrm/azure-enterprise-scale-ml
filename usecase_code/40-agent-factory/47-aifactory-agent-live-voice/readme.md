@@ -74,6 +74,23 @@ template (`40-aifactory-agent/infra/voice-roles.bicep`), only when voice is enab
 They are broader than the project-scoped runtime role in `identity.bicep`, which stays untouched. Check in a
 test environment whether a narrower scope is enough before using voice in production.
 
+## Data roles of the deploying identity
+
+Contributor and User Access Administrator carry no data actions, so the pipeline identity could deploy the
+resources and still get 403 reading the agent, the index or a blob. Before their first data-plane call, steps
+70 (`46-factory-chat-agent`) and 72 (this step) grant the deploying **service principal** these roles, once
+(deterministic assignment names), and then wait about two minutes for RBAC to take effect:
+
+| Role | Scope | Used by |
+|---|---|---|
+| Foundry User | project Foundry account | step 70 (agent versions), step 72 (agent check, embeddings) |
+| Storage Blob Data Contributor | container `aifactory-agent` of the project data storage | step 72 (index state, deployment bundle) |
+| Search Index Data Contributor | the project AI Search service | step 72 (knowledge index documents) |
+
+An existing assignment at that scope or above (or an equivalent data role) counts, so nothing is written twice.
+`plan` lists the roles it would grant. A signed-in user (the terminal launcher) is never granted roles: the
+report names the role to request. The roles are never removed. The code is `agent_factory/deployer_access.py`.
+
 ## Prerequisites (one-time, outside the pipeline)
 
 1. An Entra admin creates the agent's dedicated registration with
@@ -86,18 +103,30 @@ test environment whether a narrower scope is enough before using voice in produc
    reach the Foundry `services.ai.azure.com` private endpoint. See the agent readme's
    [Live voice](../40-aifactory-agent/readme.md#live-voice-optional) section for languages, cost and limits.
 
-## Three ways to run it
+## Four ways to run it
 
 | Route | How |
 |---|---|
 | Azure DevOps Run pipeline UI | `infra-project-genai`, Deployment mode `manual`, keep `XXX` / `not-applicable` / `{}`, and under **Stages to run** select only Dev. The project's variables file sets the two flags and the inputs above. |
 | GitHub Actions Run workflow UI | `infra-project.yml` with environment `dev`; the repository variables `ENABLE_FACTORY_CHAT_AGENT`, `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` and `AIFACTORY_AGENT_*` set the step. |
-| Terminal (no pipeline) | `./ADO-azurefactory.sh add-aifactory-agent-chat --to-project 001` plans; add `--apply` to deploy. `GHA-azurefactory.sh` takes the same options. |
+| **Add-Factory-Agent** pipeline (agent only, fastest pipeline route) | Azure DevOps `esml-infra-project/add-factory-agent.yaml` or GitHub Actions `add-factory-agent.yml`: project number, the project's variables file, `plan` or `apply`. Runs only steps 70 and 72 (no infrastructure) with the Dev pipeline identity, which grants itself the agent's data roles. The project must already be deployed. |
+| Terminal (no pipeline) | `./ADO-azurefactory.sh add-aifactory-agent-chat --to-project 001` (or `-addAIFactoryAgentChat -toProject 001`) plans; add `--apply` to deploy. `GHA-azurefactory.sh` takes the same options. |
 
-The terminal route reads the project's own variables file (`azurefactory/factories/*/scalesets/*/projects/projectNNN/variables.json`
+The Add-Factory-Agent pipelines and the terminal route run the same entry (`bootstrap/lib/agent_chat_entry.py`). It reads the project's own variables file (`azurefactory/factories/*/scalesets/*/projects/projectNNN/variables.json`
 in a registered layout, otherwise `aifactory/variables.json`, or `--config <file>`), switches the chat and voice options on
-for that run only, and runs step 70's and this step's launchers with your signed-in Azure CLI identity.
+for that run only, and runs step 70's and this step's launchers with the signed-in Azure CLI identity (yours in a terminal, the pipeline's in Add-Factory-Agent).
 `--agent-config <file>` overrides `aifactoryAgentConfigFile`; `--without-voice` deploys only the Foundry Agent.
+
+## Faster deployments
+
+A deployment used to take 27 to 34 minutes, about 20 of them re-embedding every knowledge document after any
+repository change. Three things make repeated deployments fast, on every route:
+
+| What | Effect |
+|---|---|
+| Embedding cache (`repository-embeddings.json` in the agent's own container) | Only new or changed documents are embedded; unchanged ones reuse their vector (keyed by embedding deployment, dimensions and exact text). |
+| Skip the knowledge index | For code-only changes: `--skip-knowledge` (terminal), `refreshKnowledge: false` (Azure DevOps) or `refresh_knowledge: false` (GitHub Actions). The application keeps the last committed index; its refresh job updates it. |
+| Cached operator environment | The virtual environment (in the runner's tool directory, or the laptop's temp folder) and the Linux wheels are reused while `requirements.lock.txt` is unchanged. |
 
 ## Run this launcher directly
 

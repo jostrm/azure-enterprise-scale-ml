@@ -629,6 +629,7 @@ def test_frontend_confirmation_and_shortcuts_accessibility():
     "markdown-answer", "fallback-blocked", "fallback-failed", "fallback-stale",
     "voice-status-401-fallback", "voice-fatal-fallback",
     "question-tiles", "question-tiles-denied", "action-tiles", "action-tiles-denied",
+    "color-theme", "palette-callback",
     *[f"confirm-{action}-{scenario}" for action in (
         "prepare", "propose", "approve", "execute", "continue", "cancel", "delete",
     ) for scenario in ("consent", "scope", "signout")],
@@ -690,8 +691,10 @@ function ui(id) {
 }
 ui("sign-in").disabled = true;
 const callbackMode = !["blocked", "pkce"].includes(mode);
+// palette-callback returns from sign-in with the view, scope and color theme carried in the OAuth state.
+const expectedState = mode === "palette-callback" ? "nonce.platform.project001-dev.purple" : "expected";
 let current = new URL("https://factory.example/" + (callbackMode
-  ? "?code=UNIT_TEST_CODE&state=" + (mode === "bad-state" ? "invalid" : "expected")
+  ? "?code=UNIT_TEST_CODE&state=" + (mode === "bad-state" ? "invalid" : expectedState)
   : mode === "pkce" ? "#scope=project001-dev&view=platform" : ""));
 let assigned;
 const historyCalls = [];
@@ -701,7 +704,7 @@ const location = {
   assign(url) { assigned = url; },
 };
 const storage = new Map(callbackMode
-  ? [["aifactory.oauth.state", "expected"], ["aifactory.oauth.verifier", "v".repeat(43)]] : []);
+  ? [["aifactory.oauth.state", expectedState], ["aifactory.oauth.verifier", "v".repeat(43)]] : []);
 const calls = [];
 let operationStatus = confirmationAction === "execute" ? "approved"
   : confirmationAction === "continue" ? "awaiting_continuation" : "pending";
@@ -778,7 +781,8 @@ const fallbackStatus = mode.startsWith("fallback-") ? {
 if (fallbackStatus) answer.knowledge_status = fallbackStatus;
 const response = (data) => ({ok: true, status: 200, json: async () => data});
 const sandbox = {
-  document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text)},
+  document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text),
+    documentElement: new Element("html")},
   location, history: {replaceState(_, __, url) { historyCalls.push(url); current = new URL(url, current); }},
   crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder, TextDecoder,
   Event: class { constructor(type) { this.type = type; } },
@@ -872,6 +876,7 @@ async function consent() {
     assert.equal(ui("sign-in").disabled, true);
     assert.equal(ui("propose").disabled, true);
     await waitFor(() => ui("setup-message").textContent.includes("tokens cannot be pasted"));
+    assert.equal(ui("setup-blocker").hidden, false, "a blocked setup stays visible");
     assert.equal(calls.length, 1);
   } else if (mode === "pkce") {
     await dispatch(ui("sign-in"), "click");
@@ -883,7 +888,7 @@ async function consent() {
     assert.equal(url.searchParams.get("response_type"), "code");
     assert.equal(url.searchParams.get("code_challenge_method"), "S256");
     assert.equal(url.searchParams.get("state"), storage.get("aifactory.oauth.state"));
-    assert.equal(url.searchParams.get("state").split(".").slice(1).join("."), "platform.project001-dev");
+    assert.equal(url.searchParams.get("state").split(".").slice(1).join("."), "platform.project001-dev.gray-blue");
     assert.equal(url.searchParams.get("code_challenge"), createHash("sha256")
       .update(storage.get("aifactory.oauth.verifier")).digest("base64url"));
     assert.deepEqual([...storage.keys()].sort(), ["aifactory.oauth.state", "aifactory.oauth.verifier"]);
@@ -895,6 +900,11 @@ async function consent() {
     assert(!calls[0].location.includes("code"));
   } else {
     await waitFor(() => calls.some(call => call.url === "/api/operations") && !ui("scope-selector").disabled);
+    assert.notEqual(ui("setup-blocker").hidden, false, "a configured page shows no setup notice");
+    if (mode === "authenticated") {
+      await waitFor(() => ui("knowledge-status").textContent === "Ready · refresh time not reported", "short ready status");
+      assert(ui("knowledge-status").title.includes("indexed: 10"), "detail stays in the tooltip");
+    }
     assert.equal(storage.size, 0);
     assert(!current.search.includes("code"));
     assert(!calls[0].location.includes("code"));
@@ -906,24 +916,60 @@ async function consent() {
     assert.equal(exchangeBody.has("client_secret"), false);
     assert(calls.filter(call => call.url.startsWith("/api/") && call.url !== "/api/public-config")
       .every(call => call.options.headers.Authorization === "Bearer UNIT_TEST_ACCESS_TOKEN"));
-    if (mode.startsWith("question-tiles")) {
-      const tiles = descendants(ui("question-examples")).filter(child => child.tagName === "button");
-      assert.equal(tiles.length, 6);
-      const labels = tiles.map(tile => tile.textContent).join(" ");
-      for (const topic of ["Private", "Onboarding", "Project team", "Updates", "idle", "ML template"])
-        assert(labels.includes(topic), topic);
+    if (mode === "color-theme") {
+      assert.equal(sandbox.document.documentElement["data-palette"], "gray-blue", "Gray and Blue is the default");
+      assert.equal(ui("color-theme").value, "gray-blue");
       const before = calls.length;
-      for (const tile of tiles) {
-        assert.equal(tile.disabled, mode === "question-tiles-denied");
-        await dispatch(tile, "click");
-        if (tile.disabled) { assert.equal(ui("question").value, ""); continue; }
-        assert(ui("question").value.includes("active scope"));
-        assert.equal(ui("question-count").textContent, ui("question").value.length + " / 8000 characters");
-        assert.equal(sandbox.document.activeElement, ui("question"));
-        assert.equal(ui("ask").disabled, false);
+      ui("color-theme").value = "purple";
+      await dispatch(ui("color-theme"), "change");
+      assert.equal(sandbox.document.documentElement["data-palette"], "purple");
+      assert.equal(new URLSearchParams(current.hash.slice(1)).get("palette"), "purple", "choice survives a reload");
+      ui("color-theme").value = "<script>";
+      await dispatch(ui("color-theme"), "change");
+      assert.equal(sandbox.document.documentElement["data-palette"], "purple", "unknown palettes are ignored");
+      assert.equal(calls.length, before, "a color theme change never calls the Agent API");
+    } else if (mode === "palette-callback") {
+      assert.equal(sandbox.document.documentElement["data-palette"], "purple", "sign-in keeps the chosen color theme");
+      assert.equal(ui("color-theme").value, "purple");
+      assert.equal(ui("view-platform")["aria-pressed"], "true");
+      assert.equal(descendants(ui("question-examples")).filter(child => child.tagName === "button")[0]
+        .children[0].textContent, "Core team responsibilities", "the restored view selects the platform tiles");
+    }
+    if (mode.startsWith("question-tiles")) {
+      const tilesFor = () => descendants(ui("question-examples")).filter(child => child.tagName === "button");
+      const labelsFor = () => tilesFor().map(tile => tile.children[0].textContent);
+      const prompts = [];
+      const expected = {
+        project: ["Project team responsibilities", "ML Factory: use case templates", "Agent Factory: use case templates",
+          "Default project idle costs", "Tutorial videos: use case templates", "Ops: DataOps, MLOps, GenAIOps",
+          "Dev to Stage to Production: CI/CD", "Dashboards: usage, cost, FinOps, health"],
+        platform: ["Core team responsibilities", "Onboarding", "Set up a Factory: private bootstrap",
+          "Update a Factory: releases and history", "Dashboards, FinOps, health models", "AI gateways: APIM, Kong, …",
+          "Tools and walkthrough videos", "Docs, dual knowledge graphs, Factory MCP"],
+      };
+      for (const audience of ["project", "platform"]) {
+        if (audience === "platform") await dispatch(ui("view-platform"), "click");
+        assert.deepEqual(labelsFor(), expected[audience], audience + " tiles follow the Explanation view");
+        const before = calls.length;
+        for (const tile of tilesFor()) {
+          assert.equal(tile.disabled, mode === "question-tiles-denied");
+          await dispatch(tile, "click");
+          if (tile.disabled) { assert.equal(ui("question").value, ""); continue; }
+          assert(ui("question").value.startsWith("For the active scope"));
+          assert(ui("question").value.length <= 8000);
+          prompts.push(ui("question").value);
+          assert.equal(ui("question-count").textContent, ui("question").value.length + " / 8000 characters");
+          assert.equal(sandbox.document.activeElement, ui("question"));
+          assert.equal(ui("ask").disabled, false);
+        }
+        assert.equal(calls.length, before, "example questions must never submit automatically");
+        assert.equal(ui("confirmation-dialog").open, false);
       }
-      assert.equal(calls.length, before, "example questions must never submit automatically");
-      assert.equal(ui("confirmation-dialog").open, false);
+      assert.equal(new Set([...expected.project, ...expected.platform]).size, 16, "audiences share no tile");
+      assert.equal(new Set(prompts).size, prompts.length, "every tile asks its own question");
+      assert(!labelsFor().includes("ML template types"), "renamed to ML Factory: use case templates");
+      await dispatch(ui("view-project"), "click");
+      assert.deepEqual(labelsFor(), expected.project);
     } else if (mode.startsWith("action-tiles")) {
       await waitFor(() => calls.some(call => call.url.startsWith("/api/skills?")));
       const tiles = descendants(ui("action-tiles")).filter(child => child.tagName === "button");
@@ -1142,7 +1188,7 @@ async function consent() {
       await waitFor(() => ui("knowledge-status").textContent.includes(expected));
       assert(!ui("knowledge-status").textContent.includes("Knowledge ready"));
       assert(ui("knowledge-status").textContent.includes("approved operator"));
-      if (mode === "out-of-sync") assert(ui("knowledge-status").textContent.includes("Search confirms: 9"));
+      if (mode === "out-of-sync") assert(ui("knowledge-status").title.includes("Search confirms: 9"));
     } else if (mode === "cancel-disabled") {
       await waitFor(() => ui("proposed-plans").textContent.includes("Configuration writes are disabled"));
       assert(!ui("proposed-plans").textContent.includes("Approve this exact"));
@@ -1232,7 +1278,8 @@ async function consent() {
         await waitFor(() => ui("answer").textContent.includes("steal"));
         if (fallbackStatus) {
           assert(ui("knowledge-status").textContent.includes("Using last successful"));
-          assert(!ui("knowledge-status").textContent.includes("corpus age: fresh"));
+          assert(/ · Last refreshed: 2001-01-0[12] \d\d:\d\d$/.test(ui("knowledge-status").textContent));
+          assert(!ui("knowledge-status").title.includes("corpus age: fresh"));
           assert(ui("request-status").textContent.includes(fallbackStatus.warning));
           assert(ui("answer-context").textContent.includes("committed-snapshot"));
           assert(ui("answer-context").textContent.includes(fallbackStatus.refreshed_at));
@@ -1530,6 +1577,13 @@ async function ask() {
     assert.equal(sandbox.document.documentElement["data-theme"], "dark");
     listener({data: {type: "esaif.agentChat.theme", version: 1, theme: "<script>"}});
     assert.equal(sandbox.document.documentElement["data-theme"], "dark");
+    assert.equal(sandbox.document.documentElement["data-palette"], "gray-blue", "Gray and Blue is the default");
+    listener({data: {type: "esaif.agentChat.theme", version: 1, theme: "light", palette: "purple"}});
+    assert.equal(sandbox.document.documentElement["data-theme"], "light");
+    assert.equal(sandbox.document.documentElement["data-palette"], "purple");
+    assert.equal(ui("color-theme").value, "purple");
+    listener({data: {type: "esaif.agentChat.theme", version: 1, theme: "dark", palette: "<script>"}});
+    assert.equal(sandbox.document.documentElement["data-palette"], "purple", "unknown palettes are ignored");
   }
   await ask();
   if (mode === "host-401" || mode === "host-401-text") {

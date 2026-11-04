@@ -174,7 +174,7 @@ def test_status_requires_sign_in_and_reports_capabilities(app):
         body = client.get("/api/voice/status").json()
     assert body["enabled"] is True and body["ready"] is True and body["protocol"] == 1
     assert body["audio"] == {"encoding": "pcm16", "sample_rate": 24000, "channels": 1}
-    assert body["voice"] == {"name": "en-US-Ava:DragonHDLatestNeural", "languages": ["en-US"]}
+    assert body["voice"] == {"name": "en-US-Ava:DragonHDLatestNeural", "languages": ["en-US"], "multilingual": False}
     assert body["limits"] == {"max_session_seconds": 900, "idle_timeout_seconds": 120}
     assert "secret" not in json.dumps(body).lower() and "endpoint" not in json.dumps(body).lower()
     assert body["embedded_voice_version"] == 0
@@ -601,3 +601,13 @@ def test_configured_third_language_is_accepted_but_unconfigured_language_is_refu
             refused = collect(socket, ended)
             assert refused[0]["code"] == "invalid_hello"
     assert len(app.state.voice_gateway.upstreams) == 1
+
+
+@pytest.mark.parametrize("multilingual", [False, True])
+def test_voice_status_reports_whether_native_voice_understands_any_spoken_language(conversation, multilingual):
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini", multilingual=multilingual,
+                             input_languages=["sv-SE", "en-US"] if multilingual else ["en-US"])
+    app = build(settings, conversation, FakeGateway())
+    with TestClient(app) as client:
+        status = client.get("/api/voice/status", headers={"Authorization": "Bearer " + GOOD}).json()
+        assert status["voice"]["multilingual"] is multilingual

@@ -18,9 +18,11 @@ and discovered resources always come from the pipeline and Azure.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -29,6 +31,7 @@ from typing import Callable, Mapping, Protocol
 from urllib.parse import quote, urlencode
 
 from .azure import ARM, AzureError
+from .deployer_access import blob_container_contributor, foundry_user, search_index_contributor
 from .factory_chat_agent import AGENT_NAME, AI_AUDIENCE, MODEL_NAME, OWNER
 from .factory_chat_agent import API_VERSION as AGENT_API_VERSION
 from .mcp_gateway import GUID, KNOWLEDGE_EXCLUDES, KNOWLEDGE_INCLUDES, flag
@@ -51,6 +54,8 @@ COGNITIVE_API = "2025-06-01"
 APPS_API = "2025-01-01"
 VOICE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
 LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+
+STORAGE_CONTAINER = "aifactory-agent"  # the agent's own container (knowledge state, deployment bundles)
 
 
 class CommandError(RuntimeError):
@@ -294,8 +299,10 @@ def check_existing_app(session: ArmPort, group_id: str, request: LiveVoiceReques
                          "or remove the app and let this step create it.")
 
 
-def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
-    """Resolve the project's actual Foundry, data and Container Apps resources (GET only)."""
+def discover(session: ArmPort, request: LiveVoiceRequest,
+             before_data_plane: Callable[[list], None] | None = None) -> Target:
+    """Resolve the project's actual Foundry, data and Container Apps resources (GET only). before_data_plane receives
+    the data-plane access needs (deployer_access) once the resources are known and before the first data-plane call."""
     group_id = f"/subscriptions/{request.subscription_id}/resourceGroups/{request.resource_group}"
     check_existing_app(session, group_id, request)
     resources = session.pages(f"{ARM}{group_id}/resources?api-version={RESOURCES_API}")
@@ -342,6 +349,9 @@ def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
     environment = session.arm("GET", environment["id"], api_version="2024-03-01")
     if not ((environment.get("properties") or {}).get("vnetConfiguration") or {}).get("internal"):
         raise ValueError("The agent stays private: the selected Container Apps environment must be internal (VNet-integrated).")
+    if before_data_plane is not None:
+        before_data_plane([foundry_user(account["id"]), blob_container_contributor(data[0]["id"], STORAGE_CONTAINER),
+                           search_index_contributor(search["id"])])
     agent_version = verify_agent(session, endpoint.rstrip("/"))
     insights = of_type("Microsoft.Insights/components")
     model = chat["properties"]["model"]
@@ -372,7 +382,7 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
         "model_version": target.model["version"], "model_sku": target.model["sku"],
         "model_capacity": target.model["capacity"], "embedding_deployment": target.embedding,
         "search_endpoint": f"https://{target.search_name}.search.windows.net", "search_index": "enterprise-scale-ai-factory-v1",
-        "storage_endpoint": f"https://{target.storage_name}.blob.core.windows.net", "storage_container": "aifactory-agent",
+        "storage_endpoint": f"https://{target.storage_name}.blob.core.windows.net", "storage_container": STORAGE_CONTAINER,
         "credential": "cli",
     }
     if target.insights_name:
@@ -431,21 +441,29 @@ class Report:
     actions: list[dict] = field(default_factory=list)
     outputs: dict = field(default_factory=dict)
     prerequisites: list[str] = field(default_factory=list)
+    deployer_access: list[dict] = field(default_factory=list)
 
     def add(self, resource: str, action: str, detail: str = "") -> None:
         self.actions.append({"resource": resource, "action": action, **({"detail": detail} if detail else {})})
 
     def to_dict(self) -> dict:
         return {"mode": self.mode, "actions": self.actions, "outputs": self.outputs,
-                "prerequisites": self.prerequisites, "mutations": self.mode == "apply"}
+                "prerequisites": self.prerequisites, "deployer_access": self.deployer_access,
+                "mutations": self.mode == "apply"}
 
 
 class LiveVoiceIntegration:
     """Dependency-injected orchestration: plan (Azure GET only) or apply (the agent's own owned writes)."""
 
     def __init__(self, session: ArmPort, runner: Runner, *, work_dir: Path, repository_root: Path,
-                 agent_dir: Path | None = None):
-        self.session, self.runner = session, runner
+                 agent_dir: Path | None = None, access=None, cache_dir: Path | None = None):
+        # access (deployer_access.DeployerAccess) grants the deploying principal its Foundry, blob and Search data
+        # roles before the first data-plane call; None skips it (the caller already holds them).
+        self.session, self.runner, self.access = session, runner, access
+        # cache_dir keeps the operator virtual environment and the Linux wheels per lock file outside the checkout (a
+        # pipeline checkout is fresh each run), so repeated deployments skip both pip steps; None keeps everything in
+        # the run's own work directory and the checkout's .build/wheels.
+        self.cache_dir = Path(cache_dir) if cache_dir is not None else None
         self.work_dir, self.repository_root = Path(work_dir), Path(repository_root)
         self.agent_dir = agent_dir or Path(__file__).resolve().parents[1] / "40-aifactory-agent"
 
@@ -455,15 +473,24 @@ class LiveVoiceIntegration:
         sdk = str(self.repository_root / "environment_setup" / "azurefactory-cli" / "src")
         return {"PYTHONPATH": os.pathsep.join(item for item in (sdk, os.environ.get("PYTHONPATH", "")) if item)}
 
-    def _steps(self, request: LiveVoiceRequest, target: Target, config: Path) -> list[tuple[str, str, list]]:
-        env_dir = self.work_dir / "agent-env"
+    def _steps(self, request: LiveVoiceRequest, target: Target, config: Path, *,
+               skip_knowledge: bool = False) -> tuple[list[tuple[str, str, list]], list[tuple[str, str, str]], dict]:
+        """Steps to run, steps not needed (resource, action, detail) and the ready markers each step earns."""
+        lock = (hashlib.sha256((self.agent_dir / "requirements.lock.txt").read_bytes()).hexdigest()[:16]
+                if self.cache_dir is not None else "")
+        env_dir = self.cache_dir / f"agent-env-{lock}" if self.cache_dir is not None else self.work_dir / "agent-env"
         python = str(env_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
-        return [
+        wheels = str(self.cache_dir / f"wheels-{lock}") if self.cache_dir is not None else ".build/wheels"
+        ready = {} if self.cache_dir is None else {
+            "python environment": env_dir / ".aifactory-ready",
+            "wheel download": Path(wheels) / ".aifactory-ready",
+        }
+        steps = [
             ("isolated python environment", "python environment", [
                 [sys.executable, "-m", "venv", str(env_dir)],
                 [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "-r", "requirements.lock.txt"]]),
             ("linux wheels for the bundle", "wheel download", [
-                [python, "-m", "pip", "download", "--quiet", "--disable-pip-version-check", "--dest", ".build/wheels",
+                [python, "-m", "pip", "download", "--quiet", "--disable-pip-version-check", "--dest", wheels,
                  "--platform", "manylinux2014_x86_64", "--platform", "manylinux_2_28_x86_64", "--python-version", "312",
                  "--implementation", "cp", "--abi", "cp312", "--only-binary", ":all:", "-r", "requirements.lock.txt",
                  "pip==25.3"]]),
@@ -472,15 +499,34 @@ class LiveVoiceIntegration:
                                               target.environment_name, "--app-name", app_name(request),
                                               "--integration", INTEGRATION, "--apply"]]),
         ]
+        skipped = []
+        for resource, marker, _ in list(steps):
+            if marker in ready and ready[marker].is_file() and ready[marker].read_text(encoding="utf-8") == lock:
+                skipped.append((resource, "reused", f"cached for requirements.lock.txt {lock}"))
+            elif marker == "ingest" and skip_knowledge:
+                skipped.append((resource, "skipped", "the application keeps the last committed index; its refresh job updates it"))
+            else:
+                continue
+            steps = [step for step in steps if step[1] != marker]
+        return steps, skipped, {marker: (path, lock) for marker, path in ready.items()}
 
-    def run(self, request: LiveVoiceRequest, *, apply: bool) -> dict:
+    def _stage_wheels(self, source: Path) -> None:
+        """deploy.py bundles the checkout's .build/wheels: refill it with exactly this lock file's cached wheels."""
+        target = self.agent_dir / ".build" / "wheels"
+        shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True)
+        for wheel in source.glob("*.whl"):
+            shutil.copy2(wheel, target / wheel.name)
+
+    def run(self, request: LiveVoiceRequest, *, apply: bool, skip_knowledge: bool = False) -> dict:
         decision = decide(request)
         report = Report("apply" if apply else "plan")
         if not decision.act:
             report.add("ai-factory-agent-live-voice", "skipped", decision.reason)
             report.mode = "skipped"
             return report.to_dict()
-        target = discover(self.session, request)
+        grant = (lambda needs: report.deployer_access.extend(self.access.ensure(needs, apply=apply))) if self.access else None
+        target = discover(self.session, request, before_data_plane=grant)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         config = self.work_dir / "config.json"
         config.write_text(json.dumps(render_config(request, target, repository_root=self.repository_root), indent=2),
@@ -508,17 +554,26 @@ class LiveVoiceIntegration:
                    "deploy.py": "owned identity, runtime and Voice Live roles, private Container App and refresh job; "
                                 "refuses unowned resources"}
         outputs: dict = {}
-        for resource, marker, commands in self._steps(request, target, config):
+        steps, skipped, ready = self._steps(request, target, config, skip_knowledge=skip_knowledge)
+        for resource, action, detail in skipped:
+            report.add(resource, action, detail)
+        for resource, marker, commands in steps:
             if not apply:
                 report.add(resource, "would run", details.get(marker, ""))
                 continue
             result = ""
+            if marker == "deploy.py" and "wheel download" in ready:
+                self._stage_wheels(ready["wheel download"][0].parent)
             for command in commands:
                 try:
                     result = self.runner(command, cwd=self.agent_dir, env=self._command_env())
                 except CommandError as error:
                     raise CommandError(f"{resource} failed ({error})") from None
             report.add(resource, "ran", details.get(marker, ""))
+            if marker in ready:
+                path, lock = ready[marker]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(lock, encoding="utf-8")
             parsed = _last_json(result)
             if marker == "ingest":
                 outputs["knowledge"] = {key: parsed.get(key) for key in ("status", "indexed_document_count")}

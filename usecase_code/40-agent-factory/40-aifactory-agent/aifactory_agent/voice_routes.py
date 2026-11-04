@@ -272,7 +272,8 @@ def register_voice(app: FastAPI) -> None:
             "enabled": True, "ready": ready, "unavailable_reason": None if ready else "websockets_missing",
             "protocol": PROTOCOL_VERSION,
             "audio": {"encoding": "pcm16", "sample_rate": SAMPLE_RATE, "channels": 1},
-            "voice": {"name": current.voice.voice_name, "languages": list(current.voice.input_languages)},
+            "voice": {"name": current.voice.voice_name, "languages": list(current.voice.input_languages),
+                      "multilingual": current.voice.multilingual},
             "limits": {"max_session_seconds": current.voice.max_session_seconds,
                        "idle_timeout_seconds": current.voice.idle_timeout_seconds},
         }

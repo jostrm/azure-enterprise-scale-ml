@@ -486,11 +486,19 @@ currency separation, forecast double-counting and unavailable data.
 
 ## Private application deployment
 
-The web interface follows the light/dark palette from the MAUI Config Wizard's
-`ThemePaletteCatalog`: purple primary actions, lavender selected surfaces and
-the same semantic status colors. The system theme is respected unless
-`?scoutTheme=light` or `?scoutTheme=dark` explicitly selects a mode. Error red
-is reserved for actual errors, not normal action buttons.
+The web interface follows the palettes in the MAUI Config Wizard's
+`ThemePaletteCatalog`. A **Color theme** selector below **Sign in** chooses
+**Gray and Blue** (the default; its dark values are the app's `GrayAndBlue`
+palette) or **Purple** (purple primary actions, lavender selected surfaces).
+Both palettes keep the same semantic status colors and work in light and dark
+mode. The system mode is respected unless `?scoutTheme=light` or
+`?scoutTheme=dark` explicitly selects one. The color theme comes from the
+page's own choice (kept in the URL fragment as `palette=`, and carried through
+sign-in in the OAuth state, never in browser storage), then the embedding app's
+`?scoutPalette=gray-blue|purple`, then Gray and Blue. The embedded app can
+change it live with the `esaif.agentChat.theme` message's optional `palette`
+field; unknown values are ignored. Error red is reserved for actual errors,
+not normal action buttons.
 
 Answers render Markdown headings, emphasis, nested lists, tables, blockquotes
 and code, with evidence markers linked to the corresponding source entries.
@@ -602,7 +610,11 @@ the verification trade-off described below.
   As in typed chat, a failed read tool (`ok: false`) goes back to the model as
   data and is logged as `voice_tool_failed` with its error code only; a denied
   tool and bounded-round exhaustion stop the turn. The model can never approve or
-  execute writes.
+  execute writes. A native tool call starts as soon as its arguments are complete
+  (`response.output_item.done`), while the model may still be speaking, and
+  independent calls in one response run concurrently. Each call is still authorized
+  and audited, runs exactly once and stays inside the round limit. Its output reaches
+  the model only after `response.done` has listed the whole response.
 - The browser never receives Foundry credentials. It opens
   `WS /api/voice/ws` on the application; the backend connects to
   `wss://<foundry-account>.services.ai.azure.com/voice-live/realtime` with its
@@ -614,7 +626,15 @@ the verification trade-off described below.
   the token that opened them) and replaces a user's older session with the newer one. The browser cannot choose the model, voice,
   instructions or tools. It can select only an operator-configured language profile.
 - Speaking while the agent answers (barge-in) cancels the pending answer and the
-  speech. Tokens and transcripts are never logged; errors shown to the browser
+  speech. Speech is generated faster than real time, so the browser can still be
+  playing an answer that has finished generating. The relay estimates playback from
+  the audio it relayed (PCM16 bytes / 48,000 per second, plus a 0.5 s margin) and
+  flushes the browser's queue whenever the user starts speaking before that
+  estimate runs out. The server never interrupts or answers on its own
+  (`interrupt_response` and `create_response` stay off). The next grounded turn
+  deletes the interrupted answer from the Voice Live conversation before it creates
+  a new response, so the model never builds on speech the user did not hear.
+  Tokens and transcripts are never logged; errors shown to the browser
   carry no internal detail.
 - Voice failures (including a status 401 or voice-only authentication error) never
   clear or renew the text token. **Use typed chat** focuses the existing form,
@@ -647,11 +667,12 @@ reuse the current text session rather than acquiring a separate token.
 | `model` | `gpt-4.1-nano` | Shell billing tier; native mode requires `gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`. Approve regional availability and processing scope separately. |
 | `voice_name` | `en-US-Ava:DragonHDLatestNeural` | Fixed for the whole session. |
 | `voice_type` | `azure-standard` | `openai` with an approved native voice (for example `coral`) produces model-native audio. `azure-standard` selects Azure synthesis within Voice Live instead. |
-| `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). |
+| `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). Realtime mode allows exactly one unless `multilingual` is on; then they are hints and the first one is the fallback. |
+| `multilingual` | `false` | Realtime only. Understands any spoken language and replies in the user's language (see below). |
 | `turn_detection` | `azure_semantic_vad` | Also `azure_semantic_vad_multilingual`, `server_vad`; `silence_duration_ms` 500. |
 | `max_session_seconds` / `idle_timeout_seconds` | `900` / `120` | Session bounds. |
 | `max_concurrent_sessions` | `4` | Per application replica. |
-| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 1024 output tokens. Deadline covers native preparation, tools and response. |
+| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 4096 output tokens (model-native audio counts toward the cap; an answer cut by it keeps playing and is published with `spoken_truncated: true`). Deadline covers native preparation, tools and response. |
 | `greeting` | "Factory Agent online. How can I help?" | Shell speaks it; native displays it without a separate synthesis request. `null` disables it. |
 | `default_language` / `language_profiles` | `en-US` / `{}` | Optional server-owned BCP-47 locale profiles; each specifies `voice_name`, optional `voice_type`, optional `greeting`. The default must be a configured profile. |
 | `allowed_origins` | `[]` | Extra browser origins; same-origin is always allowed. |
@@ -719,6 +740,28 @@ VAD is not used for Swedish). The reply language is server-selected instructions
 the browser cannot send arbitrary instructions or a voice name. Voice is fixed
 after the first speech, so the selector starts a fresh voice session.
 
+**Multilingual realtime (opt-in).** By default a realtime session listens and
+replies in one language. Set `"multilingual": true` to let users speak any language
+the native model supports without picking one first:
+
+- Transcription omits the language, so `gpt-4o-mini-transcribe` detects it per
+  utterance (it is still only the retrieval query).
+- The model is told to reply in the language of the user's latest utterance.
+  `input_languages` (several allowed, for example `["sv-SE", "en-US"]`) are listed
+  as expected languages, and the first one is used when the language is unclear.
+- Turn detection is `azure_semantic_vad_multilingual`, which Voice Live supports
+  with all models, including `gpt-realtime` and `gpt-realtime-mini`. Set
+  `"turn_detection": "server_vad"` to keep the volume-based fallback.
+- With `language_profiles`, the selected profile still chooses the voice and
+  greeting and is the fallback language, but it no longer limits what the user
+  may speak. `GET /api/voice/status` reports `voice.multilingual`, and the voice
+  card says that any language works.
+- Use a voice that can speak every language you expect: the native `openai`
+  voices (for example `coral`) or Azure Multilingual/HD voices.
+
+Without `multilingual`, behaviour is unchanged: one language per session,
+`server_vad`, and transcription pinned to that language.
+
 If you prefer a specifically Swedish Azure synthesis voice, configure the Swedish
 profile as `{"voice_type":"azure-standard","voice_name":"sv-SE-SofieNeural"}`.
 This is Azure TTS **within Voice Live**, not native model audio; there is still no
@@ -737,11 +780,14 @@ retrieval/embedding costs. HD voices are regional. Sessions are bounded by
 Native turns isolate conversation history because their citation identifiers are
 question-local. Each prepared turn pins retrieval and knowledge-status tools to
 the same complete committed snapshot, including explicitly warned last-successful
-fallback. No browser playback-clock acknowledgement is available. Canceled read-only worker calls
+fallback. No browser playback-clock acknowledgement is available; barge-in uses the
+relay's playback estimate described above. Canceled read-only worker calls
 may finish in their thread, but their results cannot resume a canceled turn.
 The native first-audio histogram `aifactory.voice.first_audio.duration` and safe
 `voice_first_audio` log measure end-of-speech to the first relayed audio frame;
-they do not measure browser speaker playback. Compare warmed English/Swedish
+they do not measure browser speaker playback. Grounding runs before any native
+speech, by design. Its cost is logged as `voice_grounding_ready ... latency_ms=` and
+recorded in `aifactory.voice.grounding.duration`. Compare warmed English/Swedish
 median/p95 and interrupted turns on the approved private network after deployment.
 Initial transcription, readiness, Search, optional embeddings/graph queries, tools,
 network and cold-start latency remain; no sub-second claim is made from fake tests.
@@ -914,7 +960,13 @@ named skills. These are agent capabilities, not shell aliases or automatic
 permissions:
 
 Example-question tiles fill and focus the question box; they never send a
-question automatically. Action shortcuts select the existing scoped form,
+question automatically. The **Explanation view** selects the tiles: eight for
+the platform team (core team responsibilities, onboarding, setting up and
+updating a Factory, dashboards and FinOps, AI gateways, tools and walkthrough
+videos, docs, dual knowledge graphs and the Factory MCP) and eight for project
+teams (responsibilities, ML and Agent Factory use case templates, idle costs,
+template walkthrough videos, DataOps/MLOps/GenAIOps, Dev to Production CI/CD
+and dashboards). The view changes explanations, never permissions. Action shortcuts select the existing scoped form,
 not an execution endpoint. An accessible **Are you sure?** dialog, with Cancel
 as the default, is required before preparing a plan, approving its hash,
 executing, continuing or cancelling. The dialog shows the exact target,
@@ -1065,8 +1117,10 @@ Closing a progress feed does not cancel a job.
 - Refresh the approved corpus after documentation/release changes. Rebuild the
   immutable bundle after application or dependency changes.
 - Keep the previous agent version, bundle hash and Container Apps revision.
-  Revert `agent_version` and shift traffic to the known-good revision for an
-  application rollback. This does not roll back a Factory operation.
+  The app runs one active revision: a deploy retires the previous one once the
+  new one is ready, so no idle replicas keep billing. For an application
+  rollback, revert `agent_version` and reactivate the known-good revision with
+  `az containerapp revision activate`. This does not roll back a Factory operation.
 - Application Insights integration can be configured using
   `azure.application_insights_connection_string`. Capture health, retrieval/tool
   errors, latency and model token usage without prompt bodies or credentials.
@@ -1117,4 +1171,4 @@ replay/concurrency, corpus changes/deletions, failure-safe manifests and portabi
 ```
 
 See `deployment-status.json` for observed deployment/evaluation evidence and the
-explicit separation between demonstrated, unexercised and blocked capabilities.
+explicit separation between demonstrated, unexercised and blocked capabilities.

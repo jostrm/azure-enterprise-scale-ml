@@ -176,6 +176,12 @@ class FakeSearch:
     def get_document_count(self):
         return len(self.docs)
 
+    def get_document(self, key, selected_fields=None):
+        if key not in self.docs:
+            raise ResourceNotFoundError()
+        document = copy.deepcopy(self.docs[key])
+        return {field: document.get(field) for field in selected_fields} if selected_fields else document
+
 
 class FakeEmbeddings:
     def __init__(self, dimensions):
@@ -272,6 +278,72 @@ def test_snapshot_pins_generation_across_promotion_and_in_progress_read(knowledg
     knowledge.embedding_client.create = original_create
     pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
     assert "Old committed" in pinned.search("question", "project001-dev")[0]["content"]
+
+
+def test_a_fresh_snapshot_search_scans_the_index_once_after_the_query(knowledge, settings):
+    # Voice latency: a full-index scan costs ~2 s live. The snapshot was just verified, and the scan after the query
+    # still proves the evidence came from that snapshot, so a scan before the query adds latency and no guarantee.
+    write(settings, "guide.md", "# Original\nCommitted text.\n")
+    knowledge.refresh()
+    pinned = knowledge.snapshot()
+    pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
+    original, order = pinned.client.search, []
+
+    def search(**options):
+        order.append("scan" if options.get("search_text") == "*" else "query")
+        return original(**options)
+
+    pinned.client.search = search
+    assert "Committed" in pinned.search("question", "project001-dev")[0]["content"]
+    assert order == ["query", "scan"]
+
+
+def test_a_change_during_the_query_is_still_detected_by_the_scan_after_it(knowledge, settings):
+    write(settings, "guide.md", "# Original\nCommitted text.\n")
+    knowledge.refresh()
+    pinned = knowledge.snapshot()
+    pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
+    original = pinned.client.search
+
+    def search(**options):
+        rows = original(**options)
+        if options.get("search_text") != "*":
+            pinned.client.docs.clear()
+        return rows
+
+    pinned.client.search = search
+    with pytest.raises(IndexingError):
+        pinned.search("question", "project001-dev")
+
+
+def test_unstable_wildcard_paging_is_not_mistaken_for_duplicate_documents(knowledge, settings, monkeypatch):
+    # Azure AI Search keys are unique, but an unsorted "*" query pages without a stable order: a page can repeat one
+    # document and skip another. The repeat is de-duplicated and the skipped document is waited for (a fresh scan).
+    from aifactory_agent import knowledge as module
+
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    write(settings, "guide.md", "# Original\nOld committed text.\n")
+    write(settings, "other.md", "# Other\nMore committed text.\n")
+    knowledge.refresh()
+    original_factory = knowledge._search_client_factory
+
+    def factory(name):
+        client = original_factory(name)
+        search, unstable_once = client.search, [True]
+
+        def unstable(**options):
+            rows = search(**options)
+            if options.get("search_text") == "*" and len(rows) > 1 and unstable_once.pop() if unstable_once else False:
+                return [rows[0], *rows[:-1]]
+            return rows
+
+        client.search = unstable
+        return client
+
+    knowledge._search_client_factory = factory
+    write(settings, "guide.md", "# Replacement\nNew committed text.\n")
+    assert knowledge.refresh()["status"] == "ready"
+    assert knowledge.status()["availability"] == "current"
 
 
 @pytest.mark.parametrize("delay", ["count", "rows", "timeout", "corruption"])
@@ -954,3 +1026,54 @@ def test_gitless_snapshot_reuses_only_proven_byte_identical_commit_citations(
     current = next(iter(knowledge.search_client.docs.values()))
     assert current["working_tree"] and current["source_url"].startswith("file:")
     assert current["source_revision"] is None
+
+
+
+def _embedded_inputs(knowledge):
+    return [text for call in knowledge.embedding_client.calls for text in call["input"]]
+
+
+def test_a_refresh_embeds_only_new_or_changed_text_and_reuses_cached_vectors(knowledge, settings):
+    # Every purple push changes some document; re-embedding all of them made each agent deploy take ~20 minutes.
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    write(settings, "other.md", "# Other\nMore committed text.\n")
+    first = knowledge.refresh()
+    assert first["status"] == "ready" and first["embedded_count"] == len(_embedded_inputs(knowledge)) >= 2
+    knowledge.embedding_client.calls.clear()
+    write(settings, "other.md", "# Other\nChanged committed text.\n")
+    second = knowledge.refresh()
+    embedded = _embedded_inputs(knowledge)
+    assert second["status"] == "ready" and embedded and all("Changed committed text." in text for text in embedded)
+    assert second["embedded_count"] == len(embedded) and second["reused_embedding_count"] >= 1
+    assert second["embedded_count"] + second["reused_embedding_count"] == second["uploaded_count"]
+
+
+def test_a_different_embedding_deployment_or_dimension_never_reuses_cached_vectors(knowledge, settings):
+    key = knowledge._embedding_key("text")
+    azure = settings.azure.model_copy(update={"embedding_deployment": "other-embedding"})
+    knowledge.settings = settings.model_copy(update={"azure": azure})
+    assert knowledge._embedding_key("text") != key
+
+
+def test_an_invalid_cached_vector_is_ignored_and_embedded_again(knowledge, settings):
+    from aifactory_agent import knowledge as module
+
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    knowledge.refresh()
+    blob = knowledge.container.blobs[module._EMBEDDING_CACHE]
+    cache = json.loads(blob.body)
+    cache["vectors"] = {key: "AAAAAA==" for key in cache["vectors"]}  # one float, not the configured dimensions
+    blob.body = json.dumps(cache).encode()
+    knowledge.embedding_client.calls.clear()
+    write(settings, "guide.md", "# Guide\nStable committed text, edited.\n")
+    result = knowledge.refresh()
+    assert result["status"] == "ready" and result["reused_embedding_count"] == 0
+
+
+def test_a_failed_cache_write_never_fails_the_committed_refresh(knowledge, settings, monkeypatch):
+    def broken(self, vectors):
+        raise OSError("storage unavailable")
+
+    write(settings, "guide.md", "# Guide\nStable committed text.\n")
+    monkeypatch.setattr(type(knowledge), "_write_embedding_cache", broken)
+    assert knowledge.refresh()["status"] == "ready"
