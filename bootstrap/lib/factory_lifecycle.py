@@ -2856,7 +2856,13 @@ def verify_project_inventory(cloud, document, removed=()):
                 == {key: value for key, value in expected.items() if key != "providers"},
                 "project-complete-inventory-changed")
     require(set(bodies) == set(data["bodies"]) - removed, "project-resource-closure-changed")
+    # A child the plan deletes through its parent is never sent a DELETE of its own: the platform may rewrite it while a
+    # dependency is deleted (aif-144 2026-11-05: an ACR private endpoint's privateLinkServiceProxies after the registry's
+    # private endpoint connection went), so its body protects nothing.
+    via_parent = {row["id"].lower() for row in data["resources"] if row.get("delete") and row.get("delete_via_parent")}
     for key, body in bodies.items():
+        if key in via_parent:
+            continue
         before = data["bodies"][key]
         backlinks = (str(before.get("type", "")).lower() in PROJECT_NETWORK_TYPES
                      and bool(resource_references((before.get("properties") or {}).get("subnets", [])) & removed))
