@@ -389,3 +389,38 @@ def test_retained_subnet_keeps_nsg_and_all_security_rules():
     plan = fl.freeze_project_deletion(cloud, document, {})
     retained = {item["id"].lower() for item in plan["resources"] if not item["delete"]}
     assert {SUBNET.lower(), nsg.lower(), rule.lower()} <= retained
+
+
+def test_receipt_body_drift_warns_and_the_receipt_still_proves_project_ownership(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): Scenario 3's update redeployed project resources after their receipt, and a
+    private endpoint's NIC cannot be tagged. Hash drift warns, never blocks: the verified receipt names this exact
+    resource id for this owner, the drift stays as review evidence and execution proves the same receipt again."""
+    document, cloud = prepared()
+    cloud.bodies[RESOURCE.lower()]["tags"] = {}
+    identifier = str(uuid4())
+    receipt = {"schema": 1, "run_id": identifier, "manifest_hash": "f" * 64,
+               "status": "succeeded", "target": document["target"],
+               "ownership": [{"resource_id": RESOURCE, "owner": OWNER,
+                              "body_hash": fl.resource_digest(cloud.bodies[RESOURCE.lower()])}]}
+    cloud.runs["runs/" + identifier + ".worker.json"] = receipt
+    cloud.bodies[RESOURCE.lower()]["properties"]["ipTags"] = ["updated-after-the-receipt"]
+    evidence = {"run_id": identifier, "receipt_hash": fl.digest(receipt)}
+    records = {RESOURCE.lower(): {"owner": OWNER, "ownership_source": "deployment-receipt",
+                                  "ownership_evidence": evidence}}
+    document["deletion"] = fl.freeze_project_deletion(cloud, document, records)
+    row = next(item for item in document["deletion"]["resources"] if item["id"].lower() == RESOURCE.lower())
+    assert row["delete"] and row["ownership_source"] == "deployment-receipt"
+    assert row["receipt_body_drift"] == {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
+    document = seal(document)
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert RESOURCE in result["deleted_resources"]
+    receipt["ownership"][0]["owner"] = {**OWNER, "scaleset_id": "another-scale-set"}
+    cloud.runs["runs/" + identifier + ".worker.json"] = receipt
+    records[RESOURCE.lower()]["ownership_evidence"] = {"run_id": identifier, "receipt_hash": fl.digest(receipt)}
+    with pytest.raises(fl.Blocked):
+        fl.freeze_project_deletion(cloud, prepared()[0], records)

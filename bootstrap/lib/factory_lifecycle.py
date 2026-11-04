@@ -2538,9 +2538,16 @@ def project_owner(cloud, document, body, records, cache):
     record = records.get(key, {})
     if record.get("ownership_source") == "deployment-receipt":
         evidence = record.get("ownership_evidence")
-        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache)
+        drift = []
+        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache,
+                                          drift)
         require(verified == record.get("owner"), "project-receipt-owner-mismatch")
-        return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+        proof = {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+        if drift:
+            # Hash drift warns, never blocks (aif-145 Scenario 4): an update redeployed the resource after its
+            # receipt, or the platform owns its body (a private endpoint's NIC); the drift stays as review evidence.
+            proof["receipt_body_drift"] = {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
+        return proof
     return {"owner": {}, "ownership_source": "retained-unowned"}
 
 
@@ -2763,7 +2770,8 @@ def verify_project_inventory(cloud, document, removed=()):
             verify_ownership(bodies[key], item["owner"])
         elif item.get("ownership_source") == "deployment-receipt":
             require(verified_receipt_owner(coordination(cloud, document), item["ownership_evidence"], key,
-                    item["body_hash"], cache) == item["owner"], "project-ownership-receipt-changed")
+                    item["body_hash"], cache, [] if "receipt_body_drift" in item else None) == item["owner"],
+                    "project-ownership-receipt-changed")
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
     return bodies
@@ -2825,7 +2833,9 @@ def enrollment_grant(resource_id, body, document, scopes):
             and key.startswith(scope + "/providers/microsoft.authorization/roleassignments/"))
 
 
-def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
+def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache, drift=None):
+    """The owner a verified worker receipt records for exactly this resource id. With a `drift` list, a body hash
+    that changed after the receipt is appended there as a warning instead of blocking."""
     require(isinstance(evidence, dict) and guid(evidence.get("run_id"))
             and hash_value(evidence.get("receipt_hash")), "child-ownership-evidence-required")
     cache_key = (evidence["run_id"], evidence["receipt_hash"])
@@ -2839,7 +2849,10 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
     receipt = cache[cache_key]
     records = receipt.get("resource_groups", []) if RG_ID.fullmatch(resource_id) else receipt.get("ownership", [])
     matches = [row for row in records if row.get("resource_id", "").lower() == resource_id.lower()]
-    require(len(matches) == 1 and matches[0].get("body_hash") == body_hash, "child-instance-ownership-unverified")
+    require(len(matches) == 1, "child-instance-ownership-unverified")
+    if matches[0].get("body_hash") != body_hash:
+        require(drift is not None, "child-instance-ownership-unverified")
+        drift.append(resource_id)
     owner = matches[0].get("owner")
     require(isinstance(owner, dict) and all(receipt.get("target", {}).get(key) == owner.get(key)
                                           for key in ("factory_id", "scaleset_id")),
