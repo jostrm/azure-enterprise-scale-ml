@@ -2225,17 +2225,30 @@ def inherited_new_resource_owner(resource_id, bodies):
 UNTAGGABLE_GROUP_EXTENSIONS = {"microsoft.authorization/roleassignments"}
 
 
+def endpoint_managed_nic_parent(key, bodies):
+    """The private endpoint whose NIC this is: Azure creates, owns and deletes that NIC with the endpoint and refuses
+    any write to it (CannotModifyNicAttachedToPrivateEndpoint, aif-145 2026-11-04), so it can carry no tags of its own.
+    Only an endpoint that lists the NIC back qualifies; the caller still requires the same resource group."""
+    endpoint = str((((bodies.get(key) or {}).get("properties") or {}).get("privateEndpoint") or {}).get("id") or "").lower()
+    rows = (((bodies.get(endpoint) or {}).get("properties") or {}).get("networkInterfaces") or []) if endpoint else []
+    return endpoint if key in {str(row.get("id", "")).lower() for row in rows if isinstance(row, dict)} else None
+
+
 def managed_parent_id(resource_id, bodies, owner):
     """Whole-group deletion only: the owned resource an untagged child is deleted with, so it needs no receipt of its
-    own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, or
-    the owned source of an Event Grid system topic. A top-level resource never inherits its group's owner."""
+    own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, the
+    owned source of an Event Grid system topic, or the private endpoint whose managed NIC it is. A top-level resource
+    never inherits its group's owner."""
     key = resource_id.lower()
     scope, relative = key.rsplit("/providers/", 1)
     parts = relative.split("/")
     resource_type = resource_type_from_id(key)
     topic = resource_type == "microsoft.eventgrid/systemtopics"
+    endpoint = endpoint_managed_nic_parent(key, bodies) if resource_type == "microsoft.network/networkinterfaces" else None
     if topic:
         parent = str(((bodies.get(key) or {}).get("properties") or {}).get("source", "")).lower()
+    elif endpoint:
+        parent = endpoint
     elif len(parts) > 3:
         parent = scope + "/providers/" + "/".join(parts[:-2])
     else:
