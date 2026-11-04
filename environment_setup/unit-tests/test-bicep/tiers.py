@@ -131,6 +131,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_factory_lifecycle_bootstrap_handoff.py",
         "unit/test_native_foundry_lifecycle.py",
         "unit/test_prefix_bootstrap.py",
+        "unit/test_private_endpoint_connection_reverse_link.py",
         "unit/test_project_deletion_lifecycle.py",
         "unit/test_project_deletion_pipelines.py",
         "unit/test_project_deletion_shell.py",
