@@ -94,8 +94,8 @@ class ProjectCloud(FakeCloud):
         return 202, {}, None
 
 
-def prepared(subnets=False, group=False, environments=None, environment="stage"):
-    cloud = ProjectCloud()
+def prepared(subnets=False, group=False, environments=None, environment="stage", cloud_class=ProjectCloud):
+    cloud = cloud_class()
     document = manifest()
     document["target"]["environment"] = environment
     document["locks"]["scopes"] = [GROUP, COMMON]
@@ -424,3 +424,124 @@ def test_receipt_body_drift_warns_and_the_receipt_still_proves_project_ownership
     records[RESOURCE.lower()]["ownership_evidence"] = {"run_id": identifier, "receipt_hash": fl.digest(receipt)}
     with pytest.raises(fl.Blocked):
         fl.freeze_project_deletion(cloud, prepared()[0], records)
+
+
+ROLE = GROUP + "/providers/Microsoft.Authorization/roleAssignments/28724663-3b27-58be-8275-5b429900b9b9"
+POLICY_SETTING = VAULT + "/providers/microsoft.insights/diagnosticSettings/setByPolicy-MCAPSGovernance"
+
+
+class UntaggableChildrenCloud(ProjectCloud):
+    def __init__(self):
+        super().__init__()
+        self.bodies[ROLE.lower()] = {"id": ROLE, "type": "Microsoft.Authorization/roleAssignments",
+                                     "properties": {"scope": GROUP, "principalId": "p", "roleDefinitionId": "r"}}
+        self.bodies[POLICY_SETTING.lower()] = {"id": POLICY_SETTING, "type": "microsoft.insights/diagnosticSettings",
+                                               "properties": {"logs": []}}
+
+    def collection(self, path, api_version, extension=False):
+        if not extension:
+            return super().collection(path, api_version, extension)
+        prefix = path.lower() + "/"
+        return [copy.deepcopy(body) for key, body in sorted(self.bodies.items())
+                if key.startswith(prefix) and "/" not in key[len(prefix):]], None
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.authorization":
+            return {"resourceTypes": [{"resourceType": "roleAssignments", "apiVersions": ["2022-04-01"]}]}
+        if namespace.lower() == "microsoft.insights":
+            return {"resourceTypes": [{"resourceType": "diagnosticSettings", "apiVersions": ["2021-05-01-preview"]}]}
+        return super().provider_schema(namespace)
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_untaggable_children_die_with_the_deleted_project_group(workspace, monkeypatch, group):
+    """aif-145 Scenario 4 (2026-11-04): two role assignments on the project group and MCAPS policy's diagnostic
+    setting on a project resource carry no tags and no receipt. When the reviewed deletion removes the project group
+    they die with it, so their owned parent proves them; a retained group still needs real ownership evidence."""
+    if not group:
+        with pytest.raises(fl.Blocked, match="project-group-ownership-incomplete-or-shared"):
+            prepared(False, False, cloud_class=UntaggableChildrenCloud)
+        return
+    document, cloud = prepared(False, True, cloud_class=UntaggableChildrenCloud)
+    rows = {row["id"].lower(): row for row in document["deletion"]["resources"]}
+    assert rows[ROLE.lower()]["ownership_source"] == "managed-parent"
+    assert rows[ROLE.lower()]["managed_parent_id"] == GROUP.lower()
+    assert rows[POLICY_SETTING.lower()]["managed_parent_id"] == VAULT.lower()
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and ROLE.lower() not in cloud.bodies
+
+
+WORKSPACE = COMMON + "/providers/Microsoft.OperationalInsights/workspaces/common-logs"
+TABLE = WORKSPACE + "/tables/AACAudit"
+
+
+class LogTablesCloud(ProjectCloud):
+    """A common Log Analytics workspace whose tables ARM lists without a type and moves on its own schedule."""
+
+    def __init__(self):
+        super().__init__()
+        self.bodies[WORKSPACE.lower()] = tagged(WORKSPACE, "Microsoft.OperationalInsights/workspaces", CORE_OWNER)
+        self.bodies[TABLE.lower()] = {"id": TABLE, "name": "AACAudit",
+                                      "properties": {"plan": "Analytics", "totalRetentionInDays": 30,
+                                                     "schema": {"name": "AACAudit"}}}
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.operationalinsights":
+            return {"resourceTypes": [{"resourceType": kind, "apiVersions": ["2026-03-01"]}
+                                      for kind in ("workspaces", "workspaces/tables")]}
+        return super().provider_schema(namespace)
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/tables"):
+            return [copy.deepcopy(body) for key, body in sorted(self.bodies.items())
+                    if key.startswith(path.lower() + "/")], None
+        return super().collection(path, api_version, extension)
+
+
+def test_listed_log_tables_are_fingerprinted_with_their_kind(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): the common workspace's 697 tables come from list rows without a type, so a
+    digest without their kind kept the volatile fields the closure ignores: invalid-project-resource-proof."""
+    document, cloud = prepared(cloud_class=LogTablesCloud)
+    fl.validate_project_deletion(document)
+    assert TABLE.lower() in document["deletion"]["bodies"]
+    volatile = fl.VOLATILE_FIELDS["microsoft.operationalinsights/workspaces/tables"][0]
+    body = cloud.bodies[TABLE.lower()]
+    for field in volatile[:-1]:
+        body = body.setdefault(field, {})
+    body[volatile[-1]] = "moved-by-the-platform"
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+
+
+ALERT_RULE = GROUP + "/providers/microsoft.alertsmanagement/smartDetectorAlertRules/Failure Anomalies - ain-prj001"
+
+
+class SpacedNameCloud(ProjectCloud):
+    def __init__(self):
+        super().__init__()
+        self.bodies[ALERT_RULE.lower()] = tagged(ALERT_RULE, "microsoft.alertsmanagement/smartDetectorAlertRules", OWNER)
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.alertsmanagement":
+            return {"resourceTypes": [{"resourceType": "smartDetectorAlertRules", "apiVersions": ["2021-04-01"]}]}
+        return super().provider_schema(namespace)
+
+
+def test_arm_names_with_inner_spaces_are_valid_project_resources():
+    """aif-145 Scenario 4 (2026-11-04): Application Insights names its Failure Anomalies rule with spaces and
+    Foundry its capability hosts with @."""
+    document, _ = prepared(False, True, cloud_class=SpacedNameCloud)
+    fl.validate_project_deletion(document)
+    assert next(row for row in document["deletion"]["resources"] if row["id"].lower() == ALERT_RULE.lower())["delete"]
+    assert fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.CognitiveServices/accounts/a/capabilityHosts/a@aml_aiagentservice")
+    assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/ trailing ")
+    assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/..")

@@ -126,7 +126,9 @@ SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
 RG_ID = re.compile(r"/subscriptions/(" + GUID + r")/resourceGroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 RESOURCE_ID = re.compile(RG_ID.pattern + r"/providers/([A-Za-z0-9.]+)/([A-Za-z0-9]+)/([A-Za-z0-9_.()-]{1,128})", re.I)
-ARM_SEGMENT = r"(?!\.{1,2}(?:/|$))[A-Za-z0-9_.()-]+"
+# Inner spaces and @ are legal ARM names (aif-145 2026-11-04: "Failure Anomalies - <appi>" alert rules, Foundry
+# "<account>@aml_aiagentservice" capability hosts); never at a segment's edge.
+ARM_SEGMENT = r"(?!\.{1,2}(?:/|$))[A-Za-z0-9_.()-](?:[A-Za-z0-9_.() @-]*[A-Za-z0-9_.()-])?"
 ARM_RESOURCE_PATH = r"/providers/[A-Za-z0-9.]+(?:/" + ARM_SEGMENT + "/" + ARM_SEGMENT + r")+"
 # DNS apex/wildcard names are literal ARM names, not URL syntax or arbitrary child types.
 DNS_ZONE_NAME = r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*"
@@ -1986,7 +1988,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         if not single and not extension:
             listed_rows.update({row["id"].lower(): copy.deepcopy(row) for row in rows
                                 if isinstance(row, dict) and isinstance(row.get("id"), str)})
-        rows = [fingerprint_body(row) for row in rows]
+        # The collection's kind: listed Log Analytics tables carry no type, and the platform moves their volatile
+        # fields between review and execution (aif-145 2026-11-04).
+        rows = [fingerprint_body(row, listed_kind) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
                  "body_hash": digest(rows), "unsupported": unsupported}
@@ -2479,7 +2483,9 @@ def validate_project_deletion(document):
         is_group = identifier in group_ids
         require((RG_ID if is_group else NESTED_ID).fullmatch(identifier)
                 and arm_scope(identifier) in scopes and type(item.get("delete")) is bool
-                and hash_value(item.get("body_hash")) and item["body_hash"] == resource_digest(bodies[identifier]),
+                and hash_value(item.get("body_hash"))
+                # The closure's kind: listed Log Analytics tables carry no type (aif-145 2026-11-04, 697 of them).
+                and item["body_hash"] == resource_digest(bodies[identifier], item.get("type")),
                 "invalid-project-resource-proof")
         require(item.get("etag") is None or isinstance(item["etag"], str), "invalid-project-resource-etag")
         if not is_group:
@@ -2591,6 +2597,18 @@ def freeze_project_deletion(cloud, document, ownership_records):
     matches = [key for key in closure["groups"] if entries[key]["owner"] == owner and key in registered]
     require(len(matches) == 1, "one-exact-owned-project-resource-group-required")
     project_group = matches[0]
+    if options["include_keyvault_and_resource_group"]:
+        for key, item in entries.items():
+            if item["ownership_source"] != "retained-unowned" or arm_scope(key) != project_group or key == project_group:
+                continue
+            # Untaggable children (aif-145 Scenario 4, 2026-11-04: role assignments on the project group, MCAPS
+            # policy's diagnostic setting on a project resource) die with the project group this deletion removes,
+            # so their owned parent proves them. A retained group still needs tags or a receipt for each of them.
+            try:
+                parent = managed_parent_id(key, bodies, owner)
+            except Blocked:
+                continue
+            item.update(owner=owner, ownership_source="managed-parent", managed_parent_id=parent)
     writable = {item.lower() for item in document["locks"]["scopes"]}
     for key, item in entries.items():
         body, kind = bodies[key], item.get("type", "")
@@ -2749,7 +2767,8 @@ def verify_project_inventory(cloud, document, removed=()):
             require(fingerprint_body(_without_deleted_children(_without_removed_backlinks(body, removed), removed))
                     == fingerprint_body(_without_deleted_children(stripped, removed)), "project-retained-parent-changed")
         else:
-            if resource_digest(body) != resource_digest(before):
+            kind = (data["closure"]["resources"].get(key) or {}).get("type")
+            if resource_digest(body, kind) != resource_digest(before, kind):
                 raise Blocked("project-resource-instance-changed", error_diagnostic={
                     "resource_id": key, "failed_comparisons": ["body_hash"]})
     expected_collections = {key: value for key, value in expected["collections"].items()
@@ -2768,6 +2787,9 @@ def verify_project_inventory(cloud, document, removed=()):
             continue
         if item.get("ownership_source") == "tags":
             verify_ownership(bodies[key], item["owner"])
+        elif item.get("ownership_source") == "managed-parent":
+            require(managed_parent_id(key, bodies, item["owner"]) == item.get("managed_parent_id"),
+                    "managed-parent-ownership-changed")
         elif item.get("ownership_source") == "deployment-receipt":
             require(verified_receipt_owner(coordination(cloud, document), item["ownership_evidence"], key,
                     item["body_hash"], cache, [] if "receipt_body_drift" in item else None) == item["owner"],
