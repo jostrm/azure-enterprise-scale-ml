@@ -2455,6 +2455,45 @@ def project_resource_dependencies(body):
     return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
 
 
+def project_inventory_view(closure, bodies, project_group, deleted, frozen=()):
+    """The part of a complete closure a selective project deletion freezes and verifies.
+
+    aif-145 Scenario 4 (2026-11-04): delete-project froze every enrolled group - the common group with 697 Log
+    Analytics tables, both project groups, 1704 resources - with every body twice (closure collections and `bodies`):
+    11.1 MB against the 8 MiB worker cap, 508 KB compressed against 16 GitHub secrets. The view keeps every group row,
+    the whole project group, each deleted resource with its ancestors and descendants, and each resource elsewhere
+    whose body names one of them (a common subnet's ipConfigurations, a diagnostic setting's workspace): what the
+    deletion changes or can break. A display link (DISPLAY_ONLY_TYPES) is no such dependency. Nothing else in the other
+    groups is frozen; execution reads every group again and the live closure decides. `frozen`, a reviewed view's ids,
+    stays in view while it exists, so a reference that went away still compares; a resource that names a deletion
+    only after the review joins the live view and changes it."""
+    targets = {project_group, *deleted}
+
+    def inside(identifier):
+        parts = identifier.split("/")
+        return any("/".join(parts[:end]) in targets for end in range(5, len(parts) + 1))
+
+    ancestors = {"/".join(parts[:end]) for parts in (key.split("/") for key in deleted) for end in range(5, len(parts))}
+    kept = set(closure["groups"]) | (set(frozen) & set(bodies))
+    for key, row in closure["resources"].items():
+        if (inside(key) or key in ancestors
+                or (row.get("type") not in DISPLAY_ONLY_TYPES
+                    and any(inside(reference) for reference in closure["references"].get(key, ())))):
+            kept.add(key)
+
+    def collection_kept(path):
+        # A group's own collections (its resource list, its extensions) stay for the project group only.
+        return inside(path) or any(owner in kept and owner not in closure["groups"]
+                                   for owner in (path.rsplit("/", 1)[0], path.rsplit("/providers/", 1)[0]))
+
+    view = {"providers": closure["providers"], "groups": closure["groups"],
+            "resources": {key: row for key, row in closure["resources"].items() if key in kept},
+            "references": {key: row for key, row in closure["references"].items() if key in kept},
+            "inline": {key: row for key, row in closure["inline"].items() if row["parent_id"] in kept},
+            "collections": {path: row for path, row in closure["collections"].items() if collection_kept(path)}}
+    return view, {key: body for key, body in bodies.items() if key in kept}
+
+
 def validate_project_deletion(document):
     options = project_deletion_policy(document)
     data, target = document.get("deletion"), document["target"]
@@ -2666,6 +2705,10 @@ def freeze_project_deletion(cloud, document, ownership_records):
                 require(all(child["owner"] == owner and not project_resource_shared(bodies[identifier])
                             for identifier, child in entries.items() if identifier == key or identifier.startswith(key + "/")),
                         "project-network-child-ownership-unverified")
+    locked = any(item.get("type") in ("microsoft.authorization/locks", "microsoft.authorization/denyassignments")
+                 for item in entries.values())
+    closure, bodies = project_inventory_view(closure, bodies, project_group,
+                                             {key for key, item in entries.items() if item["delete"]})
     result = {"inventory_mode": SELECTIVE_PROJECT_DELETE, "inventory_complete": True,
               "revision": document["manifest_revision"], "project_resource_group": bodies[project_group]["id"],
               "resource_groups": [entries[key] for key in sorted(closure["groups"])],
@@ -2675,8 +2718,7 @@ def freeze_project_deletion(cloud, document, ownership_records):
     validate_project_deletion({**document, "deletion": result})
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
-    require(not any(item.get("type") in ("microsoft.authorization/locks", "microsoft.authorization/denyassignments")
-                    for item in result["resources"]), "project-delete-lock-or-deny-assignment-present")
+    require(not locked, "project-delete-lock-or-deny-assignment-present")
     verify_project_permissions(cloud, result)
     return result
 
@@ -2700,7 +2742,9 @@ def _without_deleted_children(body, removed):
 def _without_removed_backlinks(body, removed):
     """ARM drops a back-reference once its dependent is deleted; nothing else may change."""
     def gone(value):
-        references = resource_references([value])
+        # A malformed link names no dependent (aif-145 2026-11-04: a Container Apps subnet's legionservicelink
+        # leaves out /providers/Microsoft.Network); it stays and still compares.
+        references = resource_references([value], tolerant=True)
         return bool(references) and all(any(ref == item or ref.startswith(item + "/") for item in removed)
                                         for ref in references)
 
@@ -2748,6 +2792,9 @@ def verify_project_inventory(cloud, document, removed=()):
     removed = {item.lower() for item in removed}
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
+    deleted = {row["id"].lower() for row in data["resource_groups"] + data["resources"] if row["delete"]}
+    closure, bodies = project_inventory_view(closure, bodies, data["project_resource_group"].lower(), deleted,
+                                             data["bodies"])
     expected = data["closure"]
     # A resource the review deletes that the platform removed with another deletion is absent, like one this run
     # deleted (aif-138 2026-11-02: Defender's Event Grid system topic left with its last event subscription). A vanished
@@ -6603,6 +6650,15 @@ def protected_worker_envelope(document, locks):
     return raw
 
 
+def github_envelope_chunks(document, locks):
+    """The protected worker envelope as GitHub environment secrets: compressed, base64, at most 16 secrets of 32,000
+    characters (the consumer's scoped workflow reads 16)."""
+    envelope = base64.b64encode(zlib.compress(protected_worker_envelope(document, locks))).decode("ascii")
+    chunks = [envelope[index:index + 32000] for index in range(0, len(envelope), 32000)]
+    require(len(chunks) <= 16, "github-protected-manifest-too-large")
+    return chunks
+
+
 def failed_worker_diagnostic(locks, document):
     """Read bound failure metadata without granting success or cleanup authority."""
     if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
@@ -6652,9 +6708,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     require(any(row.get("path") == "azure-enterprise-scale-ml" and row.get("mode") == "160000"
                 and row.get("sha") == document["source"]["commit"] for row in tree.get("tree", [])),
             "consumer-version-source-mismatch")
-    envelope = base64.b64encode(zlib.compress(protected_worker_envelope(document, locks))).decode("ascii")
-    chunks = [envelope[index:index + 32000] for index in range(0, len(envelope), 32000)]
-    require(len(chunks) <= 16, "github-protected-manifest-too-large")
+    chunks = github_envelope_chunks(document, locks)
     secret = "AIF_LIFECYCLE_" + document["run_id"].replace("-", "").upper()
     tag = "aifactory-runs/" + document["run_id"]
     locks.assert_held()
