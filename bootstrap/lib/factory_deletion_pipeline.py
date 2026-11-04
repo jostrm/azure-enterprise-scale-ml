@@ -591,6 +591,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
         absent_rows[key] = absent_group_row(document, key, None)
     resources = [entries[key] for key in sorted(closure["resources"])]
     groups = [entries.get(key) or absent_rows[key] for key in sorted(set(closure["groups"]) | absent)]
+    closure = fl.frozen_closure(closure)  # no provider fingerprints: a rollout never refuses the confirmation
     data = {"inventory_mode": CONTRACT, "inventory_complete": True, "revision": document["manifest_revision"],
             "flags": dict.fromkeys(DELETE_FLAGS, True), "projects": projects, "resource_groups": groups,
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
