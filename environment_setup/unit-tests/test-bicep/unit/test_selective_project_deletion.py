@@ -3,6 +3,7 @@
 import copy
 import itertools
 import json
+import types
 from uuid import uuid4
 
 import pytest
@@ -94,13 +95,14 @@ class ProjectCloud(FakeCloud):
         return 202, {}, None
 
 
-def prepared(subnets=False, group=False, environments=None, environment="stage", cloud_class=ProjectCloud):
+def prepared(subnets=False, group=False, environments=None, environment="stage", cloud_class=ProjectCloud,
+             scopes=(GROUP, COMMON)):
     cloud = cloud_class()
     document = manifest()
     document["target"]["environment"] = environment
-    document["locks"]["scopes"] = [GROUP, COMMON]
+    document["locks"]["scopes"] = list(scopes)
     document["locks"]["common_dependencies"] = []
-    for scope in (GROUP, COMMON):
+    for scope in scopes:
         cloud.enrollment["scopes"][scope.lower()] = {
             **copy.deepcopy(cloud.enrollment["scopes"][GROUP.lower()]),
             "common_dependencies": [], "target": {key: document["target"][key] for key in (
@@ -482,11 +484,13 @@ TABLE = WORKSPACE + "/tables/AACAudit"
 
 class LogTablesCloud(ProjectCloud):
     """A common Log Analytics workspace whose tables ARM lists without a type and moves on its own schedule."""
+    workspace, table, owner = WORKSPACE, TABLE, CORE_OWNER
 
     def __init__(self):
         super().__init__()
-        self.bodies[WORKSPACE.lower()] = tagged(WORKSPACE, "Microsoft.OperationalInsights/workspaces", CORE_OWNER)
-        self.bodies[TABLE.lower()] = {"id": TABLE, "name": "AACAudit",
+        self.bodies[self.workspace.lower()] = tagged(self.workspace, "Microsoft.OperationalInsights/workspaces",
+                                                     self.owner)
+        self.bodies[self.table.lower()] = {"id": self.table, "name": "AACAudit",
                                       "properties": {"plan": "Analytics", "totalRetentionInDays": 30,
                                                      "schema": {"name": "AACAudit"}}}
 
@@ -503,14 +507,22 @@ class LogTablesCloud(ProjectCloud):
         return super().collection(path, api_version, extension)
 
 
-def test_listed_log_tables_are_fingerprinted_with_their_kind(workspace, monkeypatch):
+class ProjectLogTablesCloud(LogTablesCloud):
+    """The same workspace in the project group: its tables are frozen and die with the deleted group."""
+    workspace = GROUP + "/providers/Microsoft.OperationalInsights/workspaces/project-logs"
+    table, owner = workspace + "/tables/AACAudit", OWNER
+
+
+@pytest.mark.parametrize("cloud_class", (LogTablesCloud, ProjectLogTablesCloud))
+def test_listed_log_tables_are_fingerprinted_with_their_kind(workspace, monkeypatch, cloud_class):
     """aif-145 Scenario 4 (2026-11-04): the common workspace's 697 tables come from list rows without a type, so a
-    digest without their kind kept the volatile fields the closure ignores: invalid-project-resource-proof."""
-    document, cloud = prepared(cloud_class=LogTablesCloud)
+    digest without their kind kept the volatile fields the closure ignores: invalid-project-resource-proof.
+    A common table no project resource names is no longer frozen at all; a project group's table still is."""
+    document, cloud = prepared(False, cloud_class is ProjectLogTablesCloud, cloud_class=cloud_class)
     fl.validate_project_deletion(document)
-    assert TABLE.lower() in document["deletion"]["bodies"]
+    assert (cloud_class.table.lower() in document["deletion"]["bodies"]) == (cloud_class is ProjectLogTablesCloud)
     volatile = fl.VOLATILE_FIELDS["microsoft.operationalinsights/workspaces/tables"][0]
-    body = cloud.bodies[TABLE.lower()]
+    body = cloud.bodies[cloud_class.table.lower()]
     for field in volatile[:-1]:
         body = body.setdefault(field, {})
     body[volatile[-1]] = "moved-by-the-platform"
@@ -545,3 +557,135 @@ def test_arm_names_with_inner_spaces_are_valid_project_resources():
     assert fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.CognitiveServices/accounts/a/capabilityHosts/a@aml_aiagentservice")
     assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/ trailing ")
     assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/..")
+
+
+OTHER_GROUP = f"/subscriptions/{SUB}/resourceGroups/other-project"
+OTHER_OWNER = {**OWNER, "project_id": "018"}
+
+
+def padded(index):
+    return {"resourceGuid": str(uuid4()), "index": index, "provisioningState": "Succeeded",
+            "description": " ".join(f"Setting {item} of resource {index} as the AI Factory deploys it." for item in range(8))}
+
+
+class FactorySizedCloud(LogTablesCloud):
+    """aif-145 on 2026-11-04: a common group with 697 Log Analytics tables (about 4.4 KB each as ARM lists them) and
+    about 580 other resources, and two project groups of about 215 resources each. A common subnet names a project
+    resource, as the common VNet's project subnet names the project's private endpoint NICs."""
+
+    def __init__(self):
+        super().__init__()
+        for index in range(697):
+            table = WORKSPACE + f"/tables/Table{index:03d}_CL"
+            self.bodies[table.lower()] = {"id": table, "name": table.rsplit("/", 1)[-1], "properties": {
+                "plan": "Analytics", "totalRetentionInDays": 30, "retentionInDays": 30,
+                "schema": {"name": table.rsplit("/", 1)[-1], "tableType": "Microsoft",
+                           "columns": [{"name": f"Column{column}", "type": "string", "isHidden": False,
+                                        "description": f"Column {column} of {table.rsplit('/', 1)[-1]} as its solution defines it"}
+                                       for column in range(40)]}}}
+        for index in range(64):
+            nsg = COMMON + f"/providers/Microsoft.Network/networkSecurityGroups/nsg-{index:02d}"
+            self.bodies[nsg.lower()] = tagged(nsg, "Microsoft.Network/networkSecurityGroups", CORE_OWNER, padded(index))
+            for rule in range(8):
+                identifier = nsg + f"/securityRules/rule-{rule}"
+                self.bodies[identifier.lower()] = tagged(
+                    identifier, "Microsoft.Network/networkSecurityGroups/securityRules", CORE_OWNER, padded(rule))
+        self.bodies[OTHER_GROUP.lower()] = tagged(OTHER_GROUP, "Microsoft.Resources/resourceGroups", OTHER_OWNER)
+        for scope, owner in ((GROUP, OWNER), (OTHER_GROUP, OTHER_OWNER)):
+            for index in range(212):
+                address = scope + f"/providers/Microsoft.Network/publicIPAddresses/ip-{index:03d}"
+                self.bodies[address.lower()] = tagged(address, "Microsoft.Network/publicIPAddresses", owner, padded(index))
+        self.bodies[SUBNET.lower()]["properties"]["ipConfigurations"] = [{"id": RESOURCE}]
+        self.bodies[VNET.lower()]["properties"]["subnets"][0] = copy.deepcopy(self.bodies[SUBNET.lower()])
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_a_factory_sized_project_deletion_fits_the_protected_worker_and_github_dispatch(workspace, monkeypatch, group):
+    """aif-145 Scenario 4 (2026-11-04): delete-project 002 froze every enrolled group - common with 697 Log Analytics
+    tables, project001 and project002, 1704 resources - and every body twice (in the closure's collections and in
+    `bodies`): 11.1 MB against the 8 MiB worker cap, 508 KB compressed against 16 GitHub secrets of 32,000 characters.
+    The review freezes the project group, everything it deletes and the resources elsewhere that name them;
+    execution still reads every group and verifies the same view of it."""
+    document, cloud = prepared(False, group, cloud_class=FactorySizedCloud, scopes=(GROUP, OTHER_GROUP, COMMON))
+    assert len(cloud.bodies) > 1700
+    # pink catalog_runtime refuses a frozen manifest above 8 MiB - 4096 (protected-worker capacity)
+    assert len(fl.canonical(document)) <= fl.MAX_DOCUMENT - 4096
+    assert len(fl.github_envelope_chunks(document, types.SimpleNamespace(held={"run_id": document["run_id"]}))) <= 16
+    frozen = set(document["deletion"]["bodies"])
+    assert {key for key in cloud.bodies if fl.arm_scope(key) == GROUP.lower()} <= frozen
+    assert {GROUP.lower(), OTHER_GROUP.lower(), COMMON.lower(), SUBNET.lower(), VNET.lower()} <= frozen
+    assert not any(fl.arm_scope(key) == OTHER_GROUP.lower() or "/tables/" in key or "/networksecuritygroups/" in key
+                   for key in frozen - {OTHER_GROUP.lower()})
+    fl.validate_manifest(document)
+    if not group:
+        return  # a retained group deletes resource by resource; the small cases above execute that
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and SUBNET.lower() in cloud.bodies
+    assert sum(fl.arm_scope(key) == OTHER_GROUP.lower() for key in cloud.bodies) == 213
+
+
+def test_unrelated_common_changes_after_review_never_block_a_project_deletion(workspace, monkeypatch):
+    """The platform adds and updates common Log Analytics tables all day. Nothing in the deleted project names them,
+    so a table added or changed between review and execution is no changed reviewed resource."""
+    document, cloud = prepared(False, True, cloud_class=LogTablesCloud)
+    added = WORKSPACE + "/tables/AddedAfterReview_CL"
+    cloud.bodies[added.lower()] = {"id": added, "name": "AddedAfterReview_CL", "properties": {"plan": "Analytics"}}
+    cloud.bodies[TABLE.lower()]["properties"]["plan"] = "Basic"
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and added.lower() in cloud.bodies
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_a_new_reference_to_a_reviewed_deletion_blocks_execution(workspace, monkeypatch, group):
+    """The live closure decides: a resource elsewhere that names a resource the review deletes, created after the
+    review, stops the run before any delete."""
+    document, cloud = prepared(False, group)
+    dependent = COMMON + "/providers/Microsoft.Network/publicIPAddresses/common-dependent"
+    cloud.bodies[dependent.lower()] = tagged(dependent, "Microsoft.Network/publicIPAddresses", CORE_OWNER,
+                                             {"linkedPublicIPAddress": {"id": RESOURCE}})
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] != "succeeded" and not cloud.deleted, result
+    assert result["error_code"] == "project-complete-inventory-changed", result
+
+
+class ServiceLinkCloud(ProjectCloud):
+    """The project subnet in the common VNet names a project resource and carries a Container Apps service
+    association link whose `link` leaves out /providers/Microsoft.Network, as ARM lists it on aif-145."""
+
+    def __init__(self):
+        super().__init__()
+        malformed = VNET.replace("/providers/Microsoft.Network", "") + "/subnets/project-subnet"
+        self.bodies[SUBNET.lower()]["properties"].update(ipConfigurations=[{"id": RESOURCE}], serviceAssociationLinks=[{
+            "name": "legionservicelink", "id": SUBNET + "/serviceAssociationLinks/legionservicelink",
+            "properties": {"linkedResourceType": "Microsoft.App/environments", "link": malformed}}])
+        self.bodies[VNET.lower()]["properties"]["subnets"][0] = copy.deepcopy(self.bodies[SUBNET.lower()])
+
+
+def test_a_malformed_service_association_link_never_blocks_the_retained_vnet_check(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): the common VNet stays in a project deletion's view because its project subnet
+    names the project's NICs. Execution strips back-references of deleted dependents before comparing it, and the
+    strict parse of the subnets' Container Apps service association link stopped that (invalid-resource-reference).
+    A malformed link names no deleted dependent; it stays and still compares."""
+    document, cloud = prepared(False, True, cloud_class=ServiceLinkCloud)
+    assert VNET.lower() in document["deletion"]["bodies"]
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and VNET.lower() in cloud.bodies
