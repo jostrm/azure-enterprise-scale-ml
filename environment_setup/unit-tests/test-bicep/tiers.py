@@ -174,6 +174,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_seed_vault_endpoint.py",
         "unit/test_selective_project_deletion.py",
         "unit/test_wait_absent_held_recheck.py",
+        "unit/test_single_writer_absent_scale_set_group.py",
         "unit/test_simple_bootstrap.py",
         "unit/test_single_writer_coordination.py",
         "unit/test_single_writer_deletion.py",

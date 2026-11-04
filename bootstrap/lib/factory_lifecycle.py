@@ -3082,9 +3082,11 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
             other = arm_scope(dependency)
             if other != scope and other in planned:
                 planned[scope]["depends_on"].append(other)
-    # A group the review recorded as already absent counts as deleted; it is never sent a DELETE.
+    # A group the review recorded as already absent is never sent a DELETE and is reported observed, not deleted
+    # (766d7382; aif-145 Scenario 5 run32: counting it as deleted failed the single-writer cohort release).
     removed = [group["id"] for group in groups if group.get("already_absent") is True]
-    receipt["deleted_resources"].extend(scope for scope in removed if scope not in receipt["deleted_resources"])
+    if removed:
+        receipt["observed_absent"] = list(removed)
     removed_children = set()
     # Only independently proven entries in the immutable manifest are eligible.
     # Leave private endpoint connections to the reviewed RG cascade: deleting
