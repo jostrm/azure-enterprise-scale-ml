@@ -2298,6 +2298,14 @@ def receipt_parent_id(resource_id, bodies, owner):
     return parent
 
 
+def frozen_closure(closure):
+    """The closure a deletion review freezes: without provider-schema fingerprints. They are derived and churn with
+    Azure's resource-provider rollouts (aif-145 2026-11-04: microsoft.storage, .network and .compute changed between
+    prepare and confirm, and pink's confirmation compares the whole frozen closure). They warn, never block (48b243f8):
+    the live closure decides."""
+    return {**closure, "providers": {}}
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
@@ -2351,6 +2359,7 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
                 item = {"owner": owner, "ownership_source": "managed-parent", "managed_parent_id": parent, **superseded}
         resources.append({**item, "id": resource_id, **metadata, "delete": True,
                           "depends_on": sorted(cross_group_references(body, arm_scope(resource_id)))})
+    closure = frozen_closure(closure)
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
               "revision": document["manifest_revision"], "resource_groups": groups, "resources": resources,
               "inventory_hash": digest(resources), "closure": closure, "closure_hash": digest(closure)}
