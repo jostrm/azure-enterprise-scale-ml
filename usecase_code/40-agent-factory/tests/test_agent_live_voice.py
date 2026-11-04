@@ -1,0 +1,746 @@
+"""Offline contracts for the opt-in project001 Dev live voice application step (on top of the chat Agent step)."""
+
+from __future__ import annotations
+
+import copy
+import importlib.util
+import json
+import os
+import sys
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "40-aifactory-agent"))
+
+from agent_factory import agent_live_voice as live  # noqa: E402
+from agent_factory.azure import ARM, AzureError  # noqa: E402
+from agent_factory.factory_chat_agent import AGENT_NAME, AI_AUDIENCE, OWNER  # noqa: E402
+
+SUB = "11111111-1111-4111-8111-111111111111"
+TENANT = "22222222-2222-4222-8222-222222222222"
+APP = "33333333-3333-4333-8333-333333333333"
+READER_A = "44444444-4444-4444-8444-444444444444"
+READER_B = "55555555-5555-4555-8555-555555555555"
+GROUP = "aif-esml-project001-sdc-dev-001-rg"
+GROUP_ID = f"/subscriptions/{SUB}/resourceGroups/{GROUP}"
+ACCOUNT_ID = f"{GROUP_ID}/providers/Microsoft.CognitiveServices/accounts/aifacct001"
+PROJECT_ID = f"{ACCOUNT_ID}/projects/aifproj001"
+ENV_ID = f"{GROUP_ID}/providers/Microsoft.App/managedEnvironments/aca-env-prj001"
+APP_ID = f"{GROUP_ID}/providers/Microsoft.App/containerApps/aifactory-agent-project001-dev"
+ENDPOINT = "https://aifacct001.services.ai.azure.com/api/projects/aifproj001"
+MODEL = "aifactory-agent-gpt-6-1-sol"
+VALUES = {
+    "enableFactoryChatAgent": "true", "enableAIFactoryAgentLiveVoice": "true",
+    "enableContainerApps": "true", "enableAIFoundry": "true", "enableAISearch": "true",
+    "deleteAllServicesForProject": "false", "deleteAllForProject": "false",
+    "dev_test_prod_sub_id": SUB, "tenantId": TENANT, "dev_test_prod": "dev", "project_number_000": "001",
+    "admin_location": "swedencentral", "admin_aifactoryPrefixRG": "aif-", "projectPrefix": "esml-",
+    "admin_locationSuffix": "sdc", "admin_aifactorySuffixRG": "-001", "projectSuffix": "-rg",
+    "modelGPTXName": MODEL, "aifactoryAgentEntraAppId": APP, "aifactoryAgentReaderObjectIds": f"{READER_A}, {READER_B}",
+    "aifactoryAgentContainerAppsEnvironment": "", "aifactoryAgentVoiceName": "", "aifactoryAgentVoiceLanguages": "",
+    "aifactoryAgentConfigFile": "", "aifactoryAgentModelDeployment": "",
+}
+# A customer's own agent configuration (what an operator would otherwise pass to 40-aifactory-agent/deploy.py).
+OVERLAY = {
+    "max_tool_rounds": 6,
+    "auth": {"additional_client_ids": ["04b07795-8ddb-461a-bbee-02f9e1bf7b46"],
+             "grants": [{"object_id": READER_A, "scopes": ["project001-dev"],
+                         "permissions": ["knowledge.read", "factory.read", "cost.read"]}]},
+    "voice": {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "coral",
+              "input_languages": ["en-US"]},
+}
+
+
+def values(**changes):
+    return {**VALUES, **changes}
+
+
+class FakeArm:
+    """Read-only Azure fake: records every call; refuses any write."""
+
+    def __init__(self, deployments=None, environments=None, agent="owned", app="missing"):
+        self.calls, self.agent = [], agent
+        self.resources = {
+            PROJECT_ID.lower(): {"id": PROJECT_ID, "name": "aifacct001/aifproj001", "identity": {"principalId": READER_A},
+                                 "properties": {"endpoints": {"AI Foundry API": ENDPOINT}}},
+            ENV_ID.lower(): {"id": ENV_ID, "properties": {"vnetConfiguration": {"internal": True}, "defaultDomain": "internal.example"}},
+        }
+        if app != "missing":
+            tags = {} if app == "foreign" else {
+                "managed-by": "enterprise-scale-ai-factory-agent", **({"aifactory-integration": "live-voice"} if app == "pipeline" else {})}
+            self.resources[APP_ID.lower()] = {"id": APP_ID, "name": "aifactory-agent-project001-dev", "tags": tags}
+        self.lists = {
+            f"{GROUP_ID}/resources": [
+                {"id": ACCOUNT_ID, "name": "aifacct001", "type": "Microsoft.CognitiveServices/accounts", "kind": "AIServices", "location": "swedencentral"},
+                {"id": f"{GROUP_ID}/providers/Microsoft.Search/searchServices/srch001", "name": "srch001", "type": "Microsoft.Search/searchServices"},
+                {"id": f"{GROUP_ID}/providers/Microsoft.Storage/storageAccounts/saprj0011001", "name": "saprj0011001", "type": "Microsoft.Storage/storageAccounts"},
+                {"id": f"{GROUP_ID}/providers/Microsoft.Storage/storageAccounts/saprj0012001", "name": "saprj0012001", "type": "Microsoft.Storage/storageAccounts"},
+                *(environments if environments is not None else [{"id": ENV_ID, "name": "aca-env-prj001", "type": "Microsoft.App/managedEnvironments"}]),
+                {"id": f"{GROUP_ID}/providers/Microsoft.Insights/components/appi001", "name": "appi001", "type": "Microsoft.Insights/components"},
+            ],
+            f"{ACCOUNT_ID}/projects": [{"id": PROJECT_ID, "name": "aifacct001/aifproj001"}],
+            f"{ACCOUNT_ID}/deployments": deployments if deployments is not None else [
+                {"name": MODEL, "sku": {"name": "DataZoneStandard", "capacity": 100},
+                 "properties": {"provisioningState": "Succeeded", "model": {"format": "OpenAI", "name": "gpt-6.1-sol", "version": "2026-09-29"}}},
+                {"name": "other-chat", "properties": {"provisioningState": "Succeeded", "model": {"format": "OpenAI", "name": "gpt-x", "version": "1"}}},
+                {"name": "text-embedding-3-large", "properties": {"provisioningState": "Succeeded", "model": {"format": "OpenAI", "name": "text-embedding-3-large"}}},
+            ],
+        }
+
+    def arm(self, method, resource_id, body=None, api_version="x"):
+        self.calls.append((method, resource_id))
+        if method != "GET":
+            raise AssertionError(f"The live voice step must not write through ARM ({method} {resource_id})")
+        if resource_id.lower() in self.resources:
+            return copy.deepcopy(self.resources[resource_id.lower()])
+        raise AzureError(404, method, resource_id, "NotFound")
+
+    def request(self, method, url, body=None, *, audience=ARM, headers=None):
+        self.calls.append((method, url))
+        if method != "GET" or not url.startswith(f"{ENDPOINT}/agents/{AGENT_NAME}?"):
+            raise AssertionError(f"unexpected request {method} {url}")
+        assert audience == AI_AUDIENCE
+        if self.agent == "missing":
+            raise AzureError(404, method, url, "NotFound")
+        if self.agent == "forbidden":
+            raise AzureError(403, method, url, "Forbidden")
+        if self.agent == "no-version":
+            return {"name": AGENT_NAME}
+        owner = OWNER if self.agent == "owned" else "someone-else"
+        return {"name": AGENT_NAME, "versions": {"latest": {"version": "3", "metadata": {"aifactory.managed_by": owner}}}}
+
+    def pages(self, url, *, audience=ARM, field="value"):
+        self.calls.append(("LIST", url))
+        path = url[len(ARM):].split("?", 1)[0]
+        for key, items in self.lists.items():
+            if path.endswith(key):
+                return copy.deepcopy(items)
+        return []
+
+
+class FakeRunner:
+    """Records commands; returns canned JSON like the real operator commands print."""
+
+    def __init__(self, fail_on=None):
+        self.calls, self.fail_on, self.configs = [], fail_on, []
+
+    def __call__(self, args, *, cwd, env=None):
+        self.calls.append({"args": list(args), "cwd": Path(cwd), "env": dict(env or {})})
+        text = " ".join(map(str, args))
+        if "--config" in args:
+            self.configs.append(json.loads(Path(args[args.index("--config") + 1]).read_text("utf-8")))
+        if self.fail_on and self.fail_on in text:
+            raise live.CommandError(f"{self.fail_on} failed (exit 1)")
+        if "ingest" in args:
+            return json.dumps({"status": "ready", "indexed_document_count": 12})
+        if args[-1] == "--apply":
+            return json.dumps({"deployment_state": "Succeeded", "outputs": {"fqdn": {"value": "agent.internal.example"}},
+                               "plan": {"image": "x"}, "bundle": {"sha256": "s"}})
+        return ""
+
+    def names(self):
+        return [self.step_name(call["args"]) for call in self.calls]
+
+    @staticmethod
+    def step_name(args):
+        text = " ".join(map(str, args))
+        for name in ("venv", "pip install", "pip download", "ingest", "deploy.py"):
+            if name in text:
+                return name
+        return text
+
+
+def request(**changes):
+    return live.LiveVoiceRequest.from_values(values(**changes))
+
+
+# ---- decisions -------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("chat", ["true", "false"])
+def test_voice_off_does_nothing_here_because_the_chat_agent_has_its_own_step(chat):
+    decision = live.decide(request(enableFactoryChatAgent=chat, enableAIFactoryAgentLiveVoice="false"))
+    assert decision.act is False and "enableFactoryChatAgent" in decision.reason
+
+
+def test_both_flags_true_deploys_the_voice_application():
+    decision = live.decide(request())
+    assert decision.act is True and decision.voice is True
+
+
+def test_live_voice_without_chat_is_a_loud_configuration_error_not_a_silent_skip():
+    with pytest.raises(ValueError, match="enableAIFactoryAgentLiveVoice requires enableFactoryChatAgent"):
+        live.decide(request(enableFactoryChatAgent="false"))
+
+
+def test_any_project_number_acts_in_dev_and_other_environments_skip():
+    decision = live.decide(request(project_number_000="012"))
+    assert decision.act is True and decision.reason == "Validated project012 Dev AI Factory Agent live voice request."
+    for number in ("000", "12a", "1234"):
+        with pytest.raises(ValueError, match="project_number_000"):
+            live.decide(request(project_number_000=number))
+    for environment in ("test", "prod"):
+        decision = live.decide(request(dev_test_prod=environment))
+        assert decision.act is False and "Dev" in decision.reason
+
+
+def test_the_agent_model_can_differ_from_the_projects_model():
+    req = request(modelGPTXName="gpt-infra", aifactoryAgentModelDeployment=MODEL)
+    assert req.model_deployment == MODEL and live.discover(FakeArm(), req).model["name"] == MODEL
+    assert request(aifactoryAgentModelDeployment="").model_deployment == MODEL
+
+
+def test_a_named_existing_container_apps_environment_replaces_the_container_apps_flag():
+    named = request(enableContainerApps="false", aifactoryAgentContainerAppsEnvironment="aca-env-prj001")
+    assert live.decide(named).act is True
+    with pytest.raises(ValueError, match="enableContainerApps=true or aifactoryAgentContainerAppsEnvironment"):
+        live.decide(request(enableContainerApps="false"))
+
+
+def test_names_and_scope_follow_the_project_number():
+    assert live.app_name(request()) == "aifactory-agent-project001-dev", "the existing project001 app keeps its name"
+    assert live.scope_key(request()) == "project001-dev"
+    assert live.app_name(request(project_number_000="12")) == "aifactory-agent-project012-dev"
+    assert live.scope_key(request(project_number_000="012")) == "project012-dev"
+
+
+@pytest.mark.parametrize("flag", ["deleteAllServicesForProject", "deleteAllForProject"])
+def test_delete_runs_conflict_with_enabled_options(flag):
+    with pytest.raises(ValueError, match="conflict"):
+        live.decide(request(**{flag: "true"}))
+
+
+@pytest.mark.parametrize("missing", ["enableContainerApps", "enableAIFoundry", "enableAISearch"])
+def test_dependencies_are_validated_not_ignored(missing):
+    with pytest.raises(ValueError, match=missing):
+        live.decide(request(**{missing: "false"}))
+
+
+@pytest.mark.parametrize("changes,message", [
+    ({"aifactoryAgentEntraAppId": ""}, "aifactoryAgentEntraAppId"),
+    ({"aifactoryAgentEntraAppId": "not-a-guid"}, "aifactoryAgentEntraAppId"),
+    ({"aifactoryAgentEntraAppId": "$(aifactoryAgentEntraAppId)"}, "aifactoryAgentEntraAppId"),
+    ({"aifactoryAgentReaderObjectIds": ""}, "aifactoryAgentReaderObjectIds"),
+    ({"aifactoryAgentReaderObjectIds": "nope"}, "aifactoryAgentReaderObjectIds"),
+    ({"aifactoryAgentReaderObjectIds": ",".join(f"{n:08d}-0000-4000-8000-{n:012d}" for n in range(1, 25))}, "at most 20"),
+    ({"modelGPTXName": ""}, "modelGPTXName"),
+    ({"modelGPTXName": "bad name!"}, "modelGPTXName"),
+    ({"aifactoryAgentVoiceName": "bad;voice"}, "aifactoryAgentVoiceName"),
+    ({"aifactoryAgentVoiceLanguages": "not a locale"}, "aifactoryAgentVoiceLanguages"),
+    ({"dev_test_prod_sub_id": "x"}, "dev_test_prod_sub_id"),
+    ({"tenantId": ""}, "tenantId"),
+    ({"admin_location": ""}, "admin_location"),
+])
+def test_invalid_inputs_fail_with_the_exact_variable_name(changes, message):
+    with pytest.raises(ValueError, match=message):
+        live.decide(request(**changes))
+
+
+def with_searches(*names):
+    arm = FakeArm()
+    resources = [item for item in arm.lists[f"{GROUP_ID}/resources"] if item["type"] != "Microsoft.Search/searchServices"]
+    arm.lists[f"{GROUP_ID}/resources"] = resources + [
+        {"id": f"{GROUP_ID}/providers/Microsoft.Search/searchServices/{name}", "name": name,
+         "type": "Microsoft.Search/searchServices"} for name in names]
+    return arm
+
+
+def test_the_projects_own_search_service_wins_over_other_search_services_in_the_group():
+    # A demo or sample may add another search service to the project group; it must never receive the agent's index.
+    arm = with_searches("aif48-project001-dev-frc-s1", "aisearchprj001sdcdev001")
+    assert live.discover(arm, request()).search_name == "aisearchprj001sdcdev001"
+    assert live.discover(with_searches("srch001"), request()).search_name == "srch001", "a single service needs no naming"
+    with pytest.raises(ValueError, match="project AI Search service"):
+        live.discover(with_searches("search-a", "search-b"), request())
+
+
+def test_flags_accept_only_canonical_booleans_and_treat_unset_ado_macros_as_false():
+    with pytest.raises(ValueError, match="enableAIFactoryAgentLiveVoice must be true or false"):
+        live.LiveVoiceRequest.from_values(values(enableAIFactoryAgentLiveVoice="yes"))
+    off = live.LiveVoiceRequest.from_values(values(enableFactoryChatAgent="$(enableFactoryChatAgent)", enableAIFactoryAgentLiveVoice=""))
+    assert off.enable_chat is False and off.enable_live_voice is False
+
+
+def test_resource_group_follows_the_factory_naming_convention_unless_given():
+    assert request().resource_group == GROUP
+    assert request(projectResourceGroup="custom-rg").resource_group == "custom-rg"
+
+
+# ---- discovery -------------------------------------------------------------------------------------------------
+
+def test_discovery_resolves_the_projects_foundry_search_storage_insights_agent_and_internal_environment_read_only():
+    arm = FakeArm()
+    target = live.discover(arm, request())
+    assert target.account_name == "aifacct001" and target.project_name == "aifproj001"
+    assert target.project_endpoint == ENDPOINT and target.agent_version == "3"
+    assert target.model == {"name": MODEL, "model": "gpt-6.1-sol", "version": "2026-09-29", "sku": "DataZoneStandard", "capacity": 100}
+    assert target.embedding == "text-embedding-3-large" and target.search_name == "srch001"
+    assert target.storage_name == "saprj0012001" and target.insights_name == "appi001"
+    assert target.environment_name == "aca-env-prj001"
+    assert all(call[0] in {"GET", "LIST"} for call in arm.calls)
+
+
+def test_the_model_deployment_comes_from_modelGPTXName_and_a_missing_one_is_a_clear_prerequisite_error():
+    assert live.discover(FakeArm(), request(modelGPTXName="other-chat")).model["name"] == "other-chat"
+    with pytest.raises(ValueError, match=f"{MODEL}.*modelGPTXName.*Deploy-Model"):
+        live.discover(FakeArm(deployments=[]), request())
+    with pytest.raises(ValueError, match="missing-model"):
+        live.discover(FakeArm(), request(modelGPTXName="missing-model"))
+
+
+def test_a_deployment_that_is_not_succeeded_does_not_count():
+    deployments = [{"name": MODEL, "properties": {"provisioningState": "Creating",
+                    "model": {"format": "OpenAI", "name": "gpt", "version": "1"}}}]
+    with pytest.raises(ValueError, match="succeeded"):
+        live.discover(FakeArm(deployments=deployments), request())
+
+
+def test_the_hosting_environment_must_be_internal_and_unambiguous():
+    second = {"id": ENV_ID + "-2", "name": "aca-env-other", "type": "Microsoft.App/managedEnvironments"}
+    first = {"id": ENV_ID, "name": "aca-env-prj001", "type": "Microsoft.App/managedEnvironments"}
+    with pytest.raises(ValueError, match="aifactoryAgentContainerAppsEnvironment"):
+        live.discover(FakeArm(environments=[first, second]), request())
+    arm = FakeArm(environments=[first, second])
+    assert live.discover(arm, request(aifactoryAgentContainerAppsEnvironment="aca-env-prj001")).environment_name == "aca-env-prj001"
+    public = FakeArm()
+    public.resources[ENV_ID.lower()]["properties"]["vnetConfiguration"] = {"internal": False}
+    with pytest.raises(ValueError, match="internal"):
+        live.discover(public, request())
+
+
+def test_an_operator_deployed_app_is_never_replaced_by_the_generated_baseline():
+    arm = FakeArm(app="operator")
+    with pytest.raises(ValueError, match="already exists and was not created by this pipeline step.*operator flow"):
+        live.discover(arm, request())
+    assert all(call[0] in {"GET", "LIST"} for call in arm.calls)
+    assert live.discover(FakeArm(app="pipeline"), request()).environment_name == "aca-env-prj001"
+    assert live.discover(FakeArm(app="missing"), request()).environment_name == "aca-env-prj001"
+
+
+def test_an_operator_deployed_app_is_adopted_only_with_the_customers_own_agent_configuration():
+    customer = replace(request(), config_overlay=OVERLAY)
+    assert live.discover(FakeArm(app="operator"), customer).environment_name == "aca-env-prj001"
+    with pytest.raises(ValueError, match="not owned by the Enterprise Scale AI Factory agent"):
+        live.discover(FakeArm(app="foreign"), customer)
+
+
+def test_the_customer_configuration_overlays_the_generated_baseline():
+    pytest.importorskip("pydantic")
+    from aifactory_agent.config import Settings
+    req = replace(request(), config_overlay=OVERLAY)
+    config = live.render_config(req, live.discover(FakeArm(), req), repository_root=Path("/work/checkout"))
+    assert config["voice"] == {"enabled": True, "voice_name": "coral", "input_languages": ["en-US"], "mode": "realtime",
+                               "model": "gpt-realtime-mini", "voice_type": "openai"}
+    assert config["auth"]["client_id"] == APP and config["auth"]["grants"] == OVERLAY["auth"]["grants"]
+    assert config["max_tool_rounds"] == 6 and list(config["scopes"]) == ["project001-dev"]
+    assert config["azure"]["foundry_account"] == "aifacct001"
+    settings = Settings.model_validate(config)
+    assert settings.voice.mode == "realtime"
+
+
+@pytest.mark.parametrize("overlay, key", [
+    ({"scopes": {}}, "scopes"), ({"azure": {"foundry_account": "x"}}, "azure"), ({"location": "eastus"}, "location"),
+    ({"auth": {"client_id": APP}}, "auth.client_id"), ({"auth": {"audience": APP}}, "auth.audience"),
+    ({"knowledge": {"repository_root": "/x"}}, "knowledge.repository_root"),
+    ({"workloads": {"repository_root": "/x"}}, "workloads.repository_root"),
+    ({"voice": {"enabled": False}}, "voice.enabled"), ([], "JSON object"),
+])
+def test_the_customer_configuration_cannot_replace_identity_scope_or_discovered_resources(overlay, key):
+    with pytest.raises(ValueError, match=key.replace(".", r"\.")):
+        live.decide(replace(request(), config_overlay=overlay))
+
+
+def test_the_foundry_agent_from_the_chat_step_must_exist_and_be_owned_by_the_factory():
+    with pytest.raises(ValueError, match="does not exist yet.*enableFactoryChatAgent"):
+        live.discover(FakeArm(agent="missing"), request())
+    with pytest.raises(ValueError, match="not owned by the Enterprise Scale AI Factory"):
+        live.discover(FakeArm(agent="foreign"), request())
+    with pytest.raises(ValueError, match="no valid latest version"):
+        live.discover(FakeArm(agent="no-version"), request())
+    with pytest.raises(AzureError) as denied:
+        live.discover(FakeArm(agent="forbidden"), request())
+    assert denied.value.status == 403
+
+
+# ---- generated application configuration ---------------------------------------------------------------------
+
+def render(**changes):
+    req = request(**changes)
+    return live.render_config(req, live.discover(FakeArm(), req), repository_root=Path("/work/checkout"))
+
+
+def test_the_generated_configuration_is_valid_for_the_applications_own_schema_with_voice_on():
+    pytest.importorskip("pydantic")
+    from aifactory_agent.config import Settings
+    settings = Settings.model_validate(render())
+    assert settings.voice.enabled is True and settings.azure.credential == "cli" and settings.factory.writes_enabled is False
+    assert list(settings.scopes) == ["project001-dev"] and settings.scopes["project001-dev"].environment == "dev"
+    assert settings.agent_name == AGENT_NAME
+
+
+def test_the_generated_configuration_follows_the_project_number():
+    target = live.discover(FakeArm(), request())  # the fake only knows one resource group; naming is what matters here
+    config = live.render_config(request(project_number_000="012"), target, repository_root=Path("/work/checkout"))
+    assert config["scopes"] == {"project012-dev": {**config["scopes"]["project012-dev"], "project": "012", "environment": "dev"}}
+    assert config["scopes"]["project012-dev"]["resource_group"] == "aif-esml-project012-sdc-dev-001-rg"
+    assert {scope for grant in config["auth"]["grants"] for scope in grant["scopes"]} == {"project012-dev"}
+
+
+def test_grants_are_read_only_and_exactly_the_listed_users_and_no_secret_is_present():
+    config = render()
+    assert config["auth"]["client_id"] == APP and config["auth"]["audience"] == APP, "v2 access tokens carry the client ID as aud"
+    assert config["auth"]["grants"] == [
+        {"object_id": READER_A, "scopes": ["project001-dev"], "permissions": ["knowledge.read", "factory.read"]},
+        {"object_id": READER_B, "scopes": ["project001-dev"], "permissions": ["knowledge.read", "factory.read"]}]
+    scrubbed = {**config, "knowledge": {key: item for key, item in config["knowledge"].items() if key != "excludes"}}
+    text = json.dumps(scrubbed).lower()
+    assert not any(word in text for word in ("secret", "password", "connection_string", "config.write", "factory.delete", "cost.read"))
+    assert config["actions"] == {"enabled_skills": []}
+
+
+def test_the_voice_block_follows_the_optional_overrides():
+    assert render()["voice"] == {"enabled": True, "voice_name": "en-US-Ava:DragonHDLatestNeural", "input_languages": ["en-US"]}
+    swedish = render(aifactoryAgentVoiceName="sv-SE-SofieNeural", aifactoryAgentVoiceLanguages="sv-SE, en-US")["voice"]
+    assert swedish["voice_name"] == "sv-SE-SofieNeural" and swedish["input_languages"] == ["sv-SE", "en-US"]
+
+
+# ---- orchestration ---------------------------------------------------------------------------------------------
+
+def integration(tmp_path, runner=None, arm=None):
+    runner = runner or FakeRunner()
+    return live.LiveVoiceIntegration(arm or FakeArm(), runner, work_dir=tmp_path, repository_root=Path("/work/checkout")), runner
+
+
+def test_skipped_runs_touch_nothing(tmp_path):
+    engine, runner = integration(tmp_path)
+    report = engine.run(request(enableAIFactoryAgentLiveVoice="false"), apply=True)
+    assert report["mode"] == "skipped" and report["mutations"] is False and runner.calls == []
+    assert engine.session.calls == []
+
+
+def test_plan_reads_azure_but_runs_no_command_and_lists_prerequisites(tmp_path):
+    engine, runner = integration(tmp_path)
+    report = engine.run(request(), apply=False)
+    assert report["mode"] == "plan" and report["mutations"] is False and runner.calls == []
+    assert [step["resource"] for step in report["actions"]] == [
+        "isolated python environment", "linux wheels for the bundle", "knowledge index", "container app"]
+    assert all(step["action"] == "would run" for step in report["actions"])
+    joined = " ".join(report["prerequisites"])
+    assert "Entra" in joined and "enableFactoryChatAgent" in joined and "Foundry User" in joined
+    assert report["outputs"]["voice"] is True and report["outputs"]["agent"] == {"name": AGENT_NAME, "version": "3"}
+    assert (tmp_path / "config.json").exists()
+
+
+def test_apply_runs_the_documented_operator_sequence_in_order_with_the_generated_config(tmp_path):
+    engine, runner = integration(tmp_path)
+    report = engine.run(request(), apply=True)
+    assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
+    agent_directory = ROOT / "40-aifactory-agent"
+    assert all(call["cwd"] == agent_directory for call in runner.calls[1:] if "venv" not in " ".join(map(str, call["args"][:3])))
+    config_paths = {call["args"][call["args"].index("--config") + 1] for call in runner.calls if "--config" in call["args"]}
+    assert config_paths == {str(tmp_path / "config.json")} and not str(tmp_path).startswith(str(ROOT))
+    last = runner.calls[-1]["args"]
+    assert last[-1] == "--apply" and "--environment" in last and last[last.index("--environment") + 1] == "aca-env-prj001"
+    assert last[last.index("--integration") + 1] == "live-voice", "the app is marked as created by this step"
+    assert report["mode"] == "apply" and report["mutations"] is True
+    assert report["outputs"]["agent"] == {"name": AGENT_NAME, "version": "3"}
+    assert report["outputs"]["knowledge"] == {"status": "ready", "indexed_document_count": 12}
+    assert report["outputs"]["app"] == {"fqdn": "agent.internal.example", "deployment_state": "Succeeded"}
+    assert report["outputs"]["voice"] is True and runner.configs[0]["voice"]["enabled"] is True
+    assert "secret" not in json.dumps(report).lower()
+
+
+def test_agent_commands_import_the_azurefactory_sdk_from_the_checkout_like_the_container(tmp_path):
+    # The agent imports azurefactory at module load; the container gets it from PYTHONPATH (infra/bootstrap.sh).
+    engine, runner = integration(tmp_path)
+    engine.run(request(), apply=True)
+    sdk = str(Path("/work/checkout") / "environment_setup" / "azurefactory-cli" / "src")
+    agent_calls = [call for call in runner.calls if runner.step_name(call["args"]) in ("ingest", "deploy.py")]
+    assert len(agent_calls) == 2
+    assert all(sdk in call["env"].get("PYTHONPATH", "").split(os.pathsep) for call in agent_calls)
+
+
+def test_the_step_never_creates_the_foundry_agent(tmp_path):
+    engine, runner = integration(tmp_path)
+    engine.run(request(), apply=True)
+    assert not any("deploy-agent" in " ".join(map(str, call["args"])) for call in runner.calls)
+
+
+def test_a_failed_step_stops_the_sequence_and_does_not_leak_command_output(tmp_path):
+    engine, runner = integration(tmp_path, runner=FakeRunner(fail_on="ingest"))
+    with pytest.raises(live.CommandError, match="knowledge index failed"):
+        engine.run(request(), apply=True)
+    assert "deploy.py" not in runner.names() and runner.names()[-1] == "ingest"
+
+
+@pytest.mark.parametrize("arm", [FakeArm(deployments=[]), FakeArm(agent="missing"), FakeArm(agent="foreign"), FakeArm(app="operator")])
+def test_missing_prerequisites_fail_before_any_command_runs(tmp_path, arm):
+    engine, runner = integration(tmp_path, arm=arm)
+    with pytest.raises(ValueError):
+        engine.run(request(), apply=True)
+    assert runner.calls == []
+
+
+def test_nothing_is_ever_deleted_and_azure_is_only_read_by_the_engine(tmp_path):
+    engine, runner = integration(tmp_path)
+    engine.run(request(), apply=True)
+    commands = [" ".join(map(str, call["args"])).replace(str(tmp_path), "<work>").lower() for call in runner.calls]
+    assert commands and not any("delete" in command for command in commands)
+    assert all(call[0] in {"GET", "LIST"} for call in engine.session.calls)
+
+
+# ---- launcher (what the ADO task and the GitHub Actions step run) -----------------------------------------------
+
+def launcher():
+    spec = importlib.util.spec_from_file_location("agent_live_voice_launcher", ROOT / "47-aifactory-agent-live-voice" / "deploy.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def arguments(command="apply", apply=True):
+    return type("Args", (), {"command": command, "apply": apply})()
+
+
+def no_azure(*_):
+    raise AssertionError("Azure must not be contacted")
+
+
+def test_the_launcher_reads_exactly_the_pipeline_variables_the_engine_needs():
+    module = launcher()
+    assert set(module.INPUTS) == set(VALUES) | {"projectResourceGroup"} and len(set(module.INPUTS)) == len(module.INPUTS)
+    assert module.REPOSITORY_ROOT == ROOT.parents[1]
+
+
+def test_disabled_validate_and_invalid_runs_never_reach_azure():
+    module = launcher()
+    off = values(enableAIFactoryAgentLiveVoice="false")
+    assert module.run(arguments(), off, no_azure)["mode"] == "skipped"
+    assert module.run(arguments("validate", False), VALUES, no_azure) == {
+        "mode": "validated", "reason": "Validated project001 Dev AI Factory Agent live voice request.", "voice": True,
+        "mutations": False}
+    with pytest.raises(ValueError, match="requires --apply"):
+        module.run(arguments("apply", False), VALUES, no_azure)
+    with pytest.raises(ValueError, match="requires enableFactoryChatAgent"):
+        module.run(arguments("plan", False), values(enableFactoryChatAgent="false"), no_azure)
+    with pytest.raises(ValueError, match="aifactoryAgentEntraAppId"):
+        module.run(arguments("plan", False), values(aifactoryAgentEntraAppId="$(aifactoryAgentEntraAppId)"), no_azure)
+
+
+def test_plan_reads_azure_only_and_apply_runs_the_engine_in_a_work_directory_outside_the_checkout(tmp_path):
+    module, arm, runner = launcher(), FakeArm(), FakeRunner()
+    environ = values(RUNNER_TEMP=str(tmp_path))
+    recorder = RecordingAccess(arm)
+    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner,
+                      access_factory=lambda session: recorder)
+    assert plan["mode"] == "plan" and plan["mutations"] is False and runner.calls == []
+    applied = module.run(arguments(), environ, lambda subscription, tenant: arm, runner,
+                         access_factory=lambda session: recorder)
+    assert [apply for _, apply, _ in recorder.seen] == [False, True], "the launcher wires the deployer access"
+    assert applied["mode"] == "apply" and runner.names()[-1] == "deploy.py" and applied["outputs"]["voice"] is True
+    assert (tmp_path / "aifactory-agent-live-voice" / "config.json").is_file()
+    assert module.work_directory({"AGENT_TEMPDIRECTORY": str(tmp_path)}) == tmp_path / "aifactory-agent-live-voice"
+    assert not str(module.work_directory({})).startswith(str(ROOT.parents[1]))
+
+
+def test_the_launcher_loads_the_customers_agent_configuration_from_the_consumer_checkout(tmp_path):
+    module, arm, runner = launcher(), FakeArm(app="operator"), FakeRunner()
+    (tmp_path / "aifactory" / "agent").mkdir(parents=True)
+    (tmp_path / "aifactory" / "agent" / "project001-dev.json").write_text(json.dumps(OVERLAY), encoding="utf-8")
+    environ = values(RUNNER_TEMP=str(tmp_path / "temp"), BUILD_SOURCESDIRECTORY=str(tmp_path),
+                     aifactoryAgentConfigFile="aifactory/agent/project001-dev.json")
+    plan = module.run(arguments("plan", False), environ, lambda subscription, tenant: arm, runner,
+                      access_factory=lambda session: RecordingAccess(session))
+    assert plan["mode"] == "plan" and plan["outputs"]["customer_configuration"] == "aifactory/agent/project001-dev.json"
+    written = json.loads((tmp_path / "temp" / "aifactory-agent-live-voice" / "config.json").read_text("utf-8"))
+    assert written["voice"]["mode"] == "realtime" and written["max_tool_rounds"] == 6
+
+
+@pytest.mark.parametrize("path, message", [
+    ("../outside.json", "inside the repository checkout"), ("aifactory/agent/missing.json", "not found"),
+    ("aifactory/agent/list.json", "JSON object"), ("aifactory/agent/broken.json", "valid JSON"),
+])
+def test_the_launcher_refuses_unsafe_or_invalid_customer_configuration(tmp_path, path, message):
+    module = launcher()
+    folder = tmp_path / "repo" / "aifactory" / "agent"
+    folder.mkdir(parents=True)
+    (folder / "list.json").write_text("[]", encoding="utf-8")
+    (folder / "broken.json").write_text("{", encoding="utf-8")
+    (tmp_path / "outside.json").write_text("{}", encoding="utf-8")
+    environ = values(BUILD_SOURCESDIRECTORY=str(tmp_path / "repo"), aifactoryAgentConfigFile=path)
+    with pytest.raises(ValueError, match=message):
+        module.run(arguments("validate", False), environ, no_azure)
+
+
+def test_the_consumer_checkout_defaults_to_the_folder_that_contains_the_submodule():
+    module = launcher()
+    assert module.consumer_root({"GITHUB_WORKSPACE": "/gh"}) == Path("/gh")
+    assert module.consumer_root({"BUILD_SOURCESDIRECTORY": "/ado", "GITHUB_WORKSPACE": "/gh"}) == Path("/ado")
+    assert module.consumer_root({}) == ROOT.parents[2]
+
+
+def test_the_command_line_reports_configuration_and_command_errors_in_one_line(monkeypatch, capsys):
+    module = launcher()
+    monkeypatch.setattr(sys, "argv", ["deploy.py", "validate"])
+    for name in module.INPUTS:
+        monkeypatch.delenv(name, raising=False)
+    for name, value in values(enableFactoryChatAgent="false").items():
+        monkeypatch.setenv(name, value)
+    assert module.main() == 1
+    error = capsys.readouterr().err
+    assert "requires enableFactoryChatAgent" in error and "Traceback" not in error
+    monkeypatch.setattr(module, "run", lambda args: (_ for _ in ()).throw(live.CommandError("ingest failed (exit 1)")))
+    assert module.main() == 1 and "ingest failed (exit 1)" in capsys.readouterr().err
+
+
+class RecordingAccess:
+    def __init__(self, arm):
+        self.arm, self.seen = arm, []
+
+    def ensure(self, needs, *, apply):
+        self.seen.append(({need.scope: need.role for need in needs}, apply, len(self.arm.calls)))
+        return [{"status": "created", "scope": need.scope} for need in needs]
+
+
+def test_the_step_grants_its_own_foundry_blob_and_search_data_access_before_any_data_plane_call(tmp_path):
+    from agent_factory import deployer_access
+
+    arm = FakeArm()
+    recorder = RecordingAccess(arm)
+    engine = live.LiveVoiceIntegration(arm, FakeRunner(), work_dir=tmp_path, repository_root=Path("/work/checkout"),
+                                       access=recorder)
+    report = engine.run(request(), apply=True)
+    needs, apply, calls_before = recorder.seen[0]
+    assert apply is True and needs == {
+        ACCOUNT_ID: deployer_access.FOUNDRY_USER,
+        f"{GROUP_ID}/providers/Microsoft.Storage/storageAccounts/saprj0012001/blobServices/default/containers/aifactory-agent":
+            deployer_access.STORAGE_BLOB_DATA_CONTRIBUTOR,
+        f"{GROUP_ID}/providers/Microsoft.Search/searchServices/srch001": deployer_access.SEARCH_INDEX_DATA_CONTRIBUTOR,
+    }
+    first_agent_call = next(i for i, call in enumerate(arm.calls) if call[0] == "GET" and str(call[1]).startswith(ENDPOINT))
+    assert calls_before <= first_agent_call
+    assert [row["status"] for row in report["deployer_access"]] == ["created"] * 3
+
+
+def test_plan_reports_the_access_it_would_grant(tmp_path):
+    arm = FakeArm()
+    recorder = RecordingAccess(arm)
+    live.LiveVoiceIntegration(arm, FakeRunner(), work_dir=tmp_path, repository_root=Path("/work/checkout"),
+                              access=recorder).run(request(), apply=False)
+    assert recorder.seen[0][1] is False
+
+
+def test_the_launchers_build_the_real_deployer_access_from_their_session():
+    import importlib.util as util
+
+    from agent_factory import deployer_access
+
+    for folder in ("46-factory-chat-agent", "47-aifactory-agent-live-voice"):
+        spec = util.spec_from_file_location(f"launcher_{folder[:2]}", ROOT / folder / "deploy.py")
+        module = util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.run.__kwdefaults__["access_factory"].__func__ is deployer_access.DeployerAccess.for_session.__func__, folder
+
+
+
+def test_skip_knowledge_deploys_only_the_application_against_the_committed_index(tmp_path):
+    engine, runner = integration(tmp_path)
+    report = engine.run(request(), apply=True, skip_knowledge=True)
+    assert runner.names() == ["venv", "pip install", "pip download", "deploy.py"]
+    assert {"resource": "knowledge index", "action": "skipped",
+            "detail": "the application keeps the last committed index; its refresh job updates it"} in report["actions"]
+
+
+def _agent_dir(tmp_path, lock="azure-identity==1.25.1\n"):
+    agent = tmp_path / "agent"
+    agent.mkdir(exist_ok=True)
+    (agent / "requirements.lock.txt").write_text(lock, encoding="utf-8")
+    return agent
+
+
+def test_a_cached_environment_and_wheels_are_reused_until_the_lock_file_changes(tmp_path):
+    cache, agent = tmp_path / "cache", _agent_dir(tmp_path)
+
+    def run():
+        runner = FakeRunner()
+        engine = live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / "work", repository_root=Path("/work/checkout"),
+                                           agent_dir=agent, cache_dir=cache)
+        return engine.run(request(), apply=True), runner
+
+    first, runner = run()
+    assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
+    assert str(cache) in " ".join(map(str, runner.calls[0]["args"])), "the environment lives in the cache, not the run"
+    second, runner = run()
+    assert runner.names() == ["ingest", "deploy.py"]
+    reused = [item["resource"] for item in second["actions"] if item["action"] == "reused"]
+    assert reused == ["isolated python environment", "linux wheels for the bundle"]
+    _agent_dir(tmp_path, lock="azure-identity==1.26.0\n")
+    _, runner = run()
+    assert runner.names() == ["venv", "pip install", "pip download", "ingest", "deploy.py"]
+
+
+class WheelRunner(FakeRunner):
+    """pip download writes a wheel to --dest; deploy.py records what it would bundle from .build/wheels."""
+
+    def __init__(self):
+        super().__init__()
+        self.bundled = None
+
+    def __call__(self, args, *, cwd, env=None):
+        if "download" in args:
+            dest = Path(cwd) / args[args.index("--dest") + 1]
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "azure_identity-1.25.1-py3-none-any.whl").write_bytes(b"wheel")
+        if "deploy.py" in args:
+            wheels = Path(cwd) / ".build" / "wheels"
+            self.bundled = sorted(path.name for path in wheels.iterdir()) if wheels.is_dir() else []
+        return super().__call__(args, cwd=cwd, env=env)
+
+
+def test_cached_wheels_survive_a_fresh_checkout_and_are_staged_for_the_bundle(tmp_path):
+    cache = tmp_path / "cache"
+
+    def run(checkout, stale=False):
+        (tmp_path / checkout).mkdir()
+        agent = _agent_dir(tmp_path / checkout)
+        if stale:
+            (agent / ".build" / "wheels").mkdir(parents=True)
+            (agent / ".build" / "wheels" / "azure_identity-1.0.0-py3-none-any.whl").write_bytes(b"old")
+        runner = WheelRunner()
+        live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / checkout / "work",
+                                  repository_root=Path("/work/checkout"), agent_dir=agent,
+                                  cache_dir=cache).run(request(), apply=True)
+        return runner
+
+    first = run("checkout-1")
+    download = next(call["args"] for call in first.calls if "download" in call["args"])
+    assert str(cache) in download[download.index("--dest") + 1], "wheels are kept in the cache, not the checkout"
+    assert first.bundled == ["azure_identity-1.25.1-py3-none-any.whl"]
+    second = run("checkout-2", stale=True)
+    assert second.names() == ["ingest", "deploy.py"], "a fresh pipeline checkout reuses the cached wheels"
+    assert second.bundled == ["azure_identity-1.25.1-py3-none-any.whl"], "only this lock file's wheels are bundled"
+
+
+def test_a_failed_environment_step_is_never_marked_reusable(tmp_path):
+    cache, agent = tmp_path / "cache", _agent_dir(tmp_path)
+    failing = live.LiveVoiceIntegration(FakeArm(), FakeRunner(fail_on="pip install"), work_dir=tmp_path / "work",
+                                        repository_root=Path("/work/checkout"), agent_dir=agent, cache_dir=cache)
+    with pytest.raises(live.CommandError):
+        failing.run(request(), apply=True)
+    runner = FakeRunner()
+    live.LiveVoiceIntegration(FakeArm(), runner, work_dir=tmp_path / "work", repository_root=Path("/work/checkout"),
+                              agent_dir=agent, cache_dir=cache).run(request(), apply=True)
+    assert runner.names()[:2] == ["venv", "pip install"]
+
+
+def test_the_launcher_passes_skip_knowledge_and_a_persistent_cache_directory(tmp_path):
+    module, arm, runner = launcher(), FakeArm(), FakeRunner()
+    environ = values(RUNNER_TEMP=str(tmp_path / "temp"), AGENT_TOOLSDIRECTORY=str(tmp_path / "tools"))
+    args = type("Args", (), {"command": "apply", "apply": True, "skip_knowledge": True})()
+    module.run(args, environ, lambda subscription, tenant: arm, runner, access_factory=lambda session: None)
+    assert "ingest" not in runner.names()
+    assert module.cache_directory(environ) == tmp_path / "tools" / "aifactory-agent-cache"
+    assert module.cache_directory({}).name == "aifactory-agent-cache"

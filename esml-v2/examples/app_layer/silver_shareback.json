@@ -1,0 +1,11 @@
+{
+  "dataset": "customers",
+  "producer_project": "003",
+  "variation": "validated-demographics",
+  "version": "v1",
+  "source_key": "mlops/v1/projects/project003/environments/dev/usecases/customer-model/training/runs/refinement-v1/data/customers/silver",
+  "table_relative": "",
+  "owner": "project003-data-product-owner",
+  "allowed_projects": ["003", "004", "005"],
+  "mode": "reference"
+}

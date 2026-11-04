@@ -1,0 +1,5 @@
+-r ../requirements.txt
+# Install the ESML v2 SDK separately from the same checkout; the build bundles ml_model_factory
+# (no editable mode, so reinstall after changing esml-v2 or the model-factory engines):
+#   python -m pip install "<repository>\esml-v2[train,storage,dev]"
+# In an orange consumer repository the path is <orange>\azure-enterprise-scale-ml\esml-v2.

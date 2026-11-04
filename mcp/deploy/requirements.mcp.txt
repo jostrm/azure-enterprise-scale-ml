@@ -1,0 +1,14 @@
+mcp==1.30.0
+httpx==0.28.1
+pydantic==2.13.5
+uvicorn==0.54.0
+jsonschema==4.26.0
+PyJWT[crypto]==2.15.0
+azure-ai-projects==2.7.0
+azure-identity==1.26.0
+azure-search-documents==11.6.0
+azure-storage-blob==12.31.0
+azure-keyvault-secrets==4.11.3
+openai==3.19.2
+fastapi==0.141.1
+azure-monitor-opentelemetry==1.8.10

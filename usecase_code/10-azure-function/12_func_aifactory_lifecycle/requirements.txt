@@ -1,0 +1,8 @@
+azure-functions>=1.21,<2
+azure-identity>=1.15
+azure-data-tables>=12.5
+azure-storage-queue>=12.9
+azure-keyvault-secrets>=4.8
+# AIF_BACKEND=sdk: thin L1 ESAF client; L2 owns orchestration and durable scenario jobs.
+# Requires a live API with /api/v1/esaf/* and exact scope/enrollment/deletion guards; no legacy fallback.
+azurefactory-cli @ git+https://github.com/jostrm/azure-enterprise-scale-ml@7b0494fd161d6db90fb9a3d809ba567e1c85e046#subdirectory=environment_setup/azurefactory-cli

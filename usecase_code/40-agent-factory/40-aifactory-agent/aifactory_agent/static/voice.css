@@ -1,0 +1,13 @@
+/* Live voice card. Colours come only from the theme variables defined in theme.css. */
+.voice-card { display: grid; gap: 4px; }
+.voice-stage { display: grid; justify-items: center; gap: 8px; margin: 8px 0 4px; padding: 8px 0; }
+.voice-orb { width: min(300px, 80vw); height: min(300px, 80vw); max-width: 100%; display: block; }
+.voice-state { margin: 0; font-weight: 600; letter-spacing: .02em; color: var(--cp-text); text-align: center; }
+.voice-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 8px 0; }
+.voice-controls button { min-width: 11rem; }
+.voice-transcript { min-height: 3.2em; margin: 8px 0 0; padding: 12px 16px; border-radius: 10px; background: var(--cp-surface-soft); border: 1px solid var(--cp-border); }
+.voice-transcript:empty { display: none; }
+.voice-transcript p { margin: 4px 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .voice-controls button { flex: 1 1 100%; }
+}

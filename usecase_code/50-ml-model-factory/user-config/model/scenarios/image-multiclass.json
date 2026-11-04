@@ -1,0 +1,17 @@
+{
+  "name": "image-multiclass",
+  "task": "image_classification",
+  "model_name": "scene-classification",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "puneet6060/intel-image-classification",
+    "file": "seg_train/seg_train", "version": 2, "license": "Data files © Original Authors",
+    "source_url": "https://www.kaggle.com/datasets/puneet6060/intel-image-classification",
+    "status": "license-review",
+    "notes": "Six scene classes in image folders. Original-author terms must be approved before ingestion. Only the source training directory is re-split; no pretrained weight download by default."
+  },
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "vision": {"format": "image_folder", "image_root": ".", "image_base_uri": null, "pretrained": false, "device": "cpu", "image_size": 64, "epochs": 1, "batch_size": 2, "max_steps_per_epoch": 5, "learning_rate": 0.001},
+  "automl": {"primary_metric": "accuracy", "limits": {"max_trials": 1, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "resnet18"},
+  "quality": {}
+}

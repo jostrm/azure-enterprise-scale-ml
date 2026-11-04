@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const explicit = param === "light" || param === "dark";
+    const system = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => document.documentElement.setAttribute("data-theme", explicit ? param : system.matches ? "dark" : "light");
+    apply();
+    if (!explicit) system.addEventListener("change", apply);
+    // Color theme: a choice saved in the fragment, then the embedding app's scoutPalette, then Gray and Blue.
+    const palettes = ["gray-blue", "purple"];
+    const palette = [new URLSearchParams((window.location.hash || "").slice(1)).get("palette"),
+      new URLSearchParams(window.location.search).get("scoutPalette")].find((value) => palettes.includes(value));
+    document.documentElement.setAttribute("data-palette", palette || "gray-blue");
+  })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Enterprise Scale AI Factory Agent</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/voice.css">
+  <script src="/static/vendor/markdown-it.min.js" defer></script>
+  <script src="/static/markdown.js" defer></script>
+  <script src="/static/app.js" defer></script>
+  <script src="/static/voice-orb.js" defer></script>
+  <script src="/static/voice.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">ENTERPRISE SCALE · AI FACTORY</p>
+      <h1>Factory Agent</h1>
+      <p class="muted">Evidence-backed guidance. Explicitly governed actions.</p>
+    </div>
+    <div class="auth-controls">
+      <span id="auth-status" role="status">Not signed in</span>
+      <button id="sign-in" type="button" disabled>Sign in with Microsoft</button>
+      <button id="sign-out" class="secondary" type="button" hidden>Clear session</button>
+      <div class="theme-control">
+        <label for="color-theme">Color theme</label>
+        <select id="color-theme">
+          <option value="gray-blue">Gray and Blue</option>
+          <option value="purple">Purple</option>
+        </select>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section id="setup-blocker" class="notice" aria-labelledby="setup-heading" hidden>
+      <h2 id="setup-heading">Checking sign-in setup</h2>
+      <p id="setup-message">Loading the public authentication configuration. No factory scopes are public.</p>
+    </section>
+    <p id="error-message" class="error" role="alert" hidden></p>
+    <div class="workspace">
+      <aside class="card scope-panel" aria-label="Workspace controls">
+        <h2>Your workspace</h2>
+        <label for="scope-selector">Active factory / project / environment</label>
+        <select id="scope-selector" disabled>
+          <option value="">Sign in to see authorized scopes</option>
+        </select>
+        <dl id="scope-details" class="metadata"></dl>
+        <h3>Explanation view</h3>
+        <div class="view-controls" role="group" aria-label="Explanation audience">
+          <button type="button" id="view-platform" class="secondary" aria-pressed="false">Platform team</button>
+          <button type="button" id="view-project" aria-pressed="true">Project team</button>
+        </div>
+        <p id="view-help" class="muted">Project guidance emphasizes use-case onboarding and self-service.</p>
+        <p class="muted">The view changes explanations, never permissions. The selected scope applies to every request.</p>
+        <section aria-labelledby="knowledge-heading">
+          <h3 id="knowledge-heading">Knowledge freshness</h3>
+          <p id="knowledge-status" role="status">Sign in to inspect knowledge.</p>
+          <button id="refresh-status" class="secondary" type="button" disabled>Check status and history</button>
+          <p class="muted">Ingestion refresh is an external approved-operator task, not a browser action.</p>
+        </section>
+      </aside>
+      <div class="content">
+        <section id="voice-card" class="card voice-card" aria-labelledby="voice-heading" hidden>
+          <h2 id="voice-heading">Talk to the Factory Agent</h2>
+          <p id="voice-help" class="muted">Voice uses the same sign-in and governed read tools as typed chat. Typing remains available if voice fails.</p>
+          <details><summary>More info</summary><p class="muted">The microphone is used only during a voice session; this app does not store audio. Native voice audio and live transcripts are provisional until final citation checks; checked answers and sources appear below. Changing language restarts voice only.</p></details>
+          <label for="voice-language">Voice language</label>
+          <select id="voice-language" hidden aria-label="Voice language"></select>
+          <div class="voice-stage">
+            <canvas id="voice-orb" class="voice-orb" width="320" height="320" role="img" aria-label="Voice activity light"></canvas>
+            <p id="voice-state" class="voice-state" role="status" aria-live="polite">Voice is off</p>
+          </div>
+          <div class="voice-controls">
+            <button id="voice-toggle" type="button" aria-pressed="false" disabled>Start talking</button>
+            <button id="voice-mute" type="button" class="secondary" aria-pressed="false" disabled>Mute microphone</button>
+            <button id="voice-interrupt" type="button" class="secondary" disabled>Stop speaking</button>
+            <button id="voice-use-text" type="button" class="secondary">Use typed chat</button>
+            <button id="voice-retry" type="button" class="secondary">Check voice again</button>
+          </div>
+          <div id="voice-transcript" class="voice-transcript" aria-live="polite"></div>
+          <p id="voice-error" class="error" role="status" hidden></p>
+        </section>
+        <section class="card" aria-labelledby="question-heading">
+          <h2 id="question-heading">Ask the Factory expert</h2>
+          <p class="muted" id="question-examples-help">Read-only examples for the active scope. Choose a question to edit it, then press Ask agent yourself. No example sends automatically.</p>
+          <div id="question-examples" class="tile-grid" role="group" aria-label="Example questions" aria-describedby="question-examples-help"></div>
+          <form id="question-form">
+            <label for="question">Architecture, onboarding, operations or updates</label>
+            <textarea id="question" rows="6" maxlength="8000" required disabled
+              placeholder="Ask a question about the active scope. Documentation does not prove what is deployed."></textarea>
+            <div class="form-footer">
+              <span id="question-count" class="muted">0 / 8000 characters</span>
+              <button id="ask" type="submit" disabled>Ask agent</button>
+            </div>
+          </form>
+          <p id="request-status" role="status">Sign in and choose an authorized scope to start.</p>
+        </section>
+        <section class="card" aria-labelledby="answer-heading">
+          <h2 id="answer-heading">Answer and evidence</h2>
+          <p id="answer-context" class="muted"></p>
+          <div id="answer" class="answer" aria-live="polite">No answer requested yet.</div>
+          <h3>Sources</h3>
+          <p class="muted">Current guidance, historical release notes and live observations are separate evidence types. Installed version remains unknown without a live observation.</p>
+          <ol id="citations" class="citations"></ol>
+          <div id="tool-activity" class="muted"></div>
+        </section>
+        <section class="card" aria-labelledby="skills-heading">
+          <h2 id="skills-heading">Factory actions and cost monitoring</h2>
+          <p class="muted">Cost reports are read-only. Factory actions prepare a saved plan here; they never run from chat. Creation uses an approved private hub/VPN/default-project configuration. Deletion requires the exact resource list, plan hash and deletion phrase, and preserves Entra security groups.</p>
+          <p class="muted" id="action-tiles-help">Action shortcuts ask for confirmation before selecting the form only; no request is sent. Complete the form and confirm preparation separately. Approval and execution remain separate server-governed steps.</p>
+          <div id="action-tiles" class="tile-grid" role="group" aria-label="Factory skill shortcuts" aria-describedby="action-tiles-help"></div>
+          <form id="skill-form">
+            <label for="skill-selector">Skill</label>
+            <select id="skill-selector" disabled>
+              <option value="">Sign in to see the skills for your scope</option>
+            </select>
+            <p id="skill-description" class="muted"></p>
+            <div id="skill-arguments"></div>
+            <button id="run-skill" type="submit" disabled>Choose a skill</button>
+          </form>
+          <p id="skill-status" role="status">Sign in and select an authorized scope.</p>
+          <button id="discover-templates" type="button" class="secondary" disabled>Browse approved agent and ML template types</button>
+          <p class="muted">Agent type is an immediate source-folder name; target is its exact Foundry project resource ID. ML type is a folder under batch, online or streaming; choose that mode and its approved Azure ML workspace or project resource group ID. Training submission is not a deployed model endpoint.</p>
+          <div id="template-result"></div>
+          <div id="skill-result" class="answer" aria-live="polite"></div>
+        </section>
+        <section class="card" aria-labelledby="plans-heading">
+          <h2 id="plans-heading">Department metadata plans · not executed</h2>
+          <p class="muted">Chat is read-only. This form changes display metadata only, not Azure resources or IAM. The Factory skills above have their own permissions and reviewed targets. Review the exact target, changes and expiry; approve the exact hash, then execute separately.</p>
+          <form id="proposal-form">
+            <label for="department-name">Department display name</label>
+            <input id="department-name" type="text" maxlength="200" autocomplete="off" disabled>
+            <label for="department-id">Department identifier</label>
+            <input id="department-id" type="text" maxlength="128" autocomplete="off" disabled>
+            <p class="muted">Leave a field blank to keep it unchanged. At least one field is required. The target is the active workspace scope; arbitrary configuration keys are not accepted.</p>
+            <button id="propose" type="submit" disabled>Propose metadata plan · do not execute</button>
+          </form>
+          <p id="proposal-status" role="status">Blocked until approved Entra sign-in. The server must also enable configuration writes, configure exact factory/scale-set/project identifiers, and reach the existing Factory API. No separate API host is provisioned.</p>
+          <div id="proposed-plans">Sign in to inspect your persisted plans.</div>
+        </section>
+        <section class="card" aria-labelledby="history-heading">
+          <h2 id="history-heading">Execution progress and history</h2>
+          <p class="muted">Started is not completed. Failed or uncertain confirmations must not be replayed. Cancelling a pending plan does not cancel an underlying job.</p>
+          <div id="operation-history">No operation history loaded.</div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <dialog id="confirmation-dialog" class="confirmation-dialog" aria-labelledby="confirmation-heading"
+    aria-describedby="confirmation-action confirmation-description">
+    <h2 id="confirmation-heading">Are you sure?</h2>
+    <p id="confirmation-action" class="confirmation-action"></p>
+    <p id="confirmation-description"></p>
+    <h3>Review the exact action and active target</h3>
+    <pre id="confirmation-details" tabindex="0" aria-label="Action, scope and request details"></pre>
+    <p class="muted">Cancel or press Escape to make no request. This confirmation never replaces server permissions, exact plan-hash approval or the typed deletion phrase.</p>
+    <div class="confirmation-controls">
+      <button id="confirmation-cancel" type="button" class="secondary" autofocus>Cancel · do nothing</button>
+      <button id="confirmation-accept" type="button">Confirm action</button>
+    </div>
+  </dialog>
+  <footer>Tenant-bound Entra sign-in · scoped evidence · server-enforced approvals · no tokens stored in the browser</footer>
+</body>
+</html>

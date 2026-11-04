@@ -1,0 +1,17 @@
+{
+  "$schema": "https://azuremlschemas.azureedge.net/latest/amlCompute.schema.json",
+  "name": "m01-cpu-dev",
+  "type": "amlcompute",
+  "size": "Standard_DS3_v2",
+  "tier": "dedicated",
+  "min_instances": 0,
+  "max_instances": 1,
+  "idle_time_before_scale_down": 120,
+  "ssh_public_access_enabled": false,
+  "enable_node_public_ip": false,
+  "network_settings": {
+    "subnet": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/example-common-dev/providers/Microsoft.Network/virtualNetworks/example-vnet/subnets/example-private-ml"
+  },
+  "identity": {"type": "system_assigned"},
+  "tags": {"model_alias": "M01", "purpose": "esml-v2-training-inference"}
+}

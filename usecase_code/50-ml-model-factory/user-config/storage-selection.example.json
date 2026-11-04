@@ -1,0 +1,19 @@
+{
+  "use_common_datalake_storage": false,
+  "resource_group": "example-project001-dev",
+  "common_resource_group": "example-common-dev",
+  "storage_targets": {
+    "common": {
+      "account_name": "examplecommonlake",
+      "resource_group": "example-common-dev",
+      "container": "lake3",
+      "datastore": "esml_shared_lake"
+    },
+    "project": {
+      "account_name": "exampleprojectdata",
+      "resource_group": "example-project001-dev",
+      "container": "ml-model-factory",
+      "datastore": "ml_model_factory"
+    }
+  }
+}

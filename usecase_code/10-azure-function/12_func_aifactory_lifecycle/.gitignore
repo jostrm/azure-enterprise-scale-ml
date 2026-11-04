@@ -1,0 +1,4 @@
+# Local state of the mock loop (AIF_STORE=file) and local settings (copy local.settings.example.json).
+.aif-lifecycle-state.json
+.aif-lifecycle-state.tmp
+local.settings.json

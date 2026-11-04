@@ -1,0 +1,17 @@
+.git*
+.vscode
+.venv
+__pycache__
+*.py[cod]
+*$py.class
+.python_version
+.pytest_cache
+.DS_Store
+.aif-lifecycle-state.json
+local.settings.json
+settings.*.json
+deploy.ps1
+README.md
+tests
+infra
+workflows

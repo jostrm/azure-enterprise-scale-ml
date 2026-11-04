@@ -1,0 +1,29 @@
+{
+  "batch": {
+    "input_table": "<catalog>.<schema>.<input_table>",
+    "output_table": "<catalog>.<schema>.<predictions_table>",
+    "prediction_type": "double",
+    "env_manager": "local",
+    "model_mode": "custom"
+  },
+  "online": {
+    "registered_model_name": "<catalog>.<schema>.<model>",
+    "endpoint_name": "<endpoint-name>",
+    "workload_size": "Small",
+    "scale_to_zero": "true",
+    "sample_request": ""
+  },
+  "streaming": {
+    "eventhubs_namespace": "<eventhubs-namespace>",
+    "eventhub_name": "<eventhub-name>",
+    "secret_scope": "<secret-scope>",
+    "connection_string_secret": "<secret-name>",
+    "checkpoint_root": "<checkpoint-root>",
+    "output_table": "<catalog>.<schema>.<stream_predictions>",
+    "payload_schema_json": "<spark-schema-json>",
+    "prediction_type": "double",
+    "trigger_interval": "30 seconds",
+    "env_manager": "local",
+    "model_mode": "custom"
+  }
+}

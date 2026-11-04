@@ -1,0 +1,19 @@
+{
+  "configuration_instructions": "Use main.py init-config to resolve the lake from an existing consumer binding; do not run this file as a deployment configuration.",
+  "factory_config": "<consumer-owned agent-factory config.json>",
+  "target": "<exact configured target key>",
+  "common_sources_file": "<existing rag-sources.json>",
+  "common_source_key": "<explicit common lake binding key>",
+  "dataset": "car-sales",
+  "version": "v1",
+  "paths_approved": false,
+  "backend_identity_client_id": "<separate retrieval backend managed identity>",
+  "search_identity_object_id": "<Search service ingestion identity>",
+  "acl_test_principal_ids": [],
+  "denied_test_user_ids": [],
+  "partition_policies": {
+    "json": {"allowed_group_ids": [], "allowed_user_ids": []},
+    "excel": {"allowed_group_ids": [], "allowed_user_ids": []}
+  },
+  "image": null
+}

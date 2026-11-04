@@ -1,0 +1,9 @@
+{
+  "name": "aifactory-agent-web-assets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned browser assets vendored into the private AI Factory Agent bundle",
+  "dependencies": {
+    "markdown-it": "15.0.2"
+  }
+}

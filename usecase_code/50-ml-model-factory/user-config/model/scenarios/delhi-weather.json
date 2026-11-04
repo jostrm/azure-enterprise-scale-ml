@@ -1,0 +1,21 @@
+{
+  "name": "delhi-weather",
+  "task": "forecasting",
+  "model_name": "delhi-temperature",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "sumanthvrao/daily-climate-time-series-data",
+    "file": "DailyDelhiClimateTrain.csv", "version": 3, "license": "CC0: Public Domain",
+    "source_url": "https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data",
+    "status": "configured",
+    "notes": "Daily mean temperature; weather covariates are omitted because their future values are not known at forecast origin. Last two 14-day windows of the labeled training file are held out. Verify upstream Weather Underground attribution for intended use."
+  },
+  "features": ["date"],
+  "target": "meantemp",
+  "categorical_features": [],
+  "sensitive_features": [],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "forecast": {"time_column": "date", "series_columns": [], "frequency": "D", "horizon": 14},
+  "automl": {"primary_metric": "normalized_root_mean_squared_error", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "seasonal_naive", "seasonal_period": 7},
+  "quality": {"max_rmse": 25}
+}

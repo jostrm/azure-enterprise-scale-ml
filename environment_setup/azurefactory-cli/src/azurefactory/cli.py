@@ -1,0 +1,2141 @@
+"""Command line interface for AzureFactoryClient."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import sys
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, catalog_settings_request, factory_create_request, redact_secrets, registered_creation_issues
+from .configuration import ConfigurationDraft
+from .client import catalog_settings_request
+from . import catalog_requests, enrollment
+from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
+from .monitoring_saved import register_saved_commands
+from .review import load_receipt as review_load_receipt
+from .review import parse_expires_at, validate_preview, write_receipt
+
+EXIT_OK = 0
+EXIT_USAGE = 2
+EXIT_BLOCKED = 3
+EXIT_TIMEOUT = 4
+EXIT_FAILURE = 5
+
+# Client-side time budgets (doubled 2026-10-27; pinned in tests/test_time_budgets.py).
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 90.0
+PREFLIGHT_REQUEST_TIMEOUT_SECONDS = 540.0
+COST_REQUEST_TIMEOUT_SECONDS = 900.0
+WATCH_TIMEOUT_SECONDS = 900.0
+WATCH_MAX_RETRIES = 9
+POLL_TIMEOUT_SECONDS = 1800.0
+
+REQUIRED_OPENAPI_PATHS = {
+    "/health": {"get"},
+    "/api/v1/schema": {"get"},
+    "/api/v1/projects/load": {"post"},
+    "/api/v1/import": {"post"},
+    "/api/v1/validation": {"post"},
+    "/api/v1/export": {"post"},
+    "/api/v1/projects/save": {"post"},
+    "/api/v1/projects/load": {"post"},
+    "/api/v1/projects/save": {"post"},
+    "/api/v1/validation": {"post"},
+    "/api/v1/export": {"post"},
+    "/api/v1/azure/auth/status": {"post"},
+    "/api/v1/factory-catalog": {"get"},
+    "/api/v1/factory-catalog/settings": {"get"},
+    "/api/v1/factory-catalog/parameters": {"get"},
+    "/api/v1/factory-catalog/parameters/prepare": {"post"},
+    "/api/v1/factory-catalog/parameters/confirm": {"post"},
+    "/api/v1/factory-catalog/prepare": {"post"},
+    "/api/v1/factory-catalog/confirm": {"post"},
+    "/api/v1/factory-catalog/jobs": {"get"},
+    "/api/v1/factory-catalog/jobs/{job_id}": {"get"},
+    "/api/v1/factory-catalog/terminal": {"get"},
+    "/api/v1/creation/capabilities": {"get"},
+    "/api/v1/creation/bootstrap/config": {"post"},
+    "/api/v1/creation/bootstrap/prepare": {"post"},
+    "/api/v1/creation/bootstrap/start": {"post"},
+    "/api/v1/creation/bootstrap/jobs/{job_id}": {"get"},
+    "/api/v1/operations/project-deployments": {"get"},
+    "/api/v1/operations/project-deployments/plan": {"post"},
+    "/api/v1/operations/project-deployments/prepare": {"post"},
+    "/api/v1/operations/project-deployments/start": {"post"},
+    "/api/v1/operations/project-deployments/terminal": {"get"},
+}
+
+REQUIRED_SCHEMAS = {
+    "CatalogPrepare",
+    "CatalogConfirm",
+    "CatalogPreview",
+    "CatalogConfirmed",
+    "CatalogParameterPrepare",
+    "ProjectDeploymentPlanBody",
+    "ProjectDeploymentPrepareBody",
+    "ProjectDeploymentStartBody",
+    "ProjectDeploymentAcknowledgement",
+    "BootstrapPrepare",
+}
+
+BOOLEAN = ("true", "false")
+# Dedicated config options: (option, exact variable name, choices, help).
+MCP_GATEWAY_OPTIONS = (
+    ("--enable-aifactory-mcp", "enableAIFactoryMCP", BOOLEAN,
+     "Host the governed, read-only AI Factory MCP in project001 Dev (requires enableContainerApps and enableAIFoundry)."),
+    ("--enable-factory-chat-agent", "enableFactoryChatAgent", BOOLEAN,
+     "Create or update the owned Factory Chat Agent in the selected project Foundry (requires enableAIFoundry)."),
+    ("--enable-ai-gateway-sku", "enableAIGatewaySKU", BOOLEAN,
+     "Create or adopt the new Azure AI Gateway SKU wired to the project001 Dev Foundry (requires enableAIFoundry)."),
+    ("--add-aifactory-mcp-to-ai-gateway-sku", "addAIFactoryMCP2AIGatewaySKU", BOOLEAN,
+     "Register the AI Factory MCP as a read-only AI Gateway tool server (requires both options above)."),
+    ("--aifactory-mcp-image", "aifactoryMcpImage", None,
+     "Digest-pinned MCP image <registry>.azurecr.io/<repository>@sha256:<digest>."),
+    ("--aifactory-mcp-api-image", "aifactoryMcpApiImage", None, "Digest-pinned Factory API sidecar image."),
+    ("--aifactory-mcp-entra-app-id", "aifactoryMcpEntraAppId", None,
+     "Client ID (GUID) of the MCP API app registration exposing AiFactory.Mcp.Read."),
+    ("--aifactory-mcp-container-apps-environment", "aifactoryMcpContainerAppsEnvironment", None,
+     "Internal project Container Apps environment name; empty selects the single one."),
+    ("--ai-gateway-sku-resource-id", "aiGatewaySkuResourceId", None,
+     "Existing AI Gateway SKU resource ID to adopt (never modified); empty creates an owned gateway."),
+    ("--ai-gateway-sku-outbound-subnet-id", "aiGatewaySkuOutboundSubnetId", None,
+     "Subnet ID for AI Gateway outbound VNet integration (needed to register the private MCP)."),
+    ("--aifactory-mcp-classic-apim-resource-ids", "aifactoryMcpClassicApimResourceIds", None,
+     "Comma-separated classic APIM (Microsoft.ApiManagement/service) resource IDs whose system-assigned "
+     "identities may call the MCP (requires enableAIFactoryMCP; APIMs are only read)."),
+    ("--aifactory-mcp-container-app-resource-id", "aifactoryMcpContainerAppResourceId", None,
+     "Resource ID of an AI Factory MCP Container App deployed outside the pipeline to adopt; must be in the "
+     "project resource group, only its caller lists grow (requires enableAIFactoryMCP; empty uses the pipeline-managed app)."),
+    ("--add-aifactory-mcp-to-apim", "addAIFactoryMCP2APIM", BOOLEAN,
+     "Publish the AI Factory MCP on the AI gateway pipeline's classic APIM (apimGateway* variables): the project step "
+     "adds the APIM identity to the MCP callers and infra-ai-gateway exposes the MCP API (requires enableAIFactoryMCP)."),
+)
+LIVE_VOICE_OPTIONS = (
+    ("--enable-aifactory-agent-live-voice", "enableAIFactoryAgentLiveVoice", BOOLEAN,
+     "Deploy the AI Factory Agent chat application with Azure Voice Live speech and the pulsing voice orb in this project's Dev "
+     "(requires enableFactoryChatAgent, enableAIFoundry, enableAISearch and enableContainerApps or a named environment)."),
+    ("--aifactory-agent-entra-app-id", "aifactoryAgentEntraAppId", None,
+     "Client ID (GUID) of the agent's dedicated Entra single-page-app registration."),
+    ("--aifactory-agent-container-apps-environment", "aifactoryAgentContainerAppsEnvironment", None,
+     "Internal project Container Apps environment name; empty selects the single one."),
+    ("--aifactory-agent-reader-object-ids", "aifactoryAgentReaderObjectIds", None,
+     "Comma-separated Entra object IDs (GUIDs) granted read-only chat access."),
+    ("--aifactory-agent-voice-name", "aifactoryAgentVoiceName", None,
+     "Azure Speech voice for spoken answers; empty uses en-US-Ava:DragonHDLatestNeural."),
+    ("--aifactory-agent-voice-languages", "aifactoryAgentVoiceLanguages", None,
+     "Comma-separated BCP-47 speech input languages such as sv-SE,en-US; empty uses en-US."),
+    ("--aifactory-agent-config-file", "aifactoryAgentConfigFile", None,
+     "Your own agent configuration (JSON, relative to the repository root) merged over the generated one; empty uses none."),
+    ("--aifactory-agent-model-deployment", "aifactoryAgentModelDeployment", None,
+     "Foundry model deployment used by the agent; empty uses modelGPTXName."),
+)
+DEDICATED_OPTIONS = (("mcp_gateway", MCP_GATEWAY_OPTIONS), ("live_voice", LIVE_VOICE_OPTIONS))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not hasattr(args, "func"):
+        parser.print_help(sys.stderr)
+        return EXIT_USAGE
+    try:
+        return int(args.func(args))
+    except KeyboardInterrupt:
+        return _error(130, "Interrupted.")
+    except APIError as exc:
+        exc.message = redact_secrets(exc.message, args.api_key)
+        exc.details = redact_secrets(exc.details, args.api_key)
+        return _error(exc.exit_code, exc.message, exc)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="azurefactory", description="Safe CLI for the local AzureFactory API.")
+    parser.add_argument("--api-url", default=os.getenv(API_URL_ENV), help=f"API base URL (env {API_URL_ENV}, default loopback:8765).")
+    parser.add_argument("--api-key", default=os.getenv(API_KEY_ENV), help=f"API key value (env {API_KEY_ENV}); never logged or stored.")
+    parser.add_argument("--timeout", type=positive_float,
+                        help="Per-request timeout seconds (default 360 for preflight, 600 for costs, 60 otherwise).")
+    sub = parser.add_subparsers(dest="command")
+
+    add_simple(sub, "health", cmd_health)
+    preflight = add_simple(sub, "preflight", cmd_preflight,
+                           help="Read-only deployment readiness; complements health/doctor, never approves or provisions.")
+    preflight.add_argument("--request-json", required=True, help="Deployment preflight or workflow-prepare JSON file.")
+    preflight.add_argument("--save-report", help="Save redacted report JSON to a new file, never an approval receipt.")
+    deletion_help = ("Deletes Azure resources and removes the saved factory only after confirmed success; "
+                     "Entra security groups and Git history are kept.")
+    deletion = sub.add_parser("delete-aifactory", help=deletion_help, description=deletion_help)
+    deletion_sub = deletion.add_subparsers(dest="deletion_command", required=True)
+    deletion_prepare = add_simple(deletion_sub, "prepare", cmd_delete_aifactory_prepare,
+                                  help="Preview exact deleted and retained resources; never delete.")
+    for field in ("folder", "factory-id", "expected-revision", "save-receipt"):
+        deletion_prepare.add_argument("--" + field, required=True)
+    deletion_prepare.add_argument("--version-ref", help="Optional approved source version.")
+    deletion_confirm = add_simple(deletion_sub, "confirm", cmd_delete_aifactory_confirm,
+                                  help="Show the saved review, then require its exact confirmation phrase.")
+    deletion_confirm.add_argument("--receipt", required=True, help="Unexpired receipt from delete-aifactory prepare.")
+    deletion_confirm.add_argument("--yes", action="store_true",
+                                  help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    deletion_confirm.add_argument("--confirmation-phrase",
+                                  help="Exact server phrase from the reviewed receipt; required without a terminal.")
+    deletion_status = add_simple(deletion_sub, "status", cmd_delete_aifactory_status,
+                                 help="Read deletion progress without starting or retrying deletion.")
+    deletion_status.add_argument("--folder", required=True)
+    deletion_status.add_argument("--job-id", required=True)
+    deletion_reconcile = add_simple(
+        deletion_sub, "reconcile", cmd_delete_aifactory_reconcile,
+        help="Resume local completion of an existing job from its verified pipeline receipts; never dispatch, "
+             "retry pipelines or call Azure.")
+    deletion_reconcile.add_argument("--folder", required=True)
+    deletion_reconcile.add_argument("--job-id", required=True)
+    claim_help = ("Release the single-writer claim that a failed run kept, after review; every record is kept, "
+                  "an audit record is added and Azure is never changed.")
+    claim = sub.add_parser("reconcile-run-claim", help=claim_help, description=claim_help)
+    claim_sub = claim.add_subparsers(dest="claim_command", required=True)
+    claim_prepare = add_simple(claim_sub, "prepare", cmd_reconcile_run_claim_prepare,
+                               help="Review the claim, receipts and remote run; never releases anything.")
+    for field in ("folder", "factory-id", "run-id", "save-receipt"):
+        claim_prepare.add_argument("--" + field, required=True)
+    claim_confirm = add_simple(claim_sub, "confirm", cmd_reconcile_run_claim_confirm,
+                               help="Show the saved review, then require its exact confirmation phrase.")
+    claim_confirm.add_argument("--receipt", required=True, help="Unexpired receipt from reconcile-run-claim prepare.")
+    claim_confirm.add_argument("--yes", action="store_true",
+                               help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    claim_confirm.add_argument("--confirmation-phrase",
+                               help="Exact server phrase from the reviewed receipt; required without a terminal.")
+    authorize_help = ("Grant (--mode allow) or revoke (--mode revoke) a factory's deletion permission after review; "
+                      "only the provider state changes, an audit record is added and Azure is never changed.")
+    authorize = sub.add_parser("authorize-deletion", help=authorize_help, description=authorize_help)
+    authorize_sub = authorize.add_subparsers(dest="authorize_command", required=True)
+    authorize_prepare = add_simple(authorize_sub, "prepare", cmd_authorize_deletion_prepare,
+                                   help="Review the deletion permission change; never changes anything.")
+    for field in ("folder", "factory-id", "save-receipt"):
+        authorize_prepare.add_argument("--" + field, required=True)
+    authorize_prepare.add_argument("--mode", required=True,
+                                   help="allow grants deletion permission; revoke removes it.")
+    authorize_confirm = add_simple(authorize_sub, "confirm", cmd_authorize_deletion_confirm,
+                                   help="Show the saved review, then require its exact confirmation phrase.")
+    authorize_confirm.add_argument("--receipt", required=True,
+                                   help="Unexpired receipt from authorize-deletion prepare.")
+    authorize_confirm.add_argument("--yes", action="store_true",
+                                   help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    authorize_confirm.add_argument("--confirmation-phrase",
+                                   help="Exact server phrase from the reviewed receipt; required without a terminal.")
+    workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
+    workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
+    for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
+        command = add_simple(workflow_sub, name, handler)
+        command.add_argument("--repository", required=True, help="Exact GitHub OWNER/REPO.")
+        command.add_argument("--run-id", type=int, required=True)
+        command.add_argument("--json", action="store_true", help="JSON status, or one JSON event per line when watching.")
+        if name == "watch":
+            command.add_argument("--after", help="Opaque event cursor from an earlier observation.")
+            command.add_argument("--follow", action=argparse.BooleanOptionalAction, default=True)
+            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=WATCH_TIMEOUT_SECONDS,
+                                 help="Overall observation deadline seconds (default 600); does not cancel the workflow.")
+            command.add_argument("--max-retries", type=int, default=WATCH_MAX_RETRIES,
+                                 help="Maximum read-only reconnects (default 6).")
+            command.add_argument("--backoff-initial", type=positive_float, default=0.5)
+            command.add_argument("--backoff-max", type=positive_float, default=8.0)
+    add_esaf_commands(sub)
+    api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
+    api_sub = api.add_subparsers(dest="api_command", required=True)
+    add_simple(api_sub, "instructions", cmd_api_instructions,
+               help="Print offline startup instructions and the selected URL; never print or persist credentials.")
+    monitoring = sub.add_parser("monitoring", help="Canonical evidence and read-only Azure cost reports; no deployments.")
+    monitoring_sub = monitoring.add_subparsers(dest="monitoring_command", required=True)
+    add_simple(monitoring_sub, "catalog", cmd_monitoring_catalog)
+    costs = add_simple(
+        monitoring_sub, "resource-group-costs", cmd_resource_group_costs,
+        help="Azure Cost Management actual and full-month forecast; explicitly selected subscriptions only.")
+    costs.add_argument("--subscription", dest="subscription_ids", action="append", required=True,
+                       help="Selected subscription UUID; repeat for multiple subscriptions.")
+    costs.add_argument("--month", help="Calendar month YYYY-MM; omitted uses the current UTC month on the API.")
+    costs.add_argument("--folder", help="Optional registered factory catalog folder on the API host.")
+    costs.add_argument("--refresh", action="store_true", help="Bypass the API's scoped read cache.")
+    register_saved_commands(monitoring_sub)
+    gateway = sub.add_parser(
+        "gateway", help="AI Gateway Portal: DEMO, native AI Gateway SKU and classic APIM; read-only, same menu as the wizards.")
+    gateway_sub = gateway.add_subparsers(dest="gateway_command", required=True)
+    add_simple(gateway_sub, "list", cmd_gateway_list,
+               help="List DEMO and the configured gateways with their labels; never contacts Azure.")
+    add_simple(gateway_sub, "show", cmd_gateway_show,
+               help="Show the last refreshed menu: enabled areas and inventory; never contacts Azure.",
+               ).add_argument("instance", help="Instance ID from 'azurefactory gateway list'.")
+    add_simple(gateway_sub, "refresh", cmd_gateway_refresh,
+               help="Refresh one gateway with the API host's bounded GET-only ARM reads.",
+               ).add_argument("instance", help="Instance ID from 'azurefactory gateway list'.")
+    for action in ("summary", "report", "export"):
+        command = add_simple(monitoring_sub, action, cmd_monitoring)
+        command.add_argument("--request", help="Exact canonical request JSON, including explicit source and supplied live observations.")
+        if action != "summary":
+            command.add_argument("--report", choices=(
+                "agent-value", "showback", "foundry-tokens", "foundry-usage",
+                "quality-reliability", "security-governance",
+            ))
+        command.add_argument("--source", choices=("sample", "live"))
+        command.add_argument("--days", type=int)
+        command.add_argument("--start-date", help="Inclusive UTC date (YYYY-MM-DD); requires --end-date.")
+        command.add_argument("--end-date", help="Inclusive UTC date (YYYY-MM-DD); requires --start-date, at most 90 days.")
+        for dimension in ("factory", "scaleset", "project", "environment"):
+            command.add_argument("--" + dimension, help="Exact identity; omitted selects All.")
+        if action == "export":
+            command.add_argument("--format", choices=("json", "csv"))
+    enroll = sub.add_parser("enrollment", help="Reviewed add-only Azure/provider enrollment; schema-2 consumers only.")
+    enroll_sub = enroll.add_subparsers(dest="enrollment_command", required=True)
+    for name, handler in (("plan", cmd_enrollment_plan), ("ensure", cmd_enrollment_ensure)):
+        command = add_simple(enroll_sub, name, handler)
+        for field in ("consumer-root", "factory-id", "scale-set-id", "options"):
+            command.add_argument("--" + field, required=name == "plan")
+        command.add_argument("--environment", choices=("dev", "stage", "prod"), required=name == "plan")
+        command.add_argument("--expected-orchestrator", choices=("ado", "gha"), help="Block a different registered provider.")
+        command.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
+                             help="Attest serialized provisioning and ALL writers' Blob leases or exclusive repository/shared-hub governance; never automatic.")
+        if name == "plan":
+            command.add_argument("--save-plan", help="New non-secret, integrity-bound local review file; never overwritten.")
+        else:
+            command.add_argument("--plan", help="Previously saved --save-plan artifact; scope/options must still match.")
+            command.add_argument("--expected-plan", help="Approved plan_hash; required without --plan and full scope flags.")
+            command.add_argument("--yes", action="store_true")
+            command.add_argument("--save-result", help="New candidate artifact for prepare-binding; requires --plan.")
+    binding = add_simple(enroll_sub, "prepare-binding", cmd_enrollment_binding,
+                         help="Prepare the exact ensure candidate with the local catalog API; never publish directly.")
+    binding.add_argument("--result", required=True, help="Artifact written by enrollment ensure --save-result.")
+    binding.add_argument("--expected-revision", required=True, help="Current catalog list revision, not the enrollment hash.")
+    binding.add_argument("--save-receipt", required=True, help="New API receipt for a separate catalog confirm --yes.")
+    publish = add_simple(enroll_sub, "publish", cmd_enrollment_publish,
+                         help="Confirm only a separately reviewed binding API receipt.")
+    add_receipt_and_yes(publish)
+    combined = add_simple(enroll_sub, "plan-and-publish", cmd_enrollment_plan_and_publish,
+                          help="Plan, ensure, prepare-binding and publish one bounded scope; no runtime deployment.")
+    for field in ("consumer-root", "factory-id", "scale-set-id", "options", "artifact-dir"):
+        combined.add_argument("--" + field, required=True)
+    combined.add_argument("--environment", choices=("dev", "stage", "prod"), required=True)
+    combined.add_argument("--expected-orchestrator", choices=("ado", "gha"))
+    combined.add_argument("--expected-revision", help="Optional pinned catalog source_revision; otherwise read before ensure.")
+    combined.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
+                          help="Administrator attestation of serialized provisioning and exclusive repository/shared-hub governance (or Blob leases).")
+    combined.add_argument("--yes", action="store_true",
+                          help="Approve this exact scope once, including bounded RG/identity creation and binding publication; without it only plan.")
+    doctor = add_simple(sub, "doctor", cmd_doctor)
+    doctor.add_argument("--local-openapi", help="Optional OpenAPI snapshot to compare with the live API.")
+    schema = add_simple(sub, "schema", cmd_schema)
+    schema.add_argument("--openapi", action="store_true", help="Print live OpenAPI instead of /api/v1/schema.")
+
+    config = sub.add_parser("config", help="Source-preserving JSON legacy-project configuration; never deployment.")
+    config_sub = config.add_subparsers(dest="config_command", required=True)
+    for name, handler in (("review", cmd_config_review), ("save", cmd_config_save)):
+        command = add_simple(config_sub, name, handler)
+        command.add_argument("--folder", required=True, help="Exact legacy factory folder on the API host.")
+        command.add_argument("--project-number", required=True)
+        command.add_argument("--changes-json", help="Local JSON object with only intentional field replacements.")
+        command.add_argument("--snapshot-only", action="store_true", help="Do not write pipeline variable files.")
+        mcp_gateway = command.add_argument_group(
+            "Factory Chat Agent, MCP & AI Gateway",
+            "Dedicated options for late Foundry-phase pipeline steps; saving never deploys.")
+        for option, key, choices, help_text in MCP_GATEWAY_OPTIONS:
+            mcp_gateway.add_argument(option, dest=f"mcp_gateway_{key}", choices=choices, help=f"{help_text} Sets {key}.")
+        live_voice = command.add_argument_group(
+            "AI Factory Agent live voice (project001 Dev)",
+            "Dedicated replacements for the late foundry-phase pipeline step; saving never deploys.")
+        for option, key, choices, help_text in LIVE_VOICE_OPTIONS:
+            live_voice.add_argument(option, dest=f"live_voice_{key}", choices=choices, help=f"{help_text} Sets {key}.")
+        if name == "save":
+            command.add_argument("--expected-review", required=True, help="review_id from the separately approved review.")
+            command.add_argument("--yes", action="store_true")
+
+    auth = sub.add_parser("auth", help="Scoped Azure authentication checks.")
+    auth_sub = auth.add_subparsers(dest="auth_command", required=True)
+    auth_status = add_simple(auth_sub, "status", cmd_auth_status)
+    add_auth_scope(auth_status)
+
+    catalog = sub.add_parser("catalog", help="Catalog introspection and receipts.")
+    catalog_sub = catalog.add_subparsers(dest="catalog_command", required=True)
+    catalog_list = add_simple(catalog_sub, "list", cmd_catalog_list)
+    catalog_list.add_argument("--folder", required=True)
+    catalog_settings = add_simple(catalog_sub, "settings", cmd_catalog_settings)
+    catalog_settings.add_argument("--folder", required=True)
+    catalog_settings.add_argument("--factory-id", required=True)
+    catalog_settings.add_argument("--scale-set-id")
+    catalog_settings.add_argument("--project-id")
+    settings_prepare = add_prepare_common(catalog_sub, "configure-settings", cmd_catalog_settings_prepare)
+    settings_prepare.description = "Prepare scoped setting replacements only; review and use catalog confirm separately. No deployment or resource deletion."
+    settings_prepare.add_argument("--factory-id", required=True)
+    settings_prepare.add_argument("--scale-set-id")
+    settings_prepare.add_argument("--project-id")
+    settings_prepare.add_argument("--settings-json", required=True,
+                                  help="Nonsecret JSON object with only intentional replacements; omitted keys stay unchanged.")
+    catalog_confirm = add_simple(catalog_sub, "confirm", cmd_catalog_confirm)
+    add_receipt_and_yes(catalog_confirm)
+    catalog_jobs = add_simple(catalog_sub, "jobs", cmd_catalog_jobs)
+    catalog_jobs.add_argument("--folder", required=True)
+    catalog_job = add_simple(catalog_sub, "job", cmd_catalog_job)
+    catalog_job.add_argument("--folder", required=True)
+    catalog_job.add_argument("--job-id", required=True)
+    catalog_logs = add_simple(catalog_sub, "logs", cmd_catalog_logs)
+    catalog_logs.add_argument("--folder", required=True)
+    catalog_logs.add_argument("--job-id", required=True)
+    catalog_logs.add_argument("--cursor", type=int, default=0)
+    catalog_poll = add_simple(catalog_sub, "poll", cmd_catalog_poll)
+    add_poll_args(catalog_poll)
+    catalog_poll.add_argument("--folder", required=True)
+    catalog_poll.add_argument("--job-id", required=True)
+
+    factory = sub.add_parser("factory", help="Factory create/clone preview commands.")
+    factory_sub = factory.add_subparsers(dest="factory_command", required=True)
+    factory_create = add_prepare_common(factory_sub, "create", cmd_factory_create)
+    factory_create.add_argument("--factory-key")
+    factory_create.add_argument("--kind", default="ai", choices=["ai", "robot", "web", "app"])
+    factory_create.add_argument("--prefix", required=True)
+    factory_create.add_argument("--region", required=True)
+    factory_create.add_argument("--region-short-name", help="Explicit naming abbreviation; omit for the API's region default.")
+    factory_create.add_argument("--aifactory-version", help="Registered source version: 125 or newer, or main; omit for the API default.")
+    initial_project = factory_create.add_mutually_exclusive_group()
+    initial_project.add_argument("--project-number", help="Choose one initial project instead of the AI default project001.")
+    initial_project.add_argument("--initial-project-json", help="Initial-project object with number, optional display_name and environment/suffix placements.")
+    initial_project.add_argument("--common-only", action="store_true", help="Explicitly configure without an initial project.")
+    factory_create.add_argument("--project-display-name", help="Optional initial-project friendly name; requires --project-number.")
+    factory_create.add_argument("--settings-json", help="Nonsecret editable factory settings object; identity stays in factory/scale-set flags.")
+    add_scaleset_flags(factory_create)
+    factory_clone = add_prepare_common(factory_sub, "clone", cmd_factory_clone)
+    factory_clone.add_argument("--factory-id", required=True)
+    factory_clone.add_argument("--factory-key")
+    factory_clone.add_argument("--scale-set-id")
+    factory_clone.add_argument("--prefix")
+    factory_clone.add_argument("--region")
+    factory_clone.add_argument("--region-short-name")
+    factory_clone.add_argument("--include-projects", choices=["none", "all"], default="none")
+    factory_clone.add_argument("--aifactory-version")
+
+    scaleset = sub.add_parser("scaleset", help="Scale-set catalog changes.")
+    scaleset_sub = scaleset.add_subparsers(dest="scaleset_command", required=True)
+    scaleset_add = add_prepare_common(scaleset_sub, "add", cmd_scaleset_add)
+    scaleset_add.add_argument("--factory-id", required=True)
+    add_scaleset_flags(scaleset_add)
+    scaleset_delete = add_prepare_common(scaleset_sub, "delete", cmd_scaleset_delete, revision_required=True)
+    scaleset_delete.description = (
+        "Prepare guarded Azure scale-set resource deletion, not local draft removal. No deletion occurs now. "
+        "Review --save-receipt PATH, then separately approve: azurefactory runtime confirm --receipt PATH --yes.")
+    scaleset_delete.add_argument("--factory-id", required=True)
+    scaleset_delete.add_argument("--scale-set-id", required=True)
+    scaleset_delete.add_argument("--version-ref")
+
+    project = sub.add_parser("project", help="Project catalog changes.")
+    project_sub = project.add_subparsers(dest="project_command", required=True)
+    placement_help = ("Use dev=latest-successful for server selection, or environment=scale_set_uuid. "
+                      "Environments: dev, stage, prod; repeat for each placement. "
+                      "Review the resolved UUID and recorded success before confirming.")
+    project_add = add_prepare_common(project_sub, "add", cmd_project_add)
+    project_add.add_argument("--factory-id", required=True)
+    project_add.add_argument("--number", required=True)
+    project_add.add_argument("--display-name", default="")
+    project_add.add_argument("--settings-json", help="Nonsecret project setting replacements.")
+    add_project_selection(project_add, placement_help)
+    project_place = add_prepare_common(project_sub, "add-placements", cmd_project_add_placements)
+    project_place.add_argument("--factory-id", required=True)
+    project_place.add_argument("--project-id", required=True)
+    add_project_selection(project_place, placement_help)
+    project_delete = add_prepare_common(project_sub, "delete", cmd_project_delete, revision_required=True)
+    project_delete.description = (
+        "Prepare guarded Azure project resource deletion for explicit environments. Both retention choices are required. "
+        "No deletion occurs now. Review --save-receipt PATH, then separately approve: "
+        "azurefactory runtime confirm --receipt PATH --yes.")
+    project_delete.add_argument("--factory-id", required=True)
+    project_delete.add_argument("--project-id", required=True)
+    project_delete.add_argument("--scale-set-id", help="Optional exact registered source scale-set scope.")
+    project_delete.add_argument("--environment", action="append", choices=["dev", "stage", "prod"], required=True)
+    project_delete.add_argument("--include-project-subnets", choices=["yes", "no"], required=True,
+                                help="Independently choose whether project subnets may be deleted.")
+    project_delete.add_argument("--include-keyvault-and-resource-group", choices=["yes", "no"], required=True,
+                                help="Independently choose whether the project Key Vault and resource group may be deleted.")
+    project_delete.add_argument("--version-ref")
+
+    draft = sub.add_parser("draft", help="Local catalog draft lifecycle; never Azure resource deletion.")
+    draft_sub = draft.add_subparsers(dest="draft_command", required=True)
+    draft_remove = add_prepare_common(draft_sub, "remove", cmd_draft_remove, revision_required=True)
+    draft_remove.description = (
+        "Prepare removal of a proven-safe local factory, scale-set or project draft. No Azure resource deletion. "
+        "Review --save-receipt PATH, then separately approve: azurefactory catalog confirm --receipt PATH --yes.")
+    draft_remove.add_argument("--kind", choices=["factory", "scale-set", "project"], required=True)
+    draft_remove.add_argument("--factory-id", required=True)
+    draft_remove.add_argument("--scale-set-id")
+    draft_remove.add_argument("--project-id")
+
+    params = sub.add_parser("parameters", help="Typed ARM parameter introspection and editing.")
+    params_sub = params.add_subparsers(dest="parameters_command", required=True)
+    params_get = add_simple(params_sub, "get", cmd_parameters_get)
+    add_catalog_selection(params_get, scale=True)
+    params_get.add_argument("--project-id")
+    params_get.add_argument("--version-ref")
+    params_prepare = add_simple(params_sub, "prepare", cmd_parameters_prepare)
+    params_prepare.add_argument("--folder")
+    params_prepare.add_argument("--expected-revision")
+    params_prepare.add_argument("--save-receipt", help="Write preview receipt JSON for later confirm.")
+    params_prepare.add_argument("--factory-id")
+    params_prepare.add_argument("--scale-set-id")
+    params_prepare.add_argument("--project-id")
+    params_prepare.add_argument("--version-ref")
+    params_prepare.add_argument("--schema-revision")
+    params_prepare.add_argument("--reset-profile", action="store_true")
+    params_prepare.add_argument("--request-json", help="Full CatalogParameterPrepare JSON body.")
+    params_prepare.add_argument("--template-patch", action="append", help="ParameterPatch JSON file; repeatable.")
+    params_prepare.add_argument("--template")
+    params_prepare.add_argument("--parameters-json")
+    params_prepare.add_argument("--unset", action="append", default=[])
+    params_prepare.add_argument("--resource-group-id")
+    params_prepare.add_argument("--template-spec-id")
+    params_confirm = add_simple(params_sub, "confirm", cmd_parameters_confirm)
+    add_receipt_and_yes(params_confirm)
+
+    runtime = sub.add_parser("runtime", help="Catalog runtime deployment through /factory-catalog; never legacy endpoints.")
+    runtime_sub = runtime.add_subparsers(dest="runtime_command", required=True)
+    runtime_deploy = add_prepare_common(runtime_sub, "deploy", cmd_runtime_deploy_prepare)
+    runtime_deploy.add_argument("--factory-id", required=True)
+    runtime_deploy.add_argument("--scale-set-id", required=True)
+    runtime_deploy.add_argument("--project-id")
+    runtime_deploy.add_argument("--version-ref")
+    runtime_confirm = add_simple(runtime_sub, "confirm", cmd_runtime_confirm)
+    add_receipt_and_yes(runtime_confirm)
+    runtime_status = add_simple(runtime_sub, "status", cmd_catalog_job)
+    runtime_status.add_argument("--folder", required=True)
+    runtime_status.add_argument("--job-id", required=True)
+    runtime_logs = add_simple(runtime_sub, "logs", cmd_catalog_logs)
+    runtime_logs.add_argument("--folder", required=True)
+    runtime_logs.add_argument("--job-id", required=True)
+    runtime_logs.add_argument("--cursor", type=int, default=0)
+    runtime_poll = add_simple(runtime_sub, "poll", cmd_catalog_poll)
+    add_poll_args(runtime_poll)
+    runtime_poll.add_argument("--folder", required=True)
+    runtime_poll.add_argument("--job-id", required=True)
+
+    bootstrap = sub.add_parser("bootstrap", help="Full bootstrap creation flow.")
+    bootstrap_sub = bootstrap.add_subparsers(dest="bootstrap_command", required=True)
+    add_simple(bootstrap_sub, "capabilities", cmd_bootstrap_capabilities)
+    boot_config = add_simple(bootstrap_sub, "config", cmd_bootstrap_config)
+    boot_config.add_argument("--state-json", required=True)
+    boot_config.add_argument("--mapping-mode", choices=["strict", "common-details"], default="strict",
+                             help="common-details returns only account/team defaults; merge into a separate new-factory draft.")
+    boot_prepare = add_simple(bootstrap_sub, "prepare", cmd_bootstrap_prepare)
+    boot_prepare.add_argument("--save-receipt", help="Write preview receipt JSON for later start.")
+    boot_prepare.add_argument("--request-json", help="Full BootstrapPrepare JSON body.")
+    boot_prepare.add_argument("--launcher")
+    boot_prepare.add_argument("--orchestrator", choices=["ado", "gha"])
+    boot_prepare.add_argument("--config-json")
+    boot_start = add_simple(bootstrap_sub, "start", cmd_bootstrap_start)
+    add_receipt_and_yes(boot_start)
+    boot_start.add_argument("--wait", action="store_true")
+    add_poll_args(boot_start)
+    boot_status = add_simple(bootstrap_sub, "status", cmd_bootstrap_status)
+    boot_status.add_argument("--job-id", required=True)
+    boot_status.add_argument("--wait", action="store_true")
+    add_poll_args(boot_status)
+
+    workflow = bootstrap_sub.add_parser("workflow", help="Registered bootstrap with per-stage or opt-in bounded whole-workflow approval.")
+    workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
+    workflow_prepare = add_simple(workflow_sub, "prepare", cmd_creation_workflow_prepare)
+    workflow_prepare.add_argument("--request-json", required=True, help="Exact CreationWorkflowPrepare JSON; coordination mode belongs in bootstrap_config.")
+    workflow_prepare.add_argument("--preflight", action="store_true",
+                                  help="Call only read-only /creation/preflight; never prepare a workflow.")
+    workflow_prepare.add_argument("--save-report", help="With --preflight only: new redacted report JSON file.")
+    workflow_prepare.add_argument("--save-receipt")
+    workflow_prepare.add_argument("--whole-workflow", action="store_true",
+                                  help="Review one bounded Full bootstrap authorization; the API owns stage continuation.")
+    workflow_next = add_simple(workflow_sub, "next", cmd_creation_workflow_next)
+    workflow_next.add_argument("--folder", required=True)
+    workflow_next.add_argument("--workflow-id", required=True)
+    workflow_next.add_argument("--save-receipt")
+    workflow_start = add_simple(workflow_sub, "start", cmd_creation_workflow_start)
+    add_receipt_and_yes(workflow_start)
+    workflow_status = add_simple(workflow_sub, "status", cmd_creation_workflow_status)
+    workflow_status.add_argument("--folder", required=True)
+    workflow_status.add_argument("--workflow-id", required=True)
+    workflow_continue = add_simple(workflow_sub, "continue", cmd_creation_workflow_continue)
+    workflow_continue.add_argument("--folder", required=True)
+    workflow_continue.add_argument("--workflow-id", required=True)
+    workflow_continue.add_argument("--authorization-hash", required=True,
+                                   help="Resume already-consumed consent at a verified boundary; never retries a failed/in-flight stage.")
+
+    legacy = sub.add_parser("legacy", help="Legacy project update/promote deployments for legacy roots only; never catalog roots.")
+    legacy_sub = legacy.add_subparsers(dest="legacy_command", required=True)
+    legacy_list = add_simple(legacy_sub, "list", cmd_legacy_list)
+    legacy_list.add_argument("--folder", required=True)
+    legacy_plan = add_simple(legacy_sub, "plan", cmd_legacy_plan)
+    add_legacy_plan_args(legacy_plan)
+    legacy_prepare = add_prepare_common(legacy_sub, "prepare", cmd_legacy_prepare)
+    legacy_prepare.add_argument("--draft-id", required=True)
+    legacy_prepare.add_argument("--patch", dest="patch", action="store_true", default=None)
+    legacy_prepare.add_argument("--no-patch", dest="patch", action="store_false")
+    legacy_prepare.add_argument("--aifactory-version")
+    legacy_start = add_simple(legacy_sub, "start", cmd_legacy_start)
+    add_receipt_and_yes(legacy_start)
+    legacy_start.add_argument("--wait", action="store_true",
+                              help="Wait for the local script to finish, not verified Azure deployment.")
+    add_poll_args(legacy_start)
+    legacy_status = add_simple(legacy_sub, "status", cmd_legacy_status)
+    legacy_status.add_argument("--folder", required=True)
+    legacy_status.add_argument("--job-id", required=True)
+    legacy_status.add_argument("--cursor", type=int, default=0)
+    legacy_status.add_argument("--wait", action="store_true",
+                               help="Wait for the local script to finish, not verified Azure deployment.")
+    add_poll_args(legacy_status)
+
+    request = add_simple(sub, "request", cmd_request)
+    request.add_argument("method")
+    request.add_argument("endpoint")
+    request.add_argument("--query", action="append", default=[], help="key=value query value; repeatable.")
+    request.add_argument("--body-json", help="JSON request body file.")
+    request.add_argument("--body", help="Inline JSON request body.")
+    request.add_argument("--write", action="store_true", help="Required for generic unsafe methods.")
+    request.add_argument("--yes", action="store_true", help="Required with --write.")
+    return parser
+
+
+def add_simple(sub, name: str, func, **kwargs):
+    parser = sub.add_parser(name, **kwargs)
+    parser.set_defaults(func=func)
+    return parser
+
+
+def add_prepare_common(sub, name: str, func, *, revision_required: bool = False):
+    parser = add_simple(sub, name, func)
+    parser.add_argument("--folder", required=True)
+    parser.add_argument("--expected-revision", required=revision_required)
+    parser.add_argument("--save-receipt", help="Write preview receipt JSON for later confirm/start.")
+    return parser
+
+
+def add_project_selection(parser, placement_help):
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--placement", action="append", help=placement_help)
+    selection.add_argument("--environment", action="append", choices=["dev", "stage", "prod"],
+                           help="Explicit environment; repeat as needed. API selects the latest verified successful "
+                                "common placement. Review resolved UUID/evidence; no implicit dev or client selection.")
+
+
+def add_auth_scope(parser):
+    parser.add_argument("--folder", dest="aifactory_folder")
+    parser.add_argument("--factory-id")
+    parser.add_argument("--scale-set-id")
+    parser.add_argument("--expected-tenant-id")
+    parser.add_argument("--expected-subscription-id")
+
+
+def add_catalog_selection(parser, *, scale: bool):
+    parser.add_argument("--folder", required=True)
+    parser.add_argument("--factory-id", required=True)
+    if scale:
+        parser.add_argument("--scale-set-id", required=True)
+
+
+def add_receipt_and_yes(parser):
+    parser.add_argument("--receipt", required=True)
+    parser.add_argument("--yes", action="store_true")
+
+
+def add_poll_args(parser):
+    parser.add_argument("--poll-timeout", type=positive_float, default=POLL_TIMEOUT_SECONDS)
+    parser.add_argument("--poll-interval", type=positive_float, default=5.0)
+
+
+def add_scaleset_flags(parser):
+    parser.add_argument("--scale-set-json", help="JSON object or list of CatalogScaleSetInput objects.")
+    parser.add_argument("--environment", choices=["dev", "stage", "prod"])
+    parser.add_argument("--suffix")
+    parser.add_argument("--subscription-id")
+    parser.add_argument("--tenant-id")
+    parser.add_argument("--orchestrator", choices=["ado", "gha"])
+    parser.add_argument("--vnet-cidr")
+    parser.add_argument("--max-projects", type=int, default=1)
+    parser.add_argument("--common-subnet")
+    parser.add_argument("--scoring-subnet")
+    parser.add_argument("--powerbi-subnet")
+    parser.add_argument("--bastion-subnet")
+
+
+def add_legacy_plan_args(parser):
+    parser.add_argument("--folder", required=True)
+    parser.add_argument("--project-number", required=True)
+    parser.add_argument("--source-env", choices=["dev", "stage", "prod"], required=True)
+    parser.add_argument("--target-env", choices=["dev", "stage", "prod"], required=True)
+    parser.add_argument("--operation", choices=["deploy", "update"], default="deploy")
+    parser.add_argument("--patch", dest="patch", action="store_true", default=False)
+    parser.add_argument("--no-patch", dest="patch", action="store_false")
+    parser.add_argument("--aifactory-version")
+
+
+def positive_float(value: str) -> float:
+    result = float(value)
+    if not math.isfinite(result) or result <= 0:
+        raise argparse.ArgumentTypeError("value must be positive")
+    return result
+
+
+def client(args, *, default_timeout: float = DEFAULT_REQUEST_TIMEOUT_SECONDS) -> AzureFactoryClient:
+    timeout = args.timeout if args.timeout is not None else default_timeout
+    return AzureFactoryClient(args.api_url, args.api_key, timeout)
+
+
+def cmd_health(args):
+    return emit(client(args).health())
+
+
+def cmd_preflight(args):
+    if getattr(args, "save_receipt", None) or getattr(args, "whole_workflow", False):
+        raise ConfigError("Preflight cannot use --save-receipt or --whole-workflow; it grants no approval.")
+    if args.save_report and os.path.lexists(args.save_report):
+        raise ConfigError("Refusing to overwrite an existing preflight report or receipt.")
+    api = client(args, default_timeout=PREFLIGHT_REQUEST_TIMEOUT_SECONDS)
+    report = redact_secrets(api.preflight(read_json_file(args.request_json)), api.api_key)
+    if args.save_report:
+        try:
+            with open(args.save_report, "x", encoding="utf-8") as handle:
+                json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+                handle.write("\n")
+        except FileExistsError:
+            raise ConfigError("Refusing to overwrite an existing preflight report or receipt.") from None
+        except OSError:
+            raise ConfigError("Cannot write the preflight report file.") from None
+    return emit(report, EXIT_OK if report["ready"] else EXIT_BLOCKED)
+
+
+def _deletion_review(preview, folder):
+    from .factory_deletion import (TEARDOWN_CONTRACT, describe_access_hubs, describe_deletion_plan,
+                                   describe_shared_hub_links, describe_teardown_plan)
+
+    print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
+    print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
+          file=sys.stderr)
+    plan = preview["deletion_plan"]
+    _print_json({
+        "Factory": preview["target"]["key"], "Factory ID": preview["factory_id"],
+        "Saved folder": folder, "Scope": "Whole factory, all scale sets",
+        "Source version": preview["source_version"], "Saved revision": preview["source_revision"],
+        "Expires": preview["expires_at"], "Server review fingerprint": preview["preview_hash"],
+        "Ordered pipeline plan": {"Contract": plan["contract"], "Policy": plan["policy"],
+                                  "Plan fingerprint": plan["plan_hash"], "Pinned source": plan["source_commit"],
+                                  "Protected (never deleted)": plan["protected_resources"],
+                                  "Factory-owned access hub (deleted last, after every project pipeline)":
+                                      describe_access_hubs(plan),
+                                  "Stages": (describe_teardown_plan(plan) if plan["contract"] == TEARDOWN_CONTRACT
+                                             else describe_deletion_plan(plan)),
+                                  "Shared connectivity hub links (removed last, after the spoke VNet; "
+                                  "the hub itself is kept)": describe_shared_hub_links(plan)},
+        "Exact resource manifest (delete / retain)": preview["deletion_targets"],
+        "Retained Azure resources": preview["retained_resources"],
+        "Hub and reusable infrastructure retention policy": preview["deletion_retention_policy"],
+        "Entra security groups preserved": preview["preserve_entra_groups"],
+        "Saved configuration after successful deletion": (
+            "Retained, as reported by the backend" if preview["retain_saved_configuration"]
+            else "REMOVED after verified success; retained on failure"),
+        "Other retained resources and cautions": preview["warnings"],
+        "Effects": preview["effects"],
+    }, file=sys.stderr, flush=True)
+
+
+def cmd_delete_aifactory_prepare(args):
+    from .factory_deletion import PURPOSE, validate_deletion_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing deletion receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder,
+               "factory_id": args.factory_id, "expected_revision": args.expected_revision}
+    if args.version_ref is not None:
+        request["version_ref"] = args.version_ref
+    preview = redact_secrets(api.delete_aifactory_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    try:
+        validate_deletion_preview(request, preview)
+    except BlockedError:
+        return emit(preview, EXIT_BLOCKED)
+    _deletion_review(preview, request["folder"])
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation="delete-aifactory",
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new deletion receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_delete_aifactory_confirm(args):
+    from .factory_deletion import PURPOSE, validate_job
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode="runtime")
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid deletion receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Deletion receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _deletion_review(preview, receipt["folder"])
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "deletion", "deletion")
+    try:
+        result = redact_secrets(api.delete_aifactory_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Deletion confirmation timed out; its outcome is unknown. "
+                             "Inspect server state before any further action. No retry was attempted.") from None
+    if type(result.get("contract_version")) is not int or result["contract_version"] != 1:
+        raise FailureError("Deletion returned an incompatible confirmation. Inspect server state; do not retry.")
+    validate_job(result.get("job"), factory_id=receipt["request"]["factory_id"])
+    return emit(result, status_exit(result["job"]["status"]))
+
+
+def _typed_confirmation(args, expected: str, request: str, approval: str) -> str:
+    """A terminal y/N plus the exact phrase, or --yes with the exact --confirmation-phrase; nothing else."""
+    if args.confirmation_phrase is not None and args.confirmation_phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    if sys.stdin.isatty():
+        try:
+            print("Continue with this exact review? [y/N]", file=sys.stderr, flush=True)
+            if input().strip().lower() not in ("y", "yes"):
+                raise BlockedError(f"Cancelled; no {request} request was sent.")
+            print("Type the exact confirmation phrase: " + json.dumps(expected, ensure_ascii=True),
+                  file=sys.stderr, flush=True)
+            phrase = input()
+        except EOFError:
+            raise BlockedError(f"Cancelled at end of input; no {request} request was sent.") from None
+    else:
+        if not args.yes or args.confirmation_phrase is None:
+            raise ConfigError(f"Without an interactive terminal, {approval} requires both --yes and "
+                              "--confirmation-phrase matching the reviewed receipt; nothing was confirmed.")
+        phrase = args.confirmation_phrase
+    if phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    return phrase
+
+
+def _claim_review(preview):
+    from .run_claims import describe
+
+    print("Release this failed run's retained single-writer claim?", file=sys.stderr)
+    print("Review the claim, receipts and remote run below. Nothing has been changed by this command.",
+          file=sys.stderr)
+    _print_json(describe(preview), file=sys.stderr, flush=True)
+
+
+def cmd_reconcile_run_claim_prepare(args):
+    from .run_claims import OPERATION, PURPOSE, validate_claim_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing run claim receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder, "factory_id": args.factory_id, "run_id": args.run_id}
+    preview = redact_secrets(api.reconcile_run_claim_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    validate_claim_preview(request, preview)
+    _claim_review(preview)
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation=OPERATION,
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new run claim receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_reconcile_run_claim_confirm(args):
+    from .run_claims import OPERATION_MODE, PURPOSE, validate_release
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode=OPERATION_MODE)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid run claim receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Run claim receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _claim_review(preview)
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "release", "a claim release")
+    try:
+        result = redact_secrets(api.reconcile_run_claim_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Run claim release timed out; its outcome is unknown. Prepare again to read the "
+                             "current claim before any further action. No retry was attempted.") from None
+    validate_release(result, receipt)
+    return emit(result)
+
+
+def _authorization_review(preview):
+    from .authorization import describe
+
+    print("Change this factory's deletion permission?", file=sys.stderr)
+    print("Review the enrollment, scopes and bindings below. Nothing has been changed by this command.",
+          file=sys.stderr)
+    _print_json(describe(preview), file=sys.stderr, flush=True)
+
+
+def cmd_authorize_deletion_prepare(args):
+    from .authorization import OPERATION, PURPOSE, validate_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing deletion authorization receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder, "factory_id": args.factory_id, "mode": args.mode}
+    preview = redact_secrets(api.authorize_deletion_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    validate_preview(request, preview)
+    _authorization_review(preview)
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation=OPERATION,
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new deletion authorization receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_authorize_deletion_confirm(args):
+    from .authorization import OPERATION_MODE, PURPOSE, validate_authorization
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode=OPERATION_MODE)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid deletion authorization receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Deletion authorization receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _authorization_review(preview)
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "authorization", "a deletion permission change")
+    try:
+        result = redact_secrets(api.authorize_deletion_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Deletion authorization timed out; its outcome is unknown. Prepare again to read the "
+                             "current permission before any further action. No retry was attempted.") from None
+    validate_authorization(result, receipt)
+    return emit(result)
+
+
+ESAF_HELP = ("The six lifecycle scenarios, one call each; calling one is the approval. The Factory API runs it as a "
+             "resilient job and answers with a job id. Connection: ESAF_FOLDER (or --folder), --api-url, --api-key.")
+
+
+def add_esaf_commands(sub) -> None:
+    esaf_parser = sub.add_parser("esaf", help=ESAF_HELP, description=ESAF_HELP)
+    esaf_sub = esaf_parser.add_subparsers(dest="esaf_command", required=True)
+    environments = ("dev", "stage", "prod")
+
+    def scenario(name, help_text, *, scale_set=False, project=False):
+        command = add_simple(esaf_sub, name, cmd_esaf, help=help_text)
+        command.set_defaults(esaf_route=name)
+        if project:
+            command.add_argument("project", help="Project number, for example 002.")
+        if scale_set:
+            command.add_argument("scale_set", help="Scale-set suffix, for example 002.")
+        if project or scale_set:
+            command.add_argument("environment", choices=environments)
+        command.add_argument("--folder", default=os.getenv("ESAF_FOLDER"),
+                             help="The azurefactory folder on the API host (env ESAF_FOLDER).")
+        command.add_argument("--factory", help="Factory key or id; only when the folder has more than one.")
+        command.add_argument("--version-ref", help="Optional approved source version.")
+        command.add_argument("--retries", type=int, help="Re-runs after a failed run (0-5, default 2).")
+        command.add_argument("--wait", action="store_true", help="Read the job every second until it ends.")
+        return command
+
+    scenario("init-factory", "Scenario 1: submit the folder's saved factory draft.").add_argument(
+        "--creation-request-json", help="Optional full-bootstrap creation body JSON file instead of the saved draft.")
+    added = scenario("add-scale-set", "Scenario 2: add (or resume) a scale set and deploy its common.", scale_set=True)
+    added.add_argument("--cidr", help="The new scale set's VNet range; the pipeline computes the subnets.")
+    added.add_argument("--max-projects", type=int)
+    upsert = scenario("upsert-project", "Scenario 3: add or update a project and deploy it.", project=True)
+    upsert.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
+    upsert.add_argument("--settings-json", help="Optional JSON file of project settings to replace.")
+    deleted = scenario("delete-project", "Scenario 4: delete a project in one environment.", project=True)
+    deleted.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
+    deleted.add_argument("--include-project-subnets", action="store_true", default=None)
+    deleted.add_argument("--keep-keyvault-and-resource-group", action="store_true",
+                         help="Delete the project's services only; keep its Key Vault and resource group.")
+    scenario("delete-scale-set", "Scenario 5: delete a scale set in one environment.", scale_set=True)
+    scenario("delete-factory", "Scenario 6: delete the whole factory.")
+    job = add_simple(esaf_sub, "job", cmd_esaf_job, help="Read an ESAF job; --wait follows it to its end.")
+    job.add_argument("job_id")
+    job.add_argument("--folder", default=os.getenv("ESAF_FOLDER"))
+    job.add_argument("--wait", action="store_true")
+
+
+def _esaf_session(args):
+    from . import esaf
+
+    if not args.folder:
+        raise ConfigError("Set ESAF_FOLDER or pass --folder (the azurefactory folder on the API host).")
+    return esaf.Session(args.folder, client(args, default_timeout=POLL_TIMEOUT_SECONDS), getattr(args, "factory", None))
+
+
+def _esaf_finished(job) -> int:
+    state = job.result if job.result is not None else job.status()
+    status = state.get("status")
+    if status == "blocked":
+        return emit(state, EXIT_BLOCKED)
+    if status in ("accepted", "preparing", "confirming", "retrying"):
+        return emit(state, EXIT_OK)
+    return emit(state, status_exit(status))
+
+
+def cmd_esaf(args):
+    from . import esaf
+
+    session = _esaf_session(args)
+    common = {"version_ref": args.version_ref, "retries": args.retries, "wait": args.wait, "session": session}
+    route = args.esaf_route
+    if route == "init-factory":
+        creation = read_json_file(args.creation_request_json) if args.creation_request_json else None
+        job = esaf.init_factory(creation_request=creation, retries=args.retries, wait=args.wait, session=session)
+    elif route == "add-scale-set":
+        job = esaf.add_scale_set(args.scale_set, args.environment, cidr=args.cidr, max_projects=args.max_projects,
+                                 **common)
+    elif route == "upsert-project":
+        settings = read_json_file(args.settings_json) if args.settings_json else None
+        job = esaf.upsert_project(args.project, args.environment, scale_set=args.scale_set, settings=settings, **common)
+    elif route == "delete-project":
+        keep = True if args.keep_keyvault_and_resource_group else None
+        job = esaf.delete_project(args.project, args.environment, scale_set=args.scale_set,
+                                  include_project_subnets=args.include_project_subnets,
+                                  include_keyvault_and_resource_group=False if keep else None, **common)
+    elif route == "delete-scale-set":
+        job = esaf.delete_scale_set(args.scale_set, args.environment, **common)
+    else:
+        job = esaf.delete_factory(**common)
+    if args.wait:
+        return _esaf_finished(job)
+    return emit({"job_id": job.id, "scenario": job.scenario, "folder": session.folder})
+
+
+def cmd_esaf_job(args):
+    from . import esaf
+
+    job = esaf.EsafJob("", "esaf", args.job_id, _esaf_session(args))
+    if args.wait:
+        job.wait()
+    return _esaf_finished(job)
+
+
+def cmd_delete_aifactory_status(args):
+    from .factory_deletion import validate_job
+
+    api = client(args)
+    result = redact_secrets(api.delete_aifactory_status(args.folder, args.job_id), api.api_key)
+    validate_job(result, job_id=args.job_id)
+    return emit(result, status_exit(result["status"]))
+
+
+def cmd_delete_aifactory_reconcile(args):
+    from .factory_deletion import validate_job
+
+    api = client(args)
+    result = redact_secrets(api.delete_aifactory_reconcile(args.folder, args.job_id), api.api_key)
+    validate_job(result, job_id=args.job_id)
+    return emit(result, status_exit(result["status"]))
+
+
+def _workflow_output(args, event):
+    from .workflow_events import monitoring_unavailable
+
+    event = redact_secrets(event, args.api_key)
+    if args.json:
+        _print_json(event, compact=True, flush=True)
+    else:
+        # JSON-escape server strings even in human-readable terminal output.
+        label = json.dumps(f"{event['repository']} run {event['run_id']} attempt {event['run_attempt']}", ensure_ascii=True)
+        state = (event["status"] or "unknown") + ("/" + event["conclusion"] if event["conclusion"] else "")
+        print(f"{label}: {event['event_type']} {state}", flush=True)
+    if monitoring_unavailable(event):
+        print("Workflow monitoring error; workflow outcome is not inferred.", file=sys.stderr, flush=True)
+
+
+def _workflow_exit(event):
+    from .workflow_events import WorkflowMonitorError, monitoring_unavailable
+
+    if event is None or monitoring_unavailable(event):
+        raise WorkflowMonitorError("Workflow monitoring has no current healthy observation; workflow outcome is unknown.")
+    if event["status"] == "completed":
+        if event["conclusion"] is None:
+            raise WorkflowMonitorError("Workflow completed without an observed conclusion; outcome is unknown.")
+        # neutral/skipped, like every conclusion other than success, are non-success.
+        return EXIT_OK if event["conclusion"] == "success" else EXIT_FAILURE
+    return EXIT_OK
+
+
+def cmd_workflow_status(args):
+    event = client(args).get_workflow_run_status(args.repository, args.run_id)
+    _workflow_output(args, event)
+    return _workflow_exit(event)
+
+
+def cmd_workflow_watch(args):
+    events = client(args).watch_workflow_run(
+        args.repository, args.run_id, after=args.after, follow=args.follow,
+        timeout=args.watch_timeout, max_retries=args.max_retries,
+        backoff_initial=args.backoff_initial, backoff_max=args.backoff_max,
+    )
+    last = None
+    try:
+        while True:
+            try:
+                last = next(events)
+            except StopIteration as finished:
+                last = finished.value or last
+                break
+            _workflow_output(args, last)
+    finally:
+        events.close()
+    return _workflow_exit(last)
+
+
+def cmd_monitoring_catalog(args):
+    return emit(client(args).monitoring_catalog())
+
+
+def cmd_gateway_list(args):
+    return emit(client(args).gateway_instances())
+
+
+def cmd_gateway_show(args):
+    return emit(client(args).gateway_snapshot(args.instance))
+
+
+def cmd_gateway_refresh(args):
+    return emit(client(args).gateway_refresh(args.instance))
+
+
+def cmd_resource_group_costs(args):
+    body = {"subscription_ids": args.subscription_ids}
+    for field in ("month",):
+        if getattr(args, field) is not None:
+            body[field] = getattr(args, field)
+    if args.folder is not None:
+        body["aifactory_folder"] = args.folder
+    if args.refresh:
+        body["refresh"] = True
+    api = client(args, default_timeout=COST_REQUEST_TIMEOUT_SECONDS)
+    result = redact_secrets(api.resource_group_costs(body), api.api_key)
+    return emit(result, EXIT_OK if result.get("status") in {"available", "empty"} else EXIT_BLOCKED)
+
+
+def cmd_monitoring(args):
+    fields = ("report", "source", "days", "start_date", "end_date",
+              "factory", "scaleset", "project", "environment", "format")
+    if args.request:
+        if any(getattr(args, field, None) is not None for field in fields):
+            raise ConfigError("--request cannot be combined with generated request options.")
+        body = read_json_file(args.request)
+    else:
+        report_id = getattr(args, "report", None)
+        if args.monitoring_command != "summary" and not report_id:
+            raise ConfigError("Specify --report or --request.")
+        if args.source == "live":
+            raise ConfigError("Live reporting requires --request with explicitly supplied observations; this client never collects.")
+        days = args.days if args.days is not None else 7
+        if not 1 <= days <= 90:
+            raise ConfigError("--days must be between 1 and 90.")
+        body = {
+            "source": "sample", "days": days,
+            "filters": {field: getattr(args, field) or "All"
+                        for field in ("factory", "scaleset", "project", "environment")},
+        }
+        if report_id is not None:
+            body["report_id"] = report_id
+        for field in ("start_date", "end_date"):
+            if getattr(args, field) is not None:
+                body[field] = getattr(args, field)
+    api = client(args)
+    if args.monitoring_command == "summary":
+        return emit(api.monitoring_summary(body))
+    if args.monitoring_command == "export" and (args.format or "csv") == "csv":
+        print(api.monitoring_export(body), end="")
+        return EXIT_OK
+    result = api.monitoring_report(body)
+    return emit(result)
+
+
+def cmd_enrollment_plan(args):
+    result = enrollment.plan(args)
+    return emit(redact_secrets(result, args.api_key),
+                EXIT_OK if result.get("can_ensure") is True and not result.get("blockers") else EXIT_BLOCKED)
+
+
+def cmd_enrollment_ensure(args):
+    result = enrollment.ensure(args)
+    code = EXIT_OK if result.get("enrollment_complete") is True else EXIT_BLOCKED
+    if result.get("reconciliation_required"):
+        code = EXIT_FAILURE
+    return emit(redact_secrets(result, args.api_key), code)
+
+
+def cmd_enrollment_binding(args):
+    with enrollment.guarded():
+        ensure_receipt_target_available(args)
+        body = enrollment.binding_request(args.result, args.expected_revision)
+        return catalog_prepare_emit(args, body, "enrollment-binding")
+
+
+def cmd_enrollment_publish(args):
+    require_yes(args)
+    with enrollment.guarded():
+        receipt = load_receipt(args.receipt, client(args), "catalog-confirm", operation_mode="configuration")
+        if receipt["operation"] != "enrollment-binding":
+            raise ConfigError("Enrollment publish accepts only a separately prepared enrollment binding receipt.")
+        result = client(args).catalog_confirm(receipt["folder"], receipt["confirmation_id"])
+        return confirmed_emit(result, runtime=False)
+
+
+def cmd_enrollment_plan_and_publish(args):
+    result = enrollment.plan_and_publish(
+        args, client(args), lambda value: _print_json(redact_secrets(value, args.api_key), file=sys.stderr, flush=True))
+    code = EXIT_OK if result.get("published") is True else EXIT_BLOCKED
+    if result.get("reconciliation_required"):
+        code = EXIT_FAILURE
+    return emit(redact_secrets(result, args.api_key), code)
+
+
+def cmd_schema(args):
+    c = client(args)
+    return emit(c.openapi() if args.openapi else c.schema())
+
+
+def configuration_changes(args) -> dict:
+    """Merge --changes-json with the dedicated MCP & AI Gateway and live voice options; disagreement is an error."""
+    changes = read_json_file(args.changes_json) if args.changes_json else {}
+    if not isinstance(changes, dict):
+        raise ConfigError("--changes-json must contain a JSON object.")
+    for prefix, options in DEDICATED_OPTIONS:
+        for option, key, _, _ in options:
+            value = getattr(args, f"{prefix}_{key}", None)
+            if value is None:
+                continue
+            if key in changes and str(changes[key]).lower() != value.lower():
+                raise ConfigError(f"{option} conflicts with {key} in --changes-json.")
+            changes[key] = value
+    return changes
+
+
+def configuration_draft(args):
+    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=configuration_changes(args))
+
+
+def cmd_config_review(args):
+    result = configuration_draft(args).review(write_variables=not args.snapshot_only)
+    return emit(result, EXIT_OK if result["can_save"] else EXIT_BLOCKED)
+
+
+def cmd_config_save(args):
+    require_yes(args)
+    result = configuration_draft(args).save(args.expected_review, write_variables=not args.snapshot_only)
+    return emit(redact_secrets(result, args.api_key))
+
+
+def cmd_doctor(args):
+    c = client(args)
+    checks = {"health": None, "openapi": None, "required_paths": [], "required_schemas": [], "contracts": [], "comparison": None}
+    checks["health"] = c.health()
+    live = c.openapi()
+    checks["openapi"] = {"title": live.get("info", {}).get("title"), "version": live.get("info", {}).get("version")}
+    missing_paths = _missing_required_paths(live)
+    missing_schemas = sorted(REQUIRED_SCHEMAS - set(live.get("components", {}).get("schemas", {})))
+    checks["required_paths"] = missing_paths
+    checks["required_schemas"] = missing_schemas
+    checks["contracts"] = contract_issues(live)
+    if args.local_openapi:
+        local = read_json_file(args.local_openapi)
+        checks["comparison"] = compare_openapi(local, live)
+    ok = not missing_paths and not missing_schemas and not checks["contracts"] and not (checks["comparison"] or {}).get("incompatible")
+    return emit({"ok": ok, "checks": checks}, EXIT_OK if ok else EXIT_FAILURE)
+
+
+def cmd_api_instructions(args):
+    return emit({
+        "api_url": client(args).canonical_base_url,
+        "desktop_required": False,
+        "backend_checkout_required": False,
+        "server": "Canonical Azure Factory Tkinter API (same backend bundled by MAUI).",
+        "windows_download": "https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/readme.md",
+        "start": [
+            "Windows: download the current Tkinter ZIP, extract the entire aifactory-config folder, and run aifactory-config.exe.",
+            "In the wizard, select Quick setup > Start API host. Supply a private API key when prompted.",
+            "Set AIFACTORY_API_KEY privately in the client shell to the same key; never store it in the consumer repository.",
+            "Keep the wizard open. Set AIFACTORY_API_URL to the actual URL displayed by Quick setup or the status bar.",
+            "The default port is 8765. If occupied, launch a separate wizard with --api-port 0, then use Quick setup and its reported URL.",
+            "Developer alternative only: in an approved backend checkout with its requirements installed, set AIFACTORY_API_KEY and run python -m src.api.",
+        ],
+        "verify": ["azurefactory health", "azurefactory doctor"],
+        "configuration": "factory create prepares only; review its initial project and version, then catalog confirm --yes.",
+        "deployment": "Separate reviewed runtime operation with existing protected-manifest, binding and approval checks.",
+    })
+
+
+def cmd_auth_status(args):
+    if not any((args.aifactory_folder, args.factory_id, args.scale_set_id, args.expected_tenant_id, args.expected_subscription_id)):
+        raise ConfigError("auth status requires an explicit folder, factory/scale-set or expected tenant/subscription scope.")
+    return emit(client(args).auth_status(
+        aifactory_folder=args.aifactory_folder,
+        factory_id=args.factory_id,
+        scale_set_id=args.scale_set_id,
+        expected_tenant_id=args.expected_tenant_id,
+        expected_subscription_id=args.expected_subscription_id,
+    ))
+
+
+def cmd_catalog_list(args):
+    return emit(client(args).catalog_list(args.folder))
+
+
+def cmd_catalog_settings(args):
+    return emit(client(args).catalog_settings(args.folder, args.factory_id, args.scale_set_id, args.project_id))
+
+
+def cmd_catalog_settings_prepare(args):
+    body = catalog_settings_request(
+        args.folder, args.factory_id, read_json_file(args.settings_json),
+        scale_set_id=args.scale_set_id, project_id=args.project_id,
+        expected_revision=args.expected_revision,
+    )
+    return catalog_prepare_emit(args, body, "catalog-settings")
+
+
+def cmd_catalog_confirm(args):
+    require_yes(args)
+    receipt = load_receipt(args.receipt, client(args), "catalog-confirm", operation_mode="configuration")
+    result = client(args).catalog_confirm(receipt["folder"], receipt["confirmation_id"])
+    return confirmed_emit(result, runtime=False)
+
+
+def cmd_runtime_confirm(args):
+    require_yes(args)
+    receipt = load_receipt(args.receipt, client(args), "catalog-confirm", operation_mode="runtime")
+    result = client(args).catalog_confirm(receipt["folder"], receipt["confirmation_id"])
+    return confirmed_emit(result, runtime=True)
+
+
+def cmd_catalog_jobs(args):
+    return emit(client(args).catalog_jobs(args.folder))
+
+
+def cmd_catalog_job(args):
+    result = client(args).catalog_job(args.folder, args.job_id)
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_catalog_logs(args):
+    result = client(args).catalog_terminal(args.folder, args.job_id, args.cursor)
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_catalog_poll(args):
+    c = client(args)
+    result = poll(lambda: c.catalog_job(args.folder, args.job_id), args.poll_timeout, args.poll_interval, {"succeeded"})
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_factory_create(args):
+    if args.project_display_name is not None and args.project_number is None:
+        raise ConfigError("--project-display-name requires --project-number.")
+    project_options = {}
+    if args.project_number is not None:
+        project_options["initial_project"] = {"number": args.project_number, "display_name": args.project_display_name or ""}
+    elif args.initial_project_json:
+        project_options["initial_project"] = read_json_file(args.initial_project_json)
+        if not isinstance(project_options["initial_project"], dict):
+            raise ConfigError("--initial-project-json requires an object; use --common-only for no project.")
+    elif args.common_only:
+        project_options["initial_project"] = None
+    settings = read_json_file(args.settings_json) if args.settings_json else None
+    if args.settings_json and not isinstance(settings, dict):
+        raise ConfigError("--settings-json requires an object.")
+    body = factory_create_request(
+        args.folder, prefix=args.prefix, region=args.region, kind=args.kind, factory_key=args.factory_key,
+        aifactory_version=args.aifactory_version, scale_sets=build_scale_sets(args),
+        settings=settings, expected_revision=args.expected_revision, region_short_name=args.region_short_name,
+        **project_options,
+    )
+    return catalog_prepare_emit(args, body, "factory-create")
+
+
+def cmd_factory_clone(args):
+    body = catalog_requests.factory_clone_request(
+        args.folder, args.factory_id, factory_key=args.factory_key, scale_set_id=args.scale_set_id,
+        prefix=args.prefix, region=args.region, include_projects=args.include_projects,
+        aifactory_version=args.aifactory_version, region_short_name=args.region_short_name,
+        expected_revision=args.expected_revision)
+    return catalog_prepare_emit(args, body, "factory-clone")
+
+
+def cmd_scaleset_add(args):
+    body = catalog_requests.scaleset_add_request(
+        args.folder, args.factory_id, build_scale_sets(args), expected_revision=args.expected_revision)
+    return catalog_prepare_emit(args, body, "scaleset-add")
+
+
+def cmd_project_add(args):
+    body = catalog_requests.project_add_request(
+        args.folder, args.factory_id, number=args.number, display_name=args.display_name,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision,
+        settings=read_json_file(args.settings_json) if args.settings_json else None)
+    return catalog_prepare_emit(args, body, "project-add")
+
+
+def cmd_project_add_placements(args):
+    body = catalog_requests.project_add_placements_request(
+        args.folder, args.factory_id, args.project_id,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision)
+    return catalog_prepare_emit(args, body, "project-add-placements")
+
+
+def cmd_project_delete(args):
+    body = catalog_requests.project_delete_request(
+        args.folder, args.factory_id, args.project_id, environments=args.environment,
+        include_project_subnets=args.include_project_subnets == "yes",
+        include_keyvault_and_resource_group=args.include_keyvault_and_resource_group == "yes",
+        expected_revision=args.expected_revision, scale_set_id=args.scale_set_id, version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "project-delete")
+
+
+def cmd_scaleset_delete(args):
+    body = catalog_requests.scaleset_delete_request(
+        args.folder, args.factory_id, args.scale_set_id, expected_revision=args.expected_revision,
+        version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "scaleset-delete")
+
+
+def cmd_draft_remove(args):
+    body = catalog_requests.draft_remove_request(
+        args.folder, args.factory_id, kind=args.kind, expected_revision=args.expected_revision,
+        scale_set_id=args.scale_set_id, project_id=args.project_id)
+    return catalog_prepare_emit(args, body, "draft-remove-" + args.kind)
+
+
+def cmd_parameters_get(args):
+    return emit(client(args).catalog_parameters(args.folder, args.factory_id, args.scale_set_id, args.project_id, args.version_ref))
+
+
+def cmd_parameters_prepare(args):
+    ensure_receipt_target_available(args)
+    if args.request_json:
+        body = read_json_file(args.request_json)
+        reject_request_json_conflicts(args, body, ("folder", "factory_id", "scale_set_id", "project_id", "version_ref", "expected_revision", "schema_revision"))
+    else:
+        missing_selection = [name for name in ("folder", "factory_id", "scale_set_id") if not getattr(args, name)]
+        if missing_selection:
+            raise ConfigError("--request-json is required unless --folder, --factory-id and --scale-set-id are provided.")
+        patches = [read_json_file(path) for path in args.template_patch or []]
+        if args.template:
+            patches.append({
+                "template": args.template,
+                "parameters": read_json_file(args.parameters_json) if args.parameters_json else {},
+                "unset": args.unset,
+                "resource_group_id": args.resource_group_id,
+                "template_spec_id": args.template_spec_id,
+            })
+        if not patches:
+            raise ConfigError("parameters prepare needs --request-json, --template-patch, or --template.")
+        if not args.expected_revision or not args.schema_revision:
+            raise ConfigError("parameters prepare requires --expected-revision and --schema-revision unless --request-json is used.")
+        body = {
+            "folder": args.folder,
+            "contract_version": 1,
+            "factory_id": args.factory_id,
+            "scale_set_id": args.scale_set_id,
+            "project_id": args.project_id,
+            "version_ref": args.version_ref,
+            "expected_revision": args.expected_revision,
+            "schema_revision": args.schema_revision,
+            "reset_profile": args.reset_profile,
+            "templates": [{k: v for k, v in patch.items() if v is not None} for patch in patches],
+        }
+    result = client(args).parameter_prepare(body)
+    maybe_save_receipt(args, result, body, "parameters-confirm", operation="parameters")
+    return preview_emit(result)
+
+
+def cmd_parameters_confirm(args):
+    require_yes(args)
+    receipt = load_receipt(args.receipt, client(args), "parameters-confirm")
+    result = client(args).parameter_confirm(receipt["folder"], receipt["confirmation_id"])
+    return confirmed_emit(result, runtime=False)
+
+
+def cmd_runtime_deploy_prepare(args):
+    body = prepare_base(args, "deploy")
+    body.update(factory_id=args.factory_id, scale_set_id=args.scale_set_id, project_id=args.project_id, version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "runtime-deploy")
+
+
+def cmd_bootstrap_capabilities(args):
+    return emit(client(args).creation_capabilities())
+
+
+def cmd_bootstrap_config(args):
+    return emit(client(args).bootstrap_config(read_json_file(args.state_json), mapping_mode=args.mapping_mode))
+
+
+def cmd_bootstrap_prepare(args):
+    ensure_receipt_target_available(args)
+    if args.request_json:
+        body = read_json_file(args.request_json)
+    else:
+        if not (args.launcher and args.orchestrator and args.config_json):
+            raise ConfigError("bootstrap prepare needs --request-json or --launcher, --orchestrator and --config-json.")
+        body = {"launcher": args.launcher, "orchestrator": args.orchestrator, "config": read_json_file(args.config_json)}
+    result = client(args).bootstrap_prepare(body)
+    maybe_save_receipt(args, result, body, "bootstrap-start", operation="bootstrap")
+    return preview_emit(result)
+
+
+def cmd_bootstrap_start(args):
+    require_yes(args)
+    c = client(args)
+    receipt = load_receipt(args.receipt, c, "bootstrap-start")
+    result = c.bootstrap_start(receipt["confirmation_id"])
+    if args.wait:
+        result = poll(lambda: c.bootstrap_job(result["id"]), args.poll_timeout, args.poll_interval, {"succeeded"})
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_bootstrap_status(args):
+    c = client(args)
+    result = poll(lambda: c.bootstrap_job(args.job_id), args.poll_timeout, args.poll_interval, {"succeeded"}) if args.wait else c.bootstrap_job(args.job_id)
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_creation_workflow_prepare(args):
+    if args.preflight:
+        return cmd_preflight(args)
+    if args.save_report:
+        raise ConfigError("--save-report requires --preflight; use --save-receipt for workflow preparation.")
+    ensure_receipt_target_available(args)
+    body = read_json_file(args.request_json)
+    if args.whole_workflow:
+        body["approval_mode"] = "whole-workflow"
+    result = client(args).creation_workflow_prepare(body)
+    maybe_save_receipt(args, result, body, "creation-workflow-start", operation="creation-workflow")
+    return preview_emit(result)
+
+
+def cmd_creation_workflow_next(args):
+    ensure_receipt_target_available(args)
+    body = {"folder": args.folder, "workflow_id": args.workflow_id}
+    result = client(args).creation_workflow_next(args.folder, args.workflow_id)
+    maybe_save_receipt(args, result, body, "creation-workflow-start", operation="creation-workflow")
+    return preview_emit(result)
+
+
+def cmd_creation_workflow_start(args):
+    require_yes(args)
+    api = client(args)
+    receipt = load_receipt(args.receipt, api, "creation-workflow-start")
+    authorization = receipt["preview"].get("review", {}).get("workflow_authorization")
+    result = api.creation_workflow_start(receipt["folder"], receipt["preview"]["workflow_id"], receipt["confirmation_id"],
+                                        **({"authorization_hash": authorization["authorization_hash"]} if authorization else {}))
+    if result.get("scope") != receipt["preview"]["scope"]:
+        raise FailureError("Workflow start returned a different scope. Inspect state; do not submit again.")
+    return workflow_status_emit(result, receipt["folder"], receipt["preview"]["workflow_id"])
+
+
+def cmd_creation_workflow_status(args):
+    result = client(args).creation_workflow_status(args.folder, args.workflow_id)
+    return workflow_status_emit(result, args.folder, args.workflow_id)
+
+
+def cmd_creation_workflow_continue(args):
+    result = client(args).creation_workflow_continue(args.folder, args.workflow_id, args.authorization_hash)
+    return workflow_status_emit(result, args.folder, args.workflow_id)
+
+
+def workflow_status_emit(result, folder, identifier):
+    if (result.get("contract_version") != 1 or result.get("workflow_id") != identifier
+            or not isinstance(result.get("scope"), dict) or result["scope"].get("folder") != folder):
+        raise FailureError("Workflow status returned a different or incomplete scope. Inspect state before retrying.")
+    status = result.get("status")
+    code = EXIT_BLOCKED if status == "blocked" else EXIT_OK if status == "awaiting-review" else status_exit(status)
+    return emit(result, code)
+
+
+def cmd_legacy_list(args):
+    return emit(client(args).project_deployments(args.folder))
+
+
+def cmd_legacy_plan(args):
+    validate_legacy_operation(args.operation, args.source_env, args.target_env)
+    body = {
+        "folder": args.folder,
+        "project_number": args.project_number.zfill(3),
+        "source_environment": args.source_env,
+        "target_environment": args.target_env,
+        "operation": args.operation,
+        "patch": bool(args.patch),
+    }
+    if args.aifactory_version is not None:
+        body["aifactory_version"] = args.aifactory_version
+    result = client(args).project_deployment_plan(body)
+    validate_legacy_plan_result(result, body)
+    return emit(result)
+
+
+def cmd_legacy_prepare(args):
+    ensure_receipt_target_available(args)
+    c = client(args)
+    draft = find_legacy_draft(c.project_deployments(args.folder), args.draft_id)
+    validate_legacy_draft(draft)
+    patch = draft.get("patch") if args.patch is None else bool(args.patch)
+    body = {"folder": args.folder, "draft_id": args.draft_id, "patch": patch}
+    if args.aifactory_version is not None:
+        body["aifactory_version"] = args.aifactory_version
+    result = c.project_deployment_prepare(body)
+    if result.get("can_execute") is not True:
+        return preview_emit(result)
+    prepared_draft = find_legacy_draft(c.project_deployments(args.folder), args.draft_id)
+    for field in ("project_number", "source_environment", "target_environment", "operation"):
+        if prepared_draft.get(field) != draft.get(field):
+            raise FailureError("Saved deployment scope changed during preparation.")
+    validate_legacy_preview(result, prepared_draft, patch, args.aifactory_version)
+    contract = result["deployment_contract"]
+    maybe_save_receipt(
+        args, result, body, "legacy-start", operation="legacy-project-deployment",
+        contract=contract, draft_id=args.draft_id, patch=patch,
+        saved_patch=prepared_draft.get("patch"), patch_override=args.patch is not None,
+        source_environment=draft.get("source_environment"), target_environment=draft.get("target_environment"),
+        saved_aifactory_version=prepared_draft.get("aifactory_version"), version_override=args.aifactory_version is not None,
+        aifactory_version=contract.get("aifactory_version"),
+        requested_version=contract.get("requested_version"), branch=contract.get("branch"),
+        resolved_ref=contract.get("resolved_ref"),
+    )
+    return preview_emit(result)
+
+
+def cmd_legacy_start(args):
+    require_yes(args)
+    c = client(args)
+    receipt = load_receipt(args.receipt, c, "legacy-start")
+    contract = receipt.get("contract") or {}
+    if contract.get("version") != 2:
+        raise ConfigError("Legacy start receipt must acknowledge deployment contract version 2.")
+    if contract.get("draft_id") != receipt.get("draft_id") or contract.get("patch") is not receipt.get("patch"):
+        raise ConfigError("Legacy start receipt contract does not match the reviewed draft/patch binding.")
+    draft = find_legacy_draft(c.project_deployments(receipt["folder"]), receipt["draft_id"])
+    validate_legacy_draft(draft)
+    compare_legacy_receipt_to_draft(receipt, draft)
+    result = c.project_deployment_start(receipt["folder"], receipt["confirmation_id"])
+    validate_legacy_contract(result.get("deployment_contract"), result, "Legacy start")
+    if result.get("deployment_contract") != receipt["preview"]["deployment_contract"]:
+        raise FailureError("Legacy start acknowledgement differs from the reviewed operation; inspect the server job before retrying.")
+    if args.wait and result.get("job_id"):
+        result = poll(lambda: c.project_deployment_terminal(receipt["folder"], result["job_id"]), args.poll_timeout, args.poll_interval, {"submitted"})
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_legacy_status(args):
+    c = client(args)
+    result = poll(lambda: c.project_deployment_terminal(args.folder, args.job_id, args.cursor), args.poll_timeout, args.poll_interval, {"submitted"}) if args.wait else c.project_deployment_terminal(args.folder, args.job_id, args.cursor)
+    return emit(result, status_exit(result.get("status")))
+
+
+def cmd_request(args):
+    method = args.method.upper()
+    unsafe = method not in {"GET", "HEAD", "OPTIONS"}
+    if unsafe and not (args.write and args.yes):
+        raise ConfigError("Generic write requests require both --write and --yes.")
+    body = None
+    if args.body_json:
+        body = read_json_file(args.body_json)
+    elif args.body:
+        body = json.loads(args.body)
+    query = dict(parse_key_value(item) for item in args.query)
+    result = client(args).request(method, args.endpoint, body=body, query=query)
+    exit_code = EXIT_OK
+    if unsafe and isinstance(result, dict) and (result.get("can_execute") is False or result.get("blockers")):
+        exit_code = EXIT_BLOCKED
+    return emit(result, exit_code)
+
+
+def prepare_base(args, action: str) -> dict[str, Any]:
+    return {"folder": args.folder, "contract_version": 1, "action": action, "expected_revision": args.expected_revision}
+
+
+def build_scale_sets(args) -> list[dict[str, Any]]:
+    if args.scale_set_json:
+        value = read_json_file(args.scale_set_json)
+        return value if isinstance(value, list) else [value]
+    required = ["environment", "suffix", "subscription_id", "tenant_id", "orchestrator", "vnet_cidr"]
+    missing = [name for name in required if getattr(args, name) is None]
+    if missing:
+        raise ConfigError("Missing scale-set flags: " + ", ".join("--" + name.replace("_", "-") for name in missing))
+    network = {"vnet_cidr": args.vnet_cidr, "max_projects": args.max_projects}
+    common = {
+        "common": args.common_subnet,
+        "scoring": args.scoring_subnet,
+        "powerbi": args.powerbi_subnet,
+        "bastion": args.bastion_subnet,
+    }
+    if any(common.values()):
+        if not all(common.values()):
+            raise ConfigError("All four common subnet flags are required when one is supplied.")
+        network["common_subnets"] = common
+    return [{
+        "environment": args.environment,
+        "suffix": args.suffix,
+        "subscription_id": args.subscription_id,
+        "tenant_id": args.tenant_id,
+        "orchestrator": args.orchestrator,
+        "network": network,
+    }]
+
+
+def parse_placements(values: list[str]) -> list[dict[str, str]]:
+    placements = []
+    for value in values:
+        env, scale_set_id = parse_key_value(value)
+        if env not in {"dev", "stage", "prod"}:
+            raise ConfigError("Placement environment must be dev, stage or prod.")
+        placements.append({"environment": env, "scale_set_id": scale_set_id})
+    return placements
+
+
+def parse_key_value(value: str) -> tuple[str, str]:
+    if "=" not in value:
+        raise ConfigError(f"Expected key=value, got {value!r}.")
+    key, val = value.split("=", 1)
+    if not key:
+        raise ConfigError("key=value entry has an empty key.")
+    return key, val
+
+
+def catalog_prepare_emit(args, body: dict[str, Any], operation: str) -> int:
+    ensure_receipt_target_available(args)
+    body = {k: v for k, v in body.items() if v is not None or
+            (body.get("action") == "create-factory" and k == "initial_project")}
+    result = client(args).catalog_prepare(body)
+    if result.get("can_execute") is True:
+        from .review import validate_project_selection, validate_settings_selection, validate_removal_selection
+        validate_project_selection(body, result)
+        validate_settings_selection(body, result)
+        validate_removal_selection(body, result)
+    maybe_save_receipt(args, result, body, "catalog-confirm", operation=operation)
+    return preview_emit(result)
+
+
+def preview_emit(result: dict[str, Any]) -> int:
+    if not isinstance(result, dict) or "can_execute" not in result:
+        return emit({"ok": False, "error": "Malformed preview: missing can_execute.", "preview": result}, EXIT_FAILURE)
+    if result.get("can_execute") is not True or result.get("blockers"):
+        return emit(result, EXIT_BLOCKED)
+    validate_preview(result)
+    return emit(result, EXIT_OK)
+
+
+def confirmed_emit(result: dict[str, Any], *, runtime: bool) -> int:
+    if not isinstance(result, dict) or type(result.get("contract_version")) is not int or result["contract_version"] != 1:
+        raise FailureError("Confirmation returned an invalid catalog contract. Inspect server state before retrying.")
+    if runtime:
+        job = result.get("job")
+        if not isinstance(job, dict):
+            raise FailureError("Runtime confirmation did not return a job. Inspect server state before retrying.")
+        return emit(result, status_exit(job.get("status")))
+    if not isinstance(result.get("catalog"), dict) or result.get("job") is not None:
+        raise FailureError("Configuration confirmation did not return a catalog-only result. Inspect server state before retrying.")
+    return emit(result)
+
+
+def _print_json(value: Any, *, file=None, compact: bool = False, flush: bool = False) -> None:
+    output = sys.stdout if file is None else file
+    options = {"separators": (",", ":")} if compact else {"indent": 2, "sort_keys": True}
+    text = json.dumps(value, ensure_ascii=False, **options)
+    encoding = getattr(output, "encoding", None)
+    if encoding:
+        try:
+            # Preflight strictly, even when the stream silently replaces unsupported characters.
+            text.encode(encoding)
+        except UnicodeEncodeError:
+            text = json.dumps(value, ensure_ascii=True, **options)
+    print(text, file=output, flush=flush)
+
+
+def emit(value: Any, exit_code: int = EXIT_OK) -> int:
+    _print_json(value)
+    return exit_code
+
+
+def _error(code: int, message: str, exc: APIError | None = None) -> int:
+    payload = {"ok": False, "error": {"message": redact_secrets(message, os.getenv(API_KEY_ENV)), "type": type(exc).__name__ if exc else "Error"}}
+    if exc and exc.status is not None:
+        payload["error"]["status"] = exc.status
+    if exc and exc.details is not None:
+        payload["error"]["details"] = redact_secrets(exc.details, os.getenv(API_KEY_ENV))
+    _print_json(payload, file=sys.stderr)
+    return code
+
+
+def read_json_file(path: str) -> Any:
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            return json.load(handle)
+    except FileNotFoundError as exc:
+        raise ConfigError(f"JSON file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"Invalid JSON in {path}: {exc.msg}") from exc
+    except (OSError, UnicodeError) as exc:
+        raise ConfigError(f"Cannot read UTF-8 JSON file: {path}") from exc
+
+
+def maybe_save_receipt(args, preview: dict[str, Any], request_body: dict[str, Any], purpose: str, **extra) -> None:
+    path = getattr(args, "save_receipt", None)
+    if not path:
+        return
+    operation = extra.pop("operation", request_body.get("action"))
+    write_receipt(path, client=client(args), purpose=purpose, operation=operation,
+                  request_body=request_body, preview=preview, **extra)
+
+
+def load_receipt(path: str, c: AzureFactoryClient, purpose: str, operation_mode: str | None = None) -> dict[str, Any]:
+    return review_load_receipt(path, client=c, purpose=purpose, operation_mode=operation_mode)
+
+
+def parse_datetime(value: str | None) -> datetime:
+    return parse_expires_at(value)
+
+
+def require_yes(args) -> None:
+    if not args.yes:
+        raise ConfigError("This write requires --yes.")
+
+
+def ensure_receipt_target_available(args) -> None:
+    path = getattr(args, "save_receipt", None)
+    if path and os.path.exists(path):
+        raise ConfigError(f"Refusing to overwrite existing receipt: {path}")
+
+
+def reject_request_json_conflicts(args, body: dict[str, Any], fields: tuple[str, ...]) -> None:
+    for field in fields:
+        arg_value = getattr(args, field, None)
+        if arg_value is not None and body.get(field) != arg_value:
+            raise ConfigError(f"--request-json conflicts with --{field.replace('_', '-')}.")
+    if getattr(args, "reset_profile", False) and body.get("reset_profile") is not True:
+        raise ConfigError("--request-json conflicts with --reset-profile.")
+
+
+def validate_legacy_operation(operation: str, source: str, target: str) -> None:
+    if operation == "update" and source != target:
+        raise ConfigError("Legacy update requires source and target environment to match.")
+    if operation == "deploy":
+        order = {"dev": 0, "stage": 1, "prod": 2}
+        if order[source] >= order[target]:
+            raise ConfigError("Legacy deploy/promote requires a later target environment.")
+
+
+def validate_legacy_plan_result(result: dict[str, Any], body: dict[str, Any]) -> None:
+    if not isinstance(result, dict):
+        raise FailureError("Legacy plan returned a malformed response.")
+    for field, request_field in (("project_number", "project_number"), ("source_environment", "source_environment"),
+                                 ("target_environment", "target_environment"), ("operation", "operation")):
+        if result.get(field) != body.get(request_field):
+            raise FailureError(f"Legacy plan response {field} did not match request.")
+    if result.get("patch") is not body.get("patch"):
+        raise FailureError("Legacy plan response patch did not match request.")
+    if body.get("aifactory_version") is not None and result.get("aifactory_version") != body["aifactory_version"]:
+        raise FailureError("Legacy plan did not acknowledge the requested source version.")
+    contract = result.get("deployment_contract")
+    validate_legacy_contract(contract, result, "Legacy plan")
+
+
+def validate_legacy_contract(contract: Any, draft: dict[str, Any], context: str) -> None:
+    if not isinstance(contract, dict) or type(contract.get("version")) is not int or contract["version"] != 2:
+        raise FailureError(f"{context} did not include deployment contract version 2.")
+    if (not isinstance(draft.get("id"), str) or not draft["id"] or
+            draft.get("operation") not in {"deploy", "update"} or
+            type(draft.get("patch")) is not bool or type(contract.get("patch")) is not bool):
+        raise FailureError(f"{context} contains an invalid draft, operation or patch choice.")
+    expected = {
+        "draft_id": draft.get("id"),
+        "operation": draft.get("operation"),
+        "patch": draft.get("patch"),
+        "aifactory_version": draft.get("aifactory_version"),
+        "requested_version": draft.get("requested_version", ""),
+        "branch": draft.get("branch", ""),
+        "resolved_ref": draft.get("resolved_ref", ""),
+    }
+    for field, expected_value in expected.items():
+        if expected_value is None and field == "aifactory_version":
+            if contract.get(field) is not None:
+                raise FailureError(f"{context} contract {field} did not match.")
+            continue
+        if contract.get(field, "" if field in {"requested_version", "branch", "resolved_ref"} else None) != expected_value:
+            raise FailureError(f"{context} contract {field} did not match.")
+
+
+def find_legacy_draft(drafts_response: dict[str, Any], draft_id: str) -> dict[str, Any]:
+    drafts = drafts_response.get("drafts") if isinstance(drafts_response, dict) else None
+    if not isinstance(drafts, list):
+        raise FailureError("Legacy draft list returned a malformed response.")
+    matches = [item for item in drafts if isinstance(item, dict) and item.get("id") == draft_id]
+    if len(matches) != 1:
+        raise ConfigError("Legacy draft was not found in the selected folder.")
+    return matches[0]
+
+
+def validate_legacy_draft(draft: dict[str, Any]) -> None:
+    validate_legacy_contract(draft.get("deployment_contract"), draft, "Saved legacy draft")
+
+
+def validate_legacy_preview(preview: dict[str, Any], draft: dict[str, Any], patch: bool, version: str | None) -> None:
+    if not isinstance(preview, dict):
+        raise FailureError("Legacy prepare returned a malformed response.")
+    contract = preview.get("deployment_contract")
+    expected = dict(draft)
+    expected["patch"] = patch
+    if version is not None:
+        expected["aifactory_version"] = version
+    validate_legacy_contract(contract, expected, "Legacy prepare preview")
+    if contract.get("draft_id") != draft.get("id") or contract.get("operation") != draft.get("operation"):
+        raise FailureError("Legacy prepare acknowledgement did not match the saved draft.")
+    if contract.get("patch") is not patch:
+        raise FailureError("Legacy prepare acknowledgement did not match the requested patch flag.")
+
+
+def compare_legacy_receipt_to_draft(receipt: dict[str, Any], draft: dict[str, Any]) -> None:
+    contract = receipt.get("contract") or {}
+    fields = ("draft_id", "operation", "aifactory_version", "requested_version", "branch", "resolved_ref")
+    current = draft.get("deployment_contract", {})
+    for field in fields:
+        if contract.get(field, "" if field in {"requested_version", "branch", "resolved_ref"} else None) != current.get(field, "" if field in {"requested_version", "branch", "resolved_ref"} else None):
+            raise ConfigError("Legacy start receipt no longer matches the saved draft.")
+    if receipt.get("saved_patch") is not draft.get("patch"):
+        raise ConfigError("Legacy start receipt saved patch binding no longer matches the saved draft.")
+    if receipt.get("saved_aifactory_version") != draft.get("aifactory_version"):
+        raise ConfigError("Legacy start receipt saved version binding no longer matches the saved draft.")
+    if contract.get("patch") is not receipt.get("patch"):
+        raise ConfigError("Legacy start receipt contract patch binding is inconsistent.")
+    for field in ("source_environment", "target_environment"):
+        if receipt.get(field) != draft.get(field):
+            raise ConfigError("Legacy start receipt environment binding no longer matches the saved draft.")
+
+
+def poll(fetch, timeout: float, interval: float, success_statuses: set[str]) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last = None
+    while True:
+        if time.monotonic() >= deadline:
+            raise RequestTimeout("Polling timed out before a terminal status. This does not cancel the server operation.", details=last)
+        last = fetch()
+        if not isinstance(last, dict) or not isinstance(last.get("status"), str):
+            raise FailureError("Polling endpoint returned a malformed status response.")
+        status = str(last.get("status", "")).lower()
+        known = success_statuses | {"queued", "running", "draft", "submitted", "succeeded", "failed", "interrupted"}
+        if status not in known:
+            raise FailureError(f"Polling endpoint returned unknown status: {status}")
+        if status in success_statuses or status in {"failed", "interrupted", "succeeded"}:
+            return last
+        time.sleep(min(interval, max(0.0, deadline - time.monotonic())))
+
+
+def status_exit(status: str | None) -> int:
+    if not isinstance(status, str):
+        return EXIT_FAILURE
+    lowered = status.lower()
+    if lowered in {"failed", "interrupted"}:
+        return EXIT_FAILURE
+    if lowered not in {"queued", "running", "draft", "submitted", "succeeded"}:
+        return EXIT_FAILURE
+    return EXIT_OK
+
+
+def _missing_required_paths(openapi: dict[str, Any]) -> list[str]:
+    paths = openapi.get("paths", {})
+    missing = []
+    for path, methods in REQUIRED_OPENAPI_PATHS.items():
+        actual = {method.lower() for method in paths.get(path, {})}
+        for method in methods - actual:
+            missing.append(f"{method.upper()} {path}")
+    return sorted(missing)
+
+
+def compare_openapi(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
+    incompatible = []
+    additive = []
+    actual_paths = actual.get("paths", {})
+    for path, methods in expected.get("paths", {}).items():
+        if path not in actual_paths:
+            incompatible.append(f"Missing path {path}")
+            continue
+        for method in methods:
+            if method.lower() not in {"get", "post", "put", "patch", "delete", "head", "options", "trace"}:
+                continue
+            method_key = next((m for m in actual_paths[path] if m.lower() == method.lower()), None)
+            if method_key is None:
+                incompatible.append(f"Missing method {method.upper()} {path}")
+                continue
+            expected_op = methods[method]
+            actual_op = actual_paths[path][method_key]
+            incompatible.extend(compare_parameters(path, method, expected_op, actual_op))
+            expected_request = request_ref(expected_op)
+            actual_request = request_ref(actual_op)
+            if expected_request != actual_request:
+                incompatible.append(f"{method.upper()} {path} request model changed from {expected_request} to {actual_request}")
+            if comparable_schema(expected_op.get("requestBody", {})) != comparable_schema(actual_op.get("requestBody", {})):
+                incompatible.append(f"{method.upper()} {path} request body contract changed")
+            for status, response in expected_op.get("responses", {}).items():
+                if comparable_schema(response) != comparable_schema(actual_op.get("responses", {}).get(status)):
+                    incompatible.append(f"{method.upper()} {path} response {status} contract changed")
+            if expected_op.get("security") != actual_op.get("security"):
+                incompatible.append(f"{method.upper()} {path} security requirement changed")
+    expected_schemas = expected.get("components", {}).get("schemas", {})
+    actual_schemas = actual.get("components", {}).get("schemas", {})
+    for name, schema in expected_schemas.items():
+        if name not in actual_schemas:
+            incompatible.append(f"Missing schema {name}")
+            continue
+        incompatible.extend(compare_schema(name, schema, actual_schemas[name]))
+        optional_extra, required_extra = added_schema_properties(schema, actual_schemas[name])
+        if required_extra:
+            incompatible.append(f"Schema {name} adds required properties: {', '.join(required_extra)}")
+        if optional_extra:
+            additive.append(f"Schema {name} adds optional properties: {', '.join(optional_extra)}")
+    return {"incompatible": incompatible, "additive": additive}
+
+
+def request_ref(operation: dict[str, Any]) -> str | None:
+    content = operation.get("requestBody", {}).get("content", {}) if isinstance(operation, dict) else {}
+    schema = content.get("application/json", {}).get("schema", {}) if isinstance(content, dict) else {}
+    return schema.get("$ref")
+
+
+def compare_parameters(path: str, method: str, expected_op: dict[str, Any], actual_op: dict[str, Any]) -> list[str]:
+    issues = []
+    expected = {parameter_key(p): p for p in expected_op.get("parameters", []) if isinstance(p, dict)}
+    actual = {parameter_key(p): p for p in actual_op.get("parameters", []) if isinstance(p, dict)}
+    for key, parameter in expected.items():
+        if key not in actual:
+            issues.append(f"{method.upper()} {path} missing parameter {key}")
+            continue
+        if bool(actual[key].get("required")) != bool(parameter.get("required")):
+            issues.append(f"{method.upper()} {path} parameter {key} required flag changed")
+        if comparable_schema(parameter.get("schema", {})) != comparable_schema(actual[key].get("schema", {})):
+            issues.append(f"{method.upper()} {path} parameter {key} schema changed")
+    for key, parameter in actual.items():
+        if key not in expected and parameter.get("required"):
+            issues.append(f"{method.upper()} {path} adds required parameter {key}")
+    return issues
+
+
+def parameter_key(parameter: dict[str, Any]) -> str:
+    return f"{parameter.get('in')}:{parameter.get('name')}"
+
+
+def compare_schema(name: str, expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
+    issues = []
+    expected_required = set(expected.get("required", []))
+    actual_required = set(actual.get("required", []))
+    missing_required = expected_required - set(actual.get("properties", {}))
+    if missing_required:
+        issues.append(f"Schema {name} missing required properties: {', '.join(sorted(missing_required))}")
+    removed_required = expected_required - actual_required
+    if removed_required:
+        issues.append(f"Schema {name} removed required markers: {', '.join(sorted(removed_required))}")
+    expected_props = expected.get("properties", {})
+    actual_props = actual.get("properties", {})
+    newly_required = (actual_required - expected_required) & set(expected_props)
+    if newly_required:
+        issues.append(f"Schema {name} makes existing properties required: {', '.join(sorted(newly_required))}")
+    expected_shape = {key: value for key, value in expected.items() if key not in {"properties", "required"}}
+    actual_shape = {key: value for key, value in actual.items() if key not in {"properties", "required"}}
+    if comparable_schema(expected_shape) != comparable_schema(actual_shape):
+        issues.append(f"Schema {name} constraints changed")
+    for prop, schema in expected_props.items():
+        if prop not in actual_props:
+            issues.append(f"Schema {name}.{prop} was removed")
+            continue
+        if comparable_schema(schema) != comparable_schema(actual_props[prop]):
+            issues.append(f"Schema {name}.{prop} changed type/enum/const/ref")
+    return issues
+
+
+def comparable_schema(schema: dict[str, Any]) -> Any:
+    if isinstance(schema, list):
+        return [comparable_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    return {
+        key: comparable_schema(value)
+        for key, value in schema.items()
+        if key not in {"description", "summary", "title", "example", "examples", "externalDocs"}
+    }
+
+
+def added_schema_properties(expected: dict[str, Any], actual: dict[str, Any]) -> tuple[list[str], list[str]]:
+    expected_props = set(expected.get("properties", {}))
+    extra = set(actual.get("properties", {})) - expected_props
+    actual_required = set(actual.get("required", []))
+    return sorted(extra - actual_required), sorted(extra & actual_required)
+
+
+def contract_issues(openapi: dict[str, Any]) -> list[str]:
+    schemas = openapi.get("components", {}).get("schemas", {})
+    issues = registered_creation_issues(openapi)
+    issues.extend(require_schema_const(schemas, "CatalogPrepare", "contract_version", 1))
+    issues.extend(require_schema_const(schemas, "CatalogConfirm", "contract_version", 1))
+    issues.extend(require_schema_const(schemas, "CatalogParameterPrepare", "contract_version", 1))
+    issues.extend(require_schema_const(schemas, "ProjectDeploymentAcknowledgement", "version", 2))
+    issues.extend(require_required(schemas, "ProjectDeploymentAcknowledgement", ["version", "draft_id", "operation", "patch"]))
+    issues.extend(require_property_type(schemas, "ProjectDeploymentAcknowledgement", "patch", "boolean"))
+    issues.extend(require_property_enum(schemas, "ProjectDeploymentAcknowledgement", "operation", {"deploy", "update"}))
+    issues.extend(require_required(schemas, "ProjectDeploymentPlanBody", ["folder", "project_number", "source_environment", "target_environment"]))
+    issues.extend(require_property_type(schemas, "ProjectDeploymentPlanBody", "patch", "boolean"))
+    issues.extend(require_property_enum(schemas, "ProjectDeploymentPlanBody", "operation", {"deploy", "update"}))
+    issues.extend(require_required(schemas, "ProjectDeploymentPrepareBody", ["folder", "draft_id"]))
+    issues.extend(require_property_type(schemas, "ProjectDeploymentPrepareBody", "patch", "boolean"))
+    expected_refs = {
+        ("post", "/api/v1/factory-catalog/prepare"): "#/components/schemas/CatalogPrepare",
+        ("post", "/api/v1/factory-catalog/confirm"): "#/components/schemas/CatalogConfirm",
+        ("post", "/api/v1/factory-catalog/parameters/prepare"): "#/components/schemas/CatalogParameterPrepare",
+        ("post", "/api/v1/operations/project-deployments/plan"): "#/components/schemas/ProjectDeploymentPlanBody",
+        ("post", "/api/v1/operations/project-deployments/prepare"): "#/components/schemas/ProjectDeploymentPrepareBody",
+        ("post", "/api/v1/operations/project-deployments/start"): "#/components/schemas/ProjectDeploymentStartBody",
+    }
+    paths = openapi.get("paths", {})
+    for (method, path), ref in expected_refs.items():
+        actual = request_ref(paths.get(path, {}).get(method, {}))
+        if actual != ref:
+            issues.append(f"{method.upper()} {path} request model is {actual}, expected {ref}")
+    return issues
+
+
+def require_required(schemas: dict[str, Any], name: str, fields: list[str]) -> list[str]:
+    schema = schemas.get(name, {})
+    required = set(schema.get("required", []))
+    props = set(schema.get("properties", {}))
+    return [f"Schema {name} requires {field}" for field in fields if field not in required or field not in props]
+
+
+def require_schema_const(schemas: dict[str, Any], name: str, field: str, value: Any) -> list[str]:
+    schema = schemas.get(name, {}).get("properties", {}).get(field, {})
+    if schema.get("const") == value or schema.get("enum") == [value]:
+        return []
+    return [f"Schema {name}.{field} must be const {value}"]
+
+
+def require_property_type(schemas: dict[str, Any], name: str, field: str, expected_type: str) -> list[str]:
+    actual = schemas.get(name, {}).get("properties", {}).get(field, {})
+    if actual.get("type") == expected_type:
+        return []
+    return [f"Schema {name}.{field} must be type {expected_type}"]
+
+
+def require_property_enum(schemas: dict[str, Any], name: str, field: str, expected: set[str]) -> list[str]:
+    actual = set(schemas.get(name, {}).get("properties", {}).get(field, {}).get("enum", []))
+    if actual == expected:
+        return []
+    return [f"Schema {name}.{field} enum changed"]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

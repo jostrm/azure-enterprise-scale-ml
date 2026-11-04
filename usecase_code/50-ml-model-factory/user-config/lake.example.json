@@ -1,0 +1,32 @@
+{
+  "aifactory": "example-factory",
+  "project": "001",
+  "environment": "dev",
+  "use_case": "titanic",
+  "dataset": "kaggle-titanic",
+  "data_version": "v1",
+  "snapshot_id": "s001",
+  "run_id": "r001",
+  "serving": "batch",
+  "model_version": "m001",
+  "pipeline_id": "titanic-scoring",
+  "pipeline_version": "v1",
+  "prefix": "mlops/v1",
+  "request_id_column": "request_id",
+  "use_common_datalake_storage": false,
+  "storage_targets": {
+    "common": {
+      "account_name": "examplecommonlake",
+      "resource_group": "example-common-dev",
+      "container": "lake3",
+      "datastore": "esml_shared_lake"
+    },
+    "project": {
+      "account_name": "exampleprojectdata",
+      "resource_group": "example-project001-dev",
+      "container": "ml-model-factory",
+      "datastore": "ml_model_factory"
+    }
+  },
+  "storage": {}
+}

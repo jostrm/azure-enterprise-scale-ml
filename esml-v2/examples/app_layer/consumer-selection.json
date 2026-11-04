@@ -1,0 +1,7 @@
+{
+  "dataset": "customers",
+  "producer_project": "003",
+  "variation": "validated-demographics",
+  "version": "v1",
+  "consumer_project": "005"
+}

@@ -1,0 +1,116 @@
+PRIVATE KAGGLE TEXT INGESTION AND BASIC-COMPATIBLE FOUNDRY IQ
+
+This implementation does not deploy compute, attach identities, assign roles,
+upgrade Search, enable public access, or download from an operator's Azure account.
+It must run on approved Azure compute with the project UAMI explicitly attached.
+No CLI/user credentials, storage account keys, SAS, or DefaultAzureCredential
+fallback are used for ingestion. Missing MI authentication is a hard error.
+
+Prerequisites (provision/approve separately):
+* Target storage account name contains 2001 and does not contain 1001.
+* The target UAMI has Storage Blob Data Contributor on that project storage,
+  Search Service Contributor and Search Index Data Contributor on project Search.
+* Both Blob and Search hostnames resolve only to private VNet addresses.
+  Storage/Search public access stays disabled. The host has working private DNS
+  and routing to their private endpoints. An operator configuring IQ needs VPN.
+* The host can download the public Kaggle CSV over HTTPS, including its HTTPS
+  Google Storage redirect, and install the runtime packages. The download never
+  carries Azure credentials. Signed redirect URLs are never saved or logged.
+* Search Basic semanticSearch=free is supported, subject to region availability
+  and free semantic ranker quota. Exhausted quota is an error, not authorization
+  to buy a paid semantic plan or change the SKU. No embeddings/vectorizer/model
+  deployment is required for this initial semantic-text, minimal/extractive IQ.
+* The Foundry project managed identity (not necessarily the ingestion UAMI) has
+  Search Index Data Reader and a private network route from the Foundry runtime
+  to Search. A successful operator/VPN request does not prove agent connectivity.
+* The operator has Search Service Contributor and Search Index Data Reader plus
+  permission to create project connections through ARM using tenant-bound OAuth.
+
+From 40-agent-factory on the approved Azure host:
+  python -m pip install -r 43-data\requirements.txt
+  python 43-data\worker.py --target target.json --container agent-factory --index aif-kaggle-rag-v1
+
+target.json is a serialized agent_factory.config.Target (target.to_dict()) with
+explicit identity_id and identity_client_id. Package this script together with
+the agent_factory package. No magic target paths, secrets, or credential files.
+
+Dataset: https://www.kaggle.com/datasets/dkhundley/sample-rag-knowledge-item-dataset
+Author: D. K. Hundley (dkhundley). Dataset version: 1. License: MIT.
+Public download/parser smoke check on 2026-09-11: 43,111 bytes, 10 CSV rows,
+10 unique topic/content documents. Observed raw SHA-256:
+c48e1db2f7d1da20f7c66935f707d4b7caddbc9e898a0d0838f68aaff0f85ce7
+This read-only check did not upload anything to Azure.
+Canonical download (not its temporary signed redirect):
+https://www.kaggle.com/api/v1/datasets/download/dkhundley/sample-rag-knowledge-item-dataset/rag_sample_qas_from_kis.csv?datasetVersionNumber=1
+
+The CSV parser supports quoted multiline Markdown. It rejects HTML login/
+challenge responses, malformed headers/rows, non-UTF8, oversized data, and empty
+datasets. Deduplication hashes normalized topic+content, not sample questions.
+Only ki_topic and ki_text enter the Search text index. No sample_ground_truth
+or sample_question enters the index, semantic query, knowledge source, or MCP.
+
+Private container layout under --prefix (default kaggle-rag-v1):
+  raw\rag_sample_qas_from_kis.csv        original bytes, never sent to a model
+  documents\<deterministic-sha256>.md    one ki_text per unique topic+content
+  evaluation\samples.jsonl              separate questions and reference answers
+  manifest.json                        canonical source, version, license,
+                                       attribution, raw/evaluation/document hashes
+The index and documents contain unsigned private Blob URLs and source attribution.
+The container is not published. Raw/evaluation paths are never configured as a
+knowledge source. The only external request is the public dataset download;
+private documents remain within the selected Azure storage and Search service.
+
+Existing Blob artifacts must match size, metadata and content hashes. Existing
+indexes must have the factory ownership description and exact expected text
+schema/semantic fields; unrelated fields/documents cause refusal. Existing
+knowledge sources, KBs and connections must match their expected configuration.
+No arbitrary resource is deleted/recreated and no unrelated resource is updated.
+Uploads use deterministic IDs and can be safely rerun after partial failures.
+A changed version-1 download under an existing prefix/index is refused: inspect
+the upstream change, then deliberately select new artifact/index names.
+Success requires Blob persistence, complete Search document acknowledgments,
+queryable document hashes/count, and a real semantic reranker result.
+
+After ingestion, the parent CLI/operator calls:
+  configure_knowledge(session, target)
+It first checks private Search, semantic enablement, compatible schema, nonzero
+searchable content, and operational semantic ranking. It creates:
+  kind=searchIndex knowledge source over the already populated index
+  minimal retrievalReasoningEffort + extractiveData knowledge base, no models
+  ARM project connection: category=RemoteTool, authType=ProjectManagedIdentity,
+    isSharedToAll=true, audience=https://search.azure.com/, metadata.ApiType=Azure
+The returned plain MCPTool JSON uses the project-scoped CONNECTION NAME (not
+the full ARM resource ID), allows only knowledge_base_retrieve, and has
+require_approval=never only for this owned, private read-only Search endpoint.
+The full ARM connection ID is returned separately as connection_id.
+
+Optional local operator check:
+  verify_retrieval(session, target, "a question about an indexed topic")
+This sends an intents semantic request only to the selected private Search KB.
+It requires nonempty content and Search document references, not just HTTP 200.
+configure_knowledge reports retrieval_verified=false until this separate check;
+an agent-side MCP smoke test is still required to verify the project MI/network.
+
+IMPORTANT BASIC LIMITATION
+Do NOT use a managed azureBlob knowledge source with private ingestion on Basic.
+That alternative requires S2/S3/L1/L2 and Search shared private links. This
+implementation deliberately pushes text from Azure compute to an existing
+Search index; it does not create indexers, skillsets, private ingestion networks,
+embeddings, Azure OpenAI connections, or shared private links.
+
+Verified API contracts (2026-09-11):
+Search REST 2026-08-01-preview:
+https://learn.microsoft.com/en-us/azure/search/agentic-knowledge-source-how-to-search-index
+https://learn.microsoft.com/en-us/rest/api/searchservice/knowledge-sources/create-or-update?view=rest-searchservice-2026-08-01-preview
+https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-create-knowledge-base
+https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve#use-minimal-reasoning-effort
+ARM connection REST 2025-10-01-preview and project-scoped MCPTool:
+https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/foundry-iq-connect
+Private managed Blob ingestion tier restriction:
+https://learn.microsoft.com/en-us/azure/search/agentic-knowledge-source-how-to-blob#restrict-ingestion-to-a-private-network-preview
+
+Run local offline tests from 40-agent-factory:
+  python -m unittest discover -s tests -p "test_data.py"
+  python -m unittest discover -s tests -p "test_knowledge.py"
+Tests use fakes and make no Azure writes. Real Azure deployment is a separate,
+explicitly approved operation; passing offline tests is not a deployment claim.

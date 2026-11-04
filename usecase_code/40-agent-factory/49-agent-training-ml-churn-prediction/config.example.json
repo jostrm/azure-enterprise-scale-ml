@@ -1,0 +1,31 @@
+{
+  "configuration_instructions": "Create the consumer configuration with `main.py init-config`; this file only documents its shape. Keep the result outside the template.",
+  "schema": "aif49.ml-agent-config/v1",
+  "owner": "aif49-project001-dev",
+  "version": "v1",
+  "tenant_id": "<tenant GUID from the factory target>",
+  "subscription_id": "<subscription GUID from the factory target>",
+  "aifactory": "<aifactory name from the reviewed rollout>",
+  "project_number": 1,
+  "environment": "dev",
+  "factory_config": "<orange>\\aifactory\\agent-factory\\config.json",
+  "target": "<exact factory target key>",
+  "project_endpoint": "https://<foundry-account>.services.ai.azure.com/api/projects/<project>",
+  "model_deployment": "<existing chat deployment>",
+  "ml_factory_root": "<orange>\\aifactory-usecase-code\\50-ml-model-factory",
+  "evidence_root": "<orange>\\aifactory\\ml-model-factory\\runs",
+  "state_root": "<orange>\\aifactory\\agent-factory\\49-agent-training-ml-churn-prediction\\.agent-factory",
+  "reviewed_rollout": "<reviewed esml-rollout.local.json with the custom air-passengers binding>",
+  "shared_lake": {
+    "account_url": "https://<common lake account>.blob.core.windows.net",
+    "container": "<container>",
+    "datastore": "<Azure ML datastore of the common lake>",
+    "prefix": "mlops/v1"
+  },
+  "usecases": {
+    "49-agent-training-ml-churn-prediction": {"compute": "<existing CPU cluster>", "inference_rows": 50, "inference_seed": 4901},
+    "air-passengers": {"compute": "<existing CPU cluster>", "inference_rows": 12,
+                       "champion_model_id": "azureml:M05_air_passengers:<version>",
+                       "champion_receipts": "<folder with the champion run's training-completion.json>"}
+  }
+}

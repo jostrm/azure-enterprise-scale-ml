@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": {
+      "value": "spider-esml-project001-sdc-dev-001-rg"
+    },
+    "location": {
+      "value": "swedencentral"
+    },
+    "environmentName": {
+      "value": "aif-mcp-project001-dev-env"
+    },
+    "appName": {
+      "value": "aifactory-mcp-project001-dev"
+    },
+    "identityName": {
+      "value": "mi-aifactory-mcp-dev"
+    },
+    "registryName": {
+      "value": "acrcommonbltscsdc001dev"
+    },
+    "registryResourceGroupName": {
+      "value": "spider-esml-common-sdc-dev-001"
+    },
+    "keyVaultName": {
+      "value": "kv-p001-sdc-dev-bltsc01"
+    },
+    "apiKeySecretName": {
+      "value": "aifactory-mcp-api-key-dev"
+    },
+    "mcpImage": {
+      "value": ""
+    },
+    "apiImage": {
+      "value": ""
+    },
+    "scopeKey": {
+      "value": "project001-dev"
+    },
+    "resourceUrl": {
+      "value": "https://aifactory-mcp-project001-dev.agreeableground-46dbeb46.swedencentral.azurecontainerapps.io/mcp"
+    },
+    "deployApplication": {
+      "value": false
+    },
+    "sessionId": {
+      "value": "903d4df9-68db-49f1-84ab-91d97d7bab1f"
+    },
+    "deployedBy": {
+      "value": "<set-at-deployment>"
+    },
+    "createdAt": {
+      "value": "2026-10-04T22:53:21.4321177+02:00"
+    }
+  }
+}

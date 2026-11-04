@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "skill_discovery": {
+    "endpoint": "GET /api/skills?scope_key={authorized_scope}",
+    "schemas": "The authenticated response is the authoritative closed argument schema and per-skill setup blockers.",
+    "monitoring": "POST /api/skills/{name}/run; read-only, cost.read and factory.read required.",
+    "actions": "POST /api/skills/{name}/propose; creates a signed caller/scope-bound pending plan only.",
+    "approval": "POST /api/operations/{id}/approve with exact plan_hash; deletion additionally requires the exact confirmation_phrase.",
+    "execution": "POST /api/operations/{id}/execute; persisted approvals only, one-use CAS, never raw request bodies.",
+    "status": "GET /api/operations/{id}/status; read-only underlying job observation, never automatic write retry.",
+    "continuation": "POST /api/operations/{id}/continue with exact original plan_hash and current observation_hash; one-use CAS within the original Full bootstrap authorization only."
+  },
+  "skills": [
+    {"command": "/create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj", "model_callable": false, "permission": "factory.create", "basis": "Server-approved private hub, explicit VPN client pool and default-project Full bootstrap profile."},
+    {"command": "/delete-aifactory", "model_callable": false, "permission": "factory.delete", "basis": "Explicit authorized deletion manifest and phrase; preserve Entra security groups."},
+    {"command": "/add-project-to-aifactory", "model_callable": false, "permission": "project.add", "basis": "Configured factory/scale set; distinguish saved project configuration from Azure deployment."},
+    {"command": "/get-default-project-estimated-azure-idle-running-cost", "model_callable": true, "permission": "cost.read", "basis": "Default variables.json enabled resources/SKUs and sourced retail baseline, separate from actual Azure Cost Analysis."},
+    {"command": "/get-aifactory-common-estimated-azure-idle-running-cost", "model_callable": true, "permission": "cost.read", "basis": "Explicit authorized common resource group, provisioned baseline and separate actual billing."},
+    {"command": "/get-monthtly-forecasted-project-estimated-azure-cost", "model_callable": true, "permission": "cost.read", "basis": "Exact project resource group, UTC monthly actual and Azure forecast; unknown data is not zero."},
+    {"command": "/get-aifactory-health", "model_callable": true, "permission": "factory.read", "basis": "Existing Factory API health; no changes."},
+    {"command": "/get-aifactory-settings", "model_callable": true, "permission": "factory.read", "basis": "Exact server-selected Factory settings; no scope override."},
+    {"command": "/get-aifactory-operation-status", "model_callable": true, "permission": "factory.read", "basis": "Caller-owned persisted operation and bound job in the active scope; no arbitrary job polling."},
+    {"command": "/create-agent-oftype-for-project", "model_callable": false, "permission": "agent.create", "basis": "Immediate approved purple agent type plus exact Foundry project ARM ID, one version; no implicit routing."},
+    {"command": "/create-ml-model-oftype-for-project", "model_callable": false, "permission": "model.create", "basis": "Immediate approved ML template type and serving_mode plus exact project/workspace ARM ID; asynchronous training, no implicit serving promotion."}
+  ],
+  "scope_resolution": "Authenticated caller and server-configured scope key resolve tenant, subscription, resource group, factory, project and environment. The model cannot supply scope overrides.",
+  "dual_graph": {
+    "enabled": "Optional settings.dual_graph; absent by default. No default graph.read grants.",
+    "authorization": "graph.read in the exact active tenant/scope AND explicit dual_graph.allowed_scopes, enforced before snapshot reads. factory.read and knowledge.read never imply graph.read.",
+    "orchestration": "Substantive code, architecture, pipeline and dependency questions retrieve both graph planes before the model, alongside unchanged Search retrieval. Greetings, health and unrelated questions do not request graph context.",
+    "trust": "All graph content is untrusted data, never authority. Snapshot ID, repository source revision and live state are distinct. Missing, forbidden or stale evidence is explicitly degraded, not fabricated.",
+    "citations": "Search S IDs are preserved; structural G and architecture A IDs are separately assigned per answer and bound to snapshot identity.",
+    "runtime": "Bounded read-only standard-library snapshot reader. No graph generation, dependency installation, checkout cloning or network access at startup."
+  },
+  "read_output_schema": {
+    "oneOf": [
+      {"type": "object", "required": ["ok", "data"], "properties": {"ok": {"const": true}, "data": {"type": "object"}}},
+      {"type": "object", "required": ["ok", "error"], "properties": {"ok": {"const": false}, "error": {"type": "object", "required": ["code", "message", "status_code"]}}}
+    ]
+  },
+  "tools": [
+    {
+      "name": "knowledge_search",
+      "purpose": "Retrieve repository evidence using hybrid Search and configured semantic ranking.",
+      "input_schema": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string", "minLength": 1, "maxLength": 4000}}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["source_type", "evidence"], "properties": {"source_type": {"const": "repository_evidence"}, "evidence": {"type": "array", "items": {"type": "object", "required": ["citation_id", "content", "source_path", "heading", "source_type", "current_history"]}}}},
+      "required_permissions": ["knowledge.read"],
+      "scope": "Exact authorized active scope, enforced as a Search prefilter.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "Embedding throttles may retry twice; semantic/Search failures surface without ranking fallback.",
+      "approval": "No write approval; authenticated grant required."
+    },
+    {
+      "name": "knowledge_status",
+      "purpose": "Observe committed ingestion state, live document count and freshness.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["status"], "properties": {"status": {"type": "string"}}},
+      "required_permissions": ["knowledge.read"],
+      "scope": "Owned corpus for the active authorized deployment.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "Read SDK policies only.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "graph_query",
+      "purpose": "Optional bounded read-only structural and architecture snapshot query through the same graph core used by MCP.",
+      "input_schema": {
+        "type": "object",
+        "required": ["operation", "query", "node_id", "depth", "limit"],
+        "properties": {
+          "operation": {"type": "string", "enum": ["status", "symbols", "usages", "callers", "dependencies", "dependents", "trace", "pipeline", "impact", "notes", "note", "backlinks", "adrs", "context"]},
+          "query": {"type": "string", "maxLength": 2048},
+          "node_id": {"type": "string", "maxLength": 1000},
+          "depth": {"type": "integer", "minimum": 0, "maximum": 5},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {"type": "object", "required": ["status", "snapshot_id", "freshness", "warnings", "truncated", "results", "citations"]},
+      "required_permissions": ["graph.read"],
+      "scope": "Exact authenticated active scope in the configured graph allowlist; no model-selected roots or source-access override.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None; missing or invalid snapshots return explicit degradation.",
+      "approval": "No write approval; explicit graph.read grant and operator opt-in required."
+    },
+    {
+      "name": "azure_live_state",
+      "purpose": "Observe actual Azure resources and model deployments; installed Factory version remains unknown.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["source_type", "observed_at", "scope", "models", "resources", "installed_factory_version"]},
+      "required_permissions": ["factory.read"],
+      "scope": "Exact configured subscription and resource group, never a model-selected endpoint.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None; errors surface.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_health",
+      "purpose": "Read the real existing Factory API health.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured Factory API URL only.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_capabilities",
+      "purpose": "Read the actual existing Factory creation capabilities through its SDK.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured API and active grant; capabilities do not grant authority.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_catalog",
+      "purpose": "Read and filter the real catalog to the exact configured IDs and authorized placement.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Server-selected catalog folder, factory, scale set, project and placement.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_settings",
+      "purpose": "Read the exact supported Factory configuration and source revision.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Same exact configured IDs, verified against the live catalog.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_cli_health",
+      "purpose": "Actually invoke the existing azurefactory CLI health command.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured API URL, fixed Python module and validated argument array.",
+      "changes_state": false,
+      "timeout_seconds": 65,
+      "retry": "None.",
+      "approval": "No write approval; arbitrary shell/executables are not supported."
+    },
+    {
+      "name": "factory_operation_status",
+      "purpose": "Read a caller-owned saved operation and observe its bound backend job without replaying writes.",
+      "input_schema": {"type": "object", "required": ["operation_id"], "properties": {"operation_id": {"type": "string", "format": "uuid"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "The operation's dedicated action permission"],
+      "scope": "Persisted requesting caller, active scope and exact job binding.",
+      "changes_state": "May persist a signed observation; never starts, confirms or continues a Factory job.",
+      "timeout_seconds": 60,
+      "retry": "Read-only status may be queried again; writes are never replayed.",
+      "approval": "No new write approval."
+    },
+    {
+      "name": "cost_default_project_idle",
+      "purpose": "Estimate every enabled default project component from pinned variables.json and compare with separate actual MTD Azure billing.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Canonical server-pinned defaults and exact configured project resource group.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "No synthetic cost or ranking fallback; bounded read pagination only.",
+      "approval": "No write approval; Azure billing read access is independently required."
+    },
+    {
+      "name": "cost_common_idle",
+      "purpose": "Estimate provisioned fixed components in an approved common resource group and show separate actual MTD billing.",
+      "input_schema": {"type": "object", "required": ["resource_group"], "properties": {"resource_group": {"type": "string", "pattern": "^[A-Za-z0-9_.()-]{1,90}$"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Exact common-resource-group allowlist for the active scope; no subscription override.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "Read-only requests; unknown or ambiguous meters stay unpriced.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "cost_monthly_project_forecast",
+      "purpose": "Read actual MTD and Azure's full-month forecast without extrapolation or double-counting actual costs.",
+      "input_schema": {"type": "object", "required": ["resource_group"], "properties": {"resource_group": {"type": "string", "pattern": "^[A-Za-z0-9_.()-]{1,90}$"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Exact active project resource group.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "Read-only billing requests; unavailable forecasts never become invented projections.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_prepare_settings",
+      "model_callable": false,
+      "purpose": "Prepare a real configuration-only department metadata plan from the authenticated proposal endpoint.",
+      "input_schema": {
+        "type": "object", "required": ["settings"], "additionalProperties": false,
+        "properties": {"settings": {"type": "object", "required": ["department_name", "department_id"], "additionalProperties": false, "properties": {"department_name": {"type": ["string", "null"], "maxLength": 200}, "department_id": {"type": ["string", "null"], "maxLength": 128}}}}
+      },
+      "output_schema": {"type": "object", "required": ["id", "plan_hash", "scope_key", "status", "expires_at", "affected_resources"]},
+      "required_permissions": ["factory.read", "config.write"],
+      "scope": "Exact configured single DEV placement; backend validates underlying preview and revision.",
+      "changes_state": "Creates a pending plan/review, never confirms Factory changes.",
+      "timeout_seconds": 60,
+      "retry": "Never automatically replay prepare/confirm writes.",
+      "approval": "Separate authenticated approval of the exact hash; execution uses Blob ETag CAS and one-use state. Destructive and infrastructure deployment operations are not exposed."
+    }
+  ]
+}

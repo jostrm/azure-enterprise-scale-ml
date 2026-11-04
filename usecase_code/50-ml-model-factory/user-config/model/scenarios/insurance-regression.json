@@ -1,0 +1,21 @@
+{
+  "name": "insurance-regression",
+  "task": "regression",
+  "model_name": "insurance-charges",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "mirichoi0218/insurance",
+    "file": "insurance.csv", "version": 1,
+    "license": "Database: Open Database, Contents: Database Contents",
+    "source_url": "https://www.kaggle.com/datasets/mirichoi0218/insurance",
+    "status": "configured",
+    "notes": "True continuous target: charges. Preserve ODbL/database-content attribution and review redistribution obligations. Educational model only, not insurance underwriting or health advice."
+  },
+  "features": ["age", "sex", "bmi", "children", "smoker", "region"],
+  "target": "charges",
+  "categorical_features": ["sex", "smoker", "region"],
+  "sensitive_features": ["sex", "region"],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "automl": {"primary_metric": "normalized_root_mean_squared_error", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "random_forest"},
+  "quality": {"max_rmse": 15000}
+}

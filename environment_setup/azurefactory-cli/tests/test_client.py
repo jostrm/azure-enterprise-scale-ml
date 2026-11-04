@@ -1,0 +1,425 @@
+from __future__ import annotations
+
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import pytest
+
+from azurefactory import APIError, AuthError, AzureFactoryClient, ConfigError, FailureError, RedirectError
+
+
+class Handler(BaseHTTPRequestHandler):
+    records = []
+    responses = {}
+
+    def do_GET(self):
+        self._handle()
+
+    def do_POST(self):
+        self._handle()
+
+    def do_HEAD(self):
+        self._handle(head=True)
+
+    def log_message(self, *_):
+        pass
+
+    def _handle(self, head=False):
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length) if length else b""
+        parsed = json.loads(body.decode()) if body else None
+        type(self).records.append({
+            "method": self.command,
+            "path": self.path,
+            "key": self.headers.get("X-API-Key"),
+            "body": parsed,
+        })
+        status, payload, headers = type(self).responses.get((self.command, self.path), (200, {"ok": True}, {}))
+        self.send_response(status)
+        for key, value in headers.items():
+            self.send_header(key, value)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        if not head:
+            self.wfile.write(payload if isinstance(payload, bytes) else json.dumps(payload).encode())
+
+
+@pytest.fixture()
+def server():
+    Handler.records = []
+    Handler.responses = {("GET", "/openapi.json"): (200, {
+        "components": {"schemas": {"CatalogPrepare": {"properties": {"initial_project": {}}}}},
+    }, {})}
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_port}"
+    finally:
+        httpd.shutdown()
+        thread.join(timeout=2)
+
+
+def test_rejects_unsafe_base_urls_and_endpoint_escape(server):
+    with pytest.raises(ConfigError):
+        AzureFactoryClient("http://example.com", "k")
+    with pytest.raises(ConfigError):
+        AzureFactoryClient("http://user:pass@127.0.0.1:1", "k")
+    with pytest.raises(ConfigError):
+        AzureFactoryClient("http://[::10]:1", "k")
+    client = AzureFactoryClient(server, "k")
+    with pytest.raises(ConfigError):
+        client.request("GET", "https://evil.example/api")
+    with pytest.raises(ConfigError):
+        client.request("GET", "/api/../escape")
+    with pytest.raises(ConfigError):
+        client.request("GET", "/api/%2e%2e/escape")
+    with pytest.raises(ConfigError):
+        client.request("GET", "/api\\escape")
+
+
+def test_key_required_for_secured_paths_but_not_health(server):
+    Handler.responses[("GET", "/health")] = (200, {"status": "ok"}, {})
+    assert AzureFactoryClient(server).health()["status"] == "ok"
+    with pytest.raises(AuthError):
+        AzureFactoryClient(server).schema()
+
+
+def test_rejects_redirects_before_following(server):
+    Handler.responses[("GET", "/health")] = (302, {"detail": "moved"}, {"Location": "http://127.0.0.1/other"})
+    with pytest.raises(RedirectError):
+        AzureFactoryClient(server).health()
+
+
+def test_auth_status_payload_and_key(server):
+    client = AzureFactoryClient(server, "secret")
+    client.auth_status(aifactory_folder="C:\\factory", factory_id="f", scale_set_id=None)
+    record = Handler.records[-1]
+    assert record["path"] == "/api/v1/azure/auth/status"
+    assert record["key"] == "secret"
+    assert record["body"] == {"aifactory_folder": "C:\\factory", "factory_id": "f"}
+
+def test_bootstrap_common_details_is_explicit_and_strict_remains_default(server):
+    client = AzureFactoryClient(server, "test-key")
+    state = {"admin_aifactoryPrefixRG": "demo-", "enableFunction": True}
+    client.bootstrap_config(state)
+    assert Handler.records[-1]["body"] == {"state": state}
+    client.bootstrap_config(state, mapping_mode="common-details")
+    assert Handler.records[-1]["body"] == {"state": state, "mapping_mode": "common-details"}
+    assert state["enableFunction"] is True
+    with pytest.raises(ConfigError):
+        client.bootstrap_config(state, mapping_mode="discard-all")
+    assert len(Handler.records) == 2
+
+
+@pytest.mark.parametrize("scope", [{}, {"scale_set_id": "scale"}, {"project_id": "project"},
+                                  {"scale_set_id": "scale", "project_id": "project"}])
+def test_catalog_settings_sdk_prepares_once_without_mutating_input(server, scope):
+    settings = {"enableAIGatewaySKU": False, "addAIFactoryMCP2AIGatewaySKU": True,
+                "enableAIFactoryMCP": False}
+    preview = {"can_execute": False, "blockers": ["Scope unavailable."]}
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (200, preview, {})
+    result = AzureFactoryClient(server, "test-key").catalog_settings_prepare(
+        r"C:\factory", "factory", settings, expected_revision="a" * 64, **scope)
+    assert result == preview
+    assert Handler.records == [{
+        "method": "POST", "path": "/api/v1/factory-catalog/prepare", "key": "test-key",
+        "body": {"folder": r"C:\factory", "contract_version": 1, "action": "configure-settings",
+                 "factory_id": "factory", "settings": settings, "expected_revision": "a" * 64, **scope},
+    }]
+    assert settings == {"enableAIGatewaySKU": False, "addAIFactoryMCP2AIGatewaySKU": True,
+                        "enableAIFactoryMCP": False}
+
+
+@pytest.mark.parametrize("settings", [None, [], "settings", 1])
+def test_catalog_settings_sdk_rejects_nonobject_before_request(server, settings):
+    with pytest.raises(ConfigError, match="settings must be a JSON object"):
+        AzureFactoryClient(server, "test-key").catalog_settings_prepare(r"C:\factory", "factory", settings)
+    assert Handler.records == []
+
+
+@pytest.mark.parametrize("status", [401, 404, 405, 409, 422, 503])
+def test_catalog_settings_sdk_surfaces_errors_without_fallback_or_retry(server, status):
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (status, {"detail": "Rejected"}, {})
+    with pytest.raises(APIError) as error:
+        AzureFactoryClient(server, "test-key").catalog_settings_prepare(
+            r"C:\factory", "factory", {"enableRedisCache": "false"})
+    assert error.value.status == status
+    assert len(Handler.records) == 1
+
+
+def test_creation_prepare_and_confirm_save_a_full_bootstrap_factory_once(server):
+    body = {"contract_version": 1, "mode": "full-bootstrap", "folder": r"C:\aif\byor-122", "orchestrator": "gha",
+            "config": {"github_repository": "jostrm/azure-enterprise-scale-byor-122", "coordination_mode": "single-writer"}}
+    sent = json.loads(json.dumps(body))
+    Handler.responses[("POST", "/api/v1/creation/prepare")] = (200, {"confirmation_id": "c-1", "folder": r"C:\aif\byor-122\azurefactory"}, {})
+    Handler.responses[("POST", "/api/v1/creation/confirm")] = (200, {"catalog": {"revision": "r"}, "job": None}, {})
+    client = AzureFactoryClient(server, "k")
+    assert client.creation_prepare(body)["confirmation_id"] == "c-1"
+    assert client.creation_confirm(r"C:\aif\byor-122\azurefactory", "c-1")["catalog"] == {"revision": "r"}
+    assert body == sent, "the request body is sent as given and never changed"
+    assert [(item["method"], item["path"]) for item in Handler.records] == [
+        ("POST", "/api/v1/creation/prepare"), ("POST", "/api/v1/creation/confirm")]
+    assert Handler.records[0]["body"] == body
+    assert Handler.records[1]["body"] == {"contract_version": 1, "folder": r"C:\aif\byor-122\azurefactory",
+                                          "confirmation_id": "c-1"}
+
+
+def test_creation_confirm_is_never_retried(server):
+    Handler.responses[("POST", "/api/v1/creation/confirm")] = (500, {"detail": "boom"}, {})
+    with pytest.raises(APIError):
+        AzureFactoryClient(server, "k").creation_confirm(r"C:\aif\byor-122\azurefactory", "c-1")
+    assert len(Handler.records) == 1
+
+
+def test_factory_create_sdk_defers_defaults_and_prepares_only(server):
+    client = AzureFactoryClient(server, "test-key")
+    scales = [{"environment": "dev", "suffix": "001"}]
+    client.factory_create_prepare("C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+                                  scale_sets=scales)
+    assert [record["path"] for record in Handler.records] == ["/openapi.json", "/api/v1/factory-catalog/prepare"]
+    record = Handler.records[-1]
+    assert record["path"] == "/api/v1/factory-catalog/prepare"
+    assert record["body"]["action"] == "create-factory"
+    assert "initial_project" not in record["body"]
+    assert "aifactory_version" not in record["body"]
+    assert "target_region_short_name" not in record["body"]
+    assert record["body"]["scale_sets"] == scales
+
+
+def test_factory_create_sdk_forwards_one_explicit_project_and_version(server):
+    client = AzureFactoryClient(server, "test-key")
+    project = {"number": "003", "display_name": "Example project"}
+    client.factory_create_prepare(
+        "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+        scale_sets=[{"environment": "dev", "suffix": "001"}],
+        initial_project=project, aifactory_version="main", expected_revision="a" * 64,
+    )
+    assert len(Handler.records) == 2
+    body = Handler.records[-1]["body"]
+    assert body["initial_project"] == project
+    assert body["aifactory_version"] == "main"
+    assert body["expected_revision"] == "a" * 64
+    assert project["number"] == "003"
+
+
+def test_factory_create_sdk_preserves_explicit_common_only_and_settings(server):
+    client = AzureFactoryClient(server, "test-key")
+    client.factory_create_prepare(
+        "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+        scale_sets=[{"environment": "dev", "suffix": "001"}],
+        initial_project=None, settings={"enableAIFactoryHub": "false"},
+    )
+    body = Handler.records[-1]["body"]
+    assert "initial_project" in body and body["initial_project"] is None
+    assert body["settings"] == {"enableAIFactoryHub": "false"}
+
+
+def test_factory_create_sdk_blocks_stale_api_without_preparing(server):
+    Handler.responses[("GET", "/openapi.json")] = (200, {"components": {"schemas": {}}}, {})
+    with pytest.raises(ConfigError, match="initial_project"):
+        AzureFactoryClient(server, "test-key").factory_create_prepare(
+            "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral", scale_sets=[],
+        )
+    assert [record["path"] for record in Handler.records] == ["/openapi.json"]
+
+
+@pytest.mark.parametrize("action", ["add-project", "add-project-placements"])
+def test_project_selection_is_forwarded_once_without_client_side_resolution(server, action):
+    placement = {"environment": "dev", "scale_set_id": "latest-successful"}
+    body = {"contract_version": 1, "folder": "C:\\consumer\\azurefactory",
+            "factory_id": "11111111-1111-4111-8111-111111111111", "action": action}
+    if action == "add-project":
+        body["project"] = {"number": "002", "placements": [placement]}
+    else:
+        body.update(project_id="22222222-2222-4222-8222-222222222222", placements=[placement])
+    expected = json.loads(json.dumps(body))
+    response = {"can_execute": False, "blockers": ["No eligible recorded success."]}
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (200, response, {})
+    assert AzureFactoryClient(server, "test-key").catalog_prepare(body) == response
+    assert body == expected
+    assert Handler.records == [{
+        "method": "POST", "path": "/api/v1/factory-catalog/prepare",
+        "key": "test-key", "body": expected,
+    }]
+
+
+def test_project_selection_unsupported_api_does_not_fallback_or_retry(server):
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (
+        422, {"detail": "scale_set_id must be a UUID"}, {},
+    )
+    body = {"contract_version": 1, "folder": "C:\\consumer\\azurefactory",
+            "factory_id": "11111111-1111-4111-8111-111111111111", "action": "add-project",
+            "project": {"number": "002", "placements": [
+                {"environment": "dev", "scale_set_id": "latest-successful"}]}}
+    with pytest.raises(APIError) as exc:
+        AzureFactoryClient(server, "test-key").catalog_prepare(body)
+    assert exc.value.status == 422
+    assert len(Handler.records) == 1 and Handler.records[0]["body"] == body
+
+
+@pytest.mark.parametrize("supported", [True, False])
+def test_factory_create_sdk_region_short_name_is_explicit_and_capability_checked(server, supported):
+    properties = {"initial_project": {}}
+    if supported:
+        properties["target_region_short_name"] = {}
+    Handler.responses[("GET", "/openapi.json")] = (
+        200, {"components": {"schemas": {"CatalogPrepare": {"properties": properties}}}}, {},
+    )
+    client = AzureFactoryClient(server, "test-key")
+    request = dict(prefix="example-", region="swedencentral", region_short_name="sec", scale_sets=[])
+    if supported:
+        client.factory_create_prepare("C:\\consumer\\azurefactory", **request)
+        assert Handler.records[-1]["body"]["target_region_short_name"] == "sec"
+    else:
+        with pytest.raises(ConfigError, match="target_region_short_name"):
+            client.factory_create_prepare("C:\\consumer\\azurefactory", **request)
+        assert [record["path"] for record in Handler.records] == ["/openapi.json"]
+
+
+def test_api_key_repr_and_error_redaction(server):
+    assert "secret" not in repr(AzureFactoryClient(server, "secret"))
+    Handler.responses[("GET", "/api/v1/schema")] = (500, {"detail": "bad secret", "api_key": "secret"}, {})
+    with pytest.raises(APIError) as error:
+        AzureFactoryClient(server, "secret").schema()
+    assert "secret" not in error.value.message
+    assert error.value.details["api_key"] == "<redacted>"
+    assert error.value.details["detail"] == "bad <redacted>"
+
+
+@pytest.mark.parametrize("value", [
+    {"_json_source": {"path": "private-source-marker"}, "password": "private-value"},
+    '{"_json_source":{"path":"private-source-marker"},"password":"private-value"}',
+    "private-value",
+])
+def test_validation_errors_do_not_echo_opaque_state_or_credentials(server, value):
+    Handler.responses[("POST", "/api/v1/validation")] = (422, {"detail": [{
+        "loc": ["body", "state"], "msg": "Invalid state", "type": "value_error",
+        "input": value, "ctx": {"value": "private-value"},
+    }]}, {})
+    with pytest.raises(APIError) as exc:
+        AzureFactoryClient(server, "secret").configuration_validate({})
+    assert str(exc.value) == "Invalid state"
+    assert "private-source-marker" not in json.dumps(exc.value.details)
+    assert "private-value" not in json.dumps(exc.value.details)
+    assert "input" not in exc.value.details["detail"][0]
+    assert "ctx" not in exc.value.details["detail"][0]
+
+
+def test_non_json_and_malformed_api_objects(server):
+    Handler.responses[("GET", "/plain")] = (200, b"hello", {"Content-Type": "text/plain"})
+    with pytest.raises(APIError, match="non-JSON"):
+        AzureFactoryClient(server, "k").request("GET", "/plain")
+    Handler.responses[("GET", "/api/v1/schema")] = (200, [], {})
+    with pytest.raises(APIError):
+        AzureFactoryClient(server, "k").schema()
+
+
+def test_monitoring_csv_is_accepted_only_at_exact_export_route(server):
+    body = {"source": "sample", "report_id": "showback", "rows": []}
+    csv = b"project,actual_cost\r\n001,20\r\n"
+    Handler.responses[("POST", "/api/v1/monitoring/export")] = (200, csv, {"Content-Type": "text/csv"})
+    assert AzureFactoryClient(server, "k").monitoring_export(body) == csv.decode()
+    assert Handler.records[-1]["key"] == "k"
+    assert Handler.records[-1]["body"] == body
+    Handler.responses[("POST", "/api/v1/monitoring/report")] = (200, csv, {"Content-Type": "text/csv"})
+    with pytest.raises(APIError, match="non-JSON"):
+        AzureFactoryClient(server, "k").monitoring_report(body)
+    Handler.responses[("POST", "/api/v1/monitoring/export")] = (200, {"wrong": "json"}, {})
+    with pytest.raises(APIError, match="text/csv"):
+        AzureFactoryClient(server, "k").monitoring_export(body)
+
+
+@pytest.mark.parametrize("method,endpoint,invoke,response", [
+    ("GET", "/api/v1/operations/project-deployments?folder=demo",
+     lambda client: client.project_deployments("demo"), {"drafts": [{"status": "draft"}]}),
+    ("POST", "/api/v1/operations/project-deployments/plan",
+     lambda client: client.project_deployment_plan({"folder": "demo"}), {"status": "draft"}),
+    ("POST", "/api/v1/operations/project-deployments/start",
+     lambda client: client.project_deployment_start("demo", "confirmation"), {"status": "queued"}),
+    ("GET", "/api/v1/operations/project-deployments/terminal?folder=demo&job_id=job&cursor=0",
+     lambda client: client.project_deployment_terminal("demo", "job"), {"status": "submitted"}),
+])
+def test_legacy_sdk_exposes_conservative_result_for_older_api(server, method, endpoint, invoke, response):
+    Handler.responses[(method, endpoint)] = (200, response, {})
+    result = invoke(AzureFactoryClient(server, "k"))
+    item = result["drafts"][0] if "drafts" in result else result
+    assert item["execution_result"]["deployment_verified"] is False
+    assert item["execution_result"]["completion_scope"] == "local-script"
+    assert len(Handler.records) == 1
+
+
+def test_legacy_start_invalid_result_does_not_retry_submission(server):
+    Handler.responses[("POST", "/api/v1/operations/project-deployments/start")] = (200, {
+        "status": "submitted", "execution_result": {
+            "contract_version": 1, "completion_scope": "local-script",
+            "local_terminal": True, "deployment_verified": True,
+        },
+    }, {})
+    with pytest.raises(FailureError, match="legacy execution"):
+        AzureFactoryClient(server, "k").project_deployment_start("demo", "confirmation")
+    assert len(Handler.records) == 1
+
+
+@pytest.mark.parametrize("action", ["prepare", "confirm"])
+@pytest.mark.parametrize(("status", "detail", "missing_route"), [
+    (404, "Not Found", True), (405, "Method Not Allowed", True),
+    (404, "Deletion authorization blocked: no enrollment of this saved factory exists.", False),
+])
+def test_authorize_deletion_missing_route_is_explicit_and_never_falls_back(server, action, status, detail,
+                                                                          missing_route):
+    Handler.responses[("POST", f"/api/v1/operations/authorize-deletion/{action}")] = (status, {"detail": detail}, {})
+    api = AzureFactoryClient(server, "test-key")
+    with pytest.raises(APIError) as error:
+        if action == "prepare":
+            api.authorize_deletion_prepare({"contract_version": 1, "folder": r"C:\factory",
+                                            "factory_id": "11d7fc57-56ee-46d6-919c-3a3d4c8cbb4b", "mode": "revoke"})
+        else:
+            api.authorize_deletion_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                           preview_hash="c" * 64, confirmation_phrase="REVOKE DELETE ai-aif-130")
+    assert error.value.status == status
+    assert ("requires an API supporting the authorize-deletion routes" in str(error.value)) is missing_route
+    assert [record["path"] for record in Handler.records] == [f"/api/v1/operations/authorize-deletion/{action}"]
+
+
+ENROLL_REQUEST = {"contract_version": 1, "folder": r"C:\factory", "factory_id": "11d7fc57-56ee-46d6-919c-3a3d4c8cbb4b",
+                  "scale_set_id": "22222222-2222-4222-8222-222222222222"}
+
+
+def test_enroll_scale_set_posts_the_closed_request_and_the_exact_confirmation(server):
+    api = AzureFactoryClient(server, "test-key")
+    api.enroll_scale_set_prepare(dict(ENROLL_REQUEST))
+    api.enroll_scale_set_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                 preview_hash="c" * 64, confirmation_phrase="ENROLL SCALE SET aif-128 002")
+    assert [(record["path"], record["body"], record["key"]) for record in Handler.records] == [
+        ("/api/v1/operations/enroll-scale-set/prepare", ENROLL_REQUEST, "test-key"),
+        ("/api/v1/operations/enroll-scale-set/confirm", {
+            "contract_version": 1, "folder": r"C:\factory", "confirmation_id": "55555555-5555-4555-8555-555555555555",
+            "preview_hash": "c" * 64, "confirmation_phrase": "ENROLL SCALE SET aif-128 002"}, "test-key")]
+
+
+def test_enroll_scale_set_refuses_an_open_request_before_any_call(server):
+    with pytest.raises(ConfigError):
+        AzureFactoryClient(server, "test-key").enroll_scale_set_prepare({**ENROLL_REQUEST, "expected_revision": "a"})
+    assert Handler.records == []
+
+
+@pytest.mark.parametrize("action", ["prepare", "confirm"])
+@pytest.mark.parametrize(("status", "detail", "missing_route"), [
+    (404, "Not Found", True), (405, "Method Not Allowed", True),
+    (404, "Scale-set enrollment blocked: the review belongs to another caller.", False),
+    (409, "Scale-set enrollment blocked: the provider head moved.", False),
+])
+def test_enroll_scale_set_missing_route_is_reported_as_a_too_old_api(server, action, status, detail, missing_route):
+    Handler.responses[("POST", f"/api/v1/operations/enroll-scale-set/{action}")] = (status, {"detail": detail}, {})
+    api = AzureFactoryClient(server, "test-key")
+    with pytest.raises(APIError) as error:
+        if action == "prepare":
+            api.enroll_scale_set_prepare(dict(ENROLL_REQUEST))
+        else:
+            api.enroll_scale_set_confirm(folder=r"C:\factory", confirmation_id="55555555-5555-4555-8555-555555555555",
+                                         preview_hash="c" * 64, confirmation_phrase="ENROLL SCALE SET aif-128 002")
+    assert error.value.status == status
+    assert ("Factory API too old for enroll-scale-set" in str(error.value)) is missing_route
+    assert len(Handler.records) == 1

@@ -1,0 +1,21 @@
+{
+  "name": "churn",
+  "task": "classification",
+  "model_name": "telco-churn",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "blastchar/telco-customer-churn",
+    "file": "WA_Fn-UseC_-Telco-Customer-Churn.csv", "version": 1,
+    "license": "Data files © Original Authors",
+    "source_url": "https://www.kaggle.com/datasets/blastchar/telco-customer-churn",
+    "status": "license-review",
+    "notes": "Blocked until original-author terms and intended use are reviewed; record approval in provenance before changing status to configured. TotalCharges is deliberately excluded because blanks require explicit numeric conversion."
+  },
+  "features": ["gender", "SeniorCitizen", "Partner", "Dependents", "tenure", "PhoneService", "InternetService", "Contract", "PaperlessBilling", "PaymentMethod", "MonthlyCharges"],
+  "target": "Churn",
+  "categorical_features": ["gender", "SeniorCitizen", "Partner", "Dependents", "PhoneService", "InternetService", "Contract", "PaperlessBilling", "PaymentMethod"],
+  "sensitive_features": ["gender", "SeniorCitizen"],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "automl": {"primary_metric": "accuracy", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "logistic_regression"},
+  "quality": {"min_accuracy": 0.65}
+}

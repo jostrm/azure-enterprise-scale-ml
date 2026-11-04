@@ -1,0 +1,21 @@
+{
+  "scope_id": "car-sales-sharepoint",
+  "tenant_id": "<same-tenant-as-demo>",
+  "drive_id": "<explicit-business-drive-id>",
+  "drive_type": "documentLibrary",
+  "bindings": [
+    {"partition": "json", "item_id": "<stable-json-drive-item-id>"},
+    {"partition": "excel", "item_id": "<stable-xlsx-drive-item-id>"}
+  ],
+  "download_hosts": ["<tenant>.sharepoint.com"],
+  "permission_scan_approved": false,
+  "source_read_scope": "Sites.FullControl.All",
+  "source_authorization": "<explicit approval limited to this drive and the two synthetic input files>",
+  "principal_map": {},
+  "database": "<absolute-consumer-state-path>\\graph-sync.sqlite",
+  "staging_directory": "<absolute-consumer-state-path>\\graph-staging",
+  "notification_url": "https://<approved-public-callback>/notifications",
+  "max_age_seconds": 900,
+  "subscription_hours": 24,
+  "client_state_environment": "AIF48_GRAPH_CLIENT_STATE"
+}

@@ -1,0 +1,158 @@
+{
+  "schema": "aifactory.monitoring/v1",
+  "source": "ml-model-factory",
+  "scope": {
+    "aifactory": "spider-001",
+    "project": "001",
+    "environment": "dev"
+  },
+  "use_case": "example",
+  "subject": {
+    "kind": "model",
+    "name": "example-model",
+    "version": "1",
+    "task_type": "classification"
+  },
+  "report_id": "fixture-model-drift",
+  "generated_at": "2026-09-12T00:00:00Z",
+  "window": {
+    "start": "2026-09-10T00:00:00Z",
+    "end": "2026-09-11T12:00:00Z"
+  },
+  "reference_window": {
+    "start": "2026-08-01T00:00:00Z",
+    "end": "2026-08-15T00:00:00Z"
+  },
+  "expires_at": "2026-09-12T12:00:00Z",
+  "summary": {
+    "status": "drift",
+    "data_drift": "drift",
+    "concept_drift": "drift"
+  },
+  "metrics": [
+    {
+      "name": "reference_samples",
+      "value": 200,
+      "unit": "rows",
+      "status": "drift"
+    },
+    {
+      "name": "current_samples",
+      "value": 200,
+      "unit": "rows",
+      "status": "drift"
+    },
+    {
+      "name": "data_drift.x.psi",
+      "value": 8.291647079284708,
+      "unit": "score",
+      "status": "drift"
+    },
+    {
+      "name": "data_quality.x.missing_fraction_change",
+      "value": 0.0,
+      "unit": "fraction",
+      "status": "drift"
+    },
+    {
+      "name": "data_drift.category.js_divergence",
+      "value": 0.0,
+      "unit": "score",
+      "status": "healthy"
+    },
+    {
+      "name": "data_quality.category.missing_fraction_change",
+      "value": 0.0,
+      "unit": "fraction",
+      "status": "healthy"
+    },
+    {
+      "name": "concept_signal.value",
+      "value": 0.4,
+      "unit": "score",
+      "status": "drift"
+    },
+    {
+      "name": "concept_signal.reference_loss",
+      "value": 0.0,
+      "unit": "number",
+      "status": "drift"
+    },
+    {
+      "name": "concept_signal.current_loss",
+      "value": 0.4,
+      "unit": "number",
+      "status": "drift"
+    },
+    {
+      "name": "concept_signal.label_coverage",
+      "value": 1.0,
+      "unit": "number",
+      "status": "drift"
+    },
+    {
+      "name": "concept_signal.labeled_samples",
+      "value": 200,
+      "unit": "number",
+      "status": "drift"
+    }
+  ],
+  "details": {
+    "data_drift": {
+      "status": "drift",
+      "features": [
+        {
+          "feature": "x",
+          "metric": "psi",
+          "value": 8.291647079284708,
+          "status": "drift",
+          "warning_threshold": 0.1,
+          "drift_threshold": 0.25,
+          "reference_missing_fraction": 0.0,
+          "current_missing_fraction": 0.0,
+          "missing_fraction_change": 0.0
+        },
+        {
+          "feature": "category",
+          "metric": "js_divergence",
+          "value": 0.0,
+          "status": "healthy",
+          "warning_threshold": 0.1,
+          "drift_threshold": 0.2,
+          "reference_missing_fraction": 0.0,
+          "current_missing_fraction": 0.0,
+          "missing_fraction_change": 0.0
+        }
+      ],
+      "drifted_features": 1
+    },
+    "concept_drift": {
+      "status": "drift",
+      "metric": "error_rate_increase",
+      "value": 0.4,
+      "reference_loss": 0.0,
+      "current_loss": 0.4,
+      "normalization": 1.0,
+      "confidence_interval_95": [
+        0.33237500000000003,
+        0.4676249999999999
+      ],
+      "label_coverage": 1.0,
+      "labeled_samples": 200,
+      "reference_samples": 200,
+      "warning_threshold": 0.05,
+      "drift_threshold": 0.1,
+      "interpretation": "Observed labeled performance degradation; not proof of conditional concept drift"
+    }
+  },
+  "limitations": [
+    "Drift describes observed windows, not a prediction that a model will drift in the future.",
+    "Data drift is distribution change; it does not by itself establish a model-quality or concept change.",
+    "Concept drift signal is labeled performance degradation, not proof of P(y|x) change.",
+    "Bootstrap intervals assume independent observations; temporal/group dependence requires domain-specific analysis.",
+    "Thresholds and windows are configurable operational heuristics, not universal statistical guarantees.",
+    "Vision requires a fixed feature representation; raw pixels/annotations are not silently reduced to tabular outcomes.",
+    "Image statistics, when enabled, measure color/dimension shifts and do not establish semantic image drift."
+  ],
+  "evidence": "generated-test-fixture; not a live model health claim"
+}

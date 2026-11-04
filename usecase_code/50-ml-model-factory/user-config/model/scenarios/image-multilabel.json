@@ -1,0 +1,17 @@
+{
+  "name": "image-multilabel",
+  "task": "image_classification_multilabel",
+  "model_name": "fruit-multilabel",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "mbkinaci/fruit-images-for-object-detection",
+    "file": "train_zip/train", "version": 1, "license": "CC0: Public Domain",
+    "source_url": "https://www.kaggle.com/datasets/mbkinaci/fruit-images-for-object-detection",
+    "status": "configured",
+    "notes": "Derive real image-level label sets from Pascal VOC object labels: apple, banana, orange. Multiple fruit classes can be present in one image; labels are not invented from filenames. Original test directory is not used for training."
+  },
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "vision": {"format": "pascal_voc", "image_root": ".", "annotations": ".", "image_base_uri": null, "pretrained": false, "device": "cpu", "image_size": 64, "epochs": 1, "batch_size": 2, "max_steps_per_epoch": 5, "learning_rate": 0.001},
+  "automl": {"primary_metric": "iou", "limits": {"max_trials": 1, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "resnet18"},
+  "quality": {}
+}

@@ -1,0 +1,20 @@
+{
+  "name": "orangejuice",
+  "task": "forecasting",
+  "model_name": "orangejuice-sales",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": null,
+    "file": "orangejuice.csv", "version": null, "license": null, "source_url": null,
+    "status": "required-selection",
+    "notes": "BLOCKED: select and verify a Kaggle orange-juice sales time series, schema, version and license with the user. No suitable Kaggle source has been verified. mathsian/orange-juice is ISLR brand-purchase classification, NOT dated sales forecasting. Ask the user before substituting another source or use case; there is no automatic fallback. The following schema is an explicit selection contract, not a claim about an existing dataset."
+  },
+  "features": ["date", "store", "brand"],
+  "target": "sales",
+  "categorical_features": ["store", "brand"],
+  "sensitive_features": [],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "forecast": {"time_column": "date", "series_columns": ["store", "brand"], "frequency": "W-MON", "horizon": 4},
+  "automl": {"primary_metric": "normalized_root_mean_squared_error", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "seasonal_naive", "seasonal_period": 52},
+  "quality": {}
+}

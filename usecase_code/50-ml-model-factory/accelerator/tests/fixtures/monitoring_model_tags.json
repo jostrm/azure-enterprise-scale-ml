@@ -1,0 +1,14 @@
+{
+  "mon_schema": "1",
+  "mon_source": "ml-model-factory",
+  "mon_kind": "model",
+  "mon_subject_version": "1",
+  "mon_status": "drift",
+  "mon_data_drift": "drift",
+  "mon_concept_drift": "drift",
+  "mon_checked_at": "2026-09-12T00:00:00Z",
+  "mon_window_end": "2026-09-11T12:00:00Z",
+  "mon_expires_at": "2026-09-12T12:00:00Z",
+  "mon_data_score": "8.29165",
+  "mon_concept_score": "0.4"
+}

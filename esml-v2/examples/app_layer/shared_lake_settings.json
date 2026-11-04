@@ -1,0 +1,25 @@
+{
+  "schema": "esml.shared-lake-bootstrap/v2",
+  "aifactory": "example-factory",
+  "environment": "dev",
+  "project": "001",
+  "prefix": "mlops/v1",
+  "table_format": "delta",
+  "aml_table_format": "delta",
+  "storage": {
+    "account_url": "https://exampleesmlstorage.blob.core.windows.net",
+    "account_name": "exampleesmlstorage",
+    "container": "lake3",
+    "datastore": "esml_shared_lake",
+    "type": "azure_blob",
+    "input_area": "in"
+  },
+  "datasets": [
+    {"scenario": "diabetes", "dataset": "diabetes", "file": "diabetes.csv"},
+    {"scenario": "insurance-regression", "dataset": "insurance", "file": "insurance.csv"},
+    {"scenario": "air-passengers", "dataset": "air-passengers", "file": "AirPassengers.csv"}
+  ],
+  "image_dataset": {"scenario": "image-object-detection", "dataset": "car-plate-images", "limit": 24},
+  "rag_air_passengers": true,
+  "notes": "Local files must retain verified Kaggle provenance. This file does not create Azure resources or grant project access."
+}

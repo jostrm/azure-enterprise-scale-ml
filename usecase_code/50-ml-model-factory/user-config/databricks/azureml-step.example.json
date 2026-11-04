@@ -1,0 +1,57 @@
+{
+  "host": "https://adb-<workspace-id>.<region>.azuredatabricks.net",
+  "workspace_resource_id": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Databricks/workspaces/<workspace-name>",
+  "job_id": 1,
+  "train_task_key": "train-evaluate",
+  "task_key": "<batch-score|register-serve|stream-score>",
+  "notes": "Reference a Databricks job rendered with: databricks-job render --orchestration azureml. AML steps use --only-task so train and pattern tasks run separately; the pattern task receives model_uri from model_uri.txt.",
+  "client_id": "",
+  "timeout_seconds": 3600,
+  "environment": {
+    "image": "mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu22.04:latest",
+    "conda_file": "./environments/azureml-databricks.yml"
+  },
+  "train_parameters": {
+    "scenario_path": "<databricks-workspace-scenario-json>",
+    "input_path": "<wasbs-or-abfss-or-volume-input>",
+    "artifact_root": "/local_disk0/tmp/ml-model-factory",
+    "experiment_path": "<existing-mlflow-experiment>",
+    "max_rows": "100000",
+    "lake_config": "",
+    "model_context": ""
+  },
+  "batch_parameters": {
+    "scenario_path": "<databricks-workspace-scenario-json>",
+    "input_table": "<catalog>.<schema>.<input_table>",
+    "output_table": "<catalog>.<schema>.<predictions_table>",
+    "prediction_type": "double",
+    "env_manager": "local",
+    "model_mode": "custom",
+    "lake_config": ""
+  },
+  "online_parameters": {
+    "scenario_path": "<databricks-workspace-scenario-json>",
+    "registered_model_name": "<catalog>.<schema>.<model>",
+    "endpoint_name": "<endpoint-name>",
+    "workload_size": "Small",
+    "scale_to_zero": "true",
+    "model_context": "",
+    "lake_config": "",
+    "sample_request": ""
+  },
+  "streaming_parameters": {
+    "scenario_path": "<databricks-workspace-scenario-json>",
+    "eventhubs_namespace": "<eventhubs-namespace>",
+    "eventhub_name": "<eventhub-name>",
+    "secret_scope": "<secret-scope>",
+    "connection_string_secret": "<secret-name>",
+    "checkpoint_root": "<checkpoint-root>",
+    "output_table": "<catalog>.<schema>.<stream_predictions>",
+    "payload_schema_json": "<spark-schema-json>",
+    "prediction_type": "double",
+    "trigger_interval": "30 seconds",
+    "env_manager": "local",
+    "model_mode": "custom",
+    "lake_config": ""
+  }
+}

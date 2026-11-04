@@ -1,0 +1,17 @@
+{
+  "name": "image-instance-segmentation",
+  "task": "image_instance_segmentation",
+  "model_name": "sar-ship-instance-segmentation",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "kailaspsudheer/sarscope-unveiling-the-maritime-landscape",
+    "file": "SARscope/train", "version": 2, "license": "Apache 2.0",
+    "source_url": "https://www.kaggle.com/datasets/kailaspsudheer/sarscope-unveiling-the-maritime-landscape",
+    "status": "configured",
+    "notes": "COCO polygon instance masks, category ship. Version-2 training annotations verified: 4717 images, _annotations.coco.json with polygon segmentation. Upstream HRSID/OPEN-SSDD attribution and geographic/source independence require review before production. Re-splits only the source train directory."
+  },
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "vision": {"format": "coco", "image_root": ".", "annotations": "_annotations.coco.json", "image_base_uri": null, "pretrained": false, "device": "cpu", "image_size": 128, "max_image_size": 256, "epochs": 1, "batch_size": 1, "max_steps_per_epoch": 2, "max_detections": 30, "learning_rate": 0.001},
+  "automl": {"primary_metric": "mean_average_precision", "limits": {"max_trials": 1, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "maskrcnn_resnet50_fpn"},
+  "quality": {}
+}

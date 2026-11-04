@@ -1,0 +1,22 @@
+{
+  "model_name": "diabetes-classification",
+  "model_version": "1",
+  "reference_window": {
+    "start": "2026-08-01T00:00:00Z",
+    "end": "2026-08-15T00:00:00Z"
+  },
+  "window": {
+    "start": "2026-09-10T00:00:00Z",
+    "end": "2026-09-11T00:00:00Z"
+  },
+  "max_age_hours": 24,
+  "min_samples": 100,
+  "min_labeled_samples": 50,
+  "min_label_coverage": 0.5,
+  "max_rows": 100000,
+  "request_id_column": "request_id",
+  "psi": {"warning": 0.1, "drift": 0.25},
+  "js_divergence": {"warning": 0.1, "drift": 0.2},
+  "missing_rate_change": {"warning": 0.05, "drift": 0.15},
+  "performance": {"warning": 0.05, "drift": 0.1}
+}

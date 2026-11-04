@@ -1,0 +1,7 @@
+fastapi==0.141.1
+pydantic==2.13.5
+jsonschema==4.26.0
+PyYAML==6.0.3
+sv-ttk==2.6.1
+uvicorn==0.54.0
+tzdata==2026.3

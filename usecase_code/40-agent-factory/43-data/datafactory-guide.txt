@@ -1,0 +1,190 @@
+ADF INGESTION: NO IDENTITY ATTACHMENT TO THE ADMIN VM
+
+Use this path when the project deploys Azure Data Factory. The standalone
+worker.py remains an optional alternative, not a dependency of this path.
+No SDK dependencies are needed for the ADF authoring/polling helpers.
+
+1. In the existing orange project variables enable Data Factory, then run the
+   existing project deployment pipeline. Do not create another factory.
+2. Confirm the project UAMI, ls_cred_project_uami, ls_storage_lake and
+   AutoResolveIntegrationRuntime / managedVirtualNetwork default are deployed.
+3. From the operator's VPN-connected session call:
+
+   from agent_factory.datafactory import configure_datafactory_ingestion
+   result = configure_datafactory_ingestion(session, target, factory_name="actual-factory-name")
+
+   This creates task-owned linked services, datasets, pipeline, private artifact
+   container, ADF Blob managed endpoint and Search Blob shared private link.
+   It never attaches an identity to a VM, changes Search SKU, enables public
+   networking, edits shared Bicep, creates role assignments, or starts ingestion.
+   Existing compatible network links are reused; unrelated name collisions fail.
+   Container creation is an ARM metadata operation, not a user-authenticated
+   Blob upload. All CSV/JSON artifact writes and raw reads execute through ADF's
+   explicit project-UAMI CredentialReference.
+
+4. Approve the returned ADF managed endpoint and Search shared private link on
+   storage 2001. Both must report Approved and Succeeded. Rerun configuration.
+   The operator CLI can approve one explicitly inspected storage request:
+     python -m agent_factory approve-datafactory-link --config <config.json>
+       --connection-id <storage-privateEndpointConnections-resource-id>
+       --private-endpoint-id <requester-private-endpoint-resource-id> --apply
+   Never approve every pending request. The CLI binds both identifiers to the
+   selected 2001 storage account and refuses mismatched or rejected requests.
+   The inspected shared dataFactory.bicep currently creates the DFS endpoint
+   mpe_storage_lake ONLY, not Blob. This helper adds a separate task-owned Blob
+   endpoint. No shared module change is needed. If the deployment has since
+   added its own matching Blob endpoint, that endpoint is reused.
+5. Grant the Search service's SYSTEM-assigned MI Storage Blob Data Reader on the
+   2001 storage account (principal returned by configure). ADF uses project UAMI;
+   Search's indexer uses Search MI. No user/account-key/SAS fallback is used.
+   Search already needs its system MI enabled; this helper will not enable it.
+   The project UAMI needs Storage Blob Data Contributor as previously agreed.
+6. Run synchronously, or preserve the run ID for separate polling:
+
+   from agent_factory.datafactory import (
+       run_datafactory_ingestion, start_datafactory_ingestion, poll_datafactory_ingestion
+   )
+   result = run_datafactory_ingestion(session, target, factory_name="actual-factory-name")
+
+   # Alternative: start once, then resume polling the returned run_id.
+   started = start_datafactory_ingestion(session, target, factory_name="actual-factory-name")
+   result = poll_datafactory_ingestion(
+       session, target, factory_name="actual-factory-name", run_id=started["run_id"]
+   )
+
+   Do not call both examples to ingest once. ADF pipeline concurrency is one.
+   Polling defaults to a one-hour budget and 15-second intervals. Managed IR
+   cold starts and endpoint approvals can take several minutes.
+
+7. After status=ingested, configure the existing-index Foundry IQ source:
+
+   from agent_factory.knowledge import configure_knowledge, verify_retrieval
+   iq = configure_knowledge(session, target, **result["knowledge_kwargs"])
+   verification = verify_retrieval(session, target, "How do I reset a forgotten PIN?")
+
+   ADF defaults to index aif-kaggle-rag-adf-v1, not the standalone worker index.
+   Both use exactly data.index_schema(), including its semantic configuration.
+   The returned existing-index MCP tool is compatible with prompt/hosted agents.
+   Operator Search access does not prove Foundry runtime private connectivity;
+   retain the separate project-MI MCP smoke test.
+
+ACTUAL DATA PATH
+
+  Pinned anonymous HTTPS Kaggle CSV
+      -> ADF HTTP Binary Copy -> 2001 private Blob incoming/
+      -> byte-size gate
+      -> Blob-to-Blob Binary Copy with validateDataConsistency=true -> raw/
+      -> Get Metadata: size + Content-MD5 compared with the pinned reference
+      -> Get Metadata: exactly four header columns
+      -> CSV projection copies -> staging/knowledge.json and staging/evaluation.json
+      -> secure Lookup/union distinctness and exact row-count gate
+      -> validated Binary publication -> knowledge/items.json + evaluation/samples.json
+      -> Get Metadata persistence/checksum gates
+      -> Search MI private Blob indexer, JSON-array mode, knowledge/ prefix ONLY
+      -> exact corpus hash/count/provenance + live semantic reranker verification
+
+Storage account must contain 2001 and never 1001.
+Dedicated private container: agent-factory-adf.
+Blob prefix: kaggle-rag-v1.
+Artifact ownership metadata: agent-factory:kaggle-rag:adf:v1.
+
+The Search data source cannot see incoming/, raw/, staging/ or evaluation/.
+Only ki_topic -> topic and ki_text -> content plus public provenance metadata
+are projected into the knowledge JSON. sample_question/sample_ground_truth go
+only to the separate evaluation JSON. No skills, vectors, embeddings, LLM
+processing, managed azureBlob knowledge source, or public MCP are involved.
+The raw ki_text Markdown is preserved inside JSON content; this ADF variant
+does not produce one physical .md blob per item.
+
+SUPPORTED TRANSFORMS AND INTEGRITY LIMITS
+
+ADF Copy uses documented TabularTranslator source names and JSON sink paths.
+AdditionalColumns contain only activity-scoped constants, never invented
+per-row functions. Copy does NOT support hashing/deduplication transformations.
+The pinned version has ten unique knowledge items; a duplicate or changed count
+is rejected before publication instead of silently manufacturing a dedup step.
+For another dataset/version with sample duplicates, deliberately implement a
+supported transform or use the standalone worker; do not change this pin.
+
+The indexer explicitly maps AzureSearch_DocumentKey through base64Encode to id.
+This is the documented one-to-many key, not metadata_storage_path (which would
+collapse all records in the single JSON blob). Do not parse its internal format.
+Keys are managed by the indexer, so reruns do not append synthetic random IDs.
+An indexer does not delete orphaned row documents after row removal; pinned
+count/content verification detects that situation and refuses readiness.
+
+HTTP Copy does not support ADF data-consistency verification. Therefore this
+pipeline checks the downloaded byte count, then performs a SUPPORTED private
+Blob-to-Blob binary copy with validation, and checks its destination Content-MD5.
+It does not mislabel an unsupported HTTP check as a checksum verification.
+HTTP content-type and pre-transfer response-size limits are not exposed by
+this connector. Wrong/oversized/HTML responses fail after the incoming copy at
+the exact byte-size, digest or CSV-header gate, before any data is indexed.
+The HTTP request has a one-minute response timeout and copy activity a ten-minute
+timeout; the dataset URL/version is fixed and no caller-supplied URL is accepted.
+Incoming bytes may already occupy the owned private incoming path on failure.
+
+kaggle-v1.integrity.json records the independently verified public download:
+43,111 bytes, ten rows, MIT license, raw SHA-256, raw MD5, and canonical per-topic/
+content SHA-256 hashes. Blob metadata retains source/version/license/attribution
+and expected digests. ADF checks raw byte count + MD5; it does NOT compute SHA-256.
+dataset_sha256 is the pinned reference digest, not a Copy-generated SHA hash.
+Per-document content_sha256 is left null in Search rather than fabricated.
+After indexing, the operator helper reads only the knowledge Search documents
+(never raw/evaluation Blob content), computes SHA-256 locally, verifies every
+item against the bundled reference, and returns per-document hash evidence.
+The result explicitly records raw_sha256_computed_by_adf=false and the actual
+raw integrity method. MD5 here is an additional transfer check, not a claim of
+collision-resistant raw SHA-256 validation.
+
+All artifact copies and Lookup use secureInput/secureOutput. Metadata-only
+activities expose size/checksum/column names, not raw text or evaluation answers.
+Failure summaries omit runtime messages that could include CSV rows or signed
+redirect URLs. No copied content is sent to a public model or third-party MCP.
+ADF's public Kaggle/CDN egress must be permitted; Blob/Search remain private.
+
+No storage artifact is deleted. The dedicated owned container/prefix is reserved
+for this pipeline and its repeatable publications. Existing non-owned container,
+ADF definition, data source, index or indexer collisions are refused.
+The helper does not update arbitrary existing definitions. The Search indexer
+is created only after successful ADF publication because Search runs new
+indexers automatically. Existing compatible indexers are run explicitly without
+reset, deletion, schedule or skillset. Warnings, failures, zero documents,
+unexpected documents or unavailable semantic ranking block a success result.
+
+BASIC PRIVATE NETWORKING
+
+The specific shared-private-link documentation explicitly supports "Indexers
+without skillsets: Basic and higher", without region/creation-date restrictions.
+Use executionEnvironment=private and an approved Blob shared private link.
+Do not confuse that supported path with managed azureBlob KNOWLEDGE SOURCE
+private ingestion, which requires S2/S3/L1/L2. No tier upgrade is requested.
+The general indexer overview still contains broader S2 wording; use the specific
+shared-private-link workload table for this skillset-free case. If the service
+rejects the configuration, surface the rejection and stop; never enable public
+access or silently upgrade.
+
+VERIFIED SOURCES
+
+ADF HTTP/Binary, UAMI credential, explicit projection, static additional columns:
+https://learn.microsoft.com/en-us/azure/data-factory/connector-http
+https://learn.microsoft.com/en-us/azure/data-factory/connector-azure-blob-storage#user-assigned-managed-identity-authentication
+https://learn.microsoft.com/en-us/azure/data-factory/format-delimited-text
+https://learn.microsoft.com/en-us/azure/data-factory/format-json
+https://learn.microsoft.com/en-us/azure/data-factory/copy-activity-schema-and-type-mapping
+https://learn.microsoft.com/en-us/azure/data-factory/copy-activity-overview#add-additional-columns-during-copy
+https://learn.microsoft.com/en-us/azure/data-factory/copy-activity-data-consistency
+https://learn.microsoft.com/en-us/azure/data-factory/control-flow-get-metadata-activity
+https://learn.microsoft.com/en-us/rest/api/datafactory/pipelines/create-or-update?view=rest-datafactory-2018-06-01
+https://learn.microsoft.com/en-us/rest/api/datafactory/activity-runs/query-by-pipeline-run?view=rest-datafactory-2018-06-01
+
+Search private Basic indexer, managed identity, JSON arrays and generated keys:
+https://learn.microsoft.com/en-us/azure/search/search-indexer-howto-access-private
+https://learn.microsoft.com/en-us/azure/search/search-howto-managed-identities-storage
+https://learn.microsoft.com/en-us/azure/search/search-how-to-index-azure-blob-json
+https://learn.microsoft.com/en-us/azure/search/search-how-to-index-azure-blob-one-to-many
+https://learn.microsoft.com/en-us/azure/search/search-howto-run-reset-indexers
+
+Offline validation:
+  python -m unittest discover -s tests -p "test_datafactory.py" -v
+No live Azure ingestion is claimed by those tests.

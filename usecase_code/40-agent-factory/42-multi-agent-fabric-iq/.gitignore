@@ -1,0 +1,3 @@
+parameters.env
+.venv/
+!data/inventory.csv
