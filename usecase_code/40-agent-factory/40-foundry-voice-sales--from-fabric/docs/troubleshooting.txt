@@ -1,0 +1,137 @@
+TROUBLESHOOTING — WORK FROM OFFLINE CHECKS TO EXPLICIT LIVE ACCEPTANCE
+
+1. Start here: no Azure requests
+   Run Start-FoundryVoiceSales.ps1 with no arguments (Check).
+   Use PowerShell 7.2+ and Python 3.13. A different python on PATH is common;
+   pass -PythonExecutable "<path-to-python313.exe>" to Check/Setup.
+   Check never installs tools. Azure CLI/Node absence is reported separately;
+   Node is needed for UI tests only. Do not modify global tools to repair a
+   project-specific dependency conflict.
+
+   Setup creates .venv and installs requirements.lock.txt. It may download from
+   the configured package index, but makes no Azure calls. Missing lock files
+   mean the template copy is incomplete: restore it rather than guessing versions.
+   Setup -Notebook explicitly selects the complete requirements-notebook.lock.txt
+   instead, adding ipykernel to the local environment. The switch is rejected
+   for every other action; ordinary Setup does not install notebook dependencies.
+   An existing .venv with the wrong Python version is rejected; preserve any
+   needed local work, remove only that local environment and rerun Setup.
+
+   Validate checks .env syntax/configuration offline. Use .env.example as the
+   starting point without overwriting a customized .env. Never print the entire
+   environment. Most runtime actions need an already published agent version;
+   first-time publishers use the separate Publish action and then set its result.
+   A valid endpoint string is not evidence that the endpoint is reachable.
+   DOMAIN_CONFIG_PATH is relative to the selected .env file's directory, not
+   the caller's working directory. A consumer initializer can preserve local
+   overrides by choosing config/domain.local.json instead of the upstream default.
+
+2. Explicit Azure authorization is missing
+   Diagnose/Connectivity/Discover/Text/Smoke/Publish/Start require -AllowAzure.
+   Text/Smoke also require -Question. This is intentional: default Check and
+   notebook Run All must not make Azure calls or create agent versions.
+   Setup is a package-install step, not an Azure provisioning step.
+
+3. Wrong or expired Azure CLI user, tenant, or subscription
+   Sign in yourself in the configured tenant from your own DSVM OS session:
+     az login --tenant "<tenant-id>"
+   Then run Diagnose -AllowAzure. It checks the configured tenant/subscription
+   explicitly and obtains diagnostic token scopes without printing tokens.
+   Never use a shared admin sign-in, paste access tokens, run az account set
+   from automation, or switch to managed identity as a workaround.
+   AZURE_EXPECTED_USER should identify the consumer's own approved user if set.
+
+4. Foundry forbidden / missing agent / publication failure
+   Check the exact project endpoint, agent name, and returned agent version.
+   A portal URL or model resource endpoint is not the project endpoint.
+   Consumers need invocation access, not blanket publication permissions.
+   Have the project administrator verify current prompt-agent role/data actions.
+   Only an authorized publisher runs Publish -AllowAzure, with an existing
+   FOUNDRY_MODEL_DEPLOYMENT. Save its returned version; Start never republishes.
+   A new version does not deploy the BFF or create any underlying Azure resource.
+
+5. Fabric forbidden, unknown tool, or no grounded answer
+   Check the published Data Agent's exact MCP URL and configured tenant.
+   Run Discover -AllowAzure: it initializes the REAL Fabric MCP server and lists
+   the actual question-tool schema without issuing a data question.
+   MCP_TOOL_NAME/MCP_QUESTION_ARGUMENT are optional reviewed constraints; clear
+   incorrect guessed values and have an administrator review discovery output.
+   A discovery pass does not establish source-table access.
+   Check capacity, tenant switches, sharing and per-source permissions from
+   access-and-networking.txt. Azure resource-group RBAC is not Fabric access.
+   The Data Agent's managed identity path is unsupported; service-principal
+   preview is not this template's baseline.
+   Use an approved known-answer question in Text/Smoke and compare with the
+   authorized source result. A fluent answer without source grounding is failure.
+   Do not relax read restrictions, inject schema guesses or fall back to an
+   ungrounded model answer.
+
+6. Private endpoints / DNS / TLS / WebSocket failures
+   Run Connectivity -AllowAzure, adding -RequirePrivate when policy demands it.
+   Resolve exact approved endpoint hostnames on the DSVM and verify routes,
+   certificate names, private endpoint approvals and proxy WebSocket support.
+   Never disable TLS checks or silently fall back to a public endpoint.
+   A private DNS/TLS pass is not certification of all downstream Foundry paths.
+   Microsoft documentation has conflicting private-MCP/Data Agent support
+   statements: obtain confirmation for this exact topology. See the explicit
+   uncertainty in access-and-networking.txt. Live private acceptance is NOT RUN
+   by offline tests.
+
+7. Server did not start, port conflict, or Stop refused
+   Start writes .runtime/process.json with PID, OS creation time, executable,
+   template root, config-file path and port. It verifies /api/health reports the
+   expected application before returning; local health is not cloud acceptance.
+   A safe rerun reuses only the verified owned healthy process with the same
+   config path/port. To pick up .env changes, Stop then Start explicitly.
+   An occupied unrelated port is never reused or killed. Pick another port in
+   1024..65535 (for example -Port 8766), or ask the owner to close their app.
+   Inspect .runtime/server.stderr.log and server.stdout.log locally; redact
+   customer data and identities before sharing. Never enable token/HTTP-header
+   dumps. Failed startup stops only the child this invocation created.
+
+   Stop requires no Azure permission. It validates root, executable and start
+   identity using an OS process handle before terminating; it does not kill by
+   process name. If the PID was recycled or ownership differs, it refuses.
+   A malformed record must be inspected manually, not "fixed" by substituting
+   another PID. If the recorded process already exited, Stop clears its record.
+   A .runtime/control.lock means another Start/Stop is active; after confirming
+   that invocation crashed, remove only that stale lock, then retry.
+   Managed lifecycle is supported on Windows; Linux additionally needs Python
+   pidfd support. There is no unsafe bare-PID kill fallback.
+
+8. Text works but microphone/native voice does not
+   Keep VOICE_ENABLED=false until text grounding is proven. Enabling voice needs
+   a compatible native realtime model, endpoint, voice and API 2026-07-15, plus
+   approval of the actual processing scope. A model listed in Sweden Central
+   can process globally; location alone is not a data-residency guarantee.
+   The browser needs a secure loopback context and getUserMedia support.
+   Check Windows Sound input, Windows microphone privacy, Edge site permission,
+   and remote desktop audio-recording redirection. Redirected speakers are not
+   proof of a redirected microphone. Browser/RDP policy may forbid recording.
+   If input is unavailable, use text and mark voice NOT RUN; do not simulate a
+   recording or label a text-only smoke test as voice acceptance.
+   Verify actual audio playback, correct grounded content, user interruption,
+   cancellation and truncate-at-played-audio behavior. A native speech transcript
+   is provisional; retain the authoritative grounded answer separately.
+
+9. Notebook/kernel problems
+   Use the existing VS Code Jupyter extension. To execute the notebook Setup cell,
+   initially select an already working Python 3.13 kernel. That explicitly enabled
+   cell calls Setup -Notebook and installs the complete notebook dependency lock,
+   including ipykernel, only into this template's .venv. If no working kernel
+   exists, first run Start-FoundryVoiceSales.ps1 -Action Setup -Notebook from
+   PowerShell. Then select this template's .venv interpreter and rerun the
+   configuration cell. Do not accept automatic global dependency installs.
+   No global kernel registration occurs, and no personal kernelspec is committed.
+   If working directory discovery fails, set TEMPLATE_ROOT to the copied template
+   directory. Do not leave a machine-specific absolute path in a shared notebook.
+   ALLOW_AZURE=False and ALLOW_PUBLISH=False are deliberate defaults; Setup,
+   tests, Start and Stop have separate switches. Clear all outputs before sharing.
+
+10. What can honestly be called passed?
+   Test runs existing Python unittest tests and explicitly expands the Node UI
+   test filenames on Windows. Tests use local fakes/mocks; no Azure access.
+   Report offline tests, local health, real identity/discovery, known-answer
+   grounding, private support, actual microphone input and voice interruption
+   as separate results. No Azure, Fabric, customer-data, private-network, RDP, or
+   Voice Live checks were run while authoring this template.

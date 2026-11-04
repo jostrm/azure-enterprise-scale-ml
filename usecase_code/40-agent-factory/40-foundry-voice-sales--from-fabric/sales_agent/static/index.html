@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme = param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title data-i18n="app.title"></title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#question" data-i18n="app.skip"></a>
+  <div class="app-shell">
+    <aside class="sidebar" data-i18n-label="app.workspace">
+      <a class="brand" href="/" data-i18n-label="app.brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M7 23V17M13 23V10M19 23V14M25 23V5" /></svg>
+        </span>
+        <span data-i18n="app.brand"></span>
+      </a>
+      <button class="secondary new-conversation" id="new-conversation" type="button" data-i18n-title="app.newHelp" disabled>
+        <span aria-hidden="true">＋</span><span data-i18n="app.new"></span>
+      </button>
+      <section class="voice-panel" aria-labelledby="voice-heading">
+        <p class="eyebrow" data-i18n="app.eyebrow"></p>
+        <h2 id="voice-heading" data-i18n="voice.heading"></h2>
+        <p class="muted" data-i18n="voice.description"></p>
+        <div class="voice-stage" id="voice-stage" data-state="off">
+          <div class="voice-disc" role="img" data-i18n-label="voice.activity">
+            <div class="waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <p class="voice-state" id="voice-state" role="status" aria-live="polite" data-i18n="voice.off"></p>
+          <p class="microphone-state muted" id="microphone-state" data-i18n="voice.offHelp"></p>
+        </div>
+        <button id="voice-toggle" type="button" aria-pressed="false" data-i18n="voice.connect" disabled></button>
+        <div class="voice-actions">
+          <button id="voice-mute" class="secondary" type="button" aria-pressed="false" data-i18n="voice.mute" disabled></button>
+          <button id="voice-interrupt" class="secondary" type="button" data-i18n="voice.interrupt" data-i18n-title="voice.interruptHelp" disabled></button>
+        </div>
+        <button id="use-text" class="text-button" type="button" data-i18n="voice.useText"></button>
+        <p class="muted voice-availability" id="voice-availability" hidden></p>
+      </section>
+      <div class="sidebar-bottom">
+        <details class="identity">
+          <summary><span class="status-dot" aria-hidden="true"></span><span data-i18n="session.label"></span></summary>
+          <p data-i18n="session.description"></p>
+          <p data-i18n="session.privacy"></p>
+        </details>
+        <p class="session-status muted" id="session-status" role="status" data-i18n="session.checking"></p>
+        <div class="appearance">
+          <label for="theme" data-i18n="app.theme"></label>
+          <select id="theme"><option value="light" data-i18n="app.light"></option><option value="dark" data-i18n="app.dark"></option></select>
+        </div>
+      </div>
+    </aside>
+    <main class="main-panel" id="main">
+      <header class="topbar">
+        <div><h1 data-i18n="conversation.heading"></h1><p class="muted" data-i18n="app.subtitle"></p></div>
+        <button id="copy-conversation" class="secondary compact" type="button" data-i18n="conversation.copy" disabled></button>
+      </header>
+      <section class="notice error-notice" id="error-notice" role="alert" hidden>
+        <div><strong data-i18n="errors.heading"></strong><p id="error-message"></p></div>
+        <div class="notice-actions">
+          <button id="reload-session" class="secondary compact" type="button" data-i18n="session.reload" hidden></button>
+          <button id="dismiss-error" class="icon-button" type="button" data-i18n-label="errors.dismiss">×</button>
+        </div>
+      </section>
+      <div class="conversation-scroll" id="conversation-scroll">
+        <section class="welcome" id="welcome" aria-labelledby="welcome-heading">
+          <span class="welcome-symbol" aria-hidden="true">↗</span>
+          <p class="eyebrow" data-i18n="conversation.eyebrow"></p>
+          <h2 id="welcome-heading" data-i18n="conversation.welcome"></h2>
+          <p class="intro" data-i18n="conversation.intro"></p>
+          <div class="examples" role="group" data-i18n-label="conversation.examples">
+            <button class="example" type="button" data-example="1"><strong data-i18n="conversation.example1Title"></strong><span data-i18n="conversation.example1"></span><b aria-hidden="true">↗</b></button>
+            <button class="example" type="button" data-example="2"><strong data-i18n="conversation.example2Title"></strong><span data-i18n="conversation.example2"></span><b aria-hidden="true">↗</b></button>
+            <button class="example" type="button" data-example="3"><strong data-i18n="conversation.example3Title"></strong><span data-i18n="conversation.example3"></span><b aria-hidden="true">↗</b></button>
+          </div>
+          <p class="small muted" data-i18n="conversation.examplesHelp"></p>
+        </section>
+        <div id="conversation" class="conversation" role="log" aria-live="polite" aria-relevant="additions" data-i18n-label="conversation.heading"></div>
+        <p id="thinking" class="thinking muted" role="status" data-i18n="conversation.thinking" hidden></p>
+        <p id="retention" class="small muted" data-i18n="conversation.retained" hidden></p>
+      </div>
+      <div class="composer-area">
+        <p class="speech-disclaimer"><span aria-hidden="true">ⓘ</span><span data-i18n="voice.provisional"></span></p>
+        <form id="question-form" class="composer">
+          <label class="sr-only" for="question" data-i18n="composer.label"></label>
+          <textarea id="question" rows="2" maxlength="6000" autocomplete="off" spellcheck="true" data-i18n-placeholder="composer.placeholder" aria-describedby="composer-hint question-count" disabled></textarea>
+          <div class="composer-footer">
+            <span class="small muted" id="question-count"></span>
+            <button id="send" type="submit" data-i18n="composer.send" disabled></button>
+          </div>
+        </form>
+        <p class="composer-hint small muted" id="composer-hint" role="status" data-i18n="composer.notReady"></p>
+        <p class="small feedback" id="feedback" role="status" aria-live="polite"></p>
+      </div>
+    </main>
+    <aside class="evidence-panel" aria-labelledby="evidence-heading">
+      <div class="evidence-heading"><span class="eyebrow" data-i18n="sources.latest"></span><h2 id="evidence-heading" data-i18n="sources.heading"></h2><p class="muted" data-i18n="sources.description"></p></div>
+      <div class="evidence-status"><span class="evidence-icon" aria-hidden="true">≡</span><div><strong id="source-count" data-i18n="sources.none"></strong><p class="small muted" id="health-status" data-i18n="session.checking"></p></div></div>
+      <section class="tool-section" aria-labelledby="tool-heading">
+        <h3 id="tool-heading" data-i18n="sources.tools"></h3>
+        <p class="muted small" id="tools-empty" data-i18n="sources.toolEmpty"></p>
+        <div id="tool-activity" aria-live="polite"></div>
+      </section>
+      <details class="live-transcript" id="live-transcript">
+        <summary data-i18n="voice.history"></summary>
+        <p class="small muted" data-i18n="voice.historyHelp"></p>
+        <p class="small muted" id="live-empty" data-i18n="voice.historyEmpty"></p>
+        <div id="live-messages" role="log" data-i18n-label="voice.history"></div>
+      </details>
+      <div class="trust-note"><span aria-hidden="true">◎</span><h3 data-i18n="sources.noticeTitle"></h3><p class="small muted" data-i18n="sources.notice"></p></div>
+      <footer class="small muted" data-i18n="app.footer"></footer>
+    </aside>
+  </div>
+</body>
+</html>
