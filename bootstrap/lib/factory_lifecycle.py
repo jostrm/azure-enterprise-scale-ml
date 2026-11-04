@@ -2525,6 +2525,10 @@ def validate_project_deletion(document):
                 and item["body_hash"] == resource_digest(bodies[identifier], item.get("type")),
                 "invalid-project-resource-proof")
         require(item.get("etag") is None or isinstance(item["etag"], str), "invalid-project-resource-etag")
+        require(item.get("already_absent") is not True and "already_absent" not in bodies[identifier]
+                or (is_group and identifier == project_group and item["delete"] is True
+                    and bodies[identifier] == {"id": item["id"], "already_absent": True}),
+                "invalid-already-absent-project-group")
         if not is_group:
             require(item.get("type") == resource_type_from_id(identifier)
                     and isinstance(item.get("api_version"), str)
@@ -2596,6 +2600,8 @@ def project_owner(cloud, document, body, records, cache):
 
 def verify_project_permissions(cloud, data):
     for item in project_delete_roots(data):
+        if item.get("already_absent") is True:
+            continue  # re-proven absent by verify_project_inventory; nothing left to delete
         _, _, body = cloud.request("GET", ARM + quote(item["id"], safe="/().-_")
                                    + "/providers/Microsoft.Authorization/permissions?api-version=2022-04-01", ARM)
         require(isinstance(body, dict) and isinstance(body.get("value"), list) and not body.get("nextLink"),
@@ -2618,12 +2624,20 @@ def freeze_project_deletion(cloud, document, ownership_records):
     cloud.verify_identity()
     deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
-    closure, bodies = collect_resource_closure(cloud, scopes)
+    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
+    # Idempotent (aif-145 Scenario 4, 2026-11-04: the project pipeline deleted project002's group, then failed): the
+    # registered project group an interrupted deletion already removed is done. The review records it already absent,
+    # never reads it, and execution re-proves it absent without a DELETE. Any other absent group still blocks.
+    absent = absent_groups(cloud, scopes)
+    require(len(absent) <= 1 and all(scope.lower() in registered and scope in document["locks"]["scopes"]
+                                     for scope in absent)
+            and (not absent or options["include_keyvault_and_resource_group"]),
+            "absent-group-not-the-deleted-project-group")
+    closure, bodies = collect_resource_closure(cloud, [scope for scope in scopes if scope not in absent])
 
     records = {key.lower(): value for key, value in ownership_records.items()}
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     owner["project_id"] = document["deletion_scope"]["project_number"]
-    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
     entries, cache = {}, {}
     for key, body in bodies.items():
         group = key in closure["groups"]
@@ -2631,7 +2645,13 @@ def freeze_project_deletion(cloud, document, ownership_records):
         proof = project_owner(cloud, document, body, records, cache)
         entries[key] = {"id": body["id"], **metadata, **proof, "delete": False,
                         "depends_on": project_resource_dependencies(body)}
-    matches = [key for key in closure["groups"] if entries[key]["owner"] == owner and key in registered]
+    for scope in absent:
+        bodies[scope.lower()] = {"id": scope, "already_absent": True}
+        entries[scope.lower()] = {"id": scope, "etag": None, "body_hash": resource_digest(bodies[scope.lower()]),
+                                  "owner": owner, "ownership_source": "already-absent", "already_absent": True,
+                                  "delete": False, "depends_on": []}
+    matches = [key for key in [*closure["groups"], *(scope.lower() for scope in absent)]
+               if entries[key]["owner"] == owner and key in registered]
     require(len(matches) == 1, "one-exact-owned-project-resource-group-required")
     project_group = matches[0]
     if options["include_keyvault_and_resource_group"]:
@@ -2661,7 +2681,7 @@ def freeze_project_deletion(cloud, document, ownership_records):
             require(item["owner"] == owner and not shared, "project-group-ownership-incomplete-or-shared")
         if item["owner"] != owner or shared or arm_scope(key) not in writable:
             continue
-        if key in closure["groups"]:
+        if key in closure["groups"] or item.get("already_absent") is True:
             item["delete"] = key == project_group and options["include_keyvault_and_resource_group"]
         elif kind == "microsoft.network/virtualnetworks/subnets":
             item["delete"] = options["include_project_subnets"] and (in_project or key in registered)
@@ -2703,15 +2723,17 @@ def freeze_project_deletion(cloud, document, ownership_records):
                  for item in entries.values())
     closure, bodies = project_inventory_view(closure, bodies, project_group,
                                              {key for key, item in entries.items() if item["delete"]})
+    bodies.update({scope.lower(): {"id": scope, "already_absent": True} for scope in absent})
     result = {"inventory_mode": SELECTIVE_PROJECT_DELETE, "inventory_complete": True,
-              "revision": document["manifest_revision"], "project_resource_group": bodies[project_group]["id"],
-              "resource_groups": [entries[key] for key in sorted(closure["groups"])],
+              "revision": document["manifest_revision"], "project_resource_group": entries[project_group]["id"],
+              "resource_groups": [entries[key] for key in sorted({*closure["groups"], *(s.lower() for s in absent)})],
               "resources": [entries[key] for key in sorted(closure["resources"])],
               "closure": closure, "closure_hash": digest(closure), "bodies": bodies}
     result["inventory_hash"] = digest(result["resources"])
     validate_project_deletion({**document, "deletion": result})
     for scope in scopes:
-        cloud.assert_no_active_deployments(scope)
+        if scope not in absent:
+            cloud.assert_no_active_deployments(scope)
     require(not locked, "project-delete-lock-or-deny-assignment-present")
     verify_project_permissions(cloud, result)
     return result
@@ -2783,7 +2805,9 @@ def frozen_resource_versions(data):
 
 def verify_project_inventory(cloud, document, removed=()):
     data = document["deletion"]
-    removed = {item.lower() for item in removed}
+    absent = [row["id"] for row in data["resource_groups"] if row.get("already_absent") is True]
+    require(absent_groups(cloud, absent) == absent, "absent-resource-group-reappeared")
+    removed = {item.lower() for item in [*removed, *absent]}
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
     deleted = {row["id"].lower() for row in data["resource_groups"] + data["resources"] if row["delete"]}
@@ -2851,7 +2875,13 @@ def delete_project_resources(cloud, locks, document, receipt, persist, sleep=tim
     verify_project_permissions(cloud, document["deletion"])
     removed = set()
     entries = document["deletion"]["resource_groups"] + document["deletion"]["resources"]
+    # A group the review recorded as already absent is never sent a DELETE; it is reported observed absent.
+    absent = [row["id"] for row in document["deletion"]["resource_groups"] if row.get("already_absent") is True]
+    if absent:
+        receipt["observed_absent"] = absent
     for item in project_delete_roots(document["deletion"]):
+        if item.get("already_absent") is True:
+            continue
         locks.authorize(document)
         locks.assert_held()
         cloud.verify_identity()
