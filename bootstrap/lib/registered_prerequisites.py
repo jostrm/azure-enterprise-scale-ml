@@ -111,8 +111,11 @@ CONFIG_KEYS = {
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
     "first_party_apps", "resource_providers", "coordination_mode",
     "dns_policy_exemption_assignment_ids", "dns_policy_exemption_expires_on",
-    "enablePersonas", "persona_access_mode", "persona_access_manifest",
+    "enablePersonas", "persona_access_mode", "persona_access_manifest", "security_control_ignore_tag",
 }
+# Opt-in for test factories only (Joakim, 2026-11-05: "Yes, tag test RGs"): the exemption tag the MCAPS Modify
+# policies check on a resource or its group. Never on by default; production factories keep governance.
+SECURITY_CONTROL_TAG = {"SecurityControl": "Ignore"}
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
 canonical = enrollment.canonical
@@ -1409,6 +1412,7 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                                     expected_payload_sha256=context.get("source_payload_sha256"))
     require(root != ordinary(source_root), "source-cannot-be-consumer")
     config = copy.deepcopy(bootstrap_config)
+    require(type(config.get("security_control_ignore_tag", False)) is bool, "security-control-ignore-tag-must-be-boolean")
     persona_mode = registered_personas.mode(config)
     persona_manifest = registered_personas.local_manifest(config, root, source_root=source_root)
     if persona_manifest:
@@ -1514,6 +1518,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
             tags[registered_personas.MARKER] = "groups-v1"
         if rg == project_group:
             tags.update({"aifactory.project_id": target["project_number"], "aifactory.logical_project_id": target["project_id"]})
+        if config.get("security_control_ignore_tag") is True:
+            tags.update(SECURITY_CONTROL_TAG)
         existing = builder.read(rg, enrollment.RG_API)
         if existing is None:
             builder.ensure(rg, enrollment.RG_API, {"location": target["location"], "tags": tags},
