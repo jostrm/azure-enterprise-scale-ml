@@ -1,4 +1,6 @@
 name: infra-common
+# AIFACTORY_COMMON_DEPLOYMENT_CONTRACT=1
+run-name: infra-common [${{ inputs.deployment_id || 'manual' }}]
 
 on:
   workflow_dispatch:
@@ -23,6 +25,26 @@ on:
         type: string
         default: aifactory/variables.json
         description: Repository-relative canonical AI Factory JSON configuration file
+      config_secret:
+        type: string
+        required: false
+        default: AIFACTORY_CONFIG_JSON
+        description: Environment secret containing this run's immutable configuration (reviewed API runs)
+      deployment_id:
+        type: string
+        required: false
+        default: ''
+        description: Unique reviewed deployment correlation UUID (empty for manual runs)
+      config_hash:
+        type: string
+        required: false
+        default: ''
+        description: SHA256 of the reviewed configuration
+      scale_set_suffix:
+        type: string
+        required: false
+        default: ''
+        description: Reviewed scale set suffix (NNN) the configuration must target
 
 permissions:
   contents: read
@@ -36,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-dev
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
       ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
@@ -123,6 +146,66 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: dev
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
 
       - name: Resolve JSON OpenID Connect identity
         id: json_identity
@@ -457,6 +540,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-stage
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
       ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
@@ -544,6 +628,66 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: stage
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
 
       - name: Resolve JSON OpenID Connect identity
         id: json_identity
@@ -877,6 +1021,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-prod
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
       ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
@@ -964,6 +1109,66 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: prod
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
 
       - name: Resolve JSON OpenID Connect identity
         id: json_identity
