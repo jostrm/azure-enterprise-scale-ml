@@ -402,3 +402,14 @@ The component links in this addendum intentionally describe the current checkout
 [tutorial]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/documentation/v2/20-29/28-tutorial-walkthrough.md
 [showback]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/RUNBOOK.md
 [email-script]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/environment_setup/aifactory/bicep/scripts/ado/124_send_email_notifications.sh
+
+## Post-v1.25 backport — 5 November 2026: networking mode for Scenario 1
+
+Backported from `main` (`f115b66c`). The legacy create launcher accepts
+`AIF_NETWORK_MODE=priv|h|pub` (private default, hybrid, public). Private networking needs a
+hub (external, or the factory's own hub with `AIF_SETUP_HUB_ACCESS=true`), so a Standalone
+AI Factory without a hub uses `h` or `pub`; the API host lifts the rule with
+`AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false`. The registered launcher passes the
+full-bootstrap choice to the Factory API as `config.network_mode`; Simple Mode stays private.
+The Factory API (pink `31fd1189` or later) owns the rule and detects this source by its
+`"priv" "priv h pub"` choice list (feature `public-hybrid-network`).

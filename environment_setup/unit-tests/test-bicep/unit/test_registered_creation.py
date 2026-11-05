@@ -685,3 +685,19 @@ def test_live_bash_prepare_then_separate_cli_confirmation(
     }, indent=2), encoding="utf-8")
     print(f"LIVE {provider} {'simple' if simple else 'full'} {entrypoint}: "
           f"project{expected}, {factory['aifactory_version']}, job=null, jobs=[], {variables[0]}")
+
+
+@pytest.mark.parametrize("value,expected", [(None, None), ("priv", "private"), ("h", "hybrid"), ("pub", "public")])
+def test_full_network_mode_maps_to_the_api_choice(tmp_path, value, expected):
+    """Scenario 1 network topology (2026-11-05): the API validates the hub rule; the launcher only passes the choice."""
+    args = CREATION.parser().parse_args(["gha", "--non-interactive"])
+    env = input_env(**({"AIF_NETWORK_MODE": value} if value else {}))
+    config = CREATION.creation_input(args, tmp_path, "main", env)["config"]
+    assert config.get("network_mode") == expected
+
+
+@pytest.mark.parametrize("value", ["h", "pub"])
+def test_simple_mode_stays_private(tmp_path, value):
+    args = CREATION.parser().parse_args(["gha", "--non-interactive"])
+    with pytest.raises(ValueError, match="AIF_NETWORK_MODE"):
+        CREATION.creation_input(args, tmp_path, "main", input_env(simple=True, AIF_NETWORK_MODE=value))

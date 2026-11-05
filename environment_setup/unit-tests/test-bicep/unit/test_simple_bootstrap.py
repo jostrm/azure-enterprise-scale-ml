@@ -887,3 +887,25 @@ aif_deploy_simple_application_gateway
     assert result.stderr.count("DEPLOY") == 1 and "UNEXPECTED_" not in result.stderr
     if not healthy:
         assert "not marked complete" in result.stderr
+
+
+def test_bootstrap_offers_private_hybrid_and_public_networking():
+    """The Factory API detects public-hybrid-network support by this exact choice list."""
+    assert '"priv" "priv h pub"' in SCRIPT
+
+
+@pytest.mark.parametrize("network,hub,access,rule,ok", [
+    ("priv", "integrated", "false", "", False),
+    ("priv", "integrated", "true", "", True),
+    ("priv", "external", "false", "", True),
+    ("pub", "integrated", "false", "", True),
+    ("h", "integrated", "false", "", True),
+    ("priv", "integrated", "false", "false", True),
+])
+def test_private_networking_needs_a_hub_unless_the_rule_is_lifted(network, hub, access, rule, ok):
+    result = bash(f"""AIF_TOPOLOGY=s; AIF_NETWORK_MODE={network}; AIF_ACCESS_HUB_MODE={hub}
+AIF_SETUP_HUB_ACCESS={access}; AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB={rule}
+aif_require_hub_for_private && echo OK""", "aif_require_hub_for_private")
+    assert (result.returncode == 0 and result.stdout.strip() == "OK") == ok, result.stderr
+    if not ok:
+        assert "Private networking needs a hub" in result.stderr
