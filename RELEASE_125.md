@@ -413,3 +413,11 @@ AI Factory without a hub uses `h` or `pub`; the API host lifts the rule with
 full-bootstrap choice to the Factory API as `config.network_mode`; Simple Mode stays private.
 The Factory API (pink `31fd1189` or later) owns the rule and detects this source by its
 `"priv" "priv h pub"` choice list (feature `public-hybrid-network`).
+
+## Post-v1.25 backport — 5 November 2026: network read-back and COMMON pipeline contract
+
+Backported from `main` (`2b51f962`, `080ab776`). Network-foundation finalization logs a property Azure sets by itself on
+a created subnet, NSG or VNet as `read_back_warnings` evidence and continues; differences in written or core network
+properties (address ranges, NSG and rules, route table, NAT gateway, service endpoints, network policies, delegations,
+peerings, DNS, DDoS) still stop the stage. `infra-common.yml` carries the reviewed COMMON deployment contract
+(`AIFACTORY_COMMON_DEPLOYMENT_CONTRACT=1`) that the Factory API's opt-in `common=API-2-Pipelines` route uses.
