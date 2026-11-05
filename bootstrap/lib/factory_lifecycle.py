@@ -389,6 +389,9 @@ def digest(value):
 # of their own. Fingerprints leave these out, so a night, a disk downgrade or a Defender retry is not a changed
 # reviewed resource; every other field still is.
 VOLATILE_FIELDS = {
+    # A Bot Service channel's etag embeds the time it was read (W/"...11/4/2026 5:46:27 PM"), so every read differs
+    # (aif-144 2026-11-04 delete_factory run7: confirmation looped on DirectLineChannel). Its settings still count.
+    "microsoft.botservice/botservices/channels": (("etag",), ("properties", "etag")),
     "microsoft.compute/virtualmachines": (
         ("etag",), ("resources",), ("properties", "provisioningState"),
         ("properties", "storageProfile", "osDisk", "diskSizeGB"),
