@@ -80,6 +80,10 @@ PLATFORM_CHILDREN = {
     # (aif-138 2026-11-02 run15, NetworkSecurityGroupNotCompliantForAzureBastionSubnet), and one NSG delete replaces
     # dozens of rule deletes.
     "microsoft.network/networksecuritygroups/securityrules": "",
+    # A VM's extensions and run commands leave with the VM: governance deallocates the runner VM nightly, and ARM answers
+    # 409 to their own DELETE on a deallocated VM (aif-144 2026-11-05 delete_factory run17, AzurePolicyforLinux).
+    "microsoft.compute/virtualmachines/extensions": "",
+    "microsoft.compute/virtualmachines/runcommands": "",
 }
 
 
