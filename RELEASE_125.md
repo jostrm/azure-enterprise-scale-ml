@@ -421,3 +421,9 @@ a created subnet, NSG or VNet as `read_back_warnings` evidence and continues; di
 properties (address ranges, NSG and rules, route table, NAT gateway, service endpoints, network policies, delegations,
 peerings, DNS, DDoS) still stop the stage. `infra-common.yml` carries the reviewed COMMON deployment contract
 (`AIFACTORY_COMMON_DEPLOYMENT_CONTRACT=1`) that the Factory API's opt-in `common=API-2-Pipelines` route uses.
+
+## Post-v1.25 backport — 6 November 2026: opt-in SecurityControl=Ignore tag for test factories
+
+Backported from `main` (`547048a9`). The bootstrap key `security_control_ignore_tag` (off by default) gives the
+common and project resource groups the prerequisites create the tag `SecurityControl=Ignore` at their first write,
+the exemption the MCAPS Modify policies check. For test factories only; production factories keep governance.
