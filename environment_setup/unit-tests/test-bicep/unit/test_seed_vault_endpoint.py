@@ -143,3 +143,48 @@ def test_network_verification_accepts_only_the_planned_endpoint_on_the_created_c
     with pytest.raises(cases.net.PreservationError, match="unexpected-new-subnet-association"):
         cases.net.verify_common_network(frozen, before=before, after=cases.inventory(state, intent),
                                         expected_resources=expected, seed_vault_endpoint=endpoint)
+
+
+# aif-146 (2026-11-05, Standalone + public, Scenario 1): once the seed endpoint exists, Azure also sets the subnet's
+# read-only purpose "PrivateEndpoints"; finalization refused created-network-write-properties-mismatch on the common subnet.
+def test_the_planned_endpoint_also_takes_the_purpose_it_caused():
+    plan = planned()
+    ipconfig = plan["nic_id"] + "/ipconfigurations/privateendpointipconfig.1"
+    only = {"id": SUBNET, "properties": {"privateEndpoints": [{"id": ENDPOINT}], "ipConfigurations": [{"id": ipconfig}],
+                                         "purpose": "PrivateEndpoints"}}
+    assert net.without_seed_endpoint_associations(only, plan)["properties"] == {}
+    shared = copy.deepcopy(only)
+    shared["properties"]["privateEndpoints"].append({"id": "foreign-pe"})
+    assert net.without_seed_endpoint_associations(shared, plan)["properties"]["purpose"] == "PrivateEndpoints"
+    other = copy.deepcopy(only)
+    other["properties"]["purpose"] = "SomethingElse"
+    assert net.without_seed_endpoint_associations(other, plan)["properties"] == {"purpose": "SomethingElse"}
+    unrelated = {"id": SUBNET, "properties": {"purpose": "PrivateEndpoints"}}
+    assert net.without_seed_endpoint_associations(unrelated, plan)["properties"] == {"purpose": "PrivateEndpoints"}
+
+
+def test_network_verification_accepts_the_purpose_azure_sets_for_the_planned_endpoint():
+    base = importlib.util.spec_from_file_location("network_preservation_cases", Path(__file__).with_name(
+        "test_common_network_preservation.py"))
+    cases = importlib.util.module_from_spec(base)
+    base.loader.exec_module(cases)
+    compiled = cases.compiled.__wrapped__()
+    state, intent = cases.initial(), cases.desired()
+    before = cases.inventory(state, intent)
+    frozen = cases.plan(state, intent)
+    state, _ = cases.apply_native_arm(state, frozen, compiled)
+    endpoint = cases.net.plan_seed_vault_endpoint(
+        vault_id=cases.RG + "/providers/microsoft.keyvault/vaults/aifseed01", vnet_id=cases.VNET,
+        subnet_name="snet-one", location="westeurope", owner_tags=TAGS)
+    common = cases.VNET + "/subnets/snet-one"
+    references = {"privateEndpoints": [{"id": endpoint["resource_id"]}],
+                  "ipConfigurations": [{"id": endpoint["nic_id"] + "/ipconfigurations/privateendpointipconfig.1"}],
+                  "purpose": "PrivateEndpoints"}
+    state[common]["properties"].update(copy.deepcopy(references))
+    for row in state[cases.VNET]["properties"]["subnets"]:
+        if row["id"] == common:
+            row["properties"].update(copy.deepcopy(references))
+    after = cases.inventory(state, intent)
+    expected = cases.net.expected_resource_bodies(compiled, frozen)
+    assert cases.net.verify_common_network(frozen, before=before, after=after, expected_resources=expected,
+                                           seed_vault_endpoint=endpoint)["preserved"] is True

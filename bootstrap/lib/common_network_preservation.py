@@ -1067,6 +1067,8 @@ def without_seed_endpoint_associations(body, planned):
         return body
     body = copy.deepcopy(body)
     properties = body["properties"]
+    had_planned = any(isinstance(row, dict) and str(row.get("id", "")).lower() == planned["resource_id"]
+                      for row in properties.get("privateEndpoints") or [])
     for key, own in (("privateEndpoints", lambda value: value == planned["resource_id"]),
                      ("ipConfigurations", lambda value: value.startswith(planned["nic_id"] + "/"))):
         if isinstance(properties.get(key), list):
@@ -1076,6 +1078,11 @@ def without_seed_endpoint_associations(body, planned):
                 properties[key] = rows
             else:
                 properties.pop(key)
+    # Azure sets the read-only purpose "PrivateEndpoints" once a private endpoint lands on the subnet (aif-146,
+    # 2026-11-05). It is the planned endpoint's only when that endpoint was the subnet's only one; any other purpose,
+    # or the same purpose beside another endpoint, stays and is still checked.
+    if had_planned and properties.get("purpose") == "PrivateEndpoints" and not properties.get("privateEndpoints"):
+        properties.pop("purpose")
     return body
 
 
