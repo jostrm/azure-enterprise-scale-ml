@@ -67,6 +67,11 @@ def rows(document):
     ("microsoft.network/networksecuritygroups/securityrules", "Bastion_AzureCloudOutbound", True),
     ("microsoft.network/networksecuritygroups/securityrules", "allow-https", True),
     ("microsoft.network/virtualnetworks/subnets", "snet-esml-cmn-001", False),
+    # aif-144 (2026-11-05, delete_factory run17): governance deallocates the runner VM nightly, and ARM answers 409 to an
+    # extension or run command DELETE on a deallocated VM. Both leave with their VM.
+    ("microsoft.compute/virtualmachines/extensions", "AzurePolicyforLinux", True),
+    ("microsoft.compute/virtualmachines/extensions", "MDE.Linux", True),
+    ("microsoft.compute/virtualmachines/runcommands", "register-aifactory-gha-20261103140304-31278", True),
 ])
 def test_only_platform_maintained_children_are_classified_as_such(kind, name, expected):
     module = fl.factory_deletion_module()
