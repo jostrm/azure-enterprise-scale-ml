@@ -2789,8 +2789,10 @@ They use the existing deployment engine and route configuration.</p>
 <p>Legacy create defaults to <code>124</code>. Update inherits the saved version unless an
 explicit version selector is provided. Choose <code>main</code> explicitly for development;
 project-only is not an upgrade operation. Current create validation
-accepts <strong><code>AIF_NETWORK_MODE=priv</code> only</strong>, despite legacy help also mentioning
-<code>h</code>/<code>pub</code>. Its general region prompt defaults to <strong><code>swedencentral</code></strong>, whereas
+accepts <code>AIF_NETWORK_MODE=priv</code> (default), <code>h</code> (hybrid) or <code>pub</code> (public). Private
+networking needs a hub (external, or the own hub with <code>AIF_SETUP_HUB_ACCESS=true</code>)
+unless <code>AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false</code>; a Standalone AI Factory without a
+hub uses <code>h</code> or <code>pub</code>. Its general region prompt defaults to <strong><code>swedencentral</code></strong>, whereas
 the shared configuration templates default to <strong><code>eastus2</code></strong>.
 Initial legacy bootstrap deploys Dev only and seeds Stage/Prod subscription
 values from Dev; that is not a reviewed multi-environment network plan.</p>
@@ -9228,7 +9230,7 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter bootstrap:AIF_NETWORK_MODE --><code>AIF_NETWORK_MODE</code></td>
 <td>O</td>
 <td><code>"priv"</code></td>
-<td>Networking: private-only (priv; enforced by policy); allowed: priv</td>
+<td>Networking: private (priv; needs a hub), hybrid (h) or public (pub); allowed: priv h pub</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_NON_INTERACTIVE --><code>AIF_NON_INTERACTIVE</code></td>
