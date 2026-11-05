@@ -710,6 +710,35 @@ def _nsg_write_properties(properties, *, associations):
     return props
 
 
+# Core network properties of created resources (B, Joakim 2026-11-05: "warn, keep core"): a difference here still
+# blocks even when the plan never wrote the property, because a policy or platform that set it would leave a network
+# nobody reviewed. Any other property Azure adds by itself is a read-back warning with its observed value.
+CORE_WRITE_PROPERTIES = {
+    "microsoft.network/virtualnetworks/subnets": frozenset({
+        "addressPrefixes", "networkSecurityGroup", "routeTable", "natGateway", "serviceEndpoints",
+        "serviceEndpointPolicies", "delegations", "privateEndpointNetworkPolicies",
+        "privateLinkServiceNetworkPolicies", "defaultOutboundAccess", "ipAllocations", "sharingScope"}),
+    "microsoft.network/networksecuritygroups": frozenset({"securityRules", "flushConnection"}),
+    "microsoft.network/virtualnetworks": frozenset({
+        "addressSpace", "dhcpOptions", "virtualNetworkPeerings", "enableDdosProtection", "enableVmProtection",
+        "ddosProtectionPlan"}),
+}
+
+
+def _compare_written(identifier, kind, current, frozen):
+    """Block on written or core differences; return platform-set read-only properties as warnings."""
+    warnings = []
+    core = CORE_WRITE_PROPERTIES.get(kind, frozenset())
+    for key in sorted(set(current) | set(frozen)):
+        if current.get(key) == frozen.get(key):
+            continue
+        require(key not in frozen and key not in core and key in current,
+                "created-network-write-properties-mismatch:" + identifier)
+        warnings.append({"resource_id": identifier, "property": key, "observed": copy.deepcopy(current[key]),
+                         "code": "created-network-platform-property"})
+    return warnings
+
+
 def _verify_created_resource(identifier, actual, expected, plan, *, endpoint_scope=None):
     _validate_existing(actual, identifier)
     require(set(actual) <= {"id", "name", "type", "etag", "systemData", "location", "tags", "properties"},
@@ -746,7 +775,7 @@ def _verify_created_resource(identifier, actual, expected, plan, *, endpoint_sco
             frozen.setdefault(key, default)
         current["addressSpace"]["addressPrefixes"].sort()
         frozen["addressSpace"]["addressPrefixes"].sort()
-    require(current == frozen, "created-network-write-properties-mismatch:" + identifier)
+    return _compare_written(identifier, kind, current, frozen)
 
 
 def _retained_subnet_unchanged(old, new, old_parent, new_parent, *, additions):
@@ -838,14 +867,19 @@ def verify_common_network(plan, *, before, after, expected_resources=None, endpo
     require(set(expected) == set(plan["mutation_resource_ids"]), "frozen-compiled-resource-bodies-required")
     require(all(expected.get(key) == value for key, value in _base_expected_resources(plan).items()),
             "frozen-canonical-resource-body-mismatch")
+    warnings = []
     for key in plan["mutation_resource_ids"]:
-        _verify_created_resource(key, actual.get(key), expected[key], plan, endpoint_scope=endpoint_scope)
+        warnings.extend(_verify_created_resource(key, actual.get(key), expected[key], plan, endpoint_scope=endpoint_scope))
     parent_subnets = {resource_id(item["id"]): item for item in new_parent["properties"].get("subnets", [])}
     for key in plan["mutation_resource_ids"]:
         if resource_type(key) == "microsoft.network/virtualnetworks/subnets":
             require(parent_subnets.get(key) == actual.get(key), "created-subnet-parent-snapshot-mismatch")
-    return {"profile": PROFILE, "preserved": True, "before_sha256": digest(before),
-            "after_sha256": digest(after), "mutation_resource_ids": plan["mutation_resource_ids"]}
+    evidence = {"profile": PROFILE, "preserved": True, "before_sha256": digest(before),
+                "after_sha256": digest(after), "mutation_resource_ids": plan["mutation_resource_ids"]}
+    if warnings:
+        # Review evidence, not a refusal: properties Azure set by itself on created resources (never core ones).
+        evidence["read_back_warnings"] = warnings
+    return evidence
 
 
 def _deployment_parameters(template, parameters):
