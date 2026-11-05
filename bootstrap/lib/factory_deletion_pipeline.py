@@ -84,6 +84,8 @@ PLATFORM_CHILDREN = {
     # 409 to their own DELETE on a deallocated VM (aif-144 2026-11-05 delete_factory run17, AzurePolicyforLinux).
     "microsoft.compute/virtualmachines/extensions": "",
     "microsoft.compute/virtualmachines/runcommands": "",
+    # A Log Analytics workspace's tables leave with the workspace: aif-144 (2026-11-04) froze 697 of them.
+    "microsoft.operationalinsights/workspaces/tables": "",
 }
 
 
@@ -93,6 +95,14 @@ def delete_condition(body):
     2026-11-02 run16)."""
     etag = fl.resource_etag(body, {})
     return {"If-Match": etag} if etag else None
+
+
+def manifest_bodies(bodies):
+    """The bodies a frozen manifest holds: a listed-only child's fingerprint body. Its body_hash is unchanged (the
+    fingerprint is idempotent) and a Log Analytics table drops its schema: aif-144 (2026-11-04 run5) froze 697 tables
+    into a 9.30 MB manifest against the protected worker's 8 MB."""
+    return {key: fl.fingerprint_body(body, fl.resource_type_from_id(key))
+            if fl.resource_type_from_id(key) in fl.LISTED_ONLY_CHILDREN else body for key, body in bodies.items()}
 
 
 def platform_child(item):
@@ -488,6 +498,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
             if adopted:
                 owner = adopted[1]
                 proof = {"ownership_source": "managed-parent", "owner": owner, "managed_parent_id": adopted[0]}
+            attached = None if adopted else attached_subnet_owner(key, bodies, hub, core_owner)
+            if attached:
+                owner = attached[1]
+                proof = {"ownership_source": "attached-subnets", "owner": owner,
+                         "attached_virtual_network_ids": attached[0]}
         if hub_covers(hub, key):
             fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
             fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
@@ -566,6 +581,14 @@ def freeze(cloud, document, ownership_records, registered_projects):
                 item["delete"] = False
                 item["retention_reason"] = "retained-managed-parent"
                 changed = True
+            if item["delete"] and platform_child(item) and any(
+                    key.startswith(other + "/") and not row["delete"] and not fl.RG_ID.fullmatch(other)
+                    for other, row in entries.items()):
+                # A platform child leaves only with its parent, so a retained parent keeps it (aif-144 2026-11-04
+                # run3: a retained VNet's taggedTrafficConsumers child stopped the freeze, service-lifecycle-unsupported).
+                item["delete"] = False
+                item["retention_reason"] = "retained-parent"
+                changed = True
             if not item["delete"]:
                 for candidate, other in entries.items():
                     if other["delete"] and (key.startswith(candidate + "/") or candidate in item["depends_on"]):
@@ -599,7 +622,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
     data = {"inventory_mode": CONTRACT, "inventory_complete": True, "revision": document["manifest_revision"],
             "flags": dict.fromkeys(DELETE_FLAGS, True), "projects": projects, "resource_groups": groups,
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
-            "closure_hash": fl.digest(closure), "bodies": bodies, "protected_resource_ids": sorted(explicit),
+            "closure_hash": fl.digest(closure), "bodies": manifest_bodies(bodies), "protected_resource_ids": sorted(explicit),
             "connectivity_resource_group_ids": sorted(connectivity),
             "configuration_hash": fl.digest(document["config"]),
             "route_hash": fl.digest(document["route"]), "source_hash": fl.digest(document["source"])}
@@ -691,6 +714,9 @@ def validate(document):
         fl.require(row.get("ownership_source") != HUB_SOURCE or (hub_covers(hub, key) and row["owner"] == {
             field: document["target"][field] for field in ("factory_id", "scaleset_id")}),
                    "factory-delete-access-hub-owner-unproven")
+        fl.require(row.get("ownership_source") != "attached-subnets" or attached_subnet_owner(
+            key, data["bodies"], hub, {field: document["target"][field] for field in ("factory_id", "scaleset_id")})
+            == (row.get("attached_virtual_network_ids"), row["owner"]), "factory-delete-attached-subnets-proof-invalid")
         fl.require(not owner_number or owner_number in document["target"]["project_ids"],
                    "factory-delete-project-owner-unregistered")
         fl.require(row.get("managed_group_ids", []) == sorted(fl.managed_group_cascades(
@@ -1413,6 +1439,35 @@ def managed_parent_owner(key, bodies):
     return parent, tag_owner(bodies[ancestor])
 
 
+# Network resources a project pipeline deploys untagged into the common group and attaches to its subnets.
+ATTACHED_SUBNET_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
+
+
+def attached_subnet_owner(key, bodies, hub, core_owner):
+    """(VNet ids, owner) of an untagged NSG or route table that only subnets of owned VNets use, or None.
+
+    aif-144 (2026-11-04): the project pipeline deploys each project's NSGs into the common group untagged and option B
+    receipts cover only the project group, so the common VNet was retained. A VNet is owned by this factory's tags or
+    the access-hub proof; the NSG then leaves with the common teardown, owned by the scale set (no project)."""
+    if fl.resource_type_from_id(key) not in ATTACHED_SUBNET_TYPES:
+        return None
+    subnets = (bodies[key].get("properties") or {}).get("subnets")
+    if not isinstance(subnets, list) or not subnets:
+        return None
+    vnets = set()
+    for subnet in subnets:
+        identifier = str((subnet or {}).get("id", "") if isinstance(subnet, dict) else "").lower()
+        vnet = identifier.rsplit("/subnets/", 1)[0]
+        if "/subnets/" not in identifier or fl.resource_type_from_id(vnet) != VNET_TYPE or vnet not in bodies:
+            return None
+        owner = tag_owner(bodies[vnet])
+        if not (hub_covers(hub, vnet) or owner and all(owner.get(field) == value
+                                                        for field, value in core_owner.items())):
+            return None
+        vnets.add(vnet)
+    return sorted(vnets), dict(core_owner)
+
+
 def absent_groups(cloud, scopes):
     """Recorded groups already deleted; only 404 ResourceGroupNotFound proves absence (fl.absent_groups)."""
     return fl.absent_groups(cloud, scopes, "bootstrap-teardown-group-absence-unverified")
@@ -1487,7 +1542,7 @@ def freeze_teardown(cloud, document):
     data = {"inventory_mode": TEARDOWN_CONTRACT, "inventory_complete": True,
             "flags": dict.fromkeys(DELETE_FLAGS, True), "resource_groups": [entries[key] for key in sorted(closure["groups"])],
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
-            "closure_hash": fl.digest(closure), "bodies": bodies,
+            "closure_hash": fl.digest(closure), "bodies": manifest_bodies(bodies),
             "hub_links": sorted(links, key=lambda row: row["id"].lower()),
             "factory_virtual_networks": sorted(factory_vnets), "hub_virtual_networks": sorted(hub_vnets),
             "absent_resource_groups": absent, "request_hash": fl.digest(_request(document))}
