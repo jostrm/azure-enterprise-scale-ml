@@ -226,6 +226,16 @@ $("copy-conversation").addEventListener("click", async () => {
 });
 $("dismiss-error").addEventListener("click", () => { $("error-notice").hidden = true; });
 $("reload-session").addEventListener("click", () => window.location.reload());
+const branding = window.salesBranding;
+function showBrandPersistence(saved) {
+  $("brand-note").hidden = saved;
+  $("brand-theme").setAttribute("aria-describedby", saved ? "" : "brand-note");
+}
+$("brand-theme").value = branding.value;
+showBrandPersistence(branding.persistent);
+$("brand-theme").addEventListener("change", () => {
+  showBrandPersistence(branding.select($("brand-theme").value));
+});
 $("theme").value = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 $("theme").addEventListener("change", () => { document.documentElement.dataset.theme = $("theme").value; });
 window.addEventListener("pagehide", () => { clearTimeout(expiryTimer); voice.disconnect(); api.cancel(); });

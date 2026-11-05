@@ -13,6 +13,14 @@
     "dark": "Dark",
     "footer": "Local browser · server-side credentials · no saved browser transcripts"
   },
+  "branding": {
+    "label": "Theme",
+    "gray": "Gray",
+    "swedishRetail": "Swedish Retail",
+    "notSaved": "Theme applies to this page, but browser settings prevent saving the preference.",
+    "banner": "Your sales companion",
+    "bannerHint": "Ask. Explore. Understand."
+  },
   "session": {
     "label": "Local DSVM session",
     "description": "This single-user app runs on your DSVM. The local server uses your DSVM Entra CLI identity and downstream user authorization. No Microsoft sign-in or Entra tokens enter this browser.",

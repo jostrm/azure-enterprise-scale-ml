@@ -9,6 +9,7 @@
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
+  <script src="/static/branding.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title data-i18n="app.title"></title>
@@ -63,7 +64,17 @@
     <main class="main-panel" id="main">
       <header class="topbar">
         <div><h1 data-i18n="conversation.heading"></h1><p class="muted" data-i18n="app.subtitle"></p></div>
-        <button id="copy-conversation" class="secondary compact" type="button" data-i18n="conversation.copy" disabled></button>
+        <div class="topbar-controls">
+          <div class="theme-picker">
+            <label for="brand-theme" data-i18n="branding.label"></label>
+            <select id="brand-theme">
+              <option value="gray" data-i18n="branding.gray"></option>
+              <option value="swedish-retail" data-i18n="branding.swedishRetail"></option>
+            </select>
+            <p id="brand-note" class="small muted" role="status" data-i18n="branding.notSaved" hidden></p>
+          </div>
+          <button id="copy-conversation" class="secondary compact" type="button" data-i18n="conversation.copy" disabled></button>
+        </div>
       </header>
       <section class="notice error-notice" id="error-notice" role="alert" hidden>
         <div><strong data-i18n="errors.heading"></strong><p id="error-message"></p></div>
@@ -121,5 +132,10 @@
       <footer class="small muted" data-i18n="app.footer"></footer>
     </aside>
   </div>
+  <footer class="brand-banner">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3H3V6a2 2 0 0 1 2-2Z"/><path d="M7 10h.01M12 10h.01M17 10h.01"/></svg>
+    <strong data-i18n="branding.banner"></strong>
+    <span data-i18n="branding.bannerHint"></span>
+  </footer>
 </body>
 </html>

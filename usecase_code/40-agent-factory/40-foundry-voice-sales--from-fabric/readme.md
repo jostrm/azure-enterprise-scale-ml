@@ -4,6 +4,13 @@
 
 A configurable sales assistant for a **trusted single-user DSVM session**: browser text first, optional native live voice, answers grounded through your published Fabric Data Agent. No Azure resources are provisioned; no backend is deployed. Azure/Fabric/voice verification is **NOT RUN** by the local tests.
 
+Use the **Theme** dropdown above the conversation: **Gray** has Scout-style neutral
+surfaces; **Swedish Retail** uses blue controls, pale surfaces, dark question
+bubbles and a yellow footer inspired by the supplied retail reference. **Appearance**
+still controls Light/Dark independently. Theme changes do not reset chat or voice.
+Only the selected brand name is remembered in browser storage, never chat or audio;
+if storage is blocked, the choice applies to the current page with a visible notice.
+
 ## 2. Architecture
 
 `Browser (loopback) → local Python BFF → persisted Foundry prompt agent → query_sales_data(question) executed locally → Microsoft-hosted Fabric Data Agent MCP → permitted read-only sources`
