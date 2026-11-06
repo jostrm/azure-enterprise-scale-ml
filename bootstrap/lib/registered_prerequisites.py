@@ -273,10 +273,26 @@ class Cloud(enrollment.Cloud):
                 "unreviewed-graph-write")
         require(path.startswith(("groups", "users/", "servicePrincipals")) and "://" not in path and ".." not in path,
                 "untrusted-graph-endpoint")
+        token = self._graph_token()
+        status, raw = self._graph_send(method, path, body, token)
+        if status == 401 and method == "GET" and 401 not in allowed:
+            # aif-150 (2026-11-06): Graph rejected a cached CLI token the CLI had already renewed. A read is sent once
+            # more, and only with a different, refreshed token; a write is never retried (b6145b82).
+            self.tokens.pop((GRAPH, enrollment.guid(self.request_config["target"]["tenant_id"])), None)
+            refreshed = self._graph_token()
+            if refreshed != token:
+                status, raw = self._graph_send(method, path, body, refreshed)
+        require(status in allowed, f"graph-request-failed-{status}")
+        require(len(raw) <= enrollment.MAX_BYTES, "graph-response-too-large")
+        return enrollment.parse_json(raw) if raw else None
+
+    def _graph_token(self):
         try:
-            token = self.token(GRAPH)
+            return self.token(GRAPH)
         except enrollment.EnrollmentError as exc:
             raise PrerequisiteError("graph-" + exc.code) from None
+
+    def _graph_send(self, method, path, body, token):
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
         try:
             response = self.opener.open(Request(GRAPH + "v1.0/" + path, method=method,
@@ -287,11 +303,7 @@ class Cloud(enrollment.Cloud):
         except (URLError, OSError, TimeoutError):
             raise PrerequisiteError("graph-write-or-read-uncertain") from None
         with response:
-            status = response.status
-            raw = response.read(enrollment.MAX_BYTES + 1)
-        require(status in allowed, f"graph-request-failed-{status}")
-        require(len(raw) <= enrollment.MAX_BYTES, "graph-response-too-large")
-        return enrollment.parse_json(raw) if raw else None
+            return response.status, response.read(enrollment.MAX_BYTES + 1)
 
     def blob(self, method, blob, *, data=None, headers=None, allowed=(200,), query=""):
         coordinates = self.request_config["coordinates"]
