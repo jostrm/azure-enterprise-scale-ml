@@ -64,8 +64,13 @@ function Invoke-AzCommand {
     }
 }
 
+# Cross-platform (Windows and the Linux self-hosted runner, whose pwsh has no DnsClient module: aif-151, 2026-11-06).
 function Wait-KeyVaultPrivateDns {
-    param([string] $HostName, [string] $ExpectedIp)
+    param(
+        [string] $HostName,
+        [string] $ExpectedIp,
+        [string] $FailureHint = "Have the DNS/policy owner check record provisioning, existing VNet links and the runner's DNS forwarding; this does not require granting the deployment identity access to the private DNS resource group."
+    )
 
     for ($attempt = 1; $attempt -le 18; $attempt++) {
         if (Get-Command Clear-DnsClientCache -ErrorAction SilentlyContinue) {
@@ -85,7 +90,7 @@ function Wait-KeyVaultPrivateDns {
         }
         Start-Sleep -Seconds 10
     }
-    throw "Key Vault '$HostName' did not resolve to private endpoint IP '$ExpectedIp'. Have the DNS/policy owner check record provisioning, existing VNet links and the runner's DNS forwarding; this does not require granting the deployment identity access to the private DNS resource group."
+    throw "Key Vault '$HostName' did not resolve to private endpoint IP '$ExpectedIp'. $FailureHint"
 }
 
 $dnsZoneName = 'privatelink.vaultcore.azure.net'
@@ -328,19 +333,5 @@ else {
     Write-Host "Private endpoint DNS zone group '$($matchingDnsZoneGroup.name)' uses the expected zone."
 }
 
-for ($attempt = 1; $attempt -le 18; $attempt++) {
-    Clear-DnsClientCache -ErrorAction SilentlyContinue
-    $resolvedAddresses = @(
-        Resolve-DnsName -Name $vaultHostName -Type A -ErrorAction SilentlyContinue |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_.IPAddress) } |
-            Select-Object -ExpandProperty IPAddress -Unique
-    )
-    Write-Host "Key Vault private DNS check $attempt/18: expected=$privateEndpointIp resolved=$($resolvedAddresses -join ',')"
-    if ($resolvedAddresses -contains $privateEndpointIp) {
-        Write-Host "Key Vault '$vaultHostName' resolves to approved private endpoint IP '$privateEndpointIp'."
-        return
-    }
-    Start-Sleep -Seconds 10
-}
-
-throw "Key Vault '$vaultHostName' did not resolve to private endpoint IP '$privateEndpointIp'. Verify the '$dnsZoneName' zone link and private endpoint DNS zone group."
+Wait-KeyVaultPrivateDns -HostName $vaultHostName -ExpectedIp $privateEndpointIp `
+    -FailureHint "Verify the '$dnsZoneName' zone link and private endpoint DNS zone group."
