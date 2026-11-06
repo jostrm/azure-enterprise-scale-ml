@@ -89,6 +89,8 @@ GATEWAY_RESPONSE_EXTENSION_WARNING = (
     "live-verified; active capture or migration is blocked."
 )
 GRAPH = "https://graph.microsoft.com/"
+# How Graph names a continuous access evaluation challenge in a 401 body (the header carries insufficient_claims).
+CAE_CHALLENGE_TEXT = (b"Continuous access evaluation", b"InteractionRequired")
 SOURCE_FILES = (
     "bootstrap/lib/registered_prerequisites.py",
     "bootstrap/lib/factory_enrollment.py",
@@ -274,14 +276,17 @@ class Cloud(enrollment.Cloud):
         require(path.startswith(("groups", "users/", "servicePrincipals")) and "://" not in path and ".." not in path,
                 "untrusted-graph-endpoint")
         token = self._graph_token()
-        status, raw = self._graph_send(method, path, body, token)
+        status, raw, challenge = self._graph_send(method, path, body, token)
         if status == 401 and method == "GET" and 401 not in allowed:
             # aif-150 (2026-11-06): Graph rejected a cached CLI token the CLI had already renewed. A read is sent once
             # more, and only with a different, refreshed token; a write is never retried (b6145b82).
             self.tokens.pop((GRAPH, enrollment.guid(self.request_config["target"]["tenant_id"])), None)
             refreshed = self._graph_token()
             if refreshed != token:
-                status, raw = self._graph_send(method, path, body, refreshed)
+                status, raw, challenge = self._graph_send(method, path, body, refreshed)
+        # A continuous access evaluation challenge revokes the CLI's cached token, which the CLI keeps handing out:
+        # only an interactive az login helps, so the code says so (aif-150, 2026-11-06).
+        require(status in allowed or not challenge, "graph-cae-sign-in-required")
         require(status in allowed, f"graph-request-failed-{status}")
         require(len(raw) <= enrollment.MAX_BYTES, "graph-response-too-large")
         return enrollment.parse_json(raw) if raw else None
@@ -303,7 +308,11 @@ class Cloud(enrollment.Cloud):
         except (URLError, OSError, TimeoutError):
             raise PrerequisiteError("graph-write-or-read-uncertain") from None
         with response:
-            return response.status, response.read(enrollment.MAX_BYTES + 1)
+            status, raw = response.status, response.read(enrollment.MAX_BYTES + 1)
+            headers = getattr(response, "headers", None) or {}
+            challenge = status == 401 and ("insufficient_claims" in str(headers.get("WWW-Authenticate") or "")
+                                           or any(text in raw for text in CAE_CHALLENGE_TEXT))
+        return status, raw, challenge
 
     def blob(self, method, blob, *, data=None, headers=None, allowed=(200,), query=""):
         coordinates = self.request_config["coordinates"]

@@ -52,7 +52,8 @@ def no_live(monkeypatch):
 @pytest.fixture
 def graph_transport(monkeypatch):
     state = SimpleNamespace(now=2000000000, expiry=2000003600, claims={}, omit=set(),
-                            commands=[], calls=[], issued=[], status=200, fail_cli=False, cli_delay=0)
+                            commands=[], calls=[], issued=[], status=200, fail_cli=False, cli_delay=0,
+                            error_body=b"{}", error_headers={})
     monkeypatch.setattr(core.time, "time", lambda: state.now)
 
     def run(argv, **kwargs):
@@ -75,7 +76,7 @@ def graph_transport(monkeypatch):
         state.calls.append(request)
         assert kwargs["timeout"] == core.GRAPH_REQUEST_TIMEOUT_SECONDS == 180
         if state.status == 401:
-            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+            raise HTTPError(request.full_url, 401, "Unauthorized", state.error_headers, io.BytesIO(state.error_body))
         response = io.BytesIO(b"{}")
         response.status = state.status
         response.headers = {}
@@ -3167,3 +3168,39 @@ def test_concurrent_writers_share_one_cli_token_refresh(graph_transport):
     for thread in threads:
         thread.join()
     assert max(most) == 1 and len(state.commands) == 1
+
+
+# aif-150 (2026-11-06): Graph answered 401 InvalidAuthenticationToken "Continuous access evaluation resulted in
+# challenge with result: InteractionRequired" for the CLI's cached token, which the CLI keeps handing out. Only an
+# interactive az login helps, so the stage names that instead of a bare graph-request-failed-401.
+CAE_BODY = json.dumps({"error": {"code": "InvalidAuthenticationToken", "message": (
+    "Continuous access evaluation resulted in challenge with result: InteractionRequired and code: "
+    "TokenIssuedBeforeRevocationTimestamp")}}).encode()
+CAE_HEADERS = {"WWW-Authenticate": 'Bearer realm="", error="insufficient_claims", claims="e30="'}
+
+
+@pytest.mark.parametrize("body, headers", [(CAE_BODY, {}), (b"{}", CAE_HEADERS), (CAE_BODY, CAE_HEADERS)])
+def test_a_cae_challenge_names_the_interactive_sign_in(graph_transport, body, headers):
+    state = graph_transport
+    state.status, state.error_body, state.error_headers = 401, body, headers
+    with pytest.raises(core.PrerequisiteError, match="^graph-cae-sign-in-required$"):
+        state.cloud.graph("GET", "groups")
+    # The same revoked token is never sent twice.
+    assert len(state.commands) == 2 and len(state.calls) == 1
+
+
+def test_a_cae_challenge_on_a_write_names_the_sign_in_without_retry(graph_transport):
+    state = graph_transport
+    state.cloud.read_only = False
+    state.status, state.error_body = 401, CAE_BODY
+    with pytest.raises(core.PrerequisiteError, match="^graph-cae-sign-in-required$"):
+        state.cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
+def test_a_plain_401_keeps_its_code(graph_transport):
+    state = graph_transport
+    state.status, state.error_body = 401, json.dumps({"error": {"code": "InvalidAuthenticationToken",
+                                                                "message": "Access token has expired."}}).encode()
+    with pytest.raises(core.PrerequisiteError, match="^graph-request-failed-401$"):
+        state.cloud.graph("GET", "groups")
