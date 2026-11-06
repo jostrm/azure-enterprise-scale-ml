@@ -452,3 +452,7 @@ interactive `az login` helps.
 Backported from `main` (`e2e72b48`). `prepareSeedingKeyVaultPrivateDns.ps1` waits for the vault's private DNS through
 its cross-platform helper on both DNS paths; the zone-group path called the Windows-only `Clear-DnsClientCache` and
 `Resolve-DnsName`, so infra-project stopped on a Linux self-hosted runner after creating the zone group (aif-151).
+
+Also backported from `main` (`4f7c1b1d`): the Azure DevOps services job's inline seeding Key Vault DNS
+wait (`job-2-genai-services.yaml`, step `02b_az_prepare_seeding_keyvault_private_dns`) resolves through
+`System.Net.Dns` too, so it runs on Linux agents.

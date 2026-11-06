@@ -227,6 +227,32 @@ function az { throw 'Seeding wrapper must not call DNS APIs' }
                 self.assertIn("-DnsManagedByPolicy", source)
                 self.assertIn("centralDnsZoneByPolicyInHub", step["env"]["DNS_MANAGED_BY_POLICY"])
 
+    def test_services_seeding_inline_dns_wait_runs_on_linux_agents(self):
+        # aif-151 (2026-11-06): pwsh on a Linux agent has no DnsClient module (Clear-DnsClientCache, Resolve-DnsName).
+        step = task(ADO_DIR / "job-2-genai-services.yaml", "02b_az_prepare_seeding_keyvault_private_dns")
+        script = step["inputs"]["inlineScript"]
+        self.assertNotIn("Resolve-DnsName", script)
+        guarded = "if (Get-Command Clear-DnsClientCache -ErrorAction SilentlyContinue)"
+        self.assertEqual(script.count("Clear-DnsClientCache -ErrorAction SilentlyContinue"), script.count(guarded) * 2)
+        loop = script[script.index("for ($attempt = 1; $attempt -le 18;"):]
+        loop = loop[:loop.index("throw \"Key Vault '$vaultHostName' did not resolve")]
+        setup = """
+$ErrorActionPreference = 'Stop'
+function Resolve-DnsName { throw "The term 'Resolve-DnsName' is not recognized (Linux agent)" }
+function Start-Sleep {}
+$vaultHostName = 'localhost'
+"""
+        for expected, success in (("127.0.0.1", True), ("192.0.2.4", False)):
+            with self.subTest(expected=expected):
+                code, stdout, stderr = self.run_shell(
+                    "pwsh", setup + f"$privateEndpointIp = '{expected}'\n" + loop + "\nexit 3")
+                if success:
+                    self.assertEqual(0, code, stdout + stderr)
+                    self.assertIn("resolves to approved private endpoint IP", stdout)
+                else:
+                    self.assertEqual(3, code, stdout + stderr)
+                    self.assertIn("check 18/18", stdout)
+
     def test_services_seeding_policy_branch_does_not_enter_legacy_inline_repair(self):
         step = task(ADO_DIR / "job-2-genai-services.yaml", "02b_az_prepare_seeding_keyvault_private_dns")
         script = substitute(step["inputs"]["inlineScript"], {})
