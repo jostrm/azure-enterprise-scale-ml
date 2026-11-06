@@ -446,3 +446,9 @@ Backported from `main` (`906f25b8`). A Graph 401 that names a continuous access 
 (InteractionRequired, or insufficient_claims in WWW-Authenticate) stops the privileged prerequisites with
 `graph-cae-sign-in-required` instead of `graph-request-failed-401`: the Azure CLI keeps its revoked token, so only an
 interactive `az login` helps.
+
+## Post-v1.25 backport — 6 November 2026: the seeding Key Vault DNS check runs on Linux runners
+
+Backported from `main` (`e2e72b48`). `prepareSeedingKeyVaultPrivateDns.ps1` waits for the vault's private DNS through
+its cross-platform helper on both DNS paths; the zone-group path called the Windows-only `Clear-DnsClientCache` and
+`Resolve-DnsName`, so infra-project stopped on a Linux self-hosted runner after creating the zone group (aif-151).
