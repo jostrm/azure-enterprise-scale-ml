@@ -427,3 +427,9 @@ peerings, DNS, DDoS) still stop the stage. `infra-common.yml` carries the review
 Backported from `main` (`547048a9`). The bootstrap key `security_control_ignore_tag` (off by default) gives the
 common and project resource groups the prerequisites create the tag `SecurityControl=Ignore` at their first write,
 the exemption the MCAPS Modify policies check. For test factories only; production factories keep governance.
+
+## Post-v1.25 backport — 6 November 2026: JSON override reaches the workflow's own env names
+
+Backported from `main` (`aca8d18d`). `apply-json-config-overrides.py` also writes a configuration key to every GitHub
+Actions env name bound to the matching variable, whatever the case (`use_ad_groups` sets `useAdGroups`, bound to
+`vars.USE_AD_GROUPS`), so infra-common.yml's resource-group RBAC assigns the team group as a Group.
