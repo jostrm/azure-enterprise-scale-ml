@@ -439,3 +439,10 @@ Actions env name bound to the matching variable, whatever the case (`use_ad_grou
 Backported from `main` (`3aced095`). The privileged prerequisites' Graph client drops its cached token after a 401 on a
 read and sends the read once more, only when the CLI returns a different (renewed) token. A second 401, other failures
 and every write still stop the stage (aif-150: the preflight stopped on `graph-request-failed-401`).
+
+## Post-v1.25 backport — 6 November 2026: a Graph CAE challenge says "sign in again"
+
+Backported from `main` (`906f25b8`). A Graph 401 that names a continuous access evaluation challenge
+(InteractionRequired, or insufficient_claims in WWW-Authenticate) stops the privileged prerequisites with
+`graph-cae-sign-in-required` instead of `graph-request-failed-401`: the Azure CLI keeps its revoked token, so only an
+interactive `az login` helps.
