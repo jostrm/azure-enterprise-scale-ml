@@ -33,14 +33,14 @@ parameters:
     default: variables-yaml
     values: [variables-yaml, json]
   - name: mode
-    displayName: Plan is read-only; create skips existing assets; deploy refreshes them
+    displayName: Deploy creates or updates (upsert); create skips existing assets; plan is read-only
     type: string
-    default: plan
+    default: deploy
     values: [plan, create, deploy]
   - name: planOperation
-    displayName: Operation to preview in plan mode
+    displayName: Preview operation (ignored unless mode is plan)
     type: string
-    default: create
+    default: deploy
     values: [create, deploy]
   - name: runnerSelection
     type: string
@@ -51,22 +51,23 @@ parameters:
     type: string
     default: Default
   - name: serviceConnection
-    displayName: Existing connection override (empty uses existing per-environment variables.yaml)
+    displayName: Existing connection override (not-applicable uses per-environment variables.yaml)
     type: string
-    default: ''
+    default: 'not-applicable'
   - name: factory_id
-    displayName: Exact telemetry factory ID from the register (optional; no register publication needed)
+    displayName: Exact telemetry factory ID from the register (not-applicable leaves unset)
     type: string
-    default: ''
+    default: 'not-applicable'
   - name: scale_set_id
-    displayName: Exact telemetry scale set ID for the selected placement (optional)
+    displayName: Exact telemetry scale set ID for the selected placement (not-applicable leaves unset)
     type: string
-    default: ''
+    default: 'not-applicable'
 
 variables:
   - template: ../variables/variables.yaml
+  # ADO's Run UI requires nonempty inputs; normalize optional placeholders before use.
   - name: dashboardServiceConnection
-    ${{ if ne(parameters.serviceConnection, '') }}:
+    ${{ if and(ne(parameters.serviceConnection, ''), ne(parameters.serviceConnection, 'not-applicable')) }}:
       value: ${{ parameters.serviceConnection }}
     ${{ elseif eq(parameters.environment, 'dev') }}:
       value: ${{ variables.dev_service_connection }}
@@ -74,6 +75,16 @@ variables:
       value: ${{ variables.prod_service_connection }}
     ${{ else }}:
       value: ${{ variables.test_service_connection }}
+  - name: resolvedFactoryId
+    ${{ if eq(parameters.factory_id, 'not-applicable') }}:
+      value: ''
+    ${{ else }}:
+      value: ${{ parameters.factory_id }}
+  - name: resolvedScaleSetId
+    ${{ if eq(parameters.scale_set_id, 'not-applicable') }}:
+      value: ''
+    ${{ else }}:
+      value: ${{ parameters.scale_set_id }}
 
 jobs:
   - job: Configure
@@ -109,8 +120,8 @@ jobs:
           PROJECT_NUMBER: ${{ parameters.projectNumber }}
           RUNNER_SELECTION: ${{ parameters.runnerSelection }}
           SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
-          FACTORY_ID: ${{ parameters.factory_id }}
-          SCALE_SET_ID: ${{ parameters.scale_set_id }}
+          FACTORY_ID: $(resolvedFactoryId)
+          SCALE_SET_ID: $(resolvedScaleSetId)
 
   - ${{ each runner in split('hosted,self_hosted', ',') }}:
     - job: Dashboards_${{ runner }}
@@ -156,5 +167,5 @@ jobs:
             PROJECT_NUMBER: ${{ parameters.projectNumber }}
             DASHBOARD_MODE: ${{ parameters.mode }}
             SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
-            FACTORY_ID: ${{ parameters.factory_id }}
-            SCALE_SET_ID: ${{ parameters.scale_set_id }}
+            FACTORY_ID: $(resolvedFactoryId)
+            SCALE_SET_ID: $(resolvedScaleSetId)

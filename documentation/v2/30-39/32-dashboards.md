@@ -19,8 +19,9 @@ standalone dashboards.
    existing relative `..\variables\variables.yaml` location.
 3. Create an ADO pipeline pointing at that copied file and authorize its existing
    environment service connection and selected agent pool.
-4. Run `plan` for the intended environment/project, then run `create` or `deploy`
-   deliberately.
+4. Select the intended environment/project and run with the default `mode: deploy`
+   to create missing dashboards/workbooks or update existing ones. No plan is
+   required. Select `mode: plan` only when you want a read-only preview.
 
 No changes or new mandatory variables are required in the customer's
 `variables.yaml`. The default `configurationSource: variables-yaml` reads an
@@ -44,12 +45,25 @@ selector, never `dev_sub_id` as a fallback for Stage/Prod.
 | `projectNumber` | `001` | Assertion against `project_number_000`, not a renaming operation |
 | `configurationSource` | `variables-yaml` | Existing pipeline variables, or `json` for a persistent file |
 | `configFile` | `aifactory/variables.json` | Consumer-relative path; used only with JSON source |
-| `mode` | `plan` | Read-only preview, create missing assets, or explicitly refresh assets |
-| `planOperation` | `create` | Preview `create` or `deploy` without Azure writes |
+| `mode` | `deploy` | Upsert: create missing assets and update existing ones; `create` only adds missing assets, `plan` is read-only |
+| `planOperation` | `deploy` | Only used with `mode: plan`; ignored for `create` and `deploy` |
 | `runnerSelection` | `from-config` | Configured agent, explicit Microsoft-hosted, or explicit self-hosted |
 | `selfHostedPool` | `Default` | Bootstrap pool for explicit self-hosted selection |
-| `serviceConnection` | Empty | Optional existing connection override; must match selected configuration |
-| `factory_id`, `scale_set_id` | Empty | Optional exact telemetry identities; never invented from resource names |
+| `serviceConnection` | `not-applicable` | Use the existing per-environment connection from `variables.yaml`; an explicit override must match selected configuration |
+| `factory_id`, `scale_set_id` | `not-applicable` | Omit optional telemetry identity overrides; never invented from resource names |
+
+Azure DevOps requires nonempty manual string inputs. The pipeline resolves
+`not-applicable` before both configuration and deployment: the service connection
+uses the selected environment's existing setting and telemetry identity overrides
+are omitted. Existing callers that pass empty strings remain supported. Dashboards
+and native usage/cost views still deploy without telemetry IDs; this does not
+register or publish a factory. JSON mode retains its configured/register ID lookup.
+
+The default combination is `mode: deploy`, `planOperation: deploy`. You do not need
+to change either selector for an upsert. `planOperation` remains available for
+compatibility and optional previews, but has no effect on a deployment. The shared
+command-line runner still defaults to read-only `plan` when `--mode` is omitted;
+the pipeline's configuration-only job also remains read-only.
 
 `create` checks each exact dashboard/workbook resource independently and skips
 existing ones. A missing project dashboard can link an existing workbook without

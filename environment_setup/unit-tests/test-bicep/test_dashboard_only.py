@@ -775,17 +775,19 @@ def test_usage_boundary_preserves_safe_failure_class_and_retry_budget(stderr, co
     assert safe.get("retry-after") == delay
 
 
-def test_workflow_is_manual_plan_default_and_uses_shared_runner():
+def test_workflow_is_manual_upsert_default_and_uses_shared_runner():
     ado = yaml.load(ADO.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
     assert ado["trigger"] == ado["pr"] == "none"
     ado_params = {p["name"]: p for p in ado["parameters"]}
-    assert ado_params["mode"]["default"] == "plan"
+    assert ado_params["mode"]["default"] == "deploy"
+    assert ado_params["planOperation"]["default"] == "deploy"
+    assert "ignored unless mode is plan" in ado_params["planOperation"]["displayName"]
     assert ado_params["configurationSource"]["default"] == "variables-yaml"
     assert ado_params["mode"]["values"] == ["plan", "create", "deploy"]
     assert ado_params["runnerSelection"]["default"] == "from-config"
     assert ado_params["selfHostedPool"]["default"] == "Default"
-    for name in ("factory_id", "scale_set_id"):
-        assert ado_params[name]["default"] == ""
+    for name in ("serviceConnection", "factory_id", "scale_set_id"):
+        assert ado_params[name]["default"] == "not-applicable"
     source = ADO.read_text()
     assert source.count("deploy-dashboards-only.py") == 2
     assert "--mode $env:DASHBOARD_MODE" in source
@@ -795,6 +797,55 @@ def test_workflow_is_manual_plan_default_and_uses_shared_runner():
     assert source.count("'--factory-id', $env:FACTORY_ID") == 2
     assert source.count("'--scale-set-id', $env:SCALE_SET_ID") == 2
     assert "variables.test_service_connection" in ADO.read_text()
+
+
+def test_workflow_optional_inputs_resolve_before_both_jobs():
+    ado = yaml.load(ADO.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    variables = {item["name"]: item for item in ado["variables"] if "name" in item}
+    connection = variables["dashboardServiceConnection"]
+    assert connection[
+        "${{ if and(ne(parameters.serviceConnection, ''), ne(parameters.serviceConnection, 'not-applicable')) }}"
+    ]["value"] == "${{ parameters.serviceConnection }}"
+    for environment, variable in (("dev", "dev"), ("prod", "prod")):
+        assert connection[f"${{{{ elseif eq(parameters.environment, '{environment}') }}}}"]["value"] == (
+            f"${{{{ variables.{variable}_service_connection }}}}"
+        )
+    assert connection["${{ else }}"]["value"] == "${{ variables.test_service_connection }}"
+    configure = ado["jobs"][0]["steps"][-1]
+    deploy = next(iter(ado["jobs"][1].values()))[0]["steps"][-1]
+    for parameter, variable, env_name in (
+        ("factory_id", "resolvedFactoryId", "FACTORY_ID"),
+        ("scale_set_id", "resolvedScaleSetId", "SCALE_SET_ID"),
+    ):
+        resolved = variables[variable]
+        assert resolved[f"${{{{ if eq(parameters.{parameter}, 'not-applicable') }}}}"]["value"] == ""
+        assert resolved["${{ else }}"]["value"] == f"${{{{ parameters.{parameter} }}}}"
+        for step in (configure, deploy):
+            assert step["env"][env_name] == f"$({variable})"
+    for step in (configure, deploy):
+        assert step["env"]["PROJECT_NUMBER"] == "${{ parameters.projectNumber }}"
+        assert step["env"]["SERVICE_CONNECTION"] == "${{ variables.dashboardServiceConnection }}"
+
+
+@pytest.mark.parametrize("existing", [
+    set(), {"projectDashboard"}, {"factoryDashboard", "projectDashboard", "myProjectWorkbook"},
+])
+@pytest.mark.parametrize("plan_operation", ["create", "deploy"])
+def test_workflow_default_upserts_regardless_of_plan_operation(compiled, workspace, existing, plan_operation):
+    ado = yaml.load(ADO.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    defaults = {parameter["name"]: parameter["default"] for parameter in ado["parameters"]}
+    args, _ = arguments(workspace, mode=defaults["mode"])
+    args.plan_operation = plan_operation
+    azure = fake_azure(payload(), "dev", compiled)
+    targets = runner.dashboard_targets(azure.cfg)
+    azure.existing_artifacts = {targets[key] for key in existing}
+    summary = runner.run(args, azure)
+    assert summary["operation"] == "deploy"
+    assert summary["actions"] == {key: "refresh" for key in targets}
+    assert summary["azureWritesPerformed"]
+    assert azure.factory is not None
+    assert azure.parameters["parameters"]["deployProjectDashboard"]["value"] is True
+    assert azure.parameters["parameters"]["deployMyProjectWorkbook"]["value"] is True
 
 
 def test_explicit_ado_hosted_override_bypasses_offline_self_hosted_pool(workspace, capsys):
