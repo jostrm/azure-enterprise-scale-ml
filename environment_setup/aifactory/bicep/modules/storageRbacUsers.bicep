@@ -4,10 +4,13 @@ param storageAccountName2 string = ''
 param userObjectIds array
 param servicePrincipleAndMIArray array
 param useAdGroups bool = false
+@description('Additional SP/MI principals that need only Blob Data Contributor on the secondary account; primary-account roles remain owned by their existing deployment.')
+param additionalSecondaryBlobPrincipalIds array = []
 
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var secondaryBlobPrincipals = union(servicePrincipleAndMIArray, additionalSecondaryBlobPrincipalIds)
 
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
@@ -78,13 +81,13 @@ resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssign
 }]
 
 @description('Storage 2: Blob data contributor for SP/MI (optional)')
-resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(storageAccountName2)) {
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, servicePrincipleAndMIArray[i])
+resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(secondaryBlobPrincipals)): if(!empty(storageAccountName2)) {
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, secondaryBlobPrincipals[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: servicePrincipleAndMIArray[i]
+    principalId: secondaryBlobPrincipals[i]
     principalType: 'ServicePrincipal'
-    description: '013 - storageBlobDataContributorRoleId to SP/MI ${servicePrincipleAndMIArray[i]} for ${existingStorageAccount2.name}'
+    description: '013 - storageBlobDataContributorRoleId to SP/MI ${secondaryBlobPrincipals[i]} for ${existingStorageAccount2.name}'
   }
   scope: existingStorageAccount2
 }]

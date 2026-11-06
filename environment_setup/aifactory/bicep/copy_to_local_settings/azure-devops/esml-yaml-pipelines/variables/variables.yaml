@@ -234,6 +234,7 @@ variables:
   cmkDisableForFoundry: "true" # <optional>Disable CMK for AI Foundry<default>false<keep-as-is> <otherwise> true, disables CMK encryption for AI Foundry account even when cmk:'true'. Reason: Foundry does not respect AI Search CMK contract at runtime.
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # <optional>Update Key Vault RBAC<default>false<keep-as-is> <otherwise> true, re-run to update RBAC properties.
+  keyVaultSecretsOfficerForUsers: "false" # <optional>Grant project users/groups secret management<default>false<otherwise> true grants Secrets Officer; existing vaults also require updateKeyvaultRbac:true.
   
   # === AI foundry 2025 ===
   enableAIFoundry: "true" # <mandatory>Enable AI Foundry<default>true<recommended> AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA.

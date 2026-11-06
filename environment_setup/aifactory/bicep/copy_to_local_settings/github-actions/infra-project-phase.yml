@@ -308,6 +308,7 @@ jobs:
       enablePublicAccessWithPerimeter: ${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER || 'false' }}
       disableLocalAuth: ${{ vars.DISABLE_LOCAL_AUTH || 'true' }}
       updateKeyvaultRbac: ${{ vars.UPDATE_KEYVAULT_RBAC || 'false' }}
+      keyVaultSecretsOfficerForUsers: ${{ vars.KEY_VAULT_SECRETS_OFFICER_FOR_USERS || 'false' }}
       updateRbac: ${{ vars.UPDATE_RBAC || 'false' }}
       disableContributorAccessForUsers: ${{ vars.DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS || vars.DISABLE_CONTRIBUTOR_ACCESS_FORUSERS || 'false' }}
       disableRBACAdminOnRGForUsers: ${{ vars.DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS || vars.DISABLE_RBAC_ADMIN_ON_RG_FORUSERS || 'false' }}
@@ -2163,6 +2164,7 @@ jobs:
               --parameters projectNumber="${{ env.project_number_000 }}" \
               --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
               --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+              --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters location="${{ env.admin_location }}" \
               --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
               --parameters useCommonACR="${{ env.useCommonACR_override }}" \
@@ -2217,6 +2219,7 @@ jobs:
               --parameters enableApplicationInsights="${{ env.enableApplicationInsights }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
+              --parameters keyVaultSecretsOfficerForUsers="${{ env.keyVaultSecretsOfficerForUsers }}" \
               --parameters enableLogicApps="${{ env.enableLogicApps }}"
 
       - name: 63a-search-mode

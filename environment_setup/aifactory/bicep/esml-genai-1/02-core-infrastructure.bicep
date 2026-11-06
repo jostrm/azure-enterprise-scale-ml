@@ -156,6 +156,8 @@ param technicalContactId string = '' // TODO-Remove, Replaced by personas
 
 // Principal type configuration
 param useAdGroups bool = true
+@description('Opt in to Key Vault Secrets Officer for project users/groups; false preserves read-only Secrets User access.')
+param keyVaultSecretsOfficerForUsers bool = false
 
 // Seeding Key Vault parameters
 param inputKeyvault string
@@ -783,7 +785,7 @@ module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultE
     managedIdentityIds: mi_principals_only // Both project and ACA managed identities - CRITICAL for Container Apps
     useAdGroups: useAdGroups
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
-    keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
+    keyVaultSecretsUserRoleId: keyVaultSecretsOfficerForUsers ? keyVaultSecretsOfficerRoleId : keyVaultSecretsUserRoleId
     keyVaultContributorRoleId: keyVaultContributorRoleId
   }
   dependsOn: [

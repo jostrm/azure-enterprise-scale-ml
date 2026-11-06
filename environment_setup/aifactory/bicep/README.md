@@ -36,6 +36,37 @@ Consumers need both the fixed submodule revision and the refreshed
 Copying only the YAML or rerunning an old pipeline commit does not install the
 script/helper fix.
 
+### Project storage and Key Vault RBAC reconciliation
+
+The project infrastructure phase grants the project user-assigned managed identity
+Storage Blob Data Contributor on the secondary (`2001`) storage account even when
+Logic Apps owns its primary-account assignments. This repair leaves the existing
+primary assignments and the legacy `updateRbac` / `skipExistingRoleAssignments`
+suppression gates unchanged. Use task `100-rbac-security` with `updateRbac=false`.
+
+For an existing project vault, task `62-core-infrastructure` reconciles user/group
+roles when `updateKeyvaultRbac=true`, without recreating that vault. The default
+role remains Key Vault Secrets User (read-only). Explicitly set
+`keyVaultSecretsOfficerForUsers=true` to select Key Vault Secrets Officer instead.
+Both ADO and GitHub forward this opt-in and the selected user/group principal type.
+Existing Secrets User assignments are not deleted by the incremental deployment.
+
+The affected users/groups come from `technical_admins_ad_object_id`;
+`use_ad_groups=true` identifies them as groups. Verify these object IDs rather than
+assuming that changing an update flag selects a different group.
+`disableRBACAdminOnRGForUsers=false` enables the existing constrained RG-level RBAC
+Administrator assignment. Its condition still prohibits granting Owner, User Access
+Administrator, or RBAC Administrator; it is not unrestricted role administration.
+
+The deployment service connection must already be authorized to create every role,
+including that constrained RBAC Administrator assignment. These settings cannot
+bypass Azure Policy, deny assignments, or the deployment principal's ABAC conditions.
+Run the project pipeline for the intended environment, not the common pipeline.
+The stock project pipeline is not RBAC-only: review its other enabled tasks first.
+Consumers need the updated submodule pin and the matching services-job YAML, plus
+their explicit configuration values. No runtime permission change is proven by a
+successful local build.
+
 > [!TIP]
 >  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
 >

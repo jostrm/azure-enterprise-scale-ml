@@ -632,6 +632,10 @@ module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if (!updateRbac &&
     storageAccountName2: storageAccount2001Name
     userObjectIds: userIdsUnique
     servicePrincipleAndMIArray: spAndMiUnique
+    // Logic Apps excludes the project MI from shared grants, but only grants its primary storage.
+    additionalSecondaryBlobPrincipalIds: [
+      getProjectMIPrincipalId.outputs.principalId
+    ]
     useAdGroups: useAdGroups
   }
   dependsOn: [
