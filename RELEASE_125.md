@@ -433,3 +433,9 @@ the exemption the MCAPS Modify policies check. For test factories only; producti
 Backported from `main` (`aca8d18d`). `apply-json-config-overrides.py` also writes a configuration key to every GitHub
 Actions env name bound to the matching variable, whatever the case (`use_ad_groups` sets `useAdGroups`, bound to
 `vars.USE_AD_GROUPS`), so infra-common.yml's resource-group RBAC assigns the team group as a Group.
+
+## Post-v1.25 backport — 6 November 2026: a Graph read retries once after a 401
+
+Backported from `main` (`3aced095`). The privileged prerequisites' Graph client drops its cached token after a 401 on a
+read and sends the read once more, only when the CLI returns a different (renewed) token. A second 401, other failures
+and every write still stop the stage (aif-150: the preflight stopped on `graph-request-failed-401`).
