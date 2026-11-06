@@ -3808,6 +3808,10 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            # A transient ARM RequestConflict ("Another operation is in progress on the resource") is retried here: 69a
+            # only warns when the capability host is still provisioning, and GHA has no step retry (ADO uses
+            # retryCountOnTaskFailure). aif-151 (2026-11-06) lost an infra-project attempt to it.
+            deploy_69b() {
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-69-aif-b" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -3888,6 +3892,29 @@ jobs:
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
               --parameters disableLocalAuth="${{ env.disableLocalAuth }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}"
+            }
+            err_69b=$(mktemp)
+            for attempt in 1 2 3 4 5 6; do
+              if deploy_69b 2>"$err_69b"; then cat "$err_69b" >&2; exit 0; else rc=$?; fi
+              cat "$err_69b" >&2
+              if ! grep -qE 'RequestConflict|Another operation is in progress' "$err_69b"; then exit "$rc"; fi
+              if [ "$attempt" -eq 6 ]; then
+                echo "::error::69b: the Foundry account stayed busy (RequestConflict) through 6 attempts."
+                exit "$rc"
+              fi
+              busy=$(grep -oE "/subscriptions/[^'\" ]+/providers/Microsoft\.CognitiveServices/accounts/[A-Za-z0-9-]+" "$err_69b" | head -1 || true)
+              echo "::warning::69b attempt $attempt/6: another operation is in progress on ${busy:-the Foundry account}; waiting for it to finish before redeploying."
+              if [ -n "$busy" ]; then
+                # Bounded wait (10 min, 2 s polls) for the account's own operation to finish.
+                for poll in $(seq 1 300); do
+                  state=$(az resource show --ids "$busy" --query properties.provisioningState -o tsv 2>/dev/null || true)
+                  case "$state" in Succeeded|Failed|Canceled) echo "69b: $busy is $state."; break ;; esac
+                  sleep 2
+                done
+              fi
+              # Failure backoff: a child operation (capability host) can still hold the lock after the account settles.
+              sleep $((attempt * 10))
+            done
 
       - name: 69c_cosmosdb_data_contributor_for_foundry_project
         if: inputs.phase == 'foundry' && (success() && env.enableAIFoundry == 'true' && env.enableCosmosDB == 'true' && env.deleteAllServicesForProject != 'true')
