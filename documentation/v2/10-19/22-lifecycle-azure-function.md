@@ -4,9 +4,10 @@ A private Azure Function that runs the AI Factory lifecycle as an API: initializ
 update a project, and delete a project, a scale set or a whole factory. Each change is a review followed by a separate
 confirmation, and the Function follows the resulting GitHub workflow runs until they succeed or fail.
 
-With `AIF_BACKEND=sdk`, each approval invokes one `azurefactory.esaf` method for the whole scenario. Prepare is a
-local scope approval, not a live Azure dry-run; the SDK owns the API reviews, confirmations and deletion grants.
-`AIF_BACKEND=rest` retains the legacy per-step approvals.
+With `AIF_BACKEND=sdk`, each approval invokes one `azurefactory.esaf` method for the whole scenario. That method is
+one call to the Factory API's `/api/v1/esaf/*` route, and the API's ESAF job owns the reviews, confirmations,
+deletion grants and retries. Prepare is a local scope approval, not a live Azure dry-run. `AIF_BACKEND=rest` retains
+the legacy per-step approvals.
 
 Template: [usecase_code/10-azure-function/12_func_aifactory_lifecycle](../../../usecase_code/10-azure-function/12_func_aifactory_lifecycle/README.md).
 Design and constraints: [Lifecycle Function](../../architecture/contracts/Lifecycle-Function.md).
@@ -51,9 +52,23 @@ Invoke-RestMethod -Uri "$base/v1/operations/$($op.operationId)" -Headers $header
 Deletes also need `confirmationPhrase` (shown in the preview, for example `DELETE aif-121-sdc-dev-002`). A review
 expires after `AIF_REVIEW_TTL_SECONDS` (410 after that). Errors are `application/problem+json` with a stable `code`.
 
-SDK mode calls `esaf.add_scale_set` once to register, enroll and deploy common resources; add project001 explicitly
-with Scenario 3 (`esaf.upsert_project`). New bootstrap uses `esaf.init_factory(creation_request=...)`, with continuation
-owned by the API rather than a Function background thread. Jobs are persisted by ID and kind for later status reads.
+In SDK mode, each confirmation is one `esaf` call. The Function resolves the readable ID to the exact factory, scale
+set, project and environment, and passes the body's options as the method's parameters:
+
+| Function route | `esaf` call | Body options and the parameters they become |
+|---|---|---|
+| `init-factory` | `esaf.init_factory(creation_request=...)` | `bootstrapConfig` becomes the full-bootstrap `creation_request` (`mode: "full-bootstrap"`, the repository root as `folder`, `orchestrator: "gha"`, `region_short_name`). `wholeWorkflow` cannot be `false`. |
+| `add-scaleset` | `esaf.add_scale_set(suffix, environment=..., cidr=...)` | `scaleSet.vnetCidr` (required) becomes `cidr`, the VNet range; the pipeline computes the subnets. `scaleSet.maxProjects` becomes `max_projects` (default 7). `scaleSet.subscriptionId`, `tenantId` and `orchestrator` are optional; they default to the environment's existing scale set. |
+| `add-or-update-project` | `esaf.upsert_project(number, environment=..., scale_set=...)` | `settings` becomes `settings`, the project settings to replace. A new project gets the display name `Project <number>`. |
+| `delete-project` | `esaf.delete_project(number, environment=..., scale_set=...)` | `includeProjectSubnets` and `includeKeyvaultAndResourceGroup` (both default `true` in the Function) become `include_project_subnets` and `include_keyvault_and_resource_group`. |
+| `delete-scaleset` | `esaf.delete_scale_set(suffix, environment=...)` | None. |
+| `delete-factory` | `esaf.delete_factory()` | None. |
+
+The environment always comes from the readable ID, so a delete never reaches another environment. Scenario 2 deploys
+only the scale set's common resources: add project001 explicitly with Scenario 3. The returned job (kind `esaf`) is
+persisted by ID and followed through `GET /api/v1/esaf/jobs/{id}`; its states `accepted`, `preparing`, `confirming`
+and `retrying` are an in-progress run. The same six calls, run directly from Python, are in the
+[ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md).
 
 In REST mode, adding a scale set runs `configure`, `add-project001`, `enroll-scaleset`, `deploy-common` and `deploy-project001`. In
 a single-writer factory, `enroll-scaleset` extends the deployment binding and live enrollment to the new scale set

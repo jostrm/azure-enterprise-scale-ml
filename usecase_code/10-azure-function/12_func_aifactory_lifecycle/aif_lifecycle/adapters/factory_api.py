@@ -23,6 +23,7 @@ from .api_errors import UpstreamTooOld
 RUNTIME_STEPS = {"deploy-common", "deploy-project001", "deploy-project", "delete-project", "delete-scaleset"}
 WHOLE_WORKFLOW_SECONDS = 21600  # the full bootstrap's one approval; the API allows 60-86400 s
 _JOB_STATES = {"queued": ("queued", None), "running": ("in_progress", None), "succeeded": ("completed", "success"),
+               "pending": ("queued", None),
                "failed": ("completed", "failure"), "interrupted": ("completed", "failure"),
                # creation workflow states (CreationWorkflowStatus)
                "blocked": ("completed", "failure"), "uncertain": ("completed", "failure"),
@@ -34,6 +35,8 @@ _JOB_STATES = {"queued": ("queued", None), "running": ("in_progress", None), "su
 
 def job_observation(status: dict[str, Any]) -> dict[str, Any] | None:
     """A Factory API job (or creation workflow) status as a run observation; its latest pipeline run gives the link.
+
+    An ESAF job's outer status is authoritative: a failed child may still be retried by L2.
 
     A whole-workflow creation waits in `awaiting-review` between stages while the API continues by itself; with
     `requires_review` it needs a new human review that this Function does not drive, so the step stops there

@@ -1,10 +1,14 @@
 # 19. Add and update an AI factory
 
-Choose **one tool tab for this whole tutorial**. Each tab connects independently,
-selects real targets, prepares changes and stops for review before confirmation.
+Choose **one tool tab for this whole tutorial**. Each tab starts with the
+simplest way: **Scenarios 1-3 in one call each** (ESAF: `init_factory`,
+`add_scale_set`, `upsert_project`), where the API prepares, checks and confirms
+every review for you. The step-by-step operations follow, for when you review
+each change yourself before it is applied: they select real targets, prepare
+changes and stop for review before confirmation.
 Start with [18 — connection and compatibility checks](18-cli-and-api-and-usage.md);
 use [20 — removal and recovery](20-cli-and-api-and-usage.md) for deletion or an
-uncertain result. [17](17-cli-and-api-and-usage.md) remains historical context.
+uncertain result. [17](17-cli-and-api-and-usage.md) maps the six scenarios across the tools.
 On GitHub, expand the matching tool section. The documentation website uses
 one linked tab selector for the same content.
 
@@ -57,6 +61,51 @@ and `PROD/001` are different targets; `001` is not a UUID. API environments are
 
 <details markdown="1" data-factory-tool="CLI (PowerShell)">
 <summary>CLI (PowerShell)</summary>
+
+## Scenarios 1-3 in one command each (ESAF)
+
+Each scenario is **one `azurefactory esaf` command**. The Config Wizard API runs it as
+one job: it prepares, checks and confirms every review, waits for a busy
+configuration lock and retries a failed run. **Running a command is the approval**:
+it changes Azure. Start the API first (`.\start-api.ps1` in the API checkout;
+see the [ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md)).
+
+Connect **once** in this window: the API address and key, and `ESAF_FOLDER`, the
+absolute `azurefactory` folder on the API host. Then install the CLI from your
+approved accelerator checkout:
+
+```powershell
+$env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
+$env:AIFACTORY_API_KEY = (Get-Content -Raw (Join-Path $env:USERPROFILE '.aifactory\api.key')).Trim()
+$env:ESAF_FOLDER = (Resolve-Path (Read-Host 'Absolute azurefactory folder on the API host')).Path
+$AcceleratorRoot = Read-Host 'Absolute path to your approved accelerator checkout'
+python -m pip install -e (Join-Path $AcceleratorRoot 'environment_setup\azurefactory-cli')
+```
+
+Then run the scenarios. `--wait` follows each job to its end, reading it every second:
+
+```powershell
+azurefactory esaf init-factory --creation-request-json .\creation-request.json --wait
+azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16 --wait
+azurefactory esaf upsert-project 002 dev --scale-set 001 --wait
+azurefactory esaf upsert-project 002 dev --scale-set 001 --settings-json .\project-settings.json --wait
+```
+
+| Command | Arguments and options |
+|---|---|
+| `init-factory` | Without options it submits the folder's **saved factory draft** (for example saved in the Config Wizard). `--creation-request-json FILE` saves a new factory from a full-bootstrap creation body (`{"contract_version": 1, "mode": "full-bootstrap", "action": "create-factory", "folder", "orchestrator", "config": {...}, "factory_key", "region_short_name"}`) and starts it in the same call. |
+| `add-scale-set SUFFIX ENVIRONMENT` | `SUFFIX` is three digits (`002`); `ENVIRONMENT` is `dev`, `stage` or `prod`. `--cidr` is the new scale set's **VNet range**; the pipeline computes the subnets (with BYOSubnet they already exist). `--max-projects` defaults to 7. Tenant, subscription and orchestrator come from the environment's existing scale set. An existing scale set is resumed, not registered again. |
+| `upsert-project NUMBER ENVIRONMENT` | Adds the project if it is new, otherwise updates it, then deploys it. `--scale-set` is needed only when the environment has more than one scale set. `--settings-json FILE` holds the settings to replace, for example `{"tag_costcenter": "lab"}`. |
+| All | `--folder` overrides `ESAF_FOLDER`; `--factory` selects a factory when the folder holds several; `--retries` (0-5, default 2) and `--version-ref`; `--wait`. |
+
+Without `--wait` the command prints the job id; follow it later with
+`azurefactory esaf job <job id> --wait`. Exit code `0` means succeeded (or still
+running), `3` blocked by the server's review (its blockers are printed), `5` failed.
+
+**Step-by-step alternative.** Everything below in this tab prepares each change,
+stops for your review and confirms it separately. Use it when you must review a
+change before it is applied, or for operations the one-call methods do not cover
+(clone, placements, typed parameters).
 
 ## Connect and define the local helpers
 
@@ -564,6 +613,62 @@ See the [canonical CLI reference](../../../environment_setup/azurefactory-cli/re
 
 <details markdown="1" data-factory-tool="Python SDK">
 <summary>Python SDK</summary>
+
+## Scenarios 1-3 in one call each (ESAF)
+
+Each scenario is **one method** of `from azurefactory import esaf`. The Config Wizard
+API runs it as one job: it prepares, checks and confirms every review, waits for a
+busy configuration lock and retries a failed run. **Calling a method is the
+approval**: it changes Azure. Start the API first and install the SDK; see the
+[ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md).
+
+Save this as **`esaf_scenarios_1_3.py`** and run it. It connects **once**: the
+`azurefactory` folder on the API host, the API address and the key from the key
+file `start-api.ps1` writes. Every later call names only what it changes:
+
+```python
+import json
+from pathlib import Path
+
+from azurefactory import esaf
+
+folder = input("Absolute azurefactory folder on the API host: ").strip()
+key = (Path.home() / ".aifactory" / "api.key").read_text(encoding="utf-8").strip()
+esaf.connect(folder=folder, url="http://127.0.0.1:8765", api_key=key)
+
+
+def run(label, job):
+    print(label, "ESAF job", job.id)
+    state = job.wait()  # reads the job every second until it ends
+    print(label, state["status"], "-", state["message"])
+    if state["status"] != "succeeded":
+        raise SystemExit(f"{label} stopped: {state.get('blockers') or state.get('problem')}")
+
+
+creation = json.loads(Path(input("Creation request JSON file: ").strip()).read_text(encoding="utf-8-sig"))
+run("Scenario 1", esaf.init_factory(creation_request=creation))
+run("Scenario 2", esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16"))
+run("Scenario 3", esaf.upsert_project("002", "dev", scale_set="001"))
+run("Scenario 3 update", esaf.upsert_project("002", "dev", scale_set="001",
+                                             settings={"tag_costcenter": "lab"}))
+```
+
+| Method | Parameters |
+|---|---|
+| `esaf.init_factory()` | No arguments submits the folder's **saved factory draft** (for example saved in the Config Wizard). `creation_request=` saves a new factory from a full-bootstrap creation body (`contract_version`, `mode: "full-bootstrap"`, `action: "create-factory"`, `folder`, `orchestrator`, `config`, `factory_key`, `region_short_name`) and starts it in the same call. |
+| `esaf.add_scale_set(scale_set, environment, cidr=...)` | `scale_set` is the three-digit suffix (`"002"`); `environment` is `"dev"`, `"stage"` or `"prod"` and is required. `cidr` is the new scale set's **VNet range**; the pipeline computes the subnets (with BYOSubnet they already exist). `max_projects` defaults to 7; `subscription_id`, `tenant_id` and `orchestrator` default to the environment's existing scale set. An existing scale set is resumed. |
+| `esaf.upsert_project(project, environment)` | Adds the project if it is new, otherwise updates it, then deploys it. `scale_set=` is needed only when the environment has more than one scale set. `settings=` holds the settings to replace; omitted keys keep their value. `display_name=` names a new project. `esaf.apply_project` is an alias. |
+| All methods | `wait=True` follows the job; `retries=` (0-5, default 2); `version_ref=`; `session=` for an explicit `esaf.Session`. |
+
+Each method returns an `EsafJob` at once: `job.id`, `job.status()` (one read) and
+`job.wait(timeout=..., poll=1)`. A refusal raises before anything starts:
+`ConfigError` for an unknown or ambiguous target, `BlockedError` with the
+server's blockers when its review refuses, `AuthError` for the key.
+
+**Step-by-step alternative.** Everything below in this tab prepares each change,
+stops for your review and confirms it separately. Use it when you must review a
+change before it is applied, or for operations the one-call methods do not cover
+(clone, placements, typed parameters).
 
 ## Connect and save the reusable Python helpers
 
@@ -1211,6 +1316,66 @@ See the [published SDK/API examples](../../../environment_setup/install_config_w
 
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
+
+## Scenarios 1-3 in one request each (ESAF)
+
+Each scenario is **one POST** to `/api/v1/esaf/<scenario>`, answered with
+`202 Accepted` and a job id. The API runs it as one job: it prepares, checks and
+confirms every review, waits for a busy configuration lock and retries a failed
+run. **Sending the request is the approval**: it changes Azure, and the body must
+say `"approved": true`. Errors are `application/problem+json` with a `code`
+(`config`, `blocked`, `conflict`, `auth`, `failure`) and the server's `blockers`.
+
+Connect once in Bash / Git Bash, then define a POST and a wait helper:
+
+```bash
+API_URL='http://127.0.0.1:8765'
+API_KEY="$(tr -d '\r\n' < "$HOME/.aifactory/api.key")"
+read -r -p "Absolute azurefactory folder on the API host: " FOLDER
+
+esaf_post() {  # esaf_post ROUTE JSON_FIELDS -> prints the job id
+  jq -n --arg folder "$FOLDER" --argjson fields "$2" '{folder: $folder, approved: true} + $fields' |
+    curl --silent --show-error --fail-with-body --noproxy '*' -X POST "$API_URL/api/v1/esaf/$1" \
+      --header "X-API-Key: $API_KEY" --header 'Content-Type: application/json' --data @- | jq -r .job_id
+}
+
+esaf_wait() {  # esaf_wait JOB_ID -> reads the job every second until it ends
+  while :; do
+    job="$(curl --silent --show-error --fail-with-body --noproxy '*' --get "$API_URL/api/v1/esaf/jobs/$1" \
+      --header "X-API-Key: $API_KEY" --data-urlencode "folder=$FOLDER")"
+    case "$(jq -r .status <<<"$job")" in
+      accepted|preparing|confirming|running|retrying) sleep 1 ;;
+      *) jq '{status, message, blockers, child}' <<<"$job"; break ;;
+    esac
+  done
+}
+```
+
+Then send the scenarios:
+
+```bash
+esaf_wait "$(esaf_post init-factory "{\"creation_request\": $(cat creation-request.json)}")"
+esaf_wait "$(esaf_post add-scale-set '{"scale_set": "002", "environment": "dev", "cidr": "10.141.0.0/16"}')"
+esaf_wait "$(esaf_post upsert-project '{"project": "002", "environment": "dev", "scale_set": "001"}')"
+esaf_wait "$(esaf_post upsert-project '{"project": "002", "environment": "dev", "scale_set": "001", "settings": {"tag_costcenter": "lab"}}')"
+```
+
+| Route | Body fields (besides `folder` and `"approved": true`) |
+|---|---|
+| `POST /api/v1/esaf/init-factory` | None submits the folder's **saved factory draft**. `creation_request` saves a new factory from a full-bootstrap creation body and starts it in the same call. |
+| `POST /api/v1/esaf/add-scale-set` | `scale_set` (`"002"`) and `environment` (`dev`, `stage`, `prod`) are required. `cidr` is the new scale set's **VNet range**; the pipeline computes the subnets. Optional `max_projects` (default 7), `subscription_id`, `tenant_id`, `orchestrator` (default: the environment's existing scale set). |
+| `POST /api/v1/esaf/upsert-project` | `project` and `environment` are required. `scale_set` only when the environment has more than one scale set; `settings` to replace; `display_name` for a new project. |
+| All | `factory` (key or id) when the folder holds several factories; `retries` (0-5, default 2); `version_ref`. |
+
+`GET /api/v1/esaf/jobs/{job_id}?folder=...` returns `status` (`accepted`, `preparing`,
+`confirming`, `running`, `retrying`, then `succeeded`, `failed`, `blocked` or
+`interrupted`), `message`, `child` (the run it started), `attempts`, `events`,
+`blockers` and `problem`. The same request while its job runs returns that job.
+
+**Step-by-step alternative.** Everything below in this tab prepares each change,
+stops for your review and confirms it separately. Use it when you must review a
+change before it is applied, or for operations the one-call methods do not cover
+(clone, placements, typed parameters).
 
 ## Connect with Bash / Git Bash
 

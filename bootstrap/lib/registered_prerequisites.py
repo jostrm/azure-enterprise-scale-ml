@@ -89,6 +89,8 @@ GATEWAY_RESPONSE_EXTENSION_WARNING = (
     "live-verified; active capture or migration is blocked."
 )
 GRAPH = "https://graph.microsoft.com/"
+# How Graph names a continuous access evaluation challenge in a 401 body (the header carries insufficient_claims).
+CAE_CHALLENGE_TEXT = (b"Continuous access evaluation", b"InteractionRequired")
 SOURCE_FILES = (
     "bootstrap/lib/registered_prerequisites.py",
     "bootstrap/lib/factory_enrollment.py",
@@ -111,8 +113,11 @@ CONFIG_KEYS = {
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
     "first_party_apps", "resource_providers", "coordination_mode",
     "dns_policy_exemption_assignment_ids", "dns_policy_exemption_expires_on",
-    "enablePersonas", "persona_access_mode", "persona_access_manifest",
+    "enablePersonas", "persona_access_mode", "persona_access_manifest", "security_control_ignore_tag",
 }
+# Opt-in for test factories only (Joakim, 2026-11-05: "Yes, tag test RGs"): the exemption tag the MCAPS Modify
+# policies check on a resource or its group. Never on by default; production factories keep governance.
+SECURITY_CONTROL_TAG = {"SecurityControl": "Ignore"}
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
 canonical = enrollment.canonical
@@ -270,10 +275,29 @@ class Cloud(enrollment.Cloud):
                 "unreviewed-graph-write")
         require(path.startswith(("groups", "users/", "servicePrincipals")) and "://" not in path and ".." not in path,
                 "untrusted-graph-endpoint")
+        token = self._graph_token()
+        status, raw, challenge = self._graph_send(method, path, body, token)
+        if status == 401 and method == "GET" and 401 not in allowed:
+            # aif-150 (2026-11-06): Graph rejected a cached CLI token the CLI had already renewed. A read is sent once
+            # more, and only with a different, refreshed token; a write is never retried (b6145b82).
+            self.tokens.pop((GRAPH, enrollment.guid(self.request_config["target"]["tenant_id"])), None)
+            refreshed = self._graph_token()
+            if refreshed != token:
+                status, raw, challenge = self._graph_send(method, path, body, refreshed)
+        # A continuous access evaluation challenge revokes the CLI's cached token, which the CLI keeps handing out:
+        # only an interactive az login helps, so the code says so (aif-150, 2026-11-06).
+        require(status in allowed or not challenge, "graph-cae-sign-in-required")
+        require(status in allowed, f"graph-request-failed-{status}")
+        require(len(raw) <= enrollment.MAX_BYTES, "graph-response-too-large")
+        return enrollment.parse_json(raw) if raw else None
+
+    def _graph_token(self):
         try:
-            token = self.token(GRAPH)
+            return self.token(GRAPH)
         except enrollment.EnrollmentError as exc:
             raise PrerequisiteError("graph-" + exc.code) from None
+
+    def _graph_send(self, method, path, body, token):
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
         try:
             response = self.opener.open(Request(GRAPH + "v1.0/" + path, method=method,
@@ -284,11 +308,11 @@ class Cloud(enrollment.Cloud):
         except (URLError, OSError, TimeoutError):
             raise PrerequisiteError("graph-write-or-read-uncertain") from None
         with response:
-            status = response.status
-            raw = response.read(enrollment.MAX_BYTES + 1)
-        require(status in allowed, f"graph-request-failed-{status}")
-        require(len(raw) <= enrollment.MAX_BYTES, "graph-response-too-large")
-        return enrollment.parse_json(raw) if raw else None
+            status, raw = response.status, response.read(enrollment.MAX_BYTES + 1)
+            headers = getattr(response, "headers", None) or {}
+            challenge = status == 401 and ("insufficient_claims" in str(headers.get("WWW-Authenticate") or "")
+                                           or any(text in raw for text in CAE_CHALLENGE_TEXT))
+        return status, raw, challenge
 
     def blob(self, method, blob, *, data=None, headers=None, allowed=(200,), query=""):
         coordinates = self.request_config["coordinates"]
@@ -1409,6 +1433,7 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                                     expected_payload_sha256=context.get("source_payload_sha256"))
     require(root != ordinary(source_root), "source-cannot-be-consumer")
     config = copy.deepcopy(bootstrap_config)
+    require(type(config.get("security_control_ignore_tag", False)) is bool, "security-control-ignore-tag-must-be-boolean")
     persona_mode = registered_personas.mode(config)
     persona_manifest = registered_personas.local_manifest(config, root, source_root=source_root)
     if persona_manifest:
@@ -1514,6 +1539,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
             tags[registered_personas.MARKER] = "groups-v1"
         if rg == project_group:
             tags.update({"aifactory.project_id": target["project_number"], "aifactory.logical_project_id": target["project_id"]})
+        if config.get("security_control_ignore_tag") is True:
+            tags.update(SECURITY_CONTROL_TAG)
         existing = builder.read(rg, enrollment.RG_API)
         if existing is None:
             builder.ensure(rg, enrollment.RG_API, {"location": target["location"], "tags": tags},
@@ -1590,7 +1617,12 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                 "Microsoft.Resources/deployments/operations/read", "Microsoft.Resources/deployments/operationStatuses/read",
                 "Microsoft.Resources/deployments/validate/action", "Microsoft.Resources/deployments/whatIf/action",
                 "Microsoft.Resources/subscriptions/read", "Microsoft.Resources/subscriptions/locations/read",
-                "Microsoft.Resources/subscriptions/resourceGroups/read", "Microsoft.Resources/subscriptions/providers/read"],
+                "Microsoft.Resources/subscriptions/resourceGroups/read", "Microsoft.Resources/subscriptions/providers/read",
+                # The pipeline preflight reads regional quota at subscription scope; without these reads every
+                # Search SKU and OpenAI model looked unlisted and PROJECT never started (aif-145, 2026-11-03).
+                "Microsoft.Search/locations/usages/read", "Microsoft.CognitiveServices/locations/usages/read",
+                "Microsoft.CognitiveServices/locations/models/read", "Microsoft.MachineLearningServices/locations/usages/read",
+                "Microsoft.Compute/locations/usages/read", "Microsoft.Network/locations/usages/read"],
                 "notActions": [], "dataActions": [], "notDataActions": []}]}},
             ownership="subscription-deployment-metadata-role-retain")
         metadata_assignment = subscription + "/providers/Microsoft.Authorization/roleAssignments/" + str(

@@ -216,6 +216,15 @@ def github_runtime_names(workflow_file: str | None) -> dict[str, set[str]]:
     return mappings
 
 
+def runtime_names(mappings: dict[str, set[str]], name: str) -> set[str]:
+    """Workflow env names bound to the GitHub variable of this configuration key.
+
+    The mapping is keyed by variable name (vars.USE_AD_GROUPS); configuration keys are usually lowercase
+    (use_ad_groups), so the lookup ignores case (aif-149, 2026-11-06: useAdGroups stayed empty, and 11-rgCommon
+    assigned the team group as a User)."""
+    return mappings.get(name, set()) | mappings.get(name.upper(), set())
+
+
 def apply(
     values: dict[str, str], pipeline_format: str, github_workflow: str | None
 ) -> tuple[int, list[str]]:
@@ -235,7 +244,7 @@ def apply(
             )
         else:
             write_github_environment(name, value)
-            for runtime_name in runtime_mappings.get(name, set()):
+            for runtime_name in sorted(runtime_names(runtime_mappings, name) - {name}):
                 write_github_environment(runtime_name, value)
         applied += 1
     return applied, skipped

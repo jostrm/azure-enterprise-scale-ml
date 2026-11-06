@@ -419,4 +419,4 @@ def test_guide17_deletion_scenarios_state_their_prerequisites():
             or line.startswith("| 5.") or line.startswith("| 6.")}
     for scenario in ("4. Delete project", "5. Delete scaleset"):
         assert "authorize-deletion" in rows[scenario] and "Prerequisite" in rows[scenario]
-    assert "single-writer" in rows["6. Delete AI Factory"] and "being added" in rows["6. Delete AI Factory"]
+    assert "single-writer" in rows["6. Delete AI Factory"] and "authorize-deletion" in rows["6. Delete AI Factory"]

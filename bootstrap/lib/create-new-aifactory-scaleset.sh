@@ -243,6 +243,16 @@ aif_prompt_choice() {
   done
 }
 
+# Network topology rule (2026-11-05), owned by the Factory API (pink creation_access_hub): private networking needs a
+# hub, external or the factory's own (VPN Gateway + Bastion). AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false lifts it.
+aif_require_hub_for_private() {
+  [[ "${AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB:-true}" != "false" ]] || return 0
+  [[ "$AIF_NETWORK_MODE" == priv && "$AIF_TOPOLOGY" == s ]] || return 0
+  [[ "$AIF_ACCESS_HUB_MODE" == external || "$AIF_ACCESS_HUB_MODE" == e || "$AIF_SETUP_HUB_ACCESS" == true ]] && return 0
+  aif_error "Private networking needs a hub: choose an external hub (e) or set up the own hub (VPN Gateway and Bastion), or choose hybrid (h) or public (pub) networking for a Standalone AI Factory."
+  return 1
+}
+
 aif_prompt_yes_no() {
   local variable_name="$1" prompt="$2" default_value="$3"
   local -n output="$variable_name"
@@ -606,8 +616,8 @@ aif_collect_answers() {
   aif_prompt_choice AIF_TOPOLOGY \
     "Topology: standalone (s) or hub/spoke with central DNS (hs)" "s" "s hs"
   aif_prompt_choice AIF_NETWORK_MODE \
-    "Networking: private-only (priv; enforced by policy)" \
-    "priv" "priv"
+    "Networking: private (priv; needs a hub), hybrid (h) or public (pub)" \
+    "priv" "priv h pub"
   aif_prompt_choice AIF_IDENTITY_MODE \
     "Deployment identity: create managed identity (c), existing managed identity (mi), or existing service principal (sp)" \
     "c" "c mi sp"
@@ -687,6 +697,7 @@ aif_collect_answers() {
     AIF_SETUP_HUB_ACCESS="false"
     AIF_CONFIGURE_VPN_CLIENT="false"
   fi
+  aif_require_hub_for_private || exit 1
 
   AIF_HUB_SUBSCRIPTION_ID="${AIF_HUB_SUBSCRIPTION_ID:-}"
   AIF_HUB_RESOURCE_GROUP="${AIF_HUB_RESOURCE_GROUP:-}"

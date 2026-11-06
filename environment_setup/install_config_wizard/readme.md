@@ -34,7 +34,7 @@ Access to the private API source repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.93, complete executable and `_internal` folder |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.100, complete executable and `_internal` folder |
 | Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.36, self-contained executable |
 | macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.36, self-contained executable |
 
@@ -126,6 +126,37 @@ Set `AIFACTORY_API_URL` in the CLI's PowerShell session to the URL displayed by
 this wizard. Never put API keys in source files, screenshots, recordings,
 receipts, or Git. CLI compatibility must be checked against this exact release;
 the previous custom Windows package's workflow results do not apply.
+
+### Quickstart: the six scenarios with ESAF, one call each
+
+From v0.47.100 the packaged API serves the ESAF routes: each AI Factory scenario is one call, and the API
+prepares, checks and confirms every review for you. With the API started from **Quick setup > Start API host**
+(above), connect the Python SDK once from a PowerShell window in the root of this repository:
+
+```powershell
+python -m pip install -e .\environment_setup\azurefactory-cli
+$env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
+$env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the wizard'
+$env:ESAF_FOLDER = (Resolve-Path (Read-Host 'Your azurefactory folder')).Path
+python -c "from azurefactory import esaf; s = esaf.connect(); print([f['key'] for f in s.client.catalog_list(s.folder)['factories']])"
+```
+
+Use the URL the wizard shows if it differs from the default. The last line only reads: it prints the folder's
+factories. Then each scenario is one call, and **each call changes Azure**:
+
+```python
+from azurefactory import esaf
+
+esaf.init_factory()                                      # 1 Init AI Factory (the folder's saved draft)
+esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")   # 2 Add a scale set (its VNet range)
+esaf.upsert_project("002", "dev")                        # 3 Add or update a project
+esaf.delete_project("002", "dev")                        # 4 Delete a project
+esaf.delete_scale_set("002", "dev")                      # 5 Delete a scale set
+esaf.delete_factory()                                    # 6 Delete the AI Factory
+```
+
+Every parameter, jobs, errors and the CLI equivalents (`azurefactory esaf ...`) are in the
+[ESAF usage guide](../azurefactory-cli/docs/esaf/readme.md).
 
 ---
 

@@ -52,7 +52,8 @@ def no_live(monkeypatch):
 @pytest.fixture
 def graph_transport(monkeypatch):
     state = SimpleNamespace(now=2000000000, expiry=2000003600, claims={}, omit=set(),
-                            commands=[], calls=[], issued=[], status=200, fail_cli=False, cli_delay=0)
+                            commands=[], calls=[], issued=[], status=200, fail_cli=False, cli_delay=0,
+                            error_body=b"{}", error_headers={})
     monkeypatch.setattr(core.time, "time", lambda: state.now)
 
     def run(argv, **kwargs):
@@ -75,7 +76,7 @@ def graph_transport(monkeypatch):
         state.calls.append(request)
         assert kwargs["timeout"] == core.GRAPH_REQUEST_TIMEOUT_SECONDS == 180
         if state.status == 401:
-            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+            raise HTTPError(request.full_url, 401, "Unauthorized", state.error_headers, io.BytesIO(state.error_body))
         response = io.BytesIO(b"{}")
         response.status = state.status
         response.headers = {}
@@ -108,12 +109,69 @@ def test_graph_does_not_reuse_the_trailing_slash_cli_cache_entry(graph_transport
     assert len(state.commands) == 1 and len(state.calls) == 1
 
 
-def test_canonical_graph_resource_still_propagates_401_without_retry(graph_transport):
+def test_canonical_graph_resource_still_propagates_401_when_the_cli_returns_the_same_token(graph_transport):
+    # aif-150 (2026-11-06): a 401 asks the CLI once more, but the same rejected token is never sent again.
     state = graph_transport
     state.status = 401
     with pytest.raises(core.PrerequisiteError, match="graph-request-failed-401"):
         state.cloud.graph("GET", "groups")
-    assert state.commands[0][state.commands[0].index("--resource") + 1] == "https://graph.microsoft.com"
+    assert all(command[command.index("--resource") + 1] == "https://graph.microsoft.com" for command in state.commands)
+    assert len(state.commands) == 2 and len(state.calls) == 1
+
+
+def _rotating_tokens(state, statuses):
+    """Each CLI call issues a new token (a refreshed session); each Graph call answers the next status."""
+    original_runner = state.cloud.command_runner
+
+    def runner(argv, **kwargs):
+        state.claims = {"uti": str(len(state.issued))}
+        return original_runner(argv, **kwargs)
+
+    state.cloud.command_runner = runner
+    answers = iter(statuses)
+    original_open = state.cloud.opener.open
+
+    def open_request(request, **kwargs):
+        state.status = next(answers)
+        return original_open(request, **kwargs)
+
+    state.cloud.opener = SimpleNamespace(open=open_request)
+
+
+def test_a_graph_read_401_retries_once_with_the_refreshed_cli_token(graph_transport):
+    # aif-150 (2026-11-06): the privileged prerequisite preflight stopped on graph-request-failed-401 while the CLI
+    # already held a newer Graph token. A read is sent once more with the refreshed token.
+    state = graph_transport
+    _rotating_tokens(state, [401, 200])
+    state.cloud.graph("GET", "groups")
+    assert len(state.commands) == 2 and len(state.calls) == 2
+    first, second = (call.get_header("Authorization") for call in state.calls)
+    assert first != second and second == "Bearer " + state.issued[-1]
+
+
+def test_a_graph_write_401_is_never_retried_even_with_a_new_token(graph_transport):
+    state = graph_transport
+    state.cloud.read_only = False
+    _rotating_tokens(state, [401, 200])
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-401"):
+        state.cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
+def test_a_second_graph_401_propagates_after_exactly_one_retry(graph_transport):
+    state = graph_transport
+    _rotating_tokens(state, [401, 401, 200])
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-401"):
+        state.cloud.graph("GET", "groups")
+    assert len(state.commands) == 2 and len(state.calls) == 2
+
+
+@pytest.mark.parametrize("status", [403, 404, 500])
+def test_other_graph_failures_are_not_retried(graph_transport, status):
+    state = graph_transport
+    _rotating_tokens(state, [status, 200])
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-" + str(status)):
+        state.cloud.graph("GET", "groups")
     assert len(state.commands) == 1 and len(state.calls) == 1
 
 
@@ -3110,3 +3168,39 @@ def test_concurrent_writers_share_one_cli_token_refresh(graph_transport):
     for thread in threads:
         thread.join()
     assert max(most) == 1 and len(state.commands) == 1
+
+
+# aif-150 (2026-11-06): Graph answered 401 InvalidAuthenticationToken "Continuous access evaluation resulted in
+# challenge with result: InteractionRequired" for the CLI's cached token, which the CLI keeps handing out. Only an
+# interactive az login helps, so the stage names that instead of a bare graph-request-failed-401.
+CAE_BODY = json.dumps({"error": {"code": "InvalidAuthenticationToken", "message": (
+    "Continuous access evaluation resulted in challenge with result: InteractionRequired and code: "
+    "TokenIssuedBeforeRevocationTimestamp")}}).encode()
+CAE_HEADERS = {"WWW-Authenticate": 'Bearer realm="", error="insufficient_claims", claims="e30="'}
+
+
+@pytest.mark.parametrize("body, headers", [(CAE_BODY, {}), (b"{}", CAE_HEADERS), (CAE_BODY, CAE_HEADERS)])
+def test_a_cae_challenge_names_the_interactive_sign_in(graph_transport, body, headers):
+    state = graph_transport
+    state.status, state.error_body, state.error_headers = 401, body, headers
+    with pytest.raises(core.PrerequisiteError, match="^graph-cae-sign-in-required$"):
+        state.cloud.graph("GET", "groups")
+    # The same revoked token is never sent twice.
+    assert len(state.commands) == 2 and len(state.calls) == 1
+
+
+def test_a_cae_challenge_on_a_write_names_the_sign_in_without_retry(graph_transport):
+    state = graph_transport
+    state.cloud.read_only = False
+    state.status, state.error_body = 401, CAE_BODY
+    with pytest.raises(core.PrerequisiteError, match="^graph-cae-sign-in-required$"):
+        state.cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
+def test_a_plain_401_keeps_its_code(graph_transport):
+    state = graph_transport
+    state.status, state.error_body = 401, json.dumps({"error": {"code": "InvalidAuthenticationToken",
+                                                                "message": "Access token has expired."}}).encode()
+    with pytest.raises(core.PrerequisiteError, match="^graph-request-failed-401$"):
+        state.cloud.graph("GET", "groups")

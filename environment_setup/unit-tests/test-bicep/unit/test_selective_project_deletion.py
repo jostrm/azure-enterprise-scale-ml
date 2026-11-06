@@ -3,6 +3,7 @@
 import copy
 import itertools
 import json
+import types
 from uuid import uuid4
 
 import pytest
@@ -94,13 +95,14 @@ class ProjectCloud(FakeCloud):
         return 202, {}, None
 
 
-def prepared(subnets=False, group=False, environments=None, environment="stage"):
-    cloud = ProjectCloud()
+def prepared(subnets=False, group=False, environments=None, environment="stage", cloud_class=ProjectCloud,
+             scopes=(GROUP, COMMON)):
+    cloud = cloud_class()
     document = manifest()
     document["target"]["environment"] = environment
-    document["locks"]["scopes"] = [GROUP, COMMON]
+    document["locks"]["scopes"] = list(scopes)
     document["locks"]["common_dependencies"] = []
-    for scope in (GROUP, COMMON):
+    for scope in scopes:
         cloud.enrollment["scopes"][scope.lower()] = {
             **copy.deepcopy(cloud.enrollment["scopes"][GROUP.lower()]),
             "common_dependencies": [], "target": {key: document["target"][key] for key in (
@@ -389,3 +391,363 @@ def test_retained_subnet_keeps_nsg_and_all_security_rules():
     plan = fl.freeze_project_deletion(cloud, document, {})
     retained = {item["id"].lower() for item in plan["resources"] if not item["delete"]}
     assert {SUBNET.lower(), nsg.lower(), rule.lower()} <= retained
+
+
+def test_receipt_body_drift_warns_and_the_receipt_still_proves_project_ownership(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): Scenario 3's update redeployed project resources after their receipt, and a
+    private endpoint's NIC cannot be tagged. Hash drift warns, never blocks: the verified receipt names this exact
+    resource id for this owner, the drift stays as review evidence and execution proves the same receipt again."""
+    document, cloud = prepared()
+    cloud.bodies[RESOURCE.lower()]["tags"] = {}
+    identifier = str(uuid4())
+    receipt = {"schema": 1, "run_id": identifier, "manifest_hash": "f" * 64,
+               "status": "succeeded", "target": document["target"],
+               "ownership": [{"resource_id": RESOURCE, "owner": OWNER,
+                              "body_hash": fl.resource_digest(cloud.bodies[RESOURCE.lower()])}]}
+    cloud.runs["runs/" + identifier + ".worker.json"] = receipt
+    cloud.bodies[RESOURCE.lower()]["properties"]["ipTags"] = ["updated-after-the-receipt"]
+    evidence = {"run_id": identifier, "receipt_hash": fl.digest(receipt)}
+    records = {RESOURCE.lower(): {"owner": OWNER, "ownership_source": "deployment-receipt",
+                                  "ownership_evidence": evidence}}
+    document["deletion"] = fl.freeze_project_deletion(cloud, document, records)
+    row = next(item for item in document["deletion"]["resources"] if item["id"].lower() == RESOURCE.lower())
+    assert row["delete"] and row["ownership_source"] == "deployment-receipt"
+    assert row["receipt_body_drift"] == {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
+    document = seal(document)
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert RESOURCE in result["deleted_resources"]
+    receipt["ownership"][0]["owner"] = {**OWNER, "scaleset_id": "another-scale-set"}
+    cloud.runs["runs/" + identifier + ".worker.json"] = receipt
+    records[RESOURCE.lower()]["ownership_evidence"] = {"run_id": identifier, "receipt_hash": fl.digest(receipt)}
+    with pytest.raises(fl.Blocked):
+        fl.freeze_project_deletion(cloud, prepared()[0], records)
+
+
+ROLE = GROUP + "/providers/Microsoft.Authorization/roleAssignments/28724663-3b27-58be-8275-5b429900b9b9"
+POLICY_SETTING = VAULT + "/providers/microsoft.insights/diagnosticSettings/setByPolicy-MCAPSGovernance"
+
+
+class UntaggableChildrenCloud(ProjectCloud):
+    def __init__(self):
+        super().__init__()
+        self.bodies[ROLE.lower()] = {"id": ROLE, "type": "Microsoft.Authorization/roleAssignments",
+                                     "properties": {"scope": GROUP, "principalId": "p", "roleDefinitionId": "r"}}
+        self.bodies[POLICY_SETTING.lower()] = {"id": POLICY_SETTING, "type": "microsoft.insights/diagnosticSettings",
+                                               "properties": {"logs": []}}
+
+    def collection(self, path, api_version, extension=False):
+        if not extension:
+            return super().collection(path, api_version, extension)
+        prefix = path.lower() + "/"
+        return [copy.deepcopy(body) for key, body in sorted(self.bodies.items())
+                if key.startswith(prefix) and "/" not in key[len(prefix):]], None
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.authorization":
+            return {"resourceTypes": [{"resourceType": "roleAssignments", "apiVersions": ["2022-04-01"]}]}
+        if namespace.lower() == "microsoft.insights":
+            return {"resourceTypes": [{"resourceType": "diagnosticSettings", "apiVersions": ["2021-05-01-preview"]}]}
+        return super().provider_schema(namespace)
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_untaggable_children_die_with_the_deleted_project_group(workspace, monkeypatch, group):
+    """aif-145 Scenario 4 (2026-11-04): two role assignments on the project group and MCAPS policy's diagnostic
+    setting on a project resource carry no tags and no receipt. When the reviewed deletion removes the project group
+    they die with it, so their owned parent proves them; a retained group still needs real ownership evidence."""
+    if not group:
+        with pytest.raises(fl.Blocked, match="project-group-ownership-incomplete-or-shared"):
+            prepared(False, False, cloud_class=UntaggableChildrenCloud)
+        return
+    document, cloud = prepared(False, True, cloud_class=UntaggableChildrenCloud)
+    rows = {row["id"].lower(): row for row in document["deletion"]["resources"]}
+    assert rows[ROLE.lower()]["ownership_source"] == "managed-parent"
+    assert rows[ROLE.lower()]["managed_parent_id"] == GROUP.lower()
+    assert rows[POLICY_SETTING.lower()]["managed_parent_id"] == VAULT.lower()
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and ROLE.lower() not in cloud.bodies
+
+
+WORKSPACE = COMMON + "/providers/Microsoft.OperationalInsights/workspaces/common-logs"
+TABLE = WORKSPACE + "/tables/AACAudit"
+
+
+class LogTablesCloud(ProjectCloud):
+    """A common Log Analytics workspace whose tables ARM lists without a type and moves on its own schedule."""
+    workspace, table, owner = WORKSPACE, TABLE, CORE_OWNER
+
+    def __init__(self):
+        super().__init__()
+        self.bodies[self.workspace.lower()] = tagged(self.workspace, "Microsoft.OperationalInsights/workspaces",
+                                                     self.owner)
+        self.bodies[self.table.lower()] = {"id": self.table, "name": "AACAudit",
+                                      "properties": {"plan": "Analytics", "totalRetentionInDays": 30,
+                                                     "schema": {"name": "AACAudit"}}}
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.operationalinsights":
+            return {"resourceTypes": [{"resourceType": kind, "apiVersions": ["2026-03-01"]}
+                                      for kind in ("workspaces", "workspaces/tables")]}
+        return super().provider_schema(namespace)
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower().endswith("/tables"):
+            return [copy.deepcopy(body) for key, body in sorted(self.bodies.items())
+                    if key.startswith(path.lower() + "/")], None
+        return super().collection(path, api_version, extension)
+
+
+class ProjectLogTablesCloud(LogTablesCloud):
+    """The same workspace in the project group: its tables are frozen and die with the deleted group."""
+    workspace = GROUP + "/providers/Microsoft.OperationalInsights/workspaces/project-logs"
+    table, owner = workspace + "/tables/AACAudit", OWNER
+
+
+@pytest.mark.parametrize("cloud_class", (LogTablesCloud, ProjectLogTablesCloud))
+def test_listed_log_tables_are_fingerprinted_with_their_kind(workspace, monkeypatch, cloud_class):
+    """aif-145 Scenario 4 (2026-11-04): the common workspace's 697 tables come from list rows without a type, so a
+    digest without their kind kept the volatile fields the closure ignores: invalid-project-resource-proof.
+    A common table no project resource names is no longer frozen at all; a project group's table still is."""
+    document, cloud = prepared(False, cloud_class is ProjectLogTablesCloud, cloud_class=cloud_class)
+    fl.validate_project_deletion(document)
+    assert (cloud_class.table.lower() in document["deletion"]["bodies"]) == (cloud_class is ProjectLogTablesCloud)
+    volatile = fl.VOLATILE_FIELDS["microsoft.operationalinsights/workspaces/tables"][0]
+    body = cloud.bodies[cloud_class.table.lower()]
+    for field in volatile[:-1]:
+        body = body.setdefault(field, {})
+    body[volatile[-1]] = "moved-by-the-platform"
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+
+
+ALERT_RULE = GROUP + "/providers/microsoft.alertsmanagement/smartDetectorAlertRules/Failure Anomalies - ain-prj001"
+
+
+class SpacedNameCloud(ProjectCloud):
+    def __init__(self):
+        super().__init__()
+        self.bodies[ALERT_RULE.lower()] = tagged(ALERT_RULE, "microsoft.alertsmanagement/smartDetectorAlertRules", OWNER)
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.alertsmanagement":
+            return {"resourceTypes": [{"resourceType": "smartDetectorAlertRules", "apiVersions": ["2021-04-01"]}]}
+        return super().provider_schema(namespace)
+
+
+def test_arm_names_with_inner_spaces_are_valid_project_resources():
+    """aif-145 Scenario 4 (2026-11-04): Application Insights names its Failure Anomalies rule with spaces and
+    Foundry its capability hosts with @."""
+    document, _ = prepared(False, True, cloud_class=SpacedNameCloud)
+    fl.validate_project_deletion(document)
+    assert next(row for row in document["deletion"]["resources"] if row["id"].lower() == ALERT_RULE.lower())["delete"]
+    assert fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.CognitiveServices/accounts/a/capabilityHosts/a@aml_aiagentservice")
+    assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/ trailing ")
+    assert not fl.NESTED_ID.fullmatch(GROUP + "/providers/Microsoft.Web/sites/..")
+
+
+OTHER_GROUP = f"/subscriptions/{SUB}/resourceGroups/other-project"
+OTHER_OWNER = {**OWNER, "project_id": "018"}
+
+
+def padded(index):
+    return {"resourceGuid": str(uuid4()), "index": index, "provisioningState": "Succeeded",
+            "description": " ".join(f"Setting {item} of resource {index} as the AI Factory deploys it." for item in range(8))}
+
+
+class FactorySizedCloud(LogTablesCloud):
+    """aif-145 on 2026-11-04: a common group with 697 Log Analytics tables (about 4.4 KB each as ARM lists them) and
+    about 580 other resources, and two project groups of about 215 resources each. A common subnet names a project
+    resource, as the common VNet's project subnet names the project's private endpoint NICs."""
+
+    def __init__(self):
+        super().__init__()
+        for index in range(697):
+            table = WORKSPACE + f"/tables/Table{index:03d}_CL"
+            self.bodies[table.lower()] = {"id": table, "name": table.rsplit("/", 1)[-1], "properties": {
+                "plan": "Analytics", "totalRetentionInDays": 30, "retentionInDays": 30,
+                "schema": {"name": table.rsplit("/", 1)[-1], "tableType": "Microsoft",
+                           "columns": [{"name": f"Column{column}", "type": "string", "isHidden": False,
+                                        "description": f"Column {column} of {table.rsplit('/', 1)[-1]} as its solution defines it"}
+                                       for column in range(40)]}}}
+        for index in range(64):
+            nsg = COMMON + f"/providers/Microsoft.Network/networkSecurityGroups/nsg-{index:02d}"
+            self.bodies[nsg.lower()] = tagged(nsg, "Microsoft.Network/networkSecurityGroups", CORE_OWNER, padded(index))
+            for rule in range(8):
+                identifier = nsg + f"/securityRules/rule-{rule}"
+                self.bodies[identifier.lower()] = tagged(
+                    identifier, "Microsoft.Network/networkSecurityGroups/securityRules", CORE_OWNER, padded(rule))
+        self.bodies[OTHER_GROUP.lower()] = tagged(OTHER_GROUP, "Microsoft.Resources/resourceGroups", OTHER_OWNER)
+        for scope, owner in ((GROUP, OWNER), (OTHER_GROUP, OTHER_OWNER)):
+            for index in range(212):
+                address = scope + f"/providers/Microsoft.Network/publicIPAddresses/ip-{index:03d}"
+                self.bodies[address.lower()] = tagged(address, "Microsoft.Network/publicIPAddresses", owner, padded(index))
+        self.bodies[SUBNET.lower()]["properties"]["ipConfigurations"] = [{"id": RESOURCE}]
+        self.bodies[VNET.lower()]["properties"]["subnets"][0] = copy.deepcopy(self.bodies[SUBNET.lower()])
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_a_factory_sized_project_deletion_fits_the_protected_worker_and_github_dispatch(workspace, monkeypatch, group):
+    """aif-145 Scenario 4 (2026-11-04): delete-project 002 froze every enrolled group - common with 697 Log Analytics
+    tables, project001 and project002, 1704 resources - and every body twice (in the closure's collections and in
+    `bodies`): 11.1 MB against the 8 MiB worker cap, 508 KB compressed against 16 GitHub secrets of 32,000 characters.
+    The review freezes the project group, everything it deletes and the resources elsewhere that name them;
+    execution still reads every group and verifies the same view of it."""
+    document, cloud = prepared(False, group, cloud_class=FactorySizedCloud, scopes=(GROUP, OTHER_GROUP, COMMON))
+    assert len(cloud.bodies) > 1700
+    # pink catalog_runtime refuses a frozen manifest above 8 MiB - 4096 (protected-worker capacity)
+    assert len(fl.canonical(document)) <= fl.MAX_DOCUMENT - 4096
+    assert len(fl.github_envelope_chunks(document, types.SimpleNamespace(held={"run_id": document["run_id"]}))) <= 16
+    frozen = set(document["deletion"]["bodies"])
+    assert {key for key in cloud.bodies if fl.arm_scope(key) == GROUP.lower()} <= frozen
+    assert {GROUP.lower(), OTHER_GROUP.lower(), COMMON.lower(), SUBNET.lower(), VNET.lower()} <= frozen
+    assert not any(fl.arm_scope(key) == OTHER_GROUP.lower() or "/tables/" in key or "/networksecuritygroups/" in key
+                   for key in frozen - {OTHER_GROUP.lower()})
+    fl.validate_manifest(document)
+    if not group:
+        return  # a retained group deletes resource by resource; the small cases above execute that
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and SUBNET.lower() in cloud.bodies
+    assert sum(fl.arm_scope(key) == OTHER_GROUP.lower() for key in cloud.bodies) == 213
+
+
+def test_unrelated_common_changes_after_review_never_block_a_project_deletion(workspace, monkeypatch):
+    """The platform adds and updates common Log Analytics tables all day. Nothing in the deleted project names them,
+    so a table added or changed between review and execution is no changed reviewed resource."""
+    document, cloud = prepared(False, True, cloud_class=LogTablesCloud)
+    added = WORKSPACE + "/tables/AddedAfterReview_CL"
+    cloud.bodies[added.lower()] = {"id": added, "name": "AddedAfterReview_CL", "properties": {"plan": "Analytics"}}
+    cloud.bodies[TABLE.lower()]["properties"]["plan"] = "Basic"
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and added.lower() in cloud.bodies
+
+
+@pytest.mark.parametrize("group", (True, False))
+def test_a_new_reference_to_a_reviewed_deletion_blocks_execution(workspace, monkeypatch, group):
+    """The live closure decides: a resource elsewhere that names a resource the review deletes, created after the
+    review, stops the run before any delete."""
+    document, cloud = prepared(False, group)
+    dependent = COMMON + "/providers/Microsoft.Network/publicIPAddresses/common-dependent"
+    cloud.bodies[dependent.lower()] = tagged(dependent, "Microsoft.Network/publicIPAddresses", CORE_OWNER,
+                                             {"linkedPublicIPAddress": {"id": RESOURCE}})
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] != "succeeded" and not cloud.deleted, result
+    assert result["error_code"] == "project-complete-inventory-changed", result
+
+
+class ServiceLinkCloud(ProjectCloud):
+    """The project subnet in the common VNet names a project resource and carries a Container Apps service
+    association link whose `link` leaves out /providers/Microsoft.Network, as ARM lists it on aif-145."""
+
+    def __init__(self):
+        super().__init__()
+        malformed = VNET.replace("/providers/Microsoft.Network", "") + "/subnets/project-subnet"
+        self.bodies[SUBNET.lower()]["properties"].update(ipConfigurations=[{"id": RESOURCE}], serviceAssociationLinks=[{
+            "name": "legionservicelink", "id": SUBNET + "/serviceAssociationLinks/legionservicelink",
+            "properties": {"linkedResourceType": "Microsoft.App/environments", "link": malformed}}])
+        self.bodies[VNET.lower()]["properties"]["subnets"][0] = copy.deepcopy(self.bodies[SUBNET.lower()])
+
+
+def test_a_malformed_service_association_link_never_blocks_the_retained_vnet_check(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): the common VNet stays in a project deletion's view because its project subnet
+    names the project's NICs. Execution strips back-references of deleted dependents before comparing it, and the
+    strict parse of the subnets' Container Apps service association link stopped that (invalid-resource-reference).
+    A malformed link names no deleted dependent; it stays and still compares."""
+    document, cloud = prepared(False, True, cloud_class=ServiceLinkCloud)
+    assert VNET.lower() in document["deletion"]["bodies"]
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies and VNET.lower() in cloud.bodies
+
+
+class AbsentGroupCloud(ProjectCloud):
+    """Like ARM, a deleted group answers 404 ResourceGroupNotFound on its exact id."""
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "GET" and fl.RG_ID.fullmatch(resource_id) and resource_id.lower() not in self.bodies:
+            assert 404 in allowed
+            return 404, {}, {"error": {"code": "ResourceGroupNotFound", "message": "Resource group could not be found."}}
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+def test_an_already_absent_project_group_is_reviewed_and_executed_as_done(workspace, monkeypatch):
+    """aif-145 Scenario 4 (2026-11-04): the project pipeline deleted project002's group, then failed; the retried
+    delete-project read the absent group (remote-request-failed-404). An absent registered project group is done:
+    the review records it already absent, execution re-proves it absent, sends no DELETE and reports it observed absent."""
+    document, cloud = prepared(False, True, cloud_class=AbsentGroupCloud)
+    cloud.bodies = {key: body for key, body in cloud.bodies.items() if not (key == GROUP.lower() or key.startswith(GROUP.lower() + "/"))}
+    document["deletion"] = fl.freeze_project_deletion(cloud, document, {})
+    group = next(row for row in document["deletion"]["resource_groups"] if row["id"].lower() == GROUP.lower())
+    assert group["already_absent"] is True and group["delete"] is True
+    assert not any(row["delete"] for row in document["deletion"]["resources"])
+    document = seal(document)
+    fl.validate_manifest(document)
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    run = workspace / "execution"
+    result = fl.execute(document, source, run, run / "receipt.json", cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert result["deleted_resources"] == [] and result["observed_absent"] == [GROUP]
+    assert not cloud.deleted
+    with pytest.raises(fl.Blocked, match="absent-group-not-the-deleted-project-group"):
+        retained, other = prepared(False, False, cloud_class=AbsentGroupCloud)
+        other.bodies = {key: body for key, body in other.bodies.items() if not key.startswith(GROUP.lower())}
+        fl.freeze_project_deletion(other, retained, {})
+
+
+class ProviderRolloutCloud(ProjectCloud):
+    """Azure rolls resource-provider manifests out continuously: each read may list one more api-version."""
+
+    def __init__(self):
+        super().__init__()
+        self.rollout = 0
+
+    def provider_schema(self, namespace):
+        schema = copy.deepcopy(super().provider_schema(namespace))
+        for row in schema["resourceTypes"]:
+            row["apiVersions"] = row["apiVersions"] + ["2026-0%d-01-preview" % (1 + self.rollout % 9)]
+        return schema
+
+
+def test_provider_rollouts_between_prepare_and_confirm_change_no_frozen_view():
+    """aif-145 Scenario 4 (2026-11-04): microsoft.storage, .network and .compute schemas changed between prepare and
+    confirm, so every confirmation refused "closure, closure_hash changed". A provider fingerprint is derived and warns,
+    never blocks (48b243f8): the frozen project view keeps none, so the re-frozen view at confirmation is equal."""
+    document, cloud = prepared(False, True, cloud_class=ProviderRolloutCloud)
+    cloud.rollout += 1
+    again = fl.freeze_project_deletion(cloud, document, {})
+    assert again["closure"] == document["deletion"]["closure"]
+    assert again["closure_hash"] == document["deletion"]["closure_hash"]
+    assert document["deletion"]["closure"]["providers"] == {}

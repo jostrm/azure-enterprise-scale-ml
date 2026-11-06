@@ -1,9 +1,9 @@
 # AI Factory lifecycle Function
 
-An Azure Functions Python consumer of `from azurefactory import esaf`. Set **`AIF_BACKEND=sdk`** to run each
-scenario through **one facade method**, with one Function scope approval. Each method is one call to the Factory
-API's `/api/v1/esaf/*` routes, which own the prepare/confirm calls, enrollment, deletion authorization, server
-confirmation phrases and retries (Factory API with the ESAF routes, pink 1b1fed5 or later).
+An Azure Functions Python **Consumer → L1 ESAF SDK → L2 Factory API**. Set **`AIF_BACKEND=sdk`** to run each
+scenario through **one facade method**, with one Function scope approval. The thin Python SDK sends one approved
+`POST /api/v1/esaf/<scenario>`. L2 owns configuration, live reviews, confirmations, enrollment, deletion
+authorization, pipeline dispatch and bounded retries; neither the Function nor L1 duplicates that orchestration.
 
 | # | Function route segment | SDK method | Result |
 |---|---|---|---|
@@ -14,9 +14,10 @@ confirmation phrases and retries (Factory API with the ESAF routes, pink 1b1fed5
 | 5 | `delete-scaleset` | `esaf.delete_scale_set(suffix, environment=..., session=...)` | Delete the scale set's registered resources |
 | 6 | `delete-factory` | `esaf.delete_factory(session=...)` | Delete the factory's registered resources; shared hubs and subscriptions stay |
 
-`apply_project` remains an alias of `upsert_project`. The folder belongs to an explicit `esaf.Session`, not an argument
-of every method. Each session selects the resolved factory ID; project and scale-set calls always carry the
-environment, which the SDK requires. Scenario 2 does **not** create project001 implicitly: use Scenario 3 for it.
+`upsert_project` is canonical; `apply_project` remains a compatibility alias. The folder belongs to an explicit `esaf.Session`,
+not the first positional argument of every method. Each session selects the resolved factory ID; project and scale-set
+calls require the environment (`dev`, `stage` or `prod`). Scenario 2 does **not** create project001 implicitly:
+use Scenario 3 for it.
 
 ## Call the Function
 
@@ -37,20 +38,23 @@ Invoke-RestMethod "$base/v1/operations/$($op.operationId)/confirm" -Method Post 
 ```
 
 **SDK prepare is a local scope approval, not an Azure dry-run.** It resolves catalog IDs and validates input but
-does not call a mutating facade method or prepare a live deployment. Confirm approves the entire scenario; the
-SDK then checks and confirms the live API reviews. The returned SDK job ID and kind are saved in the operation.
-The existing reconciler reads `EsafJob.status()` after host restarts; it does not depend on an in-memory job or thread.
-Scenario 1 uses the API's bounded whole-workflow approval and stops if the API requires another human review.
+does not call a mutating facade method or prepare a live deployment. Confirm approves the entire scenario; L1
+submits it to L2 and receives `202` with an ESAF job ID. The Function persists `job_kind="esaf"`, the job ID and
+selected factory. The reconciler reads `EsafJob.status()` via `GET /api/v1/esaf/jobs/{id}?folder=...` after host
+restarts; it does not depend on an in-memory job or thread. The outer ESAF status is authoritative: a failed child
+does not end an operation while L2 is retrying. Server failure messages are retained in the operation.
 
 ## Architecture and safety
 
 ```text
-HTTP Function -> LifecycleService (scope approval, protection, durable operation)
-             -> SdkFactoryBackend -> one esaf method -> Factory API -> lifecycle job
-             <- persisted EsafJob ID/kind <- status via the reconciler
+Consumer: HTTP Function -> LifecycleService (scope approval, protection, durable operation)
+                       -> local adapter OR signed management-runner hand-off
+L1: SdkFactoryBackend -> Python esaf -> one approved POST /api/v1/esaf/<scenario>
+L2: Factory API -> durable ESAF job -> reviews/enrollment/dispatch -> L3 pipelines -> L4 Bicep/scripts -> L5 ARM
+Consumer <- persisted EsafJob ID/kind <- outer job GET via L1 and the reconciler
 ```
 
-The Factory API's catalog/deployment routes are loopback-only. Choose `AIF_EXECUTOR=inprocess` for a local Function
+The Factory API's catalog, deployment and ESAF routes are loopback-only. Choose `AIF_EXECUTOR=inprocess` for a local Function
 beside the API, or `github-runner` for an Azure-hosted Function: a signed request runs on the management VM beside
 the API, then posts its signed result back. The Function never calls those API routes across the network.
 The runner and relay workflows belong in a separate ops repository, not the factory repository.
@@ -58,8 +62,10 @@ The runner and relay workflows belong in a separate ops repository, not the fact
 - **Protected scopes:** `AIF_SELF_PROJECT_ID` and `AIF_PROTECTED_IDS` prevent changing the Function/runner's host.
 - **Deletes off:** `AIF_DELETES=refuse` is the default. `simulate` uses a read-only catalog mirror and dummy runs.
   Real deletes require `allow`, plus `AIF_ALLOW_REAL_DELETES=true` on a remote runner.
-- **No uncertain retries:** the operation is saved as `confirming` before execution. A failed facade call may already
-  have changed configuration or permissions, so it becomes `uncertain`; inspect the API state before another attempt.
+- **No resubmission:** the operation is saved as `confirming` before execution. Definite configuration/auth/scope
+  refusals fail the operation. Transport/server failures or a missing job receipt become `uncertain`; inspect the
+  API's jobs before another attempt. The Function never retries submission. L2 may retry work inside an accepted
+  ESAF job (the current server default is two retries); that is not another Function confirmation.
 - **Exact scope:** changed factory/project/scale-set identities require a new approval; unrelated catalog revision
   drift does not block. Scenario 6 refuses a factory containing other environments than the requested FactoryId.
 - **Authentication:** lifecycle routes require a function key; enable Entra App Service authentication and
@@ -95,9 +101,11 @@ IDs use the accelerator's naming; Azure `test` maps to catalog `stage`.
 | `AIF_REVIEW_TTL_SECONDS` | Scope approval lifetime, default 600 seconds |
 
 The SDK is installed from the exact published purple commit in `requirements.txt`, not copied into the Function.
-Before rollout, update the Factory API to a build that supports existing-scale-set enrollment extension and enforces
-project enrollment/deletion permission before `API-2-Pipelines` dispatch. Updating the SDK alone is insufficient;
-keep real deletes refused during the upgrade.
+**A live, compatible L2 API on the same host as L1 is a prerequisite.** Before rollout, verify the installed API
+supports `/api/v1/esaf/*`, durable job status, exact environment/scale-set/project selection and enrollment/deletion
+guards. Missing facade routes fail closed (`sdk-config`); there is no fallback to legacy prepare/confirm endpoints.
+Update/verify the API first, then the Function and runner together; keep real deletes refused during the upgrade.
+Source HEAD and the SDK pin do not prove which API or SDK is installed.
 Full setup, identities, secrets, deployment and troubleshooting: [README_More_Info.md](README_More_Info.md).
 
 ## Local use and upgrades
@@ -110,9 +118,13 @@ Copy-Item local.settings.example.json local.settings.json
 func start
 ```
 
-New scenario coverage is in `tests/test_esaf_scenarios.py`; run explicit test node IDs for the behavior being changed.
-These tests cover all six routes through the local and signed-runner paths, real SDK HTTP integration, restart-safe
-job status, scope protection and uncertain outcomes.
+New thin-SDK coverage is in `tests/test_esaf_l1_contract.py` and `tests/test_upsert_project_dispatch.py`; run explicit
+test node IDs for the behavior being changed. These tests use an ephemeral loopback HTTP fake, not a live API, for
+all six routes, both executors, restart-safe outer job status, legacy job reads and refusal/uncertain outcomes.
+
+The [onion V2 document](../../../documentation/v2/10-19/10-factory-onion-architecture-v2.md) describes the layer
+boundaries. Its older generated L1 review sequence and add-scale-set project-deployment examples predate the
+server facade; the current L1/L2 contract above takes precedence. Generated diagrams are not changed here.
 
 Copy this folder into the consumer's `aifactory-usecase-code/10-azure-function/12_func_aifactory_lifecycle/`.
 Preserve consumer settings and update the Function and lifecycle runner together. Finish/reconcile old SDK operations

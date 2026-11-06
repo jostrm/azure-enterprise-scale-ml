@@ -46,6 +46,9 @@ SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
 # Reviewed inventories a single-writer repository cohort may delete; never legacy leaf lists.
 SINGLE_WRITER_DELETION_INVENTORIES = ["arm-provider-closure-v1", "ordered-project-pipelines-v1", SELECTIVE_PROJECT_DELETE]
 PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
+# Their resource IDs are display links (dashboard tiles), never deletion dependencies (aif-145, 2026-11-04: the factory
+# dashboard in the common group charts project resources).
+DISPLAY_ONLY_TYPES = {"microsoft.portal/dashboards"}
 # ARM back-references name a dependent (deleted first), never a dependency of this resource.
 REVERSE_LINKS = {
     "microsoft.network/networkinterfaces": ("virtualMachine", "privateEndpoint", "privateLinkService"),
@@ -85,6 +88,7 @@ LOCAL_COMMAND_TIMEOUT_SECONDS = 240
 # Polling deadlines, as poll counts: x 5 s unless noted.
 LEAF_DELETE_POLLS = 240                 # 20 min
 RESOURCE_GROUP_DELETE_POLLS = 2880      # 4 h: whole resource groups routinely outlast the leaf budget
+HELD_RECHECK_SECONDS = 60               # a read-only absence wait proves the held claim once a minute
 WHAT_IF_POLLS = 240                     # 20 min
 FOUNDRY_READINESS_POLLS = 360           # 30 min
 ARM_DEPLOYMENT_POLLS = 2880             # 4 h
@@ -123,7 +127,9 @@ SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
 RG_ID = re.compile(r"/subscriptions/(" + GUID + r")/resourceGroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 RESOURCE_ID = re.compile(RG_ID.pattern + r"/providers/([A-Za-z0-9.]+)/([A-Za-z0-9]+)/([A-Za-z0-9_.()-]{1,128})", re.I)
-ARM_SEGMENT = r"(?!\.{1,2}(?:/|$))[A-Za-z0-9_.()-]+"
+# Inner spaces and @ are legal ARM names (aif-145 2026-11-04: "Failure Anomalies - <appi>" alert rules, Foundry
+# "<account>@aml_aiagentservice" capability hosts); never at a segment's edge.
+ARM_SEGMENT = r"(?!\.{1,2}(?:/|$))[A-Za-z0-9_.()-](?:[A-Za-z0-9_.() @-]*[A-Za-z0-9_.()-])?"
 ARM_RESOURCE_PATH = r"/providers/[A-Za-z0-9.]+(?:/" + ARM_SEGMENT + "/" + ARM_SEGMENT + r")+"
 # DNS apex/wildcard names are literal ARM names, not URL syntax or arbitrary child types.
 DNS_ZONE_NAME = r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*"
@@ -383,6 +389,9 @@ def digest(value):
 # of their own. Fingerprints leave these out, so a night, a disk downgrade or a Defender retry is not a changed
 # reviewed resource; every other field still is.
 VOLATILE_FIELDS = {
+    # A Bot Service channel's etag embeds the time it was read (W/"...11/4/2026 5:46:27 PM"), so every read differs
+    # (aif-144 2026-11-04 delete_factory run7: confirmation looped on DirectLineChannel). Its settings still count.
+    "microsoft.botservice/botservices/channels": (("etag",), ("properties", "etag")),
     "microsoft.compute/virtualmachines": (
         ("etag",), ("resources",), ("properties", "provisioningState"),
         ("properties", "storageProfile", "osDisk", "diskSizeGB"),
@@ -1977,13 +1986,19 @@ def _collect_resource_closure(reader, scopes, resource_versions):
                     rows, unsupported = [], ("not-listable-" + str(status)
                                              if failure.code == "unsupported-child-inventory-endpoint"
                                              and status in (400, 404, 405) else "unreadable-" + failure.code)
-        if kind in LISTED_ONLY_CHILDREN:
+        try:
+            listed_kind = kind or (None if single or extension else collection_resource_type(path))
+        except ValueError:
+            listed_kind = None
+        if listed_kind in LISTED_ONLY_CHILDREN:
             listed_bodies.update({row["id"].lower(): copy.deepcopy(row) for row in rows
                                   if isinstance(row, dict) and isinstance(row.get("id"), str)})
         if not single and not extension:
             listed_rows.update({row["id"].lower(): copy.deepcopy(row) for row in rows
                                 if isinstance(row, dict) and isinstance(row.get("id"), str)})
-        rows = [fingerprint_body(row) for row in rows]
+        # The collection's kind: listed Log Analytics tables carry no type, and the platform moves their volatile
+        # fields between review and execution (aif-145 2026-11-04).
+        rows = [fingerprint_body(row, listed_kind) for row in rows]
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
                  "body_hash": digest(rows), "unsupported": unsupported}
@@ -2220,17 +2235,30 @@ def inherited_new_resource_owner(resource_id, bodies):
 UNTAGGABLE_GROUP_EXTENSIONS = {"microsoft.authorization/roleassignments"}
 
 
+def endpoint_managed_nic_parent(key, bodies):
+    """The private endpoint whose NIC this is: Azure creates, owns and deletes that NIC with the endpoint and refuses
+    any write to it (CannotModifyNicAttachedToPrivateEndpoint, aif-145 2026-11-04), so it can carry no tags of its own.
+    Only an endpoint that lists the NIC back qualifies; the caller still requires the same resource group."""
+    endpoint = str((((bodies.get(key) or {}).get("properties") or {}).get("privateEndpoint") or {}).get("id") or "").lower()
+    rows = (((bodies.get(endpoint) or {}).get("properties") or {}).get("networkInterfaces") or []) if endpoint else []
+    return endpoint if key in {str(row.get("id", "")).lower() for row in rows if isinstance(row, dict)} else None
+
+
 def managed_parent_id(resource_id, bodies, owner):
     """Whole-group deletion only: the owned resource an untagged child is deleted with, so it needs no receipt of its
-    own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, or
-    the owned source of an Event Grid system topic. A top-level resource never inherits its group's owner."""
+    own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, the
+    owned source of an Event Grid system topic, or the private endpoint whose managed NIC it is. A top-level resource
+    never inherits its group's owner."""
     key = resource_id.lower()
     scope, relative = key.rsplit("/providers/", 1)
     parts = relative.split("/")
     resource_type = resource_type_from_id(key)
     topic = resource_type == "microsoft.eventgrid/systemtopics"
+    endpoint = endpoint_managed_nic_parent(key, bodies) if resource_type == "microsoft.network/networkinterfaces" else None
     if topic:
         parent = str(((bodies.get(key) or {}).get("properties") or {}).get("source", "")).lower()
+    elif endpoint:
+        parent = endpoint
     elif len(parts) > 3:
         parent = scope + "/providers/" + "/".join(parts[:-2])
     else:
@@ -2293,6 +2321,14 @@ def receipt_parent_id(resource_id, bodies, owner):
     return parent
 
 
+def frozen_closure(closure):
+    """The closure a deletion review freezes: without provider-schema fingerprints. They are derived and churn with
+    Azure's resource-provider rollouts (aif-145 2026-11-04: microsoft.storage, .network and .compute changed between
+    prepare and confirm, and pink's confirmation compares the whole frozen closure). They warn, never block (48b243f8):
+    the live closure decides."""
+    return {**closure, "providers": {}}
+
+
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; an untagged child needs a real receipt or an owned parent it dies with."""
     cloud.verify_identity()
@@ -2346,6 +2382,7 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
                 item = {"owner": owner, "ownership_source": "managed-parent", "managed_parent_id": parent, **superseded}
         resources.append({**item, "id": resource_id, **metadata, "delete": True,
                           "depends_on": sorted(cross_group_references(body, arm_scope(resource_id)))})
+    closure = frozen_closure(closure)
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
               "revision": document["manifest_revision"], "resource_groups": groups, "resources": resources,
               "inventory_hash": digest(resources), "closure": closure, "closure_hash": digest(closure)}
@@ -2427,13 +2464,63 @@ def project_resource_dependencies(body):
     key = body["id"].lower()
     # Dependency planning, not ownership: a provider-owned malformed ID-looking string (aif-138 2026-11-01: a Container
     # Apps serviceAssociationLink's properties.link has no /providers/) is no resolvable dependency and is skipped.
+    if str(body.get("type", "")).lower() in DISPLAY_ONLY_TYPES:
+        return []
     references = resource_references(body, tolerant=True)
     if str(body.get("type", "")).lower() in PROJECT_NETWORK_TYPES | {"microsoft.network/virtualnetworks"}:
         # Subnets are reverse links or separately inventoried child bodies.
         references -= resource_references((body.get("properties") or {}).get("subnets", []), tolerant=True)
     for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
         references -= resource_references([body.get(field), (body.get("properties") or {}).get(field)], tolerant=True)
+    # Any type: privateEndpointConnections name the endpoints connected to this resource, which are deleted first
+    # (aif-145, 2026-11-04: a project endpoint to a common resource read as a common-before-project dependency).
+    connections = (body.get("properties") or {}).get("privateEndpointConnections")
+    if isinstance(connections, list):
+        references -= resource_references([((row.get("properties") or {}).get("privateEndpoint") if isinstance(row, dict)
+                                            else None) for row in connections], tolerant=True)
     return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
+
+
+def project_inventory_view(closure, bodies, project_group, deleted, frozen=()):
+    """The part of a complete closure a selective project deletion freezes and verifies.
+
+    aif-145 Scenario 4 (2026-11-04): delete-project froze every enrolled group - the common group with 697 Log
+    Analytics tables, both project groups, 1704 resources - with every body twice (closure collections and `bodies`):
+    11.1 MB against the 8 MiB worker cap, 508 KB compressed against 16 GitHub secrets. The view keeps every group row,
+    the whole project group, each deleted resource with its ancestors and descendants, and each resource elsewhere
+    whose body names one of them (a common subnet's ipConfigurations, a diagnostic setting's workspace): what the
+    deletion changes or can break. A display link (DISPLAY_ONLY_TYPES) is no such dependency. Nothing else in the other
+    groups is frozen; execution reads every group again and the live closure decides. `frozen`, a reviewed view's ids,
+    stays in view while it exists, so a reference that went away still compares; a resource that names a deletion
+    only after the review joins the live view and changes it."""
+    targets = {project_group, *deleted}
+
+    def inside(identifier):
+        parts = identifier.split("/")
+        return any("/".join(parts[:end]) in targets for end in range(5, len(parts) + 1))
+
+    ancestors = {"/".join(parts[:end]) for parts in (key.split("/") for key in deleted) for end in range(5, len(parts))}
+    kept = set(closure["groups"]) | (set(frozen) & set(bodies))
+    for key, row in closure["resources"].items():
+        if (inside(key) or key in ancestors
+                or (row.get("type") not in DISPLAY_ONLY_TYPES
+                    and any(inside(reference) for reference in closure["references"].get(key, ())))):
+            kept.add(key)
+
+    def collection_kept(path):
+        # A group's own collections (its resource list, its extensions) stay for the project group only.
+        return inside(path) or any(owner in kept and owner not in closure["groups"]
+                                   for owner in (path.rsplit("/", 1)[0], path.rsplit("/providers/", 1)[0]))
+
+    # Provider-schema fingerprints are derived and churn with Azure's resource-provider rollouts (aif-145 2026-11-04:
+    # microsoft.storage, .network and .compute changed between prepare and confirm, so every confirmation refused
+    # "closure changed"). They warn, never block (48b243f8): the frozen view keeps none and the live closure decides.
+    view = {"providers": {}, "groups": closure["groups"],
+            "resources": {key: row for key, row in closure["resources"].items() if key in kept},
+            "references": {key: row for key, row in closure["references"].items() if key in kept},
+            "inline": {key: row for key, row in closure["inline"].items() if row["parent_id"] in kept},
+            "collections": {path: row for path, row in closure["collections"].items() if collection_kept(path)}}
+    return view, {key: body for key, body in bodies.items() if key in kept}
 
 
 def validate_project_deletion(document):
@@ -2468,9 +2555,15 @@ def validate_project_deletion(document):
         is_group = identifier in group_ids
         require((RG_ID if is_group else NESTED_ID).fullmatch(identifier)
                 and arm_scope(identifier) in scopes and type(item.get("delete")) is bool
-                and hash_value(item.get("body_hash")) and item["body_hash"] == resource_digest(bodies[identifier]),
+                and hash_value(item.get("body_hash"))
+                # The closure's kind: listed Log Analytics tables carry no type (aif-145 2026-11-04, 697 of them).
+                and item["body_hash"] == resource_digest(bodies[identifier], item.get("type")),
                 "invalid-project-resource-proof")
         require(item.get("etag") is None or isinstance(item["etag"], str), "invalid-project-resource-etag")
+        require(item.get("already_absent") is not True and "already_absent" not in bodies[identifier]
+                or (is_group and identifier == project_group and item["delete"] is True
+                    and bodies[identifier] == {"id": item["id"], "already_absent": True}),
+                "invalid-already-absent-project-group")
         if not is_group:
             require(item.get("type") == resource_type_from_id(identifier)
                     and isinstance(item.get("api_version"), str)
@@ -2527,14 +2620,23 @@ def project_owner(cloud, document, body, records, cache):
     record = records.get(key, {})
     if record.get("ownership_source") == "deployment-receipt":
         evidence = record.get("ownership_evidence")
-        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache)
+        drift = []
+        verified = verified_receipt_owner(coordination(cloud, document), evidence, key, resource_digest(body), cache,
+                                          drift)
         require(verified == record.get("owner"), "project-receipt-owner-mismatch")
-        return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+        proof = {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+        if drift:
+            # Hash drift warns, never blocks (aif-145 Scenario 4): an update redeployed the resource after its
+            # receipt, or the platform owns its body (a private endpoint's NIC); the drift stays as review evidence.
+            proof["receipt_body_drift"] = {"code": "child-instance-ownership-unverified", "ownership_evidence": evidence}
+        return proof
     return {"owner": {}, "ownership_source": "retained-unowned"}
 
 
 def verify_project_permissions(cloud, data):
     for item in project_delete_roots(data):
+        if item.get("already_absent") is True:
+            continue  # re-proven absent by verify_project_inventory; nothing left to delete
         _, _, body = cloud.request("GET", ARM + quote(item["id"], safe="/().-_")
                                    + "/providers/Microsoft.Authorization/permissions?api-version=2022-04-01", ARM)
         require(isinstance(body, dict) and isinstance(body.get("value"), list) and not body.get("nextLink"),
@@ -2557,12 +2659,20 @@ def freeze_project_deletion(cloud, document, ownership_records):
     cloud.verify_identity()
     deletion_reader(cloud, document)
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
-    closure, bodies = collect_resource_closure(cloud, scopes)
+    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
+    # Idempotent (aif-145 Scenario 4, 2026-11-04: the project pipeline deleted project002's group, then failed): the
+    # registered project group an interrupted deletion already removed is done. The review records it already absent,
+    # never reads it, and execution re-proves it absent without a DELETE. Any other absent group still blocks.
+    absent = absent_groups(cloud, scopes)
+    require(len(absent) <= 1 and all(scope.lower() in registered and scope in document["locks"]["scopes"]
+                                     for scope in absent)
+            and (not absent or options["include_keyvault_and_resource_group"]),
+            "absent-group-not-the-deleted-project-group")
+    closure, bodies = collect_resource_closure(cloud, [scope for scope in scopes if scope not in absent])
 
     records = {key.lower(): value for key, value in ownership_records.items()}
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     owner["project_id"] = document["deletion_scope"]["project_number"]
-    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
     entries, cache = {}, {}
     for key, body in bodies.items():
         group = key in closure["groups"]
@@ -2570,9 +2680,27 @@ def freeze_project_deletion(cloud, document, ownership_records):
         proof = project_owner(cloud, document, body, records, cache)
         entries[key] = {"id": body["id"], **metadata, **proof, "delete": False,
                         "depends_on": project_resource_dependencies(body)}
-    matches = [key for key in closure["groups"] if entries[key]["owner"] == owner and key in registered]
+    for scope in absent:
+        bodies[scope.lower()] = {"id": scope, "already_absent": True}
+        entries[scope.lower()] = {"id": scope, "etag": None, "body_hash": resource_digest(bodies[scope.lower()]),
+                                  "owner": owner, "ownership_source": "already-absent", "already_absent": True,
+                                  "delete": False, "depends_on": []}
+    matches = [key for key in [*closure["groups"], *(scope.lower() for scope in absent)]
+               if entries[key]["owner"] == owner and key in registered]
     require(len(matches) == 1, "one-exact-owned-project-resource-group-required")
     project_group = matches[0]
+    if options["include_keyvault_and_resource_group"]:
+        for key, item in entries.items():
+            if item["ownership_source"] != "retained-unowned" or arm_scope(key) != project_group or key == project_group:
+                continue
+            # Untaggable children (aif-145 Scenario 4, 2026-11-04: role assignments on the project group, MCAPS
+            # policy's diagnostic setting on a project resource) die with the project group this deletion removes,
+            # so their owned parent proves them. A retained group still needs tags or a receipt for each of them.
+            try:
+                parent = managed_parent_id(key, bodies, owner)
+            except Blocked:
+                continue
+            item.update(owner=owner, ownership_source="managed-parent", managed_parent_id=parent)
     writable = {item.lower() for item in document["locks"]["scopes"]}
     for key, item in entries.items():
         body, kind = bodies[key], item.get("type", "")
@@ -2588,7 +2716,7 @@ def freeze_project_deletion(cloud, document, ownership_records):
             require(item["owner"] == owner and not shared, "project-group-ownership-incomplete-or-shared")
         if item["owner"] != owner or shared or arm_scope(key) not in writable:
             continue
-        if key in closure["groups"]:
+        if key in closure["groups"] or item.get("already_absent") is True:
             item["delete"] = key == project_group and options["include_keyvault_and_resource_group"]
         elif kind == "microsoft.network/virtualnetworks/subnets":
             item["delete"] = options["include_project_subnets"] and (in_project or key in registered)
@@ -2626,17 +2754,22 @@ def freeze_project_deletion(cloud, document, ownership_records):
                 require(all(child["owner"] == owner and not project_resource_shared(bodies[identifier])
                             for identifier, child in entries.items() if identifier == key or identifier.startswith(key + "/")),
                         "project-network-child-ownership-unverified")
+    locked = any(item.get("type") in ("microsoft.authorization/locks", "microsoft.authorization/denyassignments")
+                 for item in entries.values())
+    closure, bodies = project_inventory_view(closure, bodies, project_group,
+                                             {key for key, item in entries.items() if item["delete"]})
+    bodies.update({scope.lower(): {"id": scope, "already_absent": True} for scope in absent})
     result = {"inventory_mode": SELECTIVE_PROJECT_DELETE, "inventory_complete": True,
-              "revision": document["manifest_revision"], "project_resource_group": bodies[project_group]["id"],
-              "resource_groups": [entries[key] for key in sorted(closure["groups"])],
+              "revision": document["manifest_revision"], "project_resource_group": entries[project_group]["id"],
+              "resource_groups": [entries[key] for key in sorted({*closure["groups"], *(s.lower() for s in absent)})],
               "resources": [entries[key] for key in sorted(closure["resources"])],
               "closure": closure, "closure_hash": digest(closure), "bodies": bodies}
     result["inventory_hash"] = digest(result["resources"])
     validate_project_deletion({**document, "deletion": result})
     for scope in scopes:
-        cloud.assert_no_active_deployments(scope)
-    require(not any(item.get("type") in ("microsoft.authorization/locks", "microsoft.authorization/denyassignments")
-                    for item in result["resources"]), "project-delete-lock-or-deny-assignment-present")
+        if scope not in absent:
+            cloud.assert_no_active_deployments(scope)
+    require(not locked, "project-delete-lock-or-deny-assignment-present")
     verify_project_permissions(cloud, result)
     return result
 
@@ -2660,7 +2793,9 @@ def _without_deleted_children(body, removed):
 def _without_removed_backlinks(body, removed):
     """ARM drops a back-reference once its dependent is deleted; nothing else may change."""
     def gone(value):
-        references = resource_references([value])
+        # A malformed link names no dependent (aif-145 2026-11-04: a Container Apps subnet's legionservicelink
+        # leaves out /providers/Microsoft.Network); it stays and still compares.
+        references = resource_references([value], tolerant=True)
         return bool(references) and all(any(ref == item or ref.startswith(item + "/") for item in removed)
                                         for ref in references)
 
@@ -2705,9 +2840,17 @@ def frozen_resource_versions(data):
 
 def verify_project_inventory(cloud, document, removed=()):
     data = document["deletion"]
-    removed = {item.lower() for item in removed}
+    absent = [row["id"] for row in data["resource_groups"] if row.get("already_absent") is True]
+    require(absent_groups(cloud, absent) == absent, "absent-resource-group-reappeared")
+    removed = {item.lower() for item in [*removed, *absent]}
     scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
     closure, bodies = collect_resource_closure(cloud, scopes, frozen_resource_versions(data))
+    if "project_resource_group" in data:
+        # Only a project deletion freezes the project's view; a whole-factory deletion's data has no project group
+        # and keeps its full closure (aif-144 2026-11-04: KeyError before every factory teardown's run claim).
+        deleted = {row["id"].lower() for row in data["resource_groups"] + data["resources"] if row["delete"]}
+        closure, bodies = project_inventory_view(closure, bodies, data["project_resource_group"].lower(), deleted,
+                                                 data["bodies"])
     expected = data["closure"]
     # A resource the review deletes that the platform removed with another deletion is absent, like one this run
     # deleted (aif-138 2026-11-02: Defender's Event Grid system topic left with its last event subscription). A vanished
@@ -2722,7 +2865,13 @@ def verify_project_inventory(cloud, document, removed=()):
                 == {key: value for key, value in expected.items() if key != "providers"},
                 "project-complete-inventory-changed")
     require(set(bodies) == set(data["bodies"]) - removed, "project-resource-closure-changed")
+    # A child the plan deletes through its parent is never sent a DELETE of its own: the platform may rewrite it while a
+    # dependency is deleted (aif-144 2026-11-05: an ACR private endpoint's privateLinkServiceProxies after the registry's
+    # private endpoint connection went), so its body protects nothing.
+    via_parent = {row["id"].lower() for row in data["resources"] if row.get("delete") and row.get("delete_via_parent")}
     for key, body in bodies.items():
+        if key in via_parent:
+            continue
         before = data["bodies"][key]
         backlinks = (str(before.get("type", "")).lower() in PROJECT_NETWORK_TYPES
                      and bool(resource_references((before.get("properties") or {}).get("subnets", [])) & removed))
@@ -2731,7 +2880,8 @@ def verify_project_inventory(cloud, document, removed=()):
             require(fingerprint_body(_without_deleted_children(_without_removed_backlinks(body, removed), removed))
                     == fingerprint_body(_without_deleted_children(stripped, removed)), "project-retained-parent-changed")
         else:
-            if resource_digest(body) != resource_digest(before):
+            kind = (data["closure"]["resources"].get(key) or {}).get("type")
+            if resource_digest(body, kind) != resource_digest(before, kind):
                 raise Blocked("project-resource-instance-changed", error_diagnostic={
                     "resource_id": key, "failed_comparisons": ["body_hash"]})
     expected_collections = {key: value for key, value in expected["collections"].items()
@@ -2750,9 +2900,13 @@ def verify_project_inventory(cloud, document, removed=()):
             continue
         if item.get("ownership_source") == "tags":
             verify_ownership(bodies[key], item["owner"])
+        elif item.get("ownership_source") == "managed-parent":
+            require(managed_parent_id(key, bodies, item["owner"]) == item.get("managed_parent_id"),
+                    "managed-parent-ownership-changed")
         elif item.get("ownership_source") == "deployment-receipt":
             require(verified_receipt_owner(coordination(cloud, document), item["ownership_evidence"], key,
-                    item["body_hash"], cache) == item["owner"], "project-ownership-receipt-changed")
+                    item["body_hash"], cache, [] if "receipt_body_drift" in item else None) == item["owner"],
+                    "project-ownership-receipt-changed")
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
     return bodies
@@ -2765,7 +2919,13 @@ def delete_project_resources(cloud, locks, document, receipt, persist, sleep=tim
     verify_project_permissions(cloud, document["deletion"])
     removed = set()
     entries = document["deletion"]["resource_groups"] + document["deletion"]["resources"]
+    # A group the review recorded as already absent is never sent a DELETE; it is reported observed absent.
+    absent = [row["id"] for row in document["deletion"]["resource_groups"] if row.get("already_absent") is True]
+    if absent:
+        receipt["observed_absent"] = absent
     for item in project_delete_roots(document["deletion"]):
+        if item.get("already_absent") is True:
+            continue
         locks.authorize(document)
         locks.assert_held()
         cloud.verify_identity()
@@ -2814,7 +2974,9 @@ def enrollment_grant(resource_id, body, document, scopes):
             and key.startswith(scope + "/providers/microsoft.authorization/roleassignments/"))
 
 
-def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
+def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache, drift=None):
+    """The owner a verified worker receipt records for exactly this resource id. With a `drift` list, a body hash
+    that changed after the receipt is appended there as a warning instead of blocking."""
     require(isinstance(evidence, dict) and guid(evidence.get("run_id"))
             and hash_value(evidence.get("receipt_hash")), "child-ownership-evidence-required")
     cache_key = (evidence["run_id"], evidence["receipt_hash"])
@@ -2828,7 +2990,10 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
     receipt = cache[cache_key]
     records = receipt.get("resource_groups", []) if RG_ID.fullmatch(resource_id) else receipt.get("ownership", [])
     matches = [row for row in records if row.get("resource_id", "").lower() == resource_id.lower()]
-    require(len(matches) == 1 and matches[0].get("body_hash") == body_hash, "child-instance-ownership-unverified")
+    require(len(matches) == 1, "child-instance-ownership-unverified")
+    if matches[0].get("body_hash") != body_hash:
+        require(drift is not None, "child-instance-ownership-unverified")
+        drift.append(resource_id)
     owner = matches[0].get("owner")
     require(isinstance(owner, dict) and all(receipt.get("target", {}).get(key) == owner.get(key)
                                           for key in ("factory_id", "scaleset_id")),
@@ -2926,9 +3091,11 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
             other = arm_scope(dependency)
             if other != scope and other in planned:
                 planned[scope]["depends_on"].append(other)
-    # A group the review recorded as already absent counts as deleted; it is never sent a DELETE.
+    # A group the review recorded as already absent is never sent a DELETE and is reported observed, not deleted
+    # (766d7382; aif-145 Scenario 5 run32: counting it as deleted failed the single-writer cohort release).
     removed = [group["id"] for group in groups if group.get("already_absent") is True]
-    receipt["deleted_resources"].extend(scope for scope in removed if scope not in receipt["deleted_resources"])
+    if removed:
+        receipt["observed_absent"] = list(removed)
     removed_children = set()
     # Only independently proven entries in the immutable manifest are eligible.
     # Leave private endpoint connections to the reviewed RG cascade: deleting
@@ -3435,15 +3602,28 @@ def delete_resources(cloud, locks, document, receipt, persist, sleep=time.sleep)
     verify_inventory(cloud, document, remaining)
 
 
-def wait_absent(cloud, locks, resource_id, api_version, sleep):
+def wait_absent(cloud, locks, resource_id, api_version, sleep, clock=time.monotonic):
     # Whole resource groups routinely outlast the 20-minute leaf budget.
     for _ in range(RESOURCE_GROUP_DELETE_POLLS if RG_ID.fullmatch(resource_id) else LEAF_DELETE_POLLS):
-        locks.assert_held()
+        assert_held_recently(locks, clock)
         status, _, _ = cloud.arm("GET", resource_id, api_version, allowed=(200, 404))
         if status == 404:
             return
         sleep(5)
     raise Blocked("delete-completion-unverified")
+
+
+def assert_held_recently(locks, clock=time.monotonic):
+    """Prove the held claim at most once per HELD_RECHECK_SECONDS while only waiting for a deletion to finish.
+
+    aif-145 Scenario 5 (2026-11-04): a single-writer claim proof reads the whole GitHub state branch (four GETs of a
+    10.9 MB state.json). Proven on every 5-second poll of a group DELETE and again for each of its 833 children, it
+    spent the 5,000 GitHub requests an hour allows, and the run's next state write failed 403. Every DELETE still
+    re-proves the claim through authorize and assert_held; a lost claim still stops this wait within a minute."""
+    checked = getattr(locks, "held_checked_at", None)
+    if not isinstance(checked, float) or clock() - checked >= HELD_RECHECK_SECONDS:
+        locks.assert_held()
+        locks.held_checked_at = clock()
 
 
 def ado_project(cloud, locks, document, source_root, receipt, persist, sleep=time.sleep):
@@ -5728,27 +5908,32 @@ def validate_preservation_permit(document):
             and hash_value(runner.get("body_hash"))
             and runner["body_hash"] == foundation["resources"][vm].get("body_hash")
             and runner.get("receipt_hash") == digest(foundation["resources"][vm].get("receipt"))
-            and isinstance(resources, dict) and len(resources) == 2
-            and all(isinstance(key, str) and isinstance(row, dict) for key, row in resources.items()),
+            and isinstance(resources, dict) and len(resources) in (1, 2)
+            and all(isinstance(key, str) and key.startswith(vm + "/") and isinstance(row, dict)
+                    for key, row in resources.items()),
             "reviewed-preservation-runner-proof-required")
     extension = vm + "/extensions/mde.linux"
     commands = [key for key in resources if re.fullmatch(
         re.escape(vm) + r"/runcommands/register-aifactory-gha-\d{14}-\d+", key)]
-    require(len(commands) == 1 and set(resources) == {extension, commands[0]},
+    # Defender installs MDE.Linux on its own schedule, about 40 minutes after a new runner (aif-145, 2026-11-03: COMMON
+    # was reviewed before it existed), so the permit preserves the registration command alone or with that extension.
+    defender = extension in resources
+    require(len(commands) == 1 and set(resources) == {commands[0], *([extension] if defender else [])},
             "reviewed-preservation-exact-children-required")
-    ext, command = resources[extension], resources[commands[0]]
-    require(ext.get("type") == "microsoft.compute/virtualmachines/extensions"
-            and ext.get("publisher") == "Microsoft.Azure.AzureDefenderForServers"
-            and ext.get("extension_type") == "MDE.Linux" and ext.get("provisioning_state") in ("Failed", "Succeeded")
+    ext, command = resources.get(extension), resources[commands[0]]
+    require((not defender
+             or ext.get("type") == "microsoft.compute/virtualmachines/extensions"
+             and ext.get("publisher") == "Microsoft.Azure.AzureDefenderForServers"
+             and ext.get("extension_type") == "MDE.Linux" and ext.get("provisioning_state") in ("Failed", "Succeeded"))
             and command.get("type") == "microsoft.compute/virtualmachines/runcommands"
             and command.get("provisioning_state") == command.get("execution_state") == "Succeeded"
             and type(command.get("exit_code")) is int and command["exit_code"] == 0
             and hash_value(command.get("script_sha256"))
             and all(row.get("scope") == arm_scope(vm) for row in resources.values())
             and isinstance(proposal.get("warnings"), list)
-            and all(isinstance(row, dict) for row in proposal["warnings"]) and any(
+            and all(isinstance(row, dict) for row in proposal["warnings"]) and (not defender or any(
                 row.get("resource_id") == extension and row.get("code") == "defender-security-readiness-unverified"
-                and row.get("provisioning_state") == ext["provisioning_state"] for row in proposal["warnings"]),
+                and row.get("provisioning_state") == ext["provisioning_state"] for row in proposal["warnings"])),
             "reviewed-preservation-state-or-security-warning-required")
     return permit
 
@@ -6548,6 +6733,15 @@ def protected_worker_envelope(document, locks):
     return raw
 
 
+def github_envelope_chunks(document, locks):
+    """The protected worker envelope as GitHub environment secrets: compressed, base64, at most 16 secrets of 32,000
+    characters (the consumer's scoped workflow reads 16)."""
+    envelope = base64.b64encode(zlib.compress(protected_worker_envelope(document, locks))).decode("ascii")
+    chunks = [envelope[index:index + 32000] for index in range(0, len(envelope), 32000)]
+    require(len(chunks) <= 16, "github-protected-manifest-too-large")
+    return chunks
+
+
 def failed_worker_diagnostic(locks, document):
     """Read bound failure metadata without granting success or cleanup authority."""
     if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
@@ -6597,9 +6791,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     require(any(row.get("path") == "azure-enterprise-scale-ml" and row.get("mode") == "160000"
                 and row.get("sha") == document["source"]["commit"] for row in tree.get("tree", [])),
             "consumer-version-source-mismatch")
-    envelope = base64.b64encode(zlib.compress(protected_worker_envelope(document, locks))).decode("ascii")
-    chunks = [envelope[index:index + 32000] for index in range(0, len(envelope), 32000)]
-    require(len(chunks) <= 16, "github-protected-manifest-too-large")
+    chunks = github_envelope_chunks(document, locks)
     secret = "AIF_LIFECYCLE_" + document["run_id"].replace("-", "").upper()
     tag = "aifactory-runs/" + document["run_id"]
     locks.assert_held()

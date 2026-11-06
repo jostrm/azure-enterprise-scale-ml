@@ -259,8 +259,10 @@ They use the existing deployment engine and route configuration.
 Legacy create defaults to `124`. Update inherits the saved version unless an
 explicit version selector is provided. Choose `main` explicitly for development;
 project-only is not an upgrade operation. Current create validation
-accepts **`AIF_NETWORK_MODE=priv` only**, despite legacy help also mentioning
-`h`/`pub`. Its general region prompt defaults to **`swedencentral`**, whereas
+accepts `AIF_NETWORK_MODE=priv` (default), `h` (hybrid) or `pub` (public). Private
+networking needs a hub (external, or the own hub with `AIF_SETUP_HUB_ACCESS=true`)
+unless `AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false`; a Standalone AI Factory without a
+hub uses `h` or `pub`. Its general region prompt defaults to **`swedencentral`**, whereas
 the shared configuration templates default to **`eastus2`**.
 Initial legacy bootstrap deploys Dev only and seeds Stage/Prod subscription
 values from Dev; that is not a reviewed multi-environment network plan.
@@ -1382,7 +1384,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_KV_SECRET_EXPIRES -->`AIF_KV_SECRET_EXPIRES` | O | `"$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null &#124;&#124; date -u -v+1y '+%Y-%m-%dT%H:%M:%SZ')"` | Aif kv secret expires override; see create launcher. |
 | <!-- parameter bootstrap:AIF_LOCATION -->`AIF_LOCATION` | O | `"swedencentral"` | Azure region (swedencentral, westeurope, northeurope, eastus, eastus2, uksouth, westgermany) |
 | <!-- parameter bootstrap:AIF_MI_RESOURCE_ID -->`AIF_MI_RESOURCE_ID` | C | `""` | Existing user-assigned managed identity resource ID |
-| <!-- parameter bootstrap:AIF_NETWORK_MODE -->`AIF_NETWORK_MODE` | O | `"priv"` | Networking: private-only (priv; enforced by policy); allowed: priv |
+| <!-- parameter bootstrap:AIF_NETWORK_MODE -->`AIF_NETWORK_MODE` | O | `"priv"` | Networking: private (priv; needs a hub), hybrid (h) or public (pub); allowed: priv h pub |
 | <!-- parameter bootstrap:AIF_NON_INTERACTIVE -->`AIF_NON_INTERACTIVE` | O | `"false"` | Aif non interactive override; see create launcher. |
 | <!-- parameter bootstrap:AIF_NO_WAIT -->`AIF_NO_WAIT` | O | `"false"` | Aif no wait override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PERSONA_ACCESS_MANIFEST -->`AIF_PERSONA_ACCESS_MANIFEST` | C | `""` | Repository-relative reviewed manifest for groups-v1; omission inherits saved configuration. Required for groups-v1 together with bootstrapped seeding records. |

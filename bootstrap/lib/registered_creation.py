@@ -31,6 +31,7 @@ COMMON_FIELDS = {
     "AIF_ENABLE_PERSONAS": "enablePersonas",
     "AIF_PERSONA_ACCESS_MANIFEST": "persona_access_manifest",
 }
+NETWORK_MODES = {"priv": "private", "h": "hybrid", "pub": "public"}
 FULL_FIELDS = {
     "GITHUB_REPOSITORY": "github_repository", "GITHUB_REPOSITORY_VISIBILITY": "github_visibility",
     "AIF_PROJECT_NUMBER": "project_number", "AIF_SCALESET_SUFFIX": "scale_set_number",
@@ -163,7 +164,7 @@ def creation_input(args, root, version, environ):
         raise ValueError("Scoped/common-only creation requires azurefactory.sh factory create --common-only; no implicit project001 fallback is allowed.")
     fields = {**COMMON_FIELDS, **(SIMPLE_FIELDS if simple else FULL_FIELDS)}
     fixed = {
-        "AIF_TOPOLOGY": {"s"}, "AIF_NETWORK_MODE": {"priv"},
+        "AIF_TOPOLOGY": {"s"}, "AIF_NETWORK_MODE": {"priv"} if simple else set(NETWORK_MODES),
         "AIF_CONFIGURE_VPN_CLIENT": {"false", "n"},
         "AIF_SEEDING_MODE": {"c"}, "AIF_SEED_PROJECT_SP": {"false", "n"},
     }
@@ -219,6 +220,9 @@ def creation_input(args, root, version, environ):
             if environ["AIF_RUNNER_MODE"] not in choices:
                 raise ValueError("AIF_RUNNER_MODE must be self-hosted, hosted, github-hosted or microsoft-hosted.")
             config["runner_mode"] = choices[environ["AIF_RUNNER_MODE"]]
+    if not simple and environ.get("AIF_NETWORK_MODE"):
+        # The Factory API owns the topology rule (private needs a hub); the launcher only passes the choice.
+        config["network_mode"] = NETWORK_MODES[environ["AIF_NETWORK_MODE"]]
     if "AIF_SETUP_HUB_ACCESS" in environ:
         config["setup_hub_access"] = boolean(environ["AIF_SETUP_HUB_ACCESS"], "AIF_SETUP_HUB_ACCESS")
     if "AIF_ACCESS_HUB_MODE" in environ:

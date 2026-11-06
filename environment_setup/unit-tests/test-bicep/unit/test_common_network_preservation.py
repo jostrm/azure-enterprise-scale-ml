@@ -570,7 +570,9 @@ def test_native_endpoint_location_expansion_is_scoped_not_discarded(service, loc
         net._verify_created_resource(identifier, actual, expected, planned)
 
 
-@pytest.mark.parametrize("mutation", ["route", "nsg", "policy", "outbound", "unknown", "endpoint-field"])
+# An unknown top-level property Azure sets by itself warns since B (2026-11-05, Joakim "warn, keep core"; see
+# test_network_read_back_warnings.py); unknown fields inside a core property (endpoint-field) still block.
+@pytest.mark.parametrize("mutation", ["route", "nsg", "policy", "outbound", "endpoint-field"])
 def test_new_subnet_normalization_preserves_writable_and_unknown_fields(mutation):
     identifier = VNET + "/subnets/new"
     props = {"addressPrefix": "10.1.1.0/26", "privateEndpointNetworkPolicies": "Enabled",

@@ -343,12 +343,13 @@ class StatefulCatalog:
 
 class FakeFactoryApi:
     def __init__(self, api_key: str = "test-key", *, missing_catalog: bool = False,
-                 slow: dict[str, float] | None = None, stateful: bool = False, **state_options):
+                 slow: dict[str, float] | None = None, stateful: bool = False, responder=None, **state_options):
         self.api_key = api_key
         self.missing_catalog = missing_catalog  # a new consumer folder: the API answers its catalog with 404
         self.slow = slow or {}  # path -> seconds before answering, like a real runtime review
         # pink's catalog semantics instead of fixed answers (coordination, enroll_routes, enroll_blockers)
         self.state = StatefulCatalog(**state_options) if stateful else None
+        self.responder = responder
         self.calls: list[dict] = []
         outer = self
 
@@ -366,8 +367,11 @@ class FakeFactoryApi:
                                     "key": self.headers.get("X-API-Key") == outer.api_key})
                 status = 200
                 try:
-                    respond = outer.state.respond if outer.state else _response
-                    payload = respond(self.command, parts.path, json.loads(raw) if raw else None)
+                    if outer.responder is not None:
+                        status, payload = outer.responder(self.command, parts.path, json.loads(raw) if raw else None)
+                    else:
+                        respond = outer.state.respond if outer.state else _response
+                        payload = respond(self.command, parts.path, json.loads(raw) if raw else None)
                 except Refused as refusal:
                     payload, status = {"detail": str(refusal)}, 409
                 except Problem as problem:
