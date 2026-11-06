@@ -322,6 +322,19 @@ function az { throw 'Resolver must not call Azure APIs' }
                     self.assertIn("DNS/policy owner", stderr)
                     self.assertNotIn("resolves to approved private endpoint IP", stdout)
 
+    def test_seeding_dns_checks_run_on_linux_runners(self):
+        # aif-151 (2026-11-06, run 42204601918): the self-hosted runner is Linux, where pwsh has no DnsClient module;
+        # the zone-group path called Clear-DnsClientCache and Resolve-DnsName directly and failed after its writes.
+        content = KV_HELPER.read_text(encoding="utf-8")
+        start, end = content.index("function Wait-KeyVaultPrivateDns"), content.index("$dnsZoneName =")
+        outside = content[:start] + content[end:]
+        self.assertNotIn("Clear-DnsClientCache", outside)
+        self.assertNotIn("Resolve-DnsName", outside)
+        self.assertNotIn("Resolve-DnsName", content)
+        self.assertIn("if (Get-Command Clear-DnsClientCache -ErrorAction SilentlyContinue)", content[start:end])
+        # Both DNS paths (policy-managed and zone group) wait through the cross-platform helper.
+        self.assertEqual(2, outside.count("Wait-KeyVaultPrivateDns -HostName $vaultHostName -ExpectedIp $privateEndpointIp"))
+
 
 class BicepDnsOwnershipTests(unittest.TestCase):
     def test_foundry_zone_groups_honor_policy_but_endpoint_resources_do_not_depend_on_dns_mode(self):
