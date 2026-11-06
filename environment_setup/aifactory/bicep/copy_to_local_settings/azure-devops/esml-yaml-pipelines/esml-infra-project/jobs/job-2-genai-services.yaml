@@ -932,13 +932,18 @@ steps:
        Write-Host "Private endpoint DNS zone group '$($matchingDnsZoneGroup.name)' uses the expected zone."
      }
 
+     # Cross-platform: pwsh on a Linux agent has no DnsClient module (aif-151, 2026-11-06).
      for ($attempt = 1; $attempt -le 18; $attempt++) {
-       Clear-DnsClientCache -ErrorAction SilentlyContinue
-       $resolvedAddresses = @(
-         Resolve-DnsName -Name $vaultHostName -Type A -ErrorAction SilentlyContinue |
-           Where-Object { -not [string]::IsNullOrWhiteSpace($_.IPAddress) } |
-           Select-Object -ExpandProperty IPAddress -Unique
-       )
+       if (Get-Command Clear-DnsClientCache -ErrorAction SilentlyContinue) {
+         Clear-DnsClientCache -ErrorAction SilentlyContinue
+       }
+       $resolvedAddresses = @()
+       try {
+         $resolvedAddresses = @([System.Net.Dns]::GetHostAddresses($vaultHostName) |
+           ForEach-Object { $_.IPAddressToString })
+       } catch [System.Net.Sockets.SocketException] {
+         Write-Host "DNS lookup for '$vaultHostName' is not ready: $($_.Exception.Message)"
+       }
        Write-Host "Key Vault private DNS check $attempt/18: expected=$privateEndpointIp resolved=$($resolvedAddresses -join ',')"
        if ($resolvedAddresses -contains $privateEndpointIp) {
          Write-Host "Key Vault '$vaultHostName' resolves to approved private endpoint IP '$privateEndpointIp'."
