@@ -42,7 +42,7 @@ selector, never `dev_sub_id` as a fallback for Stage/Prod.
 | Input | Default | Meaning |
 |---|---|---|
 | `environment` | `dev` | Exactly one Dev, Stage/Test or Prod placement |
-| `projectNumber` | `001` | Assertion against `project_number_000`, not a renaming operation |
+| `projectNumber` | `not-applicable` | Use `project_number_000` from `variables.yaml`; an explicit three-digit value asserts the selected project, never renames it |
 | `configurationSource` | `variables-yaml` | Existing pipeline variables, or `json` for a persistent file |
 | `configFile` | `aifactory/variables.json` | Consumer-relative path; used only with JSON source |
 | `mode` | `deploy` | Upsert: create missing assets and update existing ones; `create` only adds missing assets, `plan` is read-only |
@@ -53,9 +53,12 @@ selector, never `dev_sub_id` as a fallback for Stage/Prod.
 | `factory_id`, `scale_set_id` | `not-applicable` | Omit optional telemetry identity overrides; never invented from resource names |
 
 Azure DevOps requires nonempty manual string inputs. The pipeline resolves
-`not-applicable` before both configuration and deployment: the service connection
+`not-applicable` before both configuration and deployment: the project number
+uses `project_number_000` from `variables.yaml`, the service connection
 uses the selected environment's existing setting and telemetry identity overrides
-are omitted. Existing callers that pass empty strings remain supported. Dashboards
+are omitted. Existing callers that pass empty connection/telemetry strings remain
+supported; the resolved project number must still match the selected configuration,
+including in JSON mode. Dashboards
 and native usage/cost views still deploy without telemetry IDs; this does not
 register or publish a factory. JSON mode retains its configured/register ID lookup.
 

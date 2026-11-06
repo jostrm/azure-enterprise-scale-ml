@@ -786,7 +786,7 @@ def test_workflow_is_manual_upsert_default_and_uses_shared_runner():
     assert ado_params["mode"]["values"] == ["plan", "create", "deploy"]
     assert ado_params["runnerSelection"]["default"] == "from-config"
     assert ado_params["selfHostedPool"]["default"] == "Default"
-    for name in ("serviceConnection", "factory_id", "scale_set_id"):
+    for name in ("projectNumber", "serviceConnection", "factory_id", "scale_set_id"):
         assert ado_params[name]["default"] == "not-applicable"
     source = ADO.read_text()
     assert source.count("deploy-dashboards-only.py") == 2
@@ -811,6 +811,9 @@ def test_workflow_optional_inputs_resolve_before_both_jobs():
             f"${{{{ variables.{variable}_service_connection }}}}"
         )
     assert connection["${{ else }}"]["value"] == "${{ variables.test_service_connection }}"
+    project = variables["resolvedProjectNumber"]
+    assert project["${{ if eq(parameters.projectNumber, 'not-applicable') }}"]["value"] == "$(project_number_000)"
+    assert project["${{ else }}"]["value"] == "${{ parameters.projectNumber }}"
     configure = ado["jobs"][0]["steps"][-1]
     deploy = next(iter(ado["jobs"][1].values()))[0]["steps"][-1]
     for parameter, variable, env_name in (
@@ -823,7 +826,7 @@ def test_workflow_optional_inputs_resolve_before_both_jobs():
         for step in (configure, deploy):
             assert step["env"][env_name] == f"$({variable})"
     for step in (configure, deploy):
-        assert step["env"]["PROJECT_NUMBER"] == "${{ parameters.projectNumber }}"
+        assert step["env"]["PROJECT_NUMBER"] == "$(resolvedProjectNumber)"
         assert step["env"]["SERVICE_CONNECTION"] == "${{ variables.dashboardServiceConnection }}"
 
 

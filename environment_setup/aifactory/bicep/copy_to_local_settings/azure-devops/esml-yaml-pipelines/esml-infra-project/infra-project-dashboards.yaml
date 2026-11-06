@@ -20,9 +20,9 @@ parameters:
     default: dev
     values: [dev, stage, test, prod]
   - name: projectNumber
-    displayName: Exact project number assertion
+    displayName: Exact project number assertion (not-applicable uses project_number_000 from variables.yaml)
     type: string
-    default: '001'
+    default: 'not-applicable'
   - name: configFile
     displayName: Persistent consumer-relative variables.json (only for JSON source)
     type: string
@@ -75,6 +75,11 @@ variables:
       value: ${{ variables.prod_service_connection }}
     ${{ else }}:
       value: ${{ variables.test_service_connection }}
+  - name: resolvedProjectNumber
+    ${{ if eq(parameters.projectNumber, 'not-applicable') }}:
+      value: $(project_number_000)
+    ${{ else }}:
+      value: ${{ parameters.projectNumber }}
   - name: resolvedFactoryId
     ${{ if eq(parameters.factory_id, 'not-applicable') }}:
       value: ''
@@ -117,7 +122,7 @@ jobs:
           CONFIG_FILE: ${{ parameters.configFile }}
           CONFIGURATION_SOURCE: ${{ parameters.configurationSource }}
           TARGET_ENVIRONMENT: ${{ parameters.environment }}
-          PROJECT_NUMBER: ${{ parameters.projectNumber }}
+          PROJECT_NUMBER: $(resolvedProjectNumber)
           RUNNER_SELECTION: ${{ parameters.runnerSelection }}
           SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
           FACTORY_ID: $(resolvedFactoryId)
@@ -164,7 +169,7 @@ jobs:
             CONFIGURATION_SOURCE: ${{ parameters.configurationSource }}
             PLAN_OPERATION: ${{ parameters.planOperation }}
             TARGET_ENVIRONMENT: ${{ parameters.environment }}
-            PROJECT_NUMBER: ${{ parameters.projectNumber }}
+            PROJECT_NUMBER: $(resolvedProjectNumber)
             DASHBOARD_MODE: ${{ parameters.mode }}
             SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
             FACTORY_ID: $(resolvedFactoryId)
