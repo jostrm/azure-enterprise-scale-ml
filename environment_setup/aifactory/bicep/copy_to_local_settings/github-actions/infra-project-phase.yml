@@ -926,6 +926,7 @@ jobs:
         shell: pwsh
         env:
           DNS_MANAGED_BY_POLICY: ${{ env.centralDnsZoneByPolicyInHub }}
+          AIF_DELETE_RUN: ${{ env.deleteAllForProject == 'true' || env.deleteAllServicesForProject == 'true' }}
         run: |
           $dnsZoneSubscription = if ('${{ env.centralDnsZoneByPolicyInHub }}' -eq 'true') {
             '${{ env.privDnsSubscription_param }}'
@@ -946,7 +947,8 @@ jobs:
             -VnetName "${{ env.vnetNameFull_resolved }}" `
             -DnsZoneSubscription $dnsZoneSubscription `
             -DnsZoneResourceGroup $dnsZoneResourceGroup `
-            -DnsManagedByPolicy:($env:DNS_MANAGED_BY_POLICY -eq 'true')
+            -DnsManagedByPolicy:($env:DNS_MANAGED_BY_POLICY -eq 'true') `
+            -AllowMissingZone:($env:AIF_DELETE_RUN -eq 'true')
 
       - name: 03_Download_Secrets_From_Seeding_KeyVault
         shell: bash

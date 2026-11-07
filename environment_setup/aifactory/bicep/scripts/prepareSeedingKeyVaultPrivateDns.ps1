@@ -22,7 +22,10 @@ param(
 
     [string] $DnsZoneResourceGroup = $VnetResourceGroup,
 
-    [switch] $DnsManagedByPolicy
+    [switch] $DnsManagedByPolicy,
+
+    # Delete runs only: a partially bootstrapped factory may never have created the zone (aif-147/148, 2026-11-07).
+    [switch] $AllowMissingZone
 )
 
 $ErrorActionPreference = 'Stop'
@@ -257,6 +260,10 @@ foreach ($candidate in $dnsZoneCandidates) {
     Write-Warning "Key Vault private DNS zone is unavailable at '$candidateKey': $($output -join [Environment]::NewLine)"
 }
 if ($null -eq $dnsZone) {
+    if ($AllowMissingZone) {
+        Write-Warning "Private DNS zone '$dnsZoneName' was not found; deletion continues without linking it (the factory's DNS bootstrap never completed)."
+        exit 0
+    }
     throw "Private DNS zone '$dnsZoneName' was not found in the configured or VNet-local DNS locations."
 }
 
