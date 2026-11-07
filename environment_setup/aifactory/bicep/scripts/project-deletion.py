@@ -37,6 +37,12 @@ ABSENT_CODES = {"ResourceNotFound", "ResourceGroupNotFound"}
 CONFLICT_CODES = {"RequestConflict", "AnotherOperationInProgress", "ApplianceBeingDeleted"}
 BUSY_STATES = {"creating", "updating", "accepted"}
 MAX_DELETE_ATTEMPTS = 3
+MAX_READ_ATTEMPTS = 3
+FOUNDRY_TYPE = "Microsoft.CognitiveServices/accounts"
+# Child API proven live by the pipeline's Foundry V2 project and capability-host reads.
+FOUNDRY_CHILD_API = "2026-01-15-preview"
+# Nested Foundry deletes are short asynchronous operations: confirm them at ~1 s, bounded by the deadline.
+CHILD_POLL_SECONDS = 1.0
 
 
 class DeletionError(Exception):
@@ -259,6 +265,7 @@ class Deletion:
         self.active_id = self.group_id
         self.states = {}
         self.diagnostics = []
+        self.poll_cap = None
         self.az = shutil.which("az")
         if self.az is None:
             raise DeletionError("AzureCLIUnavailable", "Azure CLI is required; no extensions are needed.")
@@ -282,7 +289,7 @@ class Deletion:
         return remaining
 
     def pause(self):
-        self.sleep(min(self.args.poll_seconds, self.remaining()))
+        self.sleep(min(self.poll_cap or self.args.poll_seconds, self.args.poll_seconds, self.remaining()))
         self.remaining()
 
     def command(self, arguments, resource_id, *, read_json=True, timeout_cap=120):
@@ -297,7 +304,7 @@ class Deletion:
         except subprocess.TimeoutExpired:
             raise DeletionError(
                 "CommandTimeout",
-                "Azure CLI timed out; the operation outcome is uncertain. No delete will be resubmitted.",
+                "Azure CLI timed out; the outcome is uncertain until the resource state is re-read.",
                 resource_id, "timeout",
             ) from None
         except OSError as error:
@@ -385,14 +392,24 @@ class Deletion:
         self.state(item)
         return item
 
+    def note_timeout(self, resource_id, operation):
+        self.diagnostics.append({"code": "CommandTimeout", "operation": operation, "resource_id": resource_id})
+        print(f"Warning: Azure CLI timed out during {operation}; re-reading the live state of {resource_id}.",
+              file=sys.stderr)
+
     def get(self, resource_id, version):
-        try:
-            item = self.rest("get", resource_id, version)
-        except DeletionError as error:
-            if error.code in ABSENT_CODES:
-                self.states[resource_id] = "Absent"
-                return None
-            raise
+        for attempt in range(MAX_READ_ATTEMPTS):
+            try:
+                item = self.rest("get", resource_id, version)
+                break
+            except DeletionError as error:
+                if error.code in ABSENT_CODES:
+                    self.states[resource_id] = "Absent"
+                    return None
+                # A read is safe to repeat; the deadline still bounds every attempt.
+                if error.code != "CommandTimeout" or attempt + 1 >= MAX_READ_ATTEMPTS:
+                    raise
+                self.note_timeout(resource_id, "read")
         if not isinstance(item, dict) or not isinstance(item.get("id"), str) or (
             item["id"].lower() != resource_id.lower()
         ):
@@ -520,6 +537,18 @@ class Deletion:
             try:
                 self.rest("delete", resource_id, version, read_json=False)
             except DeletionError as error:
+                if error.code == "CommandTimeout":
+                    # ARM DELETE is idempotent: re-read the live state and continue, wait or resubmit.
+                    self.note_timeout(resource_id, "delete")
+                    item = self.wait_ready(resource_id, version, self.get(resource_id, version))
+                    if item is None:
+                        return
+                    if self.state(item) == "deleting":
+                        self.wait_absent(resource_id, version, deleting=True)
+                        return
+                    if attempt + 1 >= MAX_DELETE_ATTEMPTS:
+                        raise error
+                    continue
                 if error.code in ABSENT_CODES:
                     self.wait_absent(resource_id, version)
                     return
@@ -550,6 +579,48 @@ class Deletion:
             resource_id, API_VERSIONS[self.args.resource_type.lower()],
             ml_workspace=self.args.resource_type.lower() == ML_TYPE,
         )
+
+    def children(self, collection):
+        try:
+            return self.collection(collection, FOUNDRY_CHILD_API, self.group_id)
+        except DeletionError as error:
+            if error.code in ABSENT_CODES:
+                return []
+            raise
+
+    def foundry_children(self):
+        """Delete Foundry V2 project hosts, account hosts and projects, confirming each is gone (404)."""
+        account_id = f"{self.group_id}/providers/{FOUNDRY_TYPE}/{self.args.name}"
+        account = self.get(account_id, API_VERSIONS[FOUNDRY_TYPE.lower()])
+        if account is None or self.state(account) == "deleting":
+            return
+        assert_group_allowed(self.args.subscription, account_id, self.protected_patterns, account)
+        previous, self.poll_cap = self.poll_cap, CHILD_POLL_SECONDS
+        try:
+            projects = self.children(account_id + "/projects")
+            for project in projects:
+                for host in self.children(project["id"] + "/capabilityHosts"):
+                    self.delete_resource(host["id"], FOUNDRY_CHILD_API)
+            for host in self.children(account_id + "/capabilityHosts"):
+                try:
+                    self.delete_resource(host["id"], FOUNDRY_CHILD_API)
+                except DeletionError as error:
+                    if error.status == "timeout":
+                        raise
+                    # Same tolerance as before: the account delete below is the live check.
+                    self.diagnostics.append({"code": error.code, "resource_id": host["id"]})
+                    print(f"Warning: account capability host was not deleted ({error.code}); "
+                          "the account delete decides.", file=sys.stderr)
+            for project in projects:
+                self.delete_resource(project["id"], FOUNDRY_CHILD_API)
+            left = self.children(account_id + "/projects")
+            if left:
+                raise DeletionError(
+                    "NestedResourcesRemain", "Foundry projects still exist; the account cannot be deleted yet.",
+                    left[0]["id"],
+                )
+        finally:
+            self.poll_cap = previous
 
     def query_state(self):
         resource_id = f"{self.group_id}/providers/{self.args.resource_type}/{self.args.name}"
@@ -701,6 +772,9 @@ def arguments(argv):
     resource = commands.add_parser("resource", help="Delete one supported resource and confirm absence.")
     resource.add_argument("--resource-type", required=True)
     resource.add_argument("--name", required=True)
+    children = commands.add_parser(
+        "foundry-children", help="Delete a Foundry V2 account's capability hosts and projects and confirm absence.")
+    children.add_argument("--name", required=True)
     state = commands.add_parser("state", help="Read one resource's lowercase provisioning state or confirmed absence.")
     state.add_argument("--resource-type", required=True)
     state.add_argument("--name", required=True)
@@ -718,7 +792,7 @@ def validate_arguments(args):
     if not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.subscription):
         raise DeletionError("InvalidArgument", "--subscription must be a subscription GUID.")
     valid_name(args.resource_group, "resource group", 90)
-    if args.action in {"resource", "group", "guard"}:
+    if args.action in {"resource", "group", "guard", "foundry-children"}:
         assert_group_allowed(args.subscription, resource_group_id(args.subscription, args.resource_group),
                              protected_group_patterns())
     if args.action == "guard":
@@ -734,6 +808,8 @@ def validate_arguments(args):
             valid_name(prefix, "name prefix")
     if args.action in {"resource", "state"}:
         valid_resource_name(args.resource_type, args.name)
+    if args.action == "foundry-children":
+        valid_name(args.name, "Foundry account name", 64)
     if args.action == "group" and args.confirm_resource_group != args.resource_group:
         raise DeletionError("ConfirmationMismatch", "--confirm-resource-group must exactly equal --resource-group.")
     if args.action == "verify-network":

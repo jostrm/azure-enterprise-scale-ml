@@ -49,11 +49,21 @@ steps:
       set -euo pipefail
       cloud=""
       enabled="${ENABLEREDISMANAGED:-false}"
+      validator="$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py"
+      # The pipeline copy can be newer than the pinned submodule: call only what the checkout ships.
+      if [ ! -f "$validator" ]; then
+        if [ "${enabled,,}" = "true" ]; then
+          echo "##vso[task.logissue type=error]enableRedisManaged=true needs redis_managed_config.py, which the checked-out azure-enterprise-scale-ml submodule lacks. Update the submodule to a release with Azure Managed Redis."
+          exit 1
+        fi
+        echo "##vso[task.logissue type=warning]The checked-out azure-enterprise-scale-ml submodule predates Azure Managed Redis; validation skipped (enableRedisManaged is not true)."
+        exit 0
+      fi
       if [ "${enabled,,}" = "true" ]; then
         cloud="$(az cloud show --query name -o tsv)"
         cloud="${cloud%$'\r'}"
       fi
-      python "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py" \
+      python "$validator" \
         --environment "$(dev_test_prod)" --cloud "$cloud" --azure-devops
 - template: ../../variables/persona-access-steps.yaml
   parameters:
