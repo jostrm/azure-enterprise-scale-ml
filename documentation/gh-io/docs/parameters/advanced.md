@@ -408,18 +408,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 403 |
-| `env` | 401 |
+| `yaml` | 409 |
+| `env` | 407 |
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 408 |
+| `json.dev` | 414 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 157, 426; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 158, 427; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 428, 452; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 157, 433; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 158, 434; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 435, 459; one reference row.
 
 ## YAML and variables.json reference
 
@@ -513,6 +513,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enablePostgreSQL --><!-- parameter json.dev:enablePostgreSQL -->`enablePostgreSQL` | `ENABLE_POSTGRESQL` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure PostgreSQL |
 | <!-- parameter yaml:enableProjectVM --><!-- parameter json.dev:enableProjectVM -->`enableProjectVM` | `ENABLE_PROJECT_VM` | O | Y: `false`<br>J.dev: `false` | Enable project vm. |
 | <!-- parameter yaml:enableRedisCache --><!-- parameter json.dev:enableRedisCache -->`enableRedisCache` | `ENABLE_REDIS_CACHE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Cache for Redis |
+| <!-- parameter yaml:enableRedisManaged --><!-- parameter json.dev:enableRedisManaged -->`enableRedisManaged` | `ENABLE_REDIS_MANAGED` | O | Y: `"false"`<br>J.dev: `false` | Independent private, Entra-only Azure Managed Redis. |
 | <!-- parameter yaml:enableRetries --><!-- parameter json.dev:enableRetries -->`enableRetries` | `ENABLE_RETRIES` | O | Y: `"false"`<br>J.dev: `"false"` | Enable automatic job retries otherwise: true, enable automatic retries on failure for GenAI services deployment. |
 | <!-- parameter yaml:enableSQLDatabase --><!-- parameter json.dev:enableSQLDatabase -->`enableSQLDatabase` | `ENABLE_SQL_DATABASE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure SQL Database |
 | <!-- parameter yaml:enableVmBackup --><!-- parameter json.dev:enableVmBackup -->`enableVmBackup` | `ENABLE_VM_BACKUP` | O | Y: `"false"`<br>J.dev: `"false"` | Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
@@ -581,6 +582,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:bastion_custom_name --><!-- parameter json.dev:bastion_custom_name -->`bastion_custom_name` | `BASTION_CUSTOM_NAME` | O | Y: `""`<br>J.dev: `""` | Bastion name override for common RG RBAC keep-as-is: Empty uses the standard Bastion naming convention. |
 | <!-- parameter yaml:bastion_subscription_resource_group --><!-- parameter json.dev:bastion_subscription_resource_group -->`bastion_subscription_resource_group` | `BASTION_SUBSCRIPTION_RESOURCE_GROUP` | O | Y: `""`<br>J.dev: `""` | Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
 | <!-- parameter yaml:bingCustomSearchSku --><!-- parameter json.dev:bingCustomSearchSku -->`bingCustomSearchSku` | `BING_CUSTOM_SEARCH_SKU` | O | Y: `"G2"`<br>J.dev: `"G2"` | Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding. |
+| <!-- parameter yaml:clusteringPolicyRedisManaged --><!-- parameter json.dev:clusteringPolicyRedisManaged -->`clusteringPolicyRedisManaged` | `CLUSTERING_POLICY_REDIS_MANAGED` | O | Y: `"OSSCluster"`<br>J.dev: `"OSSCluster"` | OSSCluster&#124;EnterpriseCluster&#124;NoCluster |
 | <!-- parameter yaml:commonLakeNamePrefixMax8chars --><!-- parameter json.dev:commonLakeNamePrefixMax8chars -->`commonLakeNamePrefixMax8chars` | `COMMON_LAKE_NAME_PREFIX_MAX8CHARS` (not in .env template), `LAKE_PREFIX` | O | Y: `"mrvel"`<br>J.dev: `"mrvel"` | Data lake storage name prefix keep-as-is: Max 8 characters. |
 | <!-- parameter yaml:commonResourceGroup_param --><!-- parameter json.dev:commonResourceGroup_param -->`commonResourceGroup_param` | `COMMON_RESOURCE_GROUP_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common resource group name otherwise: provide a custom name for the common resource group. |
 | <!-- parameter yaml:containerAppsRetryCapacityArray --><!-- parameter json.dev:containerAppsRetryCapacityArray -->`containerAppsRetryCapacityArray` | `CONTAINER_APPS_RETRY_CAPACITY_ARRAY` | O | Y: `"true"`<br>J.dev: `"true"` | Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3. |
@@ -590,8 +592,10 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:dev_admin_bicep_kv_fw --><!-- parameter json.dev:dev_admin_bicep_kv_fw -->`dev_admin_bicep_kv_fw` | `AIFACTORY_SEEDING_KEYVAULT_NAME` | M | Y: `"<todo>_Name_Dev"`<br>J.dev: `"<todo>_Name_Dev"` | DEV seeding KV name mandatory: DEV seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. |
 | <!-- parameter yaml:dev_admin_bicep_kv_fw_rg --><!-- parameter json.dev:dev_admin_bicep_kv_fw_rg -->`dev_admin_bicep_kv_fw_rg` | `AIFACTORY_SEEDING_KEYVAULT_RG` | M | Y: `"<todo>_ResourceGroup_DEV"`<br>J.dev: `"<todo>_ResourceGroup_DEV"` | DEV seeding KV resource group mandatory: DEV seeding KV resource group ensure: resource group where the DEV seeding Key Vault resides. |
 | <!-- parameter yaml:dev_sub_id --><!-- parameter json.dev:dev_sub_id -->`dev_sub_id` | `DEV_SUBSCRIPTION_ID` | M | Y: `"<todo>_SubID"`<br>J.dev: `"<todo>_SubID"` | DEV subscription ID mandatory: DEV subscription ID |
+| <!-- parameter yaml:evictionPolicyRedisManaged --><!-- parameter json.dev:evictionPolicyRedisManaged -->`evictionPolicyRedisManaged` | `EVICTION_POLICY_REDIS_MANAGED` | O | Y: `"NoEviction"`<br>J.dev: `"NoEviction"` | Eviction policy redis managed. |
 | <!-- parameter yaml:functionRuntime --><!-- parameter json.dev:functionRuntime -->`functionRuntime` | `FUNCTION_RUNTIME` | O | Y: `"dotnet"`<br>J.dev: `"dotnet"` | Azure Function runtime otherwise: "python", "node", "java", "powershell". |
 | <!-- parameter yaml:functionVersion --><!-- parameter json.dev:functionVersion -->`functionVersion` | `FUNCTION_VERSION` | O | Y: `"v7.0"`<br>J.dev: `"v7.0"` | Azure Function runtime version |
+| <!-- parameter yaml:highAvailabilityRedisManaged --><!-- parameter json.dev:highAvailabilityRedisManaged -->`highAvailabilityRedisManaged` | `HIGH_AVAILABILITY_REDIS_MANAGED` | O | Y: `"Enabled"`<br>J.dev: `"Enabled"` | Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported. |
 | <!-- parameter yaml:kvNameFromCOMMON_param --><!-- parameter json.dev:kvNameFromCOMMON_param -->`kvNameFromCOMMON_param` | `KV_NAME_FROM_COMMON_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
 | <!-- parameter yaml:lakeContainerName --><!-- parameter json.dev:lakeContainerName -->`lakeContainerName` | `LAKE_CONTAINER_NAME` | O | Y: `"lake3"`<br>J.dev: `"lake3"` | Data lake container name |
 | <!-- parameter yaml:logicAppType --><!-- parameter json.dev:logicAppType -->`logicAppType` | `LOGIC_APP_TYPE` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Logic Apps hosting type |
@@ -782,6 +786,8 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:skuPostgreSQLDev --><!-- parameter json.dev:skuPostgreSQLDev -->`skuPostgreSQLDev` | `SKU_POSTGRESQL_DEV` | O | Y: `"Standard_B1ms"`<br>J.dev: `"Standard_B1ms"` | PostgreSQL compute SKU Dev |
 | <!-- parameter yaml:skuPostgreSQLStageProd --><!-- parameter json.dev:skuPostgreSQLStageProd -->`skuPostgreSQLStageProd` | `SKU_POSTGRESQL_STAGEPROD` | O | Y: `"Standard_B1ms"`<br>J.dev: `"Standard_B1ms"` | PostgreSQL compute SKU Stage/Prod |
 | <!-- parameter yaml:skuRedisDev --><!-- parameter json.dev:skuRedisDev -->`skuRedisDev` | `SKU_REDIS_DEV` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Redis SKU Dev ['Basic','Standard','Premium'] |
+| <!-- parameter yaml:skuRedisManagedDev --><!-- parameter json.dev:skuRedisManagedDev -->`skuRedisManagedDev` | `SKU_REDIS_MANAGED_DEV` | O | Y: `"Balanced_B1"`<br>J.dev: `"Balanced_B1"` | Balanced_B0&#124;Balanced_B1&#124;Balanced_B5&#124;Balanced_B10 |
+| <!-- parameter yaml:skuRedisManagedStageProd --><!-- parameter json.dev:skuRedisManagedStageProd -->`skuRedisManagedStageProd` | `SKU_REDIS_MANAGED_STAGEPROD` | O | Y: `"Balanced_B5"`<br>J.dev: `"Balanced_B5"` | Sku redis managed stage prod. |
 | <!-- parameter yaml:skuRedisStageProd --><!-- parameter json.dev:skuRedisStageProd -->`skuRedisStageProd` | `SKU_REDIS_STAGEPROD` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Redis SKU Stage/Prod |
 | <!-- parameter yaml:skuSQLDatabaseDev --><!-- parameter json.dev:skuSQLDatabaseDev -->`skuSQLDatabaseDev` | `SKU_SQLDATABASE_DEV` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure SQL DB (DTU model) SKU Dev |
 | <!-- parameter yaml:skuSQLDatabaseStageProd --><!-- parameter json.dev:skuSQLDatabaseStageProd -->`skuSQLDatabaseStageProd` | `SKU_SQLDATABASE_STAGEPROD` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure SQL DB (DTU model) SKU Stage/Prod |
@@ -928,11 +934,13 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:BASTION_CUSTOM_NAME -->`BASTION_CUSTOM_NAME` | `bastion_custom_name` | O | `""` | Bastion name override for common RG RBAC keep-as-is: Empty uses the standard Bastion naming convention. |
 | <!-- parameter env:BASTION_SUBSCRIPTION_RESOURCE_GROUP -->`BASTION_SUBSCRIPTION_RESOURCE_GROUP` | `bastion_subscription_resource_group` | O | `""` | Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
 | <!-- parameter env:BING_CUSTOM_SEARCH_SKU -->`BING_CUSTOM_SEARCH_SKU` | `bingCustomSearchSku` | O | `"G2"` | Bing Custom Search SKU |
+| <!-- parameter env:CLUSTERING_POLICY_REDIS_MANAGED -->`CLUSTERING_POLICY_REDIS_MANAGED` | `clusteringPolicyRedisManaged` | O | `"OSSCluster"` | Clustering policy redis managed. |
 | <!-- parameter env:COMMON_RESOURCE_GROUP_PARAM -->`COMMON_RESOURCE_GROUP_PARAM` | `commonResourceGroup_param` | O | `""` | BYO common resource group name otherwise: provide a custom name for the common resource group. |
 | <!-- parameter env:CONTAINER_APPS_RETRY_CAPACITY_ARRAY -->`CONTAINER_APPS_RETRY_CAPACITY_ARRAY` | `containerAppsRetryCapacityArray` | O | `"true"` | Retry only Container Apps capacity errors, waiting 240 seconds before attempts 2 and 3. |
 | <!-- parameter env:COSMOS_KIND -->`COSMOS_KIND` | `cosmosKind` | O | `"GlobalDocumentDB"` | Cosmos DB kind otherwise: MongoDB. |
 | <!-- parameter env:DATALAKE_NAME_PARAM -->`DATALAKE_NAME_PARAM` | `datalakeName_param` | O | `""` | BYO data lake storage account name otherwise: provide a custom storage account name. |
 | <!-- parameter env:DEV_SUBSCRIPTION_ID -->`DEV_SUBSCRIPTION_ID` | `dev_sub_id` | M | `"<todo>"` | DEV subscription ID mandatory: DEV subscription ID |
+| <!-- parameter env:EVICTION_POLICY_REDIS_MANAGED -->`EVICTION_POLICY_REDIS_MANAGED` | `evictionPolicyRedisManaged` | O | `"NoEviction"` | Eviction policy redis managed. |
 | <!-- parameter env:FUNCTION_RUNTIME -->`FUNCTION_RUNTIME` | `functionRuntime` | O | `"dotnet"` | Functions runtime stack otherwise: python, node, java. |
 | <!-- parameter env:FUNCTION_VERSION -->`FUNCTION_VERSION` | `functionVersion` | O | `"v7.0"` | Functions runtime version |
 | <!-- parameter env:GITHUB_NEW_REPO -->`GITHUB_NEW_REPO` | `GITHUB_NEW_REPO` | M | `"<todo>/<todo>azure-enterprise-scale-aifactory-001"` | New GitHub repository path mandatory: New GitHub repository path ensure: format: |
@@ -940,6 +948,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:GITHUB_TEMPLATE_REPO -->`GITHUB_TEMPLATE_REPO` | `GITHUB_TEMPLATE_REPO` | O | `"azure/enterprise-scale-aifactory"` | GitHub template repository keep-as-is: Leave as-is if BYO repo. |
 | <!-- parameter env:GITHUB_USERNAME -->`GITHUB_USERNAME` | `GITHUB_USERNAME` | M | `"<todo>"` | GitHub username or org mandatory: GitHub username or org |
 | <!-- parameter env:GITHUB_USE_SSH -->`GITHUB_USE_SSH` | `GITHUB_USE_SSH` | O | `"false"` | Use SSH for git operations otherwise: true, use SSH instead of HTTPS. |
+| <!-- parameter env:HIGH_AVAILABILITY_REDIS_MANAGED -->`HIGH_AVAILABILITY_REDIS_MANAGED` | `highAvailabilityRedisManaged` | O | `"Enabled"` | High availability redis managed. |
 | <!-- parameter env:KEYVAULT_SOFT_DELETE -->`KEYVAULT_SOFT_DELETE` | `admin_keyvaultSoftDeleteDays` | C | `"7"` | Key Vault soft delete days mandatory: if CMK:'true' (purge protection required). otherwise: 90 days recommended; 0 to disable. |
 | <!-- parameter env:KV_NAME_FROM_COMMON_PARAM -->`KV_NAME_FROM_COMMON_PARAM` | `kvNameFromCOMMON_param` | O | `""` | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
 | <!-- parameter env:LAKE_CONTAINER_NAME -->`LAKE_CONTAINER_NAME` | `lakeContainerName` | O | `"lake3"` | Data lake container name |
@@ -1063,6 +1072,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_POSTGRESQL -->`ENABLE_POSTGRESQL` | `enablePostgreSQL` | O | `"false"` | Enable Azure PostgreSQL Flexible Server |
 | <!-- parameter env:ENABLE_PROJECT_VM -->`ENABLE_PROJECT_VM` | `enableProjectVM` | O | `"false"` | Enable project vm. |
 | <!-- parameter env:ENABLE_REDIS_CACHE -->`ENABLE_REDIS_CACHE` | `enableRedisCache` | O | `"false"` | Enable Azure Cache for Redis |
+| <!-- parameter env:ENABLE_REDIS_MANAGED -->`ENABLE_REDIS_MANAGED` | `enableRedisManaged` | O | `"false"` | Enable redis managed. |
 | <!-- parameter env:ENABLE_RETRIES -->`ENABLE_RETRIES` | `enableRetries` | O | `"false"` | Enable automatic job retries otherwise: true, enables retry logic for GenAI services deployment. |
 | <!-- parameter env:ENABLE_SQL_DATABASE -->`ENABLE_SQL_DATABASE` | `enableSQLDatabase` | O | `"false"` | Enable Azure SQL Database |
 | <!-- parameter env:ENABLE_VM_BACKUP -->`ENABLE_VM_BACKUP` | `enableVmBackup` | O | `"false"` | Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
@@ -1199,6 +1209,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:SKU_POSTGRESQL_DEV -->`SKU_POSTGRESQL_DEV` | `skuPostgreSQLDev` | O | `"Standard_B1ms"` | PostgreSQL compute SKU Dev |
 | <!-- parameter env:SKU_POSTGRESQL_STAGEPROD -->`SKU_POSTGRESQL_STAGEPROD` | `skuPostgreSQLStageProd` | O | `"Standard_B1ms"` | PostgreSQL compute SKU Stage/Prod |
 | <!-- parameter env:SKU_REDIS_DEV -->`SKU_REDIS_DEV` | `skuRedisDev` | O | `"Standard"` | Redis SKU Dev keep-as-is: ['Basic','Standard','Premium'] |
+| <!-- parameter env:SKU_REDIS_MANAGED_DEV -->`SKU_REDIS_MANAGED_DEV` | `skuRedisManagedDev` | O | `"Balanced_B1"` | Sku redis managed dev. |
+| <!-- parameter env:SKU_REDIS_MANAGED_STAGEPROD -->`SKU_REDIS_MANAGED_STAGEPROD` | `skuRedisManagedStageProd` | O | `"Balanced_B5"` | Sku redis managed stageprod. |
 | <!-- parameter env:SKU_REDIS_STAGEPROD -->`SKU_REDIS_STAGEPROD` | `skuRedisStageProd` | O | `"Standard"` | Redis SKU Stage/Prod |
 | <!-- parameter env:SKU_SPEECH_DEV -->`SKU_SPEECH_DEV` | `skuSpeechDev` | O | `"S0"` | Azure AI Speech SKU Dev |
 | <!-- parameter env:SKU_SPEECH_STAGEPROD -->`SKU_SPEECH_STAGEPROD` | `skuSpeechStageProd` | O | `"S0"` | Azure AI Speech SKU Stage/Prod |
@@ -1442,7 +1454,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter helper:--simple-mode-hub-subnets -->`--simple-mode-hub-subnets` | C | `null` | Validate existing subnet JSON and print reserved simple-mode subnets. |
 | <!-- parameter helper:--simple-mode-manifest -->`--simple-mode-manifest` | C | `false` | Offline read-only contract/preset preview. |
 | <!-- parameter helper:--simple-project-providers -->`--simple-project-providers` | C | `false` | Simple project providers |
-| <!-- parameter helper:--simple-project-selected -->`--simple-project-selected` | C | `null` | Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, container-apps |
+| <!-- parameter helper:--simple-project-selected -->`--simple-project-selected` | C | `null` | Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, redis-managed, container-apps |
 | <!-- parameter helper:--state-file -->`--state-file` | C | `null` | Bootstrap state JSON, not variables.json; consumed by the selected route writer. |
 | <!-- parameter helper:--verify-simple-mode-source -->`--verify-simple-mode-source` | C | `null` | Compare supplied checkout with the required shared source trees. |
 
