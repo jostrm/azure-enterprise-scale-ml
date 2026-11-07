@@ -1536,6 +1536,8 @@ def test_accepted_source_keeps_exact_checkout_without_reresolving_a_moving_ref(w
             return fl.SOURCE_ORIGIN
         if argv[1] == "show":
             return Path(fl.__file__).read_text(encoding="utf-8").strip()
+        if argv[1] == "merge-base":
+            raise fl.Blocked("command-failed")  # a local ancestry read: unrelated history still blocks
         raise AssertionError("Accepted source must not fetch, checkout, or query its moving ref")
 
     cloud.command = command
