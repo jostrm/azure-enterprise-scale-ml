@@ -355,6 +355,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net'
     name:'privatelink.redis.cache.windows.net'
   }
+  redisManaged: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.azure.net'
+    name: 'privatelink.redis.azure.net'
+  }
   postgres: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com'
     name:'privatelink.postgres.database.azure.com'
@@ -485,6 +489,10 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.redis.name
     id: privateLinksDnsZones.redis.id
+  }
+  {
+    name: privateLinksDnsZones.redisManaged.name
+    id: privateLinksDnsZones.redisManaged.id
   }
   {
     name: privateLinksDnsZones.postgres.name

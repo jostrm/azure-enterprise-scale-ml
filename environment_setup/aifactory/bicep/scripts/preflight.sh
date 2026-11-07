@@ -155,6 +155,7 @@ FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
 REPORT_FINDINGS=() # NUL-delimited at EXIT; preserve each finding's subscription.
 REPORT_COMPLETED="false"
 CAPACITY_CONFIG_INVALID="false"
+REDIS_MANAGED_CONFIG_INVALID="false"
 AI_SEARCH_RETRY_PREFLIGHT_FAILED="false"
 SEARCH_RETRY_REQUIRED="false"
 KV_PRINCIPAL_INVALID="false"
@@ -430,6 +431,12 @@ AKS_FW_IP="$(getval aksAzureFirewallPrivateIp AKS_AZURE_FIREWALL_PRIVATE_IP '')"
 
 # --- Additional service enables (DB / app / regional readiness) ---
 ENABLE_REDIS="$(getval enableRedisCache ENABLE_REDIS_CACHE false)"
+ENABLE_REDIS_MANAGED="$(get_capacity_value enableRedisManaged ENABLE_REDIS_MANAGED false)"
+REDIS_MANAGED_SKU_DEV="$(get_capacity_value skuRedisManagedDev SKU_REDIS_MANAGED_DEV Balanced_B1)"
+REDIS_MANAGED_SKU_STAGE_PROD="$(get_capacity_value skuRedisManagedStageProd SKU_REDIS_MANAGED_STAGEPROD Balanced_B5)"
+REDIS_MANAGED_HA="$(get_capacity_value highAvailabilityRedisManaged HIGH_AVAILABILITY_REDIS_MANAGED Enabled)"
+REDIS_MANAGED_EVICTION="$(get_capacity_value evictionPolicyRedisManaged EVICTION_POLICY_REDIS_MANAGED NoEviction)"
+REDIS_MANAGED_CLUSTERING="$(get_capacity_value clusteringPolicyRedisManaged CLUSTERING_POLICY_REDIS_MANAGED OSSCluster)"
 ENABLE_POSTGRES="$(getval enablePostgreSQL ENABLE_POSTGRESQL false)"
 POSTGRES_SKU_DEV="$(get_capacity_value skuPostgreSQLDev SKU_POSTGRESQL_DEV Standard_B1ms)"
 POSTGRES_SKU_STAGE_PROD="$(get_capacity_value skuPostgreSQLStageProd SKU_POSTGRESQL_STAGEPROD Standard_B1ms)"
@@ -778,17 +785,19 @@ PY
 check_resource_providers() { # $1 subId
   local sub="$1" ns state reason sel entry
   # Precompute "selected" booleans (avoids fragile nested command substitution).
-  local sel_cs=false sel_search=false sel_cosmos=false sel_elastic=false
+  local sel_cs=false sel_search=false sel_cosmos=false sel_elastic=false sel_managed_redis=false
   if is_true "$ENABLE_AI_FOUNDRY" || is_true "$ENABLE_AOAI" || [ "${#MODELS[@]}" -gt 0 ]; then sel_cs=true; fi
   is_true "$ENABLE_AI_SEARCH" && sel_search=true
   is_true "$ENABLE_COSMOS"    && sel_cosmos=true
   is_true "$ENABLE_ELASTIC"   && sel_elastic=true
+  is_true "$ENABLE_REDIS_MANAGED" && sel_managed_redis=true
   # namespace|reason|selected(true/false)
   local rps=(
     "Microsoft.CognitiveServices|AI Foundry / Azure OpenAI / models|$sel_cs"
     "Microsoft.Search|Azure AI Search|$sel_search"
     "Microsoft.DocumentDB|Azure Cosmos DB|$sel_cosmos"
     "Microsoft.Elastic|Elasticsearch|$sel_elastic"
+    "Microsoft.Cache|Azure Managed Redis|$sel_managed_redis"
     "Microsoft.KeyVault|Key Vault (always)|true"
     "Microsoft.Storage|Storage (always)|true"
     "Microsoft.Network|Networking (always)|true"
@@ -866,6 +875,37 @@ check_capacity_profile() { # resource label, code prefix, selected, candidates, 
       CAPACITY_CONFIG_INVALID="true"
     fi
   fi
+}
+
+check_redis_managed_configuration() {
+  case "$(lc "$ENABLE_REDIS_MANAGED")" in
+    false) return 0 ;;
+    true) ;;
+    *)
+      add_finding FAIL REDIS_MANAGED_CONFIG_INVALID "enableRedisManaged must be true or false." "Use a boolean enable switch."
+      REDIS_MANAGED_CONFIG_INVALID=true
+      return 0 ;;
+  esac
+  local envname issue
+  for envname in "${CONFIG_ENVS[@]}"; do
+    if [ -z "$PYBIN" ]; then
+      issue="Python is required to validate Azure Managed Redis configuration."
+    elif issue="$(enableRedisManaged="$ENABLE_REDIS_MANAGED" \
+      skuRedisManagedDev="$REDIS_MANAGED_SKU_DEV" skuRedisManagedStageProd="$REDIS_MANAGED_SKU_STAGE_PROD" \
+      highAvailabilityRedisManaged="$REDIS_MANAGED_HA" evictionPolicyRedisManaged="$REDIS_MANAGED_EVICTION" \
+      clusteringPolicyRedisManaged="$REDIS_MANAGED_CLUSTERING" \
+      "$PYBIN" "$SCRIPT_DIR/redis_managed_config.py" --environment "$envname" 2>&1)"; then
+      continue
+    fi
+    add_finding FAIL REDIS_MANAGED_CONFIG_INVALID "[$envname] $issue" "Correct the selected environment's Azure Managed Redis settings."
+    REDIS_MANAGED_CONFIG_INVALID=true
+  done
+  if is_true "$(getval centralDnsZoneByPolicyInHub CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB false)"; then
+    add_finding WARN REDIS_MANAGED_CENTRAL_DNS_PREREQUISITE \
+      "Managed Redis central DNS policy coverage is externally managed, not verified here." \
+      "Provide privatelink.redis.azure.net, client VNet resolution and policy-owned redisEnterprise endpoint zone groups."
+  fi
+  echo "  [INFO] Azure Managed Redis region/SKU capacity and quota require separate confirmation; no retry or public-access fallback."
 }
 
 check_capacity_configuration() {
@@ -1399,6 +1439,7 @@ echo "============================================================"
 echo ""
 echo "=== Config: capacity retry candidates ==="
 check_capacity_configuration
+check_redis_managed_configuration
 echo ""
 echo "=== Config: variables.yaml placeholders ==="
 check_config_placeholders
@@ -1430,7 +1471,7 @@ if [ "$SKIP_AZURE" = "true" ]; then
 fi
 
 AZURE_READY="true"
-if [ "$CAPACITY_CONFIG_INVALID" = "true" ]; then
+if [ "$CAPACITY_CONFIG_INVALID" = "true" ] || [ "$REDIS_MANAGED_CONFIG_INVALID" = "true" ]; then
   AZURE_READY="false"
   echo "preflight: invalid capacity configuration -> no Azure lookups performed."
 elif [ "$SKIP_AZURE" != "true" ]; then
@@ -1503,6 +1544,7 @@ for t in "${TARGETS[@]:-}"; do
   is_true "$ENABLE_AI_FOUNDRY" && check_provider_region Microsoft.CognitiveServices accounts          "Azure AI Foundry / OpenAI"  COGSVC
   is_true "$ENABLE_WEBAPP" || is_true "$ENABLE_FUNCTION" && check_provider_region Microsoft.Web sites "Azure App Service / Functions" WEB
   is_true "$ENABLE_REDIS"     && check_provider_region Microsoft.Cache            Redis             "Azure Cache for Redis"          REDIS
+  is_true "$ENABLE_REDIS_MANAGED" && check_provider_region Microsoft.Cache redisEnterprise "Azure Managed Redis" REDIS_MANAGED
   is_true "$ENABLE_POSTGRES"  && check_provider_region Microsoft.DBforPostgreSQL  flexibleServers   "Azure Database for PostgreSQL"  POSTGRES
   is_true "$ENABLE_CONTAINER_APPS" && check_provider_region Microsoft.App managedEnvironments "Azure Container Apps environments" CONTAINER_APPS
   is_true "$ENABLE_SQLDB"     && check_provider_region Microsoft.Sql              servers           "Azure SQL Database"             SQL
@@ -1556,6 +1598,10 @@ if [ "${#FINDINGS[@]}" -gt 0 ]; then
   done
 fi
 
+if [ "$REDIS_MANAGED_CONFIG_INVALID" = "true" ]; then
+  ci_error "Azure Managed Redis configuration is invalid; deployment is blocked even with WARN_ONLY."
+  exit 1
+fi
 if [ "$CAPACITY_CONFIG_INVALID" = "true" ]; then
   ci_error "Capacity retry configuration is invalid; deployment is blocked even with WARN_ONLY."
   echo "preflight FAILED: invalid capacity retry configuration (exit 1)."

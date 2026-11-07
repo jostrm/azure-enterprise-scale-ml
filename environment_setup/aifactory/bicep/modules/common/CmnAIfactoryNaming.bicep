@@ -153,6 +153,7 @@ var containerAppWName = 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAI
 // Databases
 var cosmosDBName = 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var redisName ='redis-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var redisManagedName = 'redis-managed-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var postgreSQLName ='pg-flex-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlServerName ='sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlDBName ='sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
@@ -234,6 +235,7 @@ output containerAppWName string = containerAppWName
 // Databases
 output cosmosDBName string = cosmosDBName
 output redisName string = redisName
+output redisManagedName string = redisManagedName
 output postgreSQLName string = postgreSQLName
 output sqlServerName string = sqlServerName
 output sqlDBName string = sqlDBName
@@ -328,6 +330,7 @@ output namingConvention aifactoryNamingType = {
   // Databases
   cosmosDBName: cosmosDBName
   redisName: redisName
+  redisManagedName: redisManagedName
   postgreSQLName: postgreSQLName
   sqlServerName: sqlServerName
   sqlDBName: sqlDBName

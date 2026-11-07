@@ -96,6 +96,7 @@ def configuration(
         "privatelink.mongo.cosmos.azure.com",
         "privatelink.openai.azure.com",
         "privatelink.postgres.database.azure.com",
+        "privatelink.redis.azure.net",
         "privatelink.services.ai.azure.com",
     }
     zones = sorted(set(mapping.values()) | extra_zones)

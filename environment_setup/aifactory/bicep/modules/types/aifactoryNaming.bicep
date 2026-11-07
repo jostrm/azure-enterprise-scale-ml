@@ -44,6 +44,7 @@ type aifactoryNamingType = {
   // Databases
   cosmosDBName: string
   redisName: string
+  redisManagedName: string
   postgreSQLName: string
   sqlServerName: string
   sqlDBName: string

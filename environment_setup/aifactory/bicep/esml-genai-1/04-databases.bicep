@@ -29,6 +29,13 @@ var postgreSQLSKU = {
 param skuRedisDev string = 'Standard'
 param skuRedisStageProd string = 'Standard'
 var redisSKU = env == 'dev' ? skuRedisDev : skuRedisStageProd
+// Only the selected active settings are constrained in the conditional child module.
+param skuRedisManagedDev string = 'Balanced_B1'
+param skuRedisManagedStageProd string = 'Balanced_B5'
+param highAvailabilityRedisManaged string = 'Enabled'
+param evictionPolicyRedisManaged string = 'NoEviction'
+param clusteringPolicyRedisManaged string = 'OSSCluster'
+var redisManagedSKU = env == 'dev' ? skuRedisManagedDev : skuRedisManagedStageProd
 // SQL Server (DTU model)
 param skuSQLDatabaseDev string = 'S0'
 param skuSQLDatabaseStageProd string = 'S0'
@@ -85,6 +92,9 @@ param enablePostgreSQL bool = false
 
 @description('Enable Redis Cache deployment')
 param enableRedisCache bool = false
+
+@description('Deploy separate private, Entra-only Azure Managed Redis (commercial Azure only).')
+param enableRedisManaged bool = false
 
 @description('Enable SQL Database deployment')
 param enableSQLDatabase bool = false
@@ -282,6 +292,7 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var cosmosDBName = namingConvention.outputs.cosmosDBName
 var postgreSQLName = namingConvention.outputs.postgreSQLName
 var redisName = namingConvention.outputs.redisName
+var redisManagedName = namingConvention.outputs.redisManagedName
 var sqlServerName = namingConvention.outputs.sqlServerName
 var sqlDBName = namingConvention.outputs.sqlDBName
 var elasticName = 'elastic-${projectName}-${locationSuffix}-${env}'
@@ -598,6 +609,36 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
   ]
 }
 
+// ============== AZURE MANAGED REDIS ==============
+module redisManaged '../modules/databases/redis-managed/redis-managed.bicep' = if (enableRedisManaged) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-RedisManaged-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    azureCloud: any(environment().name)
+    name: redisManagedName
+    location: location
+    tags: tagsProject
+    skuName: redisManagedSKU
+    highAvailability: highAvailabilityRedisManaged
+    evictionPolicy: evictionPolicyRedisManaged
+    clusteringPolicy: clusteringPolicyRedisManaged
+    principalIds: spAndMiArray
+    subnetNamePend: defaultSubnet
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+  }
+}
+
+module privateDnsRedisManaged '../modules/privateDns.bicep' = if (enableRedisManaged && !centralDnsZoneByPolicyInHub) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-privDnsRedisManaged-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    dnsConfig: enableRedisManaged ? redisManaged!.outputs.dnsConfig : []
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+}
+
 // ============== ELASTICSEARCH ==============
 
 module elastic '../modules/databases/elasticsearch/elasticsearch.bicep' = if(!elasticExists && enableElasticsearch && elasticType == 'ElasticCloud') {
@@ -764,6 +805,17 @@ output postgreSQLDeployed bool = (!postgreSQLExists && enablePostgreSQL)
 
 @description('Redis Cache deployment status')
 output redisCacheDeployed bool = (!redisExists && enableRedisCache)
+
+output redisManagedDeployed bool = enableRedisManaged
+@description('Secret-free connection metadata. Requires Entra tokens, TLS and private DNS; OSSCluster also discovers shard ports in 85xx.')
+output redisManagedConnection object = enableRedisManaged ? {
+  resourceId: redisManaged!.outputs.resourceId
+  hostName: redisManaged!.outputs.hostName
+  port: redisManaged!.outputs.port
+  tls: true
+  authentication: 'MicrosoftEntra'
+  clusteringPolicy: clusteringPolicyRedisManaged
+} : {}
 
 @description('SQL Server deployment status')
 output sqlServerDeployed bool = (!sqlServerExists && enableSQLDatabase)
