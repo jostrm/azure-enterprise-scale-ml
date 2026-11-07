@@ -555,6 +555,12 @@ def freeze(cloud, document, ownership_records, registered_projects):
                     if ((records.get(key) or {}).get("owner") or {}).get("project_id") == project["project_number"]]
         if matches or len(gone) > 1 or recorded:
             gone = recorded
+        if not matches and not gone:
+            # The project's own pipeline deleted its group and, with it, the ownership record (aif-152 2026-11-07,
+            # job 4d970c77). AI Factory names a project group with project<NNN>: a gone registered group carrying
+            # this project's number is its own group, already deleted. Still only a label for a gone group.
+            gone = [key for key in sorted(absent & set(project["registered_resource_ids"]))
+                    if re.search(r"project" + project["project_number"] + r"(?![0-9])", key.rsplit("/", 1)[-1])]
         fl.require(len(matches) + len(gone) == 1, "factory-delete-exact-project-group-required")
         if gone:
             project["resource_group_id"] = gone[0]

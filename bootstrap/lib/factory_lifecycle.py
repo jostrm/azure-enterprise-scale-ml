@@ -3497,8 +3497,15 @@ def _verify_source(cloud, root, source, *, published):
     require(root.is_dir(), "version-source-unavailable")
     require(clean_path(cloud.command(["git", "rev-parse", "--show-toplevel"], cwd=str(root))) == root,
             "version-source-repository-root-required")
-    require(cloud.command(["git", "rev-parse", "HEAD"], cwd=str(root)) == source["commit"],
-            "version-source-commit-mismatch")
+    head = cloud.command(["git", "rev-parse", "HEAD"], cwd=str(root))
+    if head != source["commit"]:
+        # Standing rule (2026-10-30): a commit comparison warns and the live checks decide. A checkout at a published
+        # descendant or ancestor of the reviewed commit continues (release/v1.25 moved under queued aif-146..152
+        # deletes, 2026-11-07); only unrelated history still blocks.
+        require(_related_checkout(cloud, root, head, source, fetch=published), "version-source-commit-mismatch")
+        print(json.dumps({"event": "version-source-commit-drift", "checkout_commit": head,
+                          "published_commit": source["commit"], "action": "continued; live checks decide"},
+                         sort_keys=True), file=sys.stderr, flush=True)
     require(not cloud.command(["git", "status", "--porcelain", "--untracked-files=no"], cwd=str(root)),
             "version-source-dirty")
     origin = cloud.command(["git", "remote", "get-url", "origin"], cwd=str(root)).removesuffix(".git")
@@ -3534,6 +3541,22 @@ def _verify_source(cloud, root, source, *, published):
         require(published_state == Path(__file__).with_name("provider_repository_state.py").read_text(encoding="utf-8").strip(),
                 "published-single-writer-adapter-mismatch")
     return root
+
+
+def _related_checkout(cloud, root, head, source, *, fetch):
+    def base():
+        try:
+            return cloud.command(["git", "merge-base", head, source["commit"]], cwd=str(root))
+        except Blocked:
+            return None
+    found = base()
+    if found is None and fetch and source.get("ref"):
+        # The published commit may be missing locally: objects only, as the published-ref check below.
+        cloud.command(["git", "-c", "core.hooksPath=" + os.devnull, "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                       "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=", "origin", source["ref"]],
+                      cwd=str(root))
+        found = base()
+    return found in (head, source["commit"])
 
 
 def verify_ownership(body, owner):
