@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -2942,11 +2942,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">403</td>
+<td style="text-align: right;">409</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">401</td>
+<td style="text-align: right;">407</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2962,15 +2962,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">408</td>
+<td style="text-align: right;">414</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 157, 426; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 158, 427; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 428, 452; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 157, 433; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 158, 434; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 435, 459; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3575,6 +3575,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Deploy Azure Cache for Redis</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:enableRedisManaged --><!-- parameter json.dev:enableRedisManaged --><code>enableRedisManaged</code></td>
+<td><code>ENABLE_REDIS_MANAGED</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>false</code></td>
+<td>Independent private, Entra-only Azure Managed Redis.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:enableRetries --><!-- parameter json.dev:enableRetries --><code>enableRetries</code></td>
 <td><code>ENABLE_RETRIES</code></td>
 <td>O</td>
@@ -4030,6 +4037,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:clusteringPolicyRedisManaged --><!-- parameter json.dev:clusteringPolicyRedisManaged --><code>clusteringPolicyRedisManaged</code></td>
+<td><code>CLUSTERING_POLICY_REDIS_MANAGED</code></td>
+<td>O</td>
+<td>Y: <code>"OSSCluster"</code><br>J.dev: <code>"OSSCluster"</code></td>
+<td>OSSCluster&#124;EnterpriseCluster&#124;NoCluster</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:commonLakeNamePrefixMax8chars --><!-- parameter json.dev:commonLakeNamePrefixMax8chars --><code>commonLakeNamePrefixMax8chars</code></td>
 <td><code>COMMON_LAKE_NAME_PREFIX_MAX8CHARS</code> (not in .env template), <code>LAKE_PREFIX</code></td>
 <td>O</td>
@@ -4093,6 +4107,13 @@ reported, not silently represented as multiple settings.</p>
 <td>DEV subscription ID mandatory: DEV subscription ID</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:evictionPolicyRedisManaged --><!-- parameter json.dev:evictionPolicyRedisManaged --><code>evictionPolicyRedisManaged</code></td>
+<td><code>EVICTION_POLICY_REDIS_MANAGED</code></td>
+<td>O</td>
+<td>Y: <code>"NoEviction"</code><br>J.dev: <code>"NoEviction"</code></td>
+<td>Eviction policy redis managed.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:functionRuntime --><!-- parameter json.dev:functionRuntime --><code>functionRuntime</code></td>
 <td><code>FUNCTION_RUNTIME</code></td>
 <td>O</td>
@@ -4105,6 +4126,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"v7.0"</code><br>J.dev: <code>"v7.0"</code></td>
 <td>Azure Function runtime version</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:highAvailabilityRedisManaged --><!-- parameter json.dev:highAvailabilityRedisManaged --><code>highAvailabilityRedisManaged</code></td>
+<td><code>HIGH_AVAILABILITY_REDIS_MANAGED</code></td>
+<td>O</td>
+<td>Y: <code>"Enabled"</code><br>J.dev: <code>"Enabled"</code></td>
+<td>Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:kvNameFromCOMMON_param --><!-- parameter json.dev:kvNameFromCOMMON_param --><code>kvNameFromCOMMON_param</code></td>
@@ -5374,6 +5402,20 @@ reported, not silently represented as multiple settings.</p>
 <td>Redis SKU Dev ['Basic','Standard','Premium']</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:skuRedisManagedDev --><!-- parameter json.dev:skuRedisManagedDev --><code>skuRedisManagedDev</code></td>
+<td><code>SKU_REDIS_MANAGED_DEV</code></td>
+<td>O</td>
+<td>Y: <code>"Balanced_B1"</code><br>J.dev: <code>"Balanced_B1"</code></td>
+<td>Balanced_B0&#124;Balanced_B1&#124;Balanced_B5&#124;Balanced_B10</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuRedisManagedStageProd --><!-- parameter json.dev:skuRedisManagedStageProd --><code>skuRedisManagedStageProd</code></td>
+<td><code>SKU_REDIS_MANAGED_STAGEPROD</code></td>
+<td>O</td>
+<td>Y: <code>"Balanced_B5"</code><br>J.dev: <code>"Balanced_B5"</code></td>
+<td>Sku redis managed stage prod.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:skuRedisStageProd --><!-- parameter json.dev:skuRedisStageProd --><code>skuRedisStageProd</code></td>
 <td><code>SKU_REDIS_STAGEPROD</code></td>
 <td>O</td>
@@ -6307,6 +6349,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Bing Custom Search SKU</td>
 </tr>
 <tr>
+<td><!-- parameter env:CLUSTERING_POLICY_REDIS_MANAGED --><code>CLUSTERING_POLICY_REDIS_MANAGED</code></td>
+<td><code>clusteringPolicyRedisManaged</code></td>
+<td>O</td>
+<td><code>"OSSCluster"</code></td>
+<td>Clustering policy redis managed.</td>
+</tr>
+<tr>
 <td><!-- parameter env:COMMON_RESOURCE_GROUP_PARAM --><code>COMMON_RESOURCE_GROUP_PARAM</code></td>
 <td><code>commonResourceGroup_param</code></td>
 <td>O</td>
@@ -6340,6 +6389,13 @@ reported, not silently represented as multiple settings.</p>
 <td>M</td>
 <td><code>"&lt;todo&gt;"</code></td>
 <td>DEV subscription ID mandatory: DEV subscription ID</td>
+</tr>
+<tr>
+<td><!-- parameter env:EVICTION_POLICY_REDIS_MANAGED --><code>EVICTION_POLICY_REDIS_MANAGED</code></td>
+<td><code>evictionPolicyRedisManaged</code></td>
+<td>O</td>
+<td><code>"NoEviction"</code></td>
+<td>Eviction policy redis managed.</td>
 </tr>
 <tr>
 <td><!-- parameter env:FUNCTION_RUNTIME --><code>FUNCTION_RUNTIME</code></td>
@@ -6389,6 +6445,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Use SSH for git operations otherwise: true, use SSH instead of HTTPS.</td>
+</tr>
+<tr>
+<td><!-- parameter env:HIGH_AVAILABILITY_REDIS_MANAGED --><code>HIGH_AVAILABILITY_REDIS_MANAGED</code></td>
+<td><code>highAvailabilityRedisManaged</code></td>
+<td>O</td>
+<td><code>"Enabled"</code></td>
+<td>High availability redis managed.</td>
 </tr>
 <tr>
 <td><!-- parameter env:KEYVAULT_SOFT_DELETE --><code>KEYVAULT_SOFT_DELETE</code></td>
@@ -7229,6 +7292,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Enable Azure Cache for Redis</td>
+</tr>
+<tr>
+<td><!-- parameter env:ENABLE_REDIS_MANAGED --><code>ENABLE_REDIS_MANAGED</code></td>
+<td><code>enableRedisManaged</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Enable redis managed.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_RETRIES --><code>ENABLE_RETRIES</code></td>
@@ -8139,6 +8209,20 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"Standard"</code></td>
 <td>Redis SKU Dev keep-as-is: ['Basic','Standard','Premium']</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_REDIS_MANAGED_DEV --><code>SKU_REDIS_MANAGED_DEV</code></td>
+<td><code>skuRedisManagedDev</code></td>
+<td>O</td>
+<td><code>"Balanced_B1"</code></td>
+<td>Sku redis managed dev.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_REDIS_MANAGED_STAGEPROD --><code>SKU_REDIS_MANAGED_STAGEPROD</code></td>
+<td><code>skuRedisManagedStageProd</code></td>
+<td>O</td>
+<td><code>"Balanced_B5"</code></td>
+<td>Sku redis managed stageprod.</td>
 </tr>
 <tr>
 <td><!-- parameter env:SKU_REDIS_STAGEPROD --><code>SKU_REDIS_STAGEPROD</code></td>
@@ -9550,7 +9634,7 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter helper:--simple-project-selected --><code>--simple-project-selected</code></td>
 <td>C</td>
 <td><code>null</code></td>
-<td>Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, container-apps</td>
+<td>Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, redis-managed, container-apps</td>
 </tr>
 <tr>
 <td><!-- parameter helper:--state-file --><code>--state-file</code></td>
@@ -9950,7 +10034,7 @@ reported, not silently represented as multiple settings.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
