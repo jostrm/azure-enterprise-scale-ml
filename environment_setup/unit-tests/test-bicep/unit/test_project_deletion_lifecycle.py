@@ -589,11 +589,14 @@ def test_accepted_submission_times_out_without_success_report(report_dir):
 def test_subprocess_timeout_is_uncertain_no_retry_and_deadline_bounded(report_dir):
     def timeout(kwargs):
         raise subprocess.TimeoutExpired("az", kwargs["timeout"], stderr="secret raw output")
+    # A timed-out DELETE is followed by state re-reads; while the state stays unreadable, nothing is resubmitted.
     status, runner, _ = invoke([
         ("GET", DBX_ID, body(state="Updating")), ("GET", DBX_ID, body()),
         ("DELETE", DBX_ID, timeout),
+        ("GET", DBX_ID, timeout), ("GET", DBX_ID, timeout), ("GET", DBX_ID, timeout),
     ], RESOURCE, timeout=5, report_dir=report_dir)
     assert status != 0
+    assert sum(call[0] == "DELETE" for call in runner.calls) == 1
     assert runner.calls[-1][3]["timeout"] <= 3
     report = (report_dir / "last-deletion.json").read_text()
     assert "secret raw output" not in report and '"status": "timeout"' in report

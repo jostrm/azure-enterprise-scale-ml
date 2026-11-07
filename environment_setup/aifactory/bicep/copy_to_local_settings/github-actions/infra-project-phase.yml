@@ -668,12 +668,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          enabled="${enableRedisManaged:-false}"
+          validator="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py"
+          # The workflow copy can be newer than the pinned submodule: call only what the checkout ships.
+          if [ ! -f "$validator" ]; then
+            if [ "${enabled,,}" = "true" ]; then
+              echo "::error::enableRedisManaged=true needs redis_managed_config.py, which the checked-out azure-enterprise-scale-ml submodule lacks. Update the submodule to a release with Azure Managed Redis."
+              exit 1
+            fi
+            echo "::warning::The checked-out azure-enterprise-scale-ml submodule predates Azure Managed Redis; validation skipped (enableRedisManaged is not true)."
+            exit 0
+          fi
           cloud=""
-          if [ "${enableRedisManaged,,}" = "true" ]; then
+          if [ "${enabled,,}" = "true" ]; then
             cloud="$(az cloud show --query name -o tsv)"
             cloud="${cloud%$'\r'}"
           fi
-          python "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py" \
+          python "$validator" \
             --environment "${{ env.dev_test_prod }}" --cloud "$cloud"
 
       - name: 00_Preflight_Quota_Policy_Checks
