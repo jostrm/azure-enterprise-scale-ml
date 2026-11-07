@@ -77,7 +77,7 @@ class PipelineDnsOwnershipTests(unittest.TestCase):
                     self.assertEqual(0, code, stdout + stderr)
                     self.assertNotIn("AZ_CALLED:", stdout)
                     self.assertIn("policy-managed", stdout)
-                    for key in ("zoneazurecontainerapps", "zoneredis", "zonepostgres", "zonesql", "zoneMongo", "zoneServicesAi", "zoneAPIM"):
+                    for key in ("zoneazurecontainerapps", "zoneredis", "zoneRedisManaged", "zoneRedisManagedLink", "zonepostgres", "zonesql", "zoneMongo", "zoneServicesAi", "zoneAPIM"):
                         self.assertIn(f"variable={key}Exists]false", stdout)
                 else:
                     self.assertNotEqual(0, code)
@@ -129,7 +129,10 @@ GITHUB_ENV="$DNS_TEST_GITHUB_ENV"
 if command -v cygpath >/dev/null; then GITHUB_ENV="$(cygpath -u "$GITHUB_ENV")"; fi
 export GITHUB_ENV
 trap 'cat "$GITHUB_ENV"' EXIT
-az() { echo "AZ_CALLED:$*"; }
+az() {
+  if [ "$1 $2 $3 $4" = "network private-dns zone list" ]; then echo 1; return; fi
+  echo "AZ_CALLED:$*"
+}
 """
                 code, stdout, stderr = self.run_shell(
                     "bash", setup + substitute(step["run"], values),
@@ -144,7 +147,7 @@ az() { echo "AZ_CALLED:$*"; }
                 else:
                     self.assertIn("AZ_CALLED:account set --subscription project-sub", stdout)
                     expected = "true"
-                for key in ("zoneazurecontainerapps", "zoneredis", "zonepostgres", "zonesql", "zoneMongo", "zoneServicesAi", "zoneAPIM"):
+                for key in ("zoneazurecontainerapps", "zoneredis", "zoneRedisManaged", "zonepostgres", "zonesql", "zoneMongo", "zoneServicesAi", "zoneAPIM"):
                     self.assertIn(f"{key}Exists={expected}", stdout)
 
     def test_github_seeding_step_binds_policy_switch_without_dns_apis(self):
@@ -412,8 +415,14 @@ class BicepDnsOwnershipTests(unittest.TestCase):
         foundation = (BICEP / "esml-genai-1/01-foundation.bicep").read_text(encoding="utf-8")
         self.assertIn(managed, foundation)
         flags = re.findall(r"exists: (zone\w+Exists)(.*)", foundation)
-        self.assertEqual(len(flags), 6)
-        self.assertTrue(all(rest.strip() == "|| bootstrapManagedPrivateDns" for _, rest in flags))
+        self.assertEqual(len(flags), 7)
+        legacy = [(flag, rest) for flag, rest in flags if flag != "zoneRedisManagedExists"]
+        self.assertEqual(len(legacy), 6)
+        self.assertTrue(all(rest.strip() == "|| bootstrapManagedPrivateDns" for _, rest in legacy))
+        # Older bootstraps do not contain this newly introduced zone. Discover its
+        # actual zone/link state rather than treating integrated mode as proof.
+        self.assertIn(("zoneRedisManagedExists", ""), flags)
+        self.assertIn("ensureLink: !zoneRedisManagedLinkExists", foundation)
         self.assertNotRegex(foundation, r"exists: false")
 
 

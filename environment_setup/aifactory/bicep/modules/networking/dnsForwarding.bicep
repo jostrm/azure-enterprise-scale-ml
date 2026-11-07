@@ -27,6 +27,7 @@ param privateEndpointDomains array = [
   'privatelink.services.ai.azure.com'
   'privatelink.postgres.database.azure.com'
   'privatelink.redis.cache.windows.net'
+  'privatelink.redis.azure.net'
   'privatelink.sql.${environment().suffixes.sqlServerHostname}'
 ]
 

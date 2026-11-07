@@ -335,6 +335,12 @@ variables:
   skuTierPostgreSQLStageProd: "Burstable" # PostgreSQL tier Stage/Prod
   skuRedisDev: "Standard" # Redis SKU Dev ['Basic','Standard','Premium']
   skuRedisStageProd: "Standard" # Redis SKU Stage/Prod
+  enableRedisManaged: "false" # Independent private, Entra-only Azure Managed Redis.
+  skuRedisManagedDev: "Balanced_B1" # Balanced_B0|Balanced_B1|Balanced_B5|Balanced_B10
+  skuRedisManagedStageProd: "Balanced_B5"
+  highAvailabilityRedisManaged: "Enabled" # Enabled|Disabled; Enabled -> Disabled is unsupported.
+  evictionPolicyRedisManaged: "NoEviction"
+  clusteringPolicyRedisManaged: "OSSCluster" # OSSCluster|EnterpriseCluster|NoCluster
   skuSQLDatabaseDev: "S0" # Azure SQL DB (DTU model) SKU Dev
   skuSQLDatabaseStageProd: "S0" # Azure SQL DB (DTU model) SKU Stage/Prod
   skuTierSQLDatabaseDev: "Standard" # Azure SQL DB tier Dev ['Basic','Standard','Premium']

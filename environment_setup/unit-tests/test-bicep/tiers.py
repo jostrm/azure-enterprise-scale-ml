@@ -113,6 +113,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_prefix_network_runtime.py",
         "unit/test_private_data_services.py",
         "unit/test_private_dns_link_fallback.py",
+        "unit/test_redis_managed.py",
         "unit/test_private_foundry_capability_host.py",
         "unit/test_project_lake_acl.py",
         "unit/test_registered_personas.py",

@@ -209,7 +209,7 @@ def offline_preflight():
     shutil.copyfile(HELPER, workspace / HELPER.name)
     shutil.copyfile(SCRIPTS / "deploy-capacity-resource.py", workspace / "deploy-capacity-resource.py")
     shutil.copyfile(SCRIPTS / "region_report.py", workspace / "region_report.py")
-    for name in ("kv_principal_object_ids.py", "apply-json-config-overrides.py"):
+    for name in ("kv_principal_object_ids.py", "apply-json-config-overrides.py", "redis_managed_config.py"):
         shutil.copyfile(SCRIPTS / name, workspace / name)
 
     def run(settings=None, *, arguments=(), environment="dev", subscription=SUBSCRIPTION,

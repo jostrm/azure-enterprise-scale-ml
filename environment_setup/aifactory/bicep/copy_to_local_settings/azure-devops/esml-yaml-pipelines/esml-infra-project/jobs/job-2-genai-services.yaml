@@ -38,6 +38,23 @@ steps:
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - template: ../../variables/logic-app-network-steps.yaml
+- task: AzureCLI@2
+  displayName: '00_validate_RedisManaged'
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -euo pipefail
+      cloud=""
+      enabled="${ENABLEREDISMANAGED:-false}"
+      if [ "${enabled,,}" = "true" ]; then
+        cloud="$(az cloud show --query name -o tsv)"
+        cloud="${cloud%$'\r'}"
+      fi
+      python "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py" \
+        --environment "$(dev_test_prod)" --cloud "$cloud" --azure-devops
 - template: ../../variables/persona-access-steps.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
@@ -1121,7 +1138,8 @@ steps:
     AIFACTORY_USE_AZURE_CLI: 'true'
 - task: AzureCLI@2
   displayName: '05a_Check if Private DNS Zones exist'
-  condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
+  # Foundation reconciles shared DNS even when services and optional validation are disabled.
+  condition: and(succeeded(), or(ne(variables['debug_disable_validation_tasks'], 'true'), and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
@@ -1132,7 +1150,7 @@ steps:
       if ($centralDnsByPolicy -eq 'true') {
         Write-Host 'Central DNS is policy-managed; skipping DNS subscription/zone/link inspection. Existing BYO VNet links remain customer-managed.'
         # False means not detected here, not absent. Bicep must gate zone creation on policy ownership.
-        foreach ($key in @('zoneazurecontainerapps', 'zoneredis', 'zonepostgres', 'zonesql', 'zoneMongo', 'zoneServicesAi', 'zoneAPIM')) {
+        foreach ($key in @('zoneazurecontainerapps', 'zoneredis', 'zoneRedisManaged', 'zoneRedisManagedLink', 'zonepostgres', 'zonesql', 'zoneMongo', 'zoneServicesAi', 'zoneAPIM')) {
           Write-Host "##vso[task.setvariable variable=$($key)Exists]false"
         }
         exit 0
@@ -1183,6 +1201,7 @@ steps:
       $dnsZonePairs = @(
         "zoneazurecontainerapps:privatelink.$location.azurecontainerapps.io"
         'zoneredis:privatelink.redis.cache.windows.net'
+        'zoneRedisManaged:privatelink.redis.azure.net'
         'zonepostgres:privatelink.postgres.database.azure.com'
         'zonesql:privatelink.database.windows.net'
         'zoneMongo:privatelink.mongo.cosmos.azure.com'
@@ -1203,10 +1222,31 @@ steps:
 
       foreach ($pair in $dnsZonePairs) {
         $key, $dnsZoneName = $pair -split ':', 2
+        # Match the foundation/catalog scope even when a BYO VNet uses a different RG.
+        $zoneResourceGroup = if ($key -eq 'zoneRedisManaged') { $vnetResourceGroup } else { $privDnsResourceGroupName }
         Write-Host "Checking DNS Zone: $dnsZoneName in RG: $privDnsResourceGroupName, Subscription: $privDnsSubscription"
-        $zoneOutput = az network private-dns zone show --subscription "$privDnsSubscription" --resource-group "$privDnsResourceGroupName" --name "$dnsZoneName" 2>&1
+        $zoneOutput = az network private-dns zone show --subscription "$privDnsSubscription" --resource-group "$zoneResourceGroup" --name "$dnsZoneName" 2>&1
         $zoneStatus = $LASTEXITCODE
         $exists = 'true'
+        if ($key -eq 'zoneRedisManaged') {
+          $linked = 'false'
+          if ($zoneStatus -ne 0) {
+            if (($zoneOutput | Out-String) -notmatch 'ResourceNotFound|ResourceGroupNotFound') {
+              throw 'Cannot determine Managed Redis DNS zone ownership. Restore read access to the DNS resource group.'
+            }
+            $exists = 'false'
+          } else {
+            $vnetFullId = "/subscriptions/$vnetSubscription/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$vnetName"
+            $linksOutput = az network private-dns link vnet list --subscription "$privDnsSubscription" --resource-group "$zoneResourceGroup" --zone-name "$dnsZoneName" -o json
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Managed Redis DNS VNet links.' }
+            $links = $linksOutput | ConvertFrom-Json -NoEnumerate
+            if ($links -isnot [array]) { throw 'Malformed Managed Redis DNS VNet link inventory.' }
+            if (@($links | Where-Object { $_.virtualNetwork.id -eq $vnetFullId }).Count -gt 0) { $linked = 'true' }
+          }
+          Write-Host "##vso[task.setvariable variable=zoneRedisManagedExists]$exists"
+          Write-Host "##vso[task.setvariable variable=zoneRedisManagedLinkExists]$linked"
+          continue
+        }
 
         if ($zoneStatus -ne 0) {
           Write-Host '  DNS Zone not found'
@@ -1216,7 +1256,7 @@ steps:
           Write-Host '  DNS Zone found; skipping VNet link check because the VNet name or resource group is empty'
         } else {
           $vnetFullId = "/subscriptions/$vnetSubscription/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$vnetName"
-          $linksOutput = az network private-dns link vnet list --subscription "$privDnsSubscription" --resource-group "$privDnsResourceGroupName" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnetFullId'].name" -o tsv 2>&1
+          $linksOutput = az network private-dns link vnet list --subscription "$privDnsSubscription" --resource-group "$zoneResourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnetFullId'].name" -o tsv 2>&1
           $linksStatus = $LASTEXITCODE
 
           Write-Host "  VNet link query status: $linksStatus"
@@ -2962,6 +3002,8 @@ steps:
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters zoneAzurecontainerappsExists="$(zoneazurecontainerappsExists)" \
      --parameters zoneRedisExists="$(zoneredisExists)" \
+     --parameters zoneRedisManagedExists="${ZONEREDISMANAGEDEXISTS:-false}" \
+     --parameters zoneRedisManagedLinkExists="${ZONEREDISMANAGEDLINKEXISTS:-false}" \
      --parameters zonePostgresExists="$(zonepostgresExists)" \
      --parameters zoneSqlExists="$(zonesqlExists)" \
      --parameters zoneMongoExists="$(zoneMongoExists)" \
@@ -3343,6 +3385,12 @@ steps:
      --parameters enablePostgreSQL=false \
      --parameters postgreSQLVersion="17" \
      --parameters enableRedisCache="$(enableRedisCache)" \
+     --parameters enableRedisManaged="$(enableRedisManaged)" \
+     --parameters skuRedisManagedDev="$(skuRedisManagedDev)" \
+     --parameters skuRedisManagedStageProd="$(skuRedisManagedStageProd)" \
+     --parameters highAvailabilityRedisManaged="$(highAvailabilityRedisManaged)" \
+     --parameters evictionPolicyRedisManaged="$(evictionPolicyRedisManaged)" \
+     --parameters clusteringPolicyRedisManaged="$(clusteringPolicyRedisManaged)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
      --parameters enableElasticsearch="$(enableElasticsearch)" \
      --parameters elasticExists="$(elasticExists)" \

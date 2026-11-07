@@ -99,6 +99,7 @@ output context object = {
     keyvaultName: namingConvention.outputs.keyvaultName
     laWorkspaceName: namingConvention.outputs.laWorkspaceName
     postgreSQLName: namingConvention.outputs.postgreSQLName
+    redisManagedName: namingConvention.outputs.redisManagedName
     containerAppsEnvName: namingConvention.outputs.containerAppsEnvName
     containerAppAName: namingConvention.outputs.containerAppAName
     containerAppWName: namingConvention.outputs.containerAppWName

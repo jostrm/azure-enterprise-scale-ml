@@ -109,6 +109,7 @@ SIMPLE_MODE_RESOURCE_CATALOG = {
         {"id": "datafactory", "label": "Azure Data Factory", "description": "Project data pipelines with managed private endpoints.", "required": False, "default_selected": False, "dependencies": ["storage", "managed-identities", "private-dns"]},
         {"id": "event-hubs", "label": "Azure Event Hubs", "description": "Private event ingestion using Standard tier (required for Private Link).", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
         {"id": "postgresql", "label": "Azure Database for PostgreSQL", "description": "Private flexible server, Burstable Standard_B1ms.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "redis-managed", "label": "Azure Managed Redis", "description": "Private Entra-only cache, Balanced_B1 Dev / Balanced_B5 Stage-Prod, HA enabled. Independent of legacy Redis.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
         {"id": "container-apps", "label": "Azure Container Apps", "description": "Private Container Apps environment using canonical project defaults and linked Application Insights.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns", "log-analytics", "application-insights"]},
     ],
 }
@@ -187,6 +188,7 @@ def simple_mode_project_providers(selection: str | list[str] | None = None) -> l
         "datafactory": {"Microsoft.DataFactory"},
         "event-hubs": {"Microsoft.EventHub"},
         "postgresql": {"Microsoft.DBforPostgreSQL"},
+        "redis-managed": {"Microsoft.Cache"},
         "container-apps": {"Microsoft.App"},
     }
     for resource in selected:
@@ -296,6 +298,12 @@ def simple_mode_values(cost_center: str = "123456", project_resources: str | lis
         "enableDatafactory": str("datafactory" in selected).lower(),
         "enableEventHubs": str("event-hubs" in selected).lower(),
         "enablePostgreSQL": str("postgresql" in selected).lower(),
+        "enableRedisManaged": "redis-managed" in selected,
+        "skuRedisManagedDev": "Balanced_B1",
+        "skuRedisManagedStageProd": "Balanced_B5",
+        "highAvailabilityRedisManaged": "Enabled",
+        "evictionPolicyRedisManaged": "NoEviction",
+        "clusteringPolicyRedisManaged": "OSSCluster",
         "enableContainerApps": str("container-apps" in selected).lower(),
         "updateAIFoundry": "false",
         "addAIFoundry": "false",

@@ -57,6 +57,8 @@ param zonePostgresExists bool = false
 param zoneSqlExists bool = false
 param zoneMongoExists bool = false
 param zoneRedisExists bool = false
+param zoneRedisManagedExists bool = false
+param zoneRedisManagedLinkExists bool = false
 param zoneServicesAiExists bool = false
 param zoneAPIMExists bool = false
 @description('Registered bootstrap access hub mode. With integrated + setup_hub_access, the bootstrap already created and linked every private DNS zone in the common network resource group.')
@@ -617,6 +619,13 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.redis.name
     id: privateLinksDnsZones.redis.id
     exists: zoneRedisExists || bootstrapManagedPrivateDns
+  }
+  {
+    name: privateLinksDnsZones.redisManaged.name
+    id: privateLinksDnsZones.redisManaged.id
+    exists: zoneRedisManagedExists
+    // Discovery also recognizes bootstrap/customer link names; never create a second link.
+    ensureLink: !zoneRedisManagedLinkExists
   }
   {
     name: privateLinksDnsZones.postgres.name

@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import runpy
 import sys
 import uuid
 from pathlib import Path
@@ -132,6 +133,11 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
     if exact_environment != "dev" and exact_environment in config:
         values = {**values, **canonical_values(exact_environment)}
         section = exact_environment
+    validator = runpy.run_path(str(Path(__file__).with_name("redis_managed_config.py")))
+    try:
+        validator["validate"](values, environment)
+    except ValueError as error:
+        fail(str(error))
     serialized: dict[str, str] = {}
     for name, value in values.items():
         if name in METADATA_KEYS:

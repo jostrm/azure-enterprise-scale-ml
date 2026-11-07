@@ -19,14 +19,15 @@ resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (
   properties: {}
 }]
 
-resource privateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = [for (zone, index) in privateLinksDnsZones: if(zone.exists == false) {
+// A project-only upgrade can reuse a common zone but still need its VNet link.
+resource privateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = [for (zone, index) in privateLinksDnsZones: if(zone.exists == false || (zone.?ensureLink ?? false)) {
   dependsOn: [
     privateDnsZones[index]
   ]
   // IMPORTANT: Use the same deterministic link-name strategy as createPrivateDnsZones.bicep.
   // If different deployments use different link names for the same zone+VNet, Azure will throw:
   // "Private zone '...' is already linked to the virtual network '...'."
-  name: '${zone.name}/${uniqueString(privateDnsZones[index].id)}'
+  name: '${zone.name}/${uniqueString(resourceId('Microsoft.Network/privateDnsZones', zone.name))}'
   location: (zone.name == '${location}.data.privatelink.azurecr.io' && allGlobal == false) ? location : locationGlobal
   properties: {
     registrationEnabled: false // Is auto-registration of virtual machine records in the virtual network in the Private DNS zone enabled?

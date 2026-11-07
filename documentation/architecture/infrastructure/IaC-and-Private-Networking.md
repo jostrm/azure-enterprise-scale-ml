@@ -5,6 +5,9 @@ sources:
   - environment_setup/aifactory/bicep/README.md
   - environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep
   - environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep
+  - environment_setup/aifactory/bicep/esml-genai-1/04-databases.bicep
+  - environment_setup/aifactory/bicep/modules/databases/redis-managed/redis-managed.bicep
+  - environment_setup/aifactory/bicep/scripts/redis_managed_config.py
   - environment_setup/aifactory/bicep/esml-genai-1/02-core-infrastructure.bicep
   - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml
   - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml
@@ -42,6 +45,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_subnet_scaling_capacity.py
   - environment_setup/unit-tests/test-bicep/unit/test_logic_app_subnet.py
   - environment_setup/unit-tests/test-bicep/unit/test_private_data_services.py
+  - environment_setup/unit-tests/test-bicep/unit/test_redis_managed.py
   - environment_setup/unit-tests/test-bicep/test_aifactory_dashboard.py
   - environment_setup/unit-tests/test-bicep/test_my_project_workbook.py
   - environment_setup/unit-tests/test-bicep/test_generic_project_workbook.py
@@ -62,6 +66,35 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 The maintained infrastructure path is Bicep-first, invoked through provider templates. Common networking and project phases are distinct. `esml-genai-1` contains foundation, core, cognitive/search, database, compute, AI/ML, RBAC, Foundry, dashboard and integration templates; flags and orchestration select the actual resources. A numbered filename is not proof that every deployment executes it.
 
 Foundation resolves common/project scopes, private DNS routing and managed identities. `centralDnsZoneByPolicyInHub` changes whether zone creation is local or delegated to central governance; explicit DNS subscription/resource-group parameters can differ from project placement. Private endpoint creation alone does not prove name resolution, connectivity or caller data-plane authorization.
+
+Azure Managed Redis (main `789beb55` plus working tree, 2026-11-07):
+`enableRedisManaged` is an independent default-false flag, carried from JSON
+overrides and public GHA/ADO defaults through validation to `64-databases`.
+It conditionally upserts `Microsoft.Cache/redisEnterprise@2025-07-01` with a
+Managed Balanced SKU, required `default` database and project MI/optional SP
+Entra data-access assignments. Access keys/public networking are disabled;
+TLS 1.2 and a private endpoint are mandatory even in perimeter mode.
+Legacy `enableRedisCache`, its identity/secret contract and its resource remain
+unchanged. No secrets or new Key Vault RBAC grants are introduced.
+
+Managed naming, endpoint type and `privatelink.redis.azure.net` DNS entry are
+separate from legacy Redis. Shared/common/bootstrap DNS inventories include the
+zone; project foundation discovers its actual zone/link state rather than
+assuming every historical bootstrap already contains it. Existing bootstrap or
+customer link names are preserved. Missing links use the existing deterministic
+zone-link convention. Noncentral DNS uses the established VNet RG scope;
+central-policy mode does not take ownership of hub zones, links or groups.
+Central Managed Redis policy coverage and client-side name resolution remain
+external prerequisites, not inferred from the presence of the DNS zone.
+
+Disabling the service skips its incremental deployment, not deletion. There is
+no per-service Managed Redis cleanup or implicit migration/recreation; existing
+explicit whole-project teardown remains destructive. The returned host/port/auth
+metadata contains no credentials. Cluster metrics and database connection logs
+target the existing common workspace. Offline exporter, real mocked CI command,
+compiled-ARM and DNS-discovery contracts do not prove live region/SKU capacity,
+Entra refresh, private connectivity or policy/RBAC readiness. See the module
+readme for supported settings, upgrade limits and Microsoft API/DNS references.
 
 Shared-registry reuse (source reviewed at `e2e1f55c` plus this change,
 2026-10-16): project core infrastructure defaults `updateCommonACR` to true.

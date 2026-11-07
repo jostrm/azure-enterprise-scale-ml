@@ -65,6 +65,7 @@ ENABLE_CONTENT_SAFETY enableContentSafety
 ENABLE_COSMOS_DB enableCosmosDB
 ENABLE_POSTGRESQL enablePostgreSQL
 ENABLE_REDIS_CACHE enableRedisCache
+ENABLE_REDIS_MANAGED enableRedisManaged
 ENABLE_SQL_DATABASE enableSQLDatabase
 ENABLE_ELASTICSEARCH enableElasticsearch
 ENABLE_FUNCTION enableFunction
@@ -115,7 +116,7 @@ PUBLIC_FLAGS = "enablePublicGenAIAccess enablePublicAccessWithPerimeter"
 MODULE_FLAGS = {
     "02-core-infrastructure.bicep": PUBLIC_FLAGS + " enableApplicationInsights enableLogicApps enableProjectVM enableEncryptionAtHost enableVmBackup",
     "03-cognitive-services.bicep": PUBLIC_FLAGS + " enableAIServices enableAISearch enableAzureOpenAI enableContentSafety enableAzureAIVision enableAzureSpeech enableAIDocIntelligence enableBingCustomSearch enableBing enableAFoundryCaphost enableAIFoundry enableAISearchSharedPrivateLink",
-    "04-databases.bicep": PUBLIC_FLAGS + " enableCosmosDB enablePostgreSQL enableRedisCache enableSQLDatabase enableElasticsearch enableAFoundryCaphost enableAIFoundry",
+    "04-databases.bicep": PUBLIC_FLAGS + " enableCosmosDB enablePostgreSQL enableRedisCache enableRedisManaged enableSQLDatabase enableElasticsearch enableAFoundryCaphost enableAIFoundry",
     "05-compute-services.bicep": PUBLIC_FLAGS + " enableContainerApps enableFunction enableWebApp enableBingSearch enableAzureOpenAI enableAISearch enableAIServices enableAppInsightsDashboard enableAIFoundry enableAKS enableEncryptionAtHost",
     "06-ai-platform.bicep": PUBLIC_FLAGS + " enableAIFoundryHub enableAISearch enableAIServices",
     "07-ml-data-platform.bicep": "enablePublicAccessWithPerimeter enableDatafactory enableAzureMachineLearning enableDatabricks enableAksForAzureML enableEncryptionAtHost",

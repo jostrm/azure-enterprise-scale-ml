@@ -96,10 +96,11 @@ $defaultZones = @(
     "privatelink.ods.opinsights.azure.com",
     "privatelink.agentsvc.azure-automation.net",
     
-    # Cache (1)
+    # Cache (2)
     "privatelink.redis.cache.windows.net"
+    "privatelink.redis.azure.net"
     
-    # Total: ALL 30 zones from CmnPrivateDnsZones.bicep
+    # Includes the separate Azure Managed Redis zone.
 )
 
 # Use provided zones or defaults
