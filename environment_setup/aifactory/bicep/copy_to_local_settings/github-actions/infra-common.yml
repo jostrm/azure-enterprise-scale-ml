@@ -134,11 +134,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
@@ -500,11 +500,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
@@ -865,11 +865,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"

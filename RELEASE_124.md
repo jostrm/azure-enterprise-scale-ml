@@ -2,6 +2,18 @@
 **Release Tag:** [release_124](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_124)  
 **Release Date:** January 2026
 
+## GitHub Actions preflight uses the run's own settings
+
+The "Preflight quota & policy checks" steps in `infra-common.yml` (Dev, Stage and Prod)
+and `infra-project-phase.yml` set `enableCosmosDB`, `enableAIFoundry`, `enableAISearch`,
+`enableElasticsearch` and `admin_aiSearchTier` from repository variables only
+(`vars.ENABLE_COSMOS_DB || 'false'` and similar). A value the job already had, from `.env`
+or a JSON configuration, was replaced, so preflight could check the wrong services. On a
+private factory with AI Foundry this failed every run: "the private Foundry
+capability-host bundle cannot be deselected" (aif-153, 2026-11-08). The steps now read the
+job's value first and fall back to the repository variable, then the default. No
+configuration change is needed.
+
 ## ESML project entrypoint compiles again (AKS outbound type)
 
 `esml-project/22-main.bicep`, the ESML/AML project entrypoint, did not compile on Bicep
