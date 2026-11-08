@@ -162,6 +162,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_native_foundry_lifecycle.py",
         "unit/test_nic_detach_churn.py",
         "unit/test_nic_ipconfig_etag_churn.py",
+        "unit/test_own_hub_scale_set_deletion.py",
         "unit/test_platform_child_of_retained_parent.py",
         "unit/test_platform_refused_child.py",
         "unit/test_prefix_bootstrap.py",

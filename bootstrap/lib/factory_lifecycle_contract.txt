@@ -123,6 +123,33 @@ Azure already cleared counts as removed. The hub VNet, gateways, Bastion, DNS
 resolver, zones, rulesets, the hub group and every other network's links stay.
 Children record deleted_hub_links and hub_unlink_complete.
 
+Own-hub spoke attachments (own-hub-spoke-attachments-v1)
+--------------------------------------------------------
+A scale set added to a Standalone-with-own-hub factory joins the bootstrap scale
+set's hub: its common VNet peers to the hub VNet and its private endpoints' zone
+groups name the hub group's private DNS zones, while the hub side holds a peering
+and zone links to the spoke VNet. A whole-group scale-set deletion
+(arm-provider-closure-v1) freezes deletion.own_hub when references of exactly
+these kinds leave its lock scopes: a VNet or its peering naming a VNet, a private
+DNS zone group naming a private DNS zone. The referenced group must be live-tagged
+for this factory and another scale set, carry no project tag and not be marked
+shared; references into any other group, or of any other kind, still refuse with
+unknown-resource-dependency. own_hub lists contract, resource_group_ids,
+attachments (the referenced hub resources) and links (id, type, api_version,
+remote_virtual_network_id): the hub groups' VNet peerings and zone/ruleset links
+whose remote is a VNet this deletion removes. The executing identity must be
+allowed to delete the hub peerings at freeze and again before the first DELETE,
+when the hub groups' tags are re-proven too. After the scale set's groups are gone
+the operator removes each frozen link only when its spoke VNet is verifiably
+absent and the link still targets it; a link Azure already cleared (a deleted
+VNet's zone links) counts as removed. The hub VNet, gateway, zones, the hub group
+and every other network's links stay. The receipt records deleted_hub_links and
+hub_unlink_complete. An untaggable policy exemption directly on an owned group is
+owned through that group only when its metadata names contract
+aifactory-dns-policy-exemption-v1 and exactly the group's factory_id and
+scale_set_id (the Waivers the bootstrap and scale-set enrollment write); Azure
+removes it with the group.
+
 Bootstrap operator teardown (bootstrap-operator-teardown-v1)
 -------------------------------------------------------------
 bootstrap_operator_teardown advertises this separate contract for a factory whose Full
