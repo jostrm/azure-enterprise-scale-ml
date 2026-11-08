@@ -1987,6 +1987,8 @@ jobs:
               --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
               --parameters network_env="${{ env.network_env }}" \
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+              --parameters access_hub_mode="${{ env.access_hub_mode }}" \
+              --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
