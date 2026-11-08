@@ -307,24 +307,31 @@ def require_unique_hub_links(documents):
 
 def unlink_shared_hub(cloud, locks, document, receipt, persist, sleep=time.sleep):
     """Last step: remove the recorded hub-side links only once their spoke VNet is verifiably gone."""
+    _unlink_hub_links(cloud, locks, document, receipt, persist, document["deletion"]["hub_links"],
+                      "factory-delete-hub-link", sleep)
+
+
+def _unlink_hub_links(cloud, locks, document, receipt, persist, links, code, sleep):
+    """Delete each reviewed hub-side link whose spoke VNet this run verifiably deleted (shared by the shared hub and
+    the own hub); a link Azure already cleared counts as removed."""
     data = document["deletion"]
     removed = {value.lower() for value in receipt.setdefault("deleted_hub_links", [])}
     deleted = {value.lower() for value in receipt["deleted_resources"]}
     versions = {row["id"].lower(): row["api_version"] for row in data["resources"]}
-    for link in data["hub_links"]:
+    for link in links:
         if link["id"].lower() in removed:
             continue
         remote = link["remote_virtual_network_id"]
-        fl.require(remote in deleted, "factory-delete-hub-link-before-spoke")
+        fl.require(remote in deleted, code + "-before-spoke")
         locks.authorize(document)
         locks.assert_held()
         cloud.verify_identity()
         status, _, _ = cloud.arm("GET", remote, versions[remote], allowed=(200, 404))
-        fl.require(status == 404, "factory-delete-hub-link-spoke-present")
+        fl.require(status == 404, code + "-spoke-present")
         status, _, body = cloud.arm("GET", link["id"], link["api_version"], allowed=(200, 404))
         if status != 404:
             # Azure usually clears a deleted VNet's DNS links itself; a hub peering stays Disconnected.
-            fl.require(_remote(body) == remote, "factory-delete-hub-link-changed")
+            fl.require(_remote(body) == remote, code + "-changed")
             verify_link_permissions(cloud, [link])
             locks.authorize(document)
             receipt.update(mutation_started=True, pending_resource=link["id"])
@@ -338,6 +345,115 @@ def unlink_shared_hub(cloud, locks, document, receipt, persist, sleep=time.sleep
         persist()
     receipt["hub_unlink_complete"] = True
     persist()
+
+
+# An added scale set of a Standalone-with-own-hub factory joins the bootstrap scale set's hub (purple 75887c83, aif-154
+# 2026-11-08): its common VNet peers to the hub VNet and its private endpoints' zone groups name the hub group's zones.
+# Deleting only that scale set (ESAF Scenario 5) must neither treat those references as unknown dependencies nor leave
+# the hub side's peering to the deleted VNet behind. Only these (source kind -> referenced kind) pairs are attachments.
+OWN_HUB_CONTRACT = "own-hub-spoke-attachments-v1"
+ZONE_GROUP_TYPE = "microsoft.network/privateendpoints/privatednszonegroups"
+ZONE_TYPE = "microsoft.network/privatednszones"
+OWN_HUB_ATTACHMENTS = {VNET_TYPE: {VNET_TYPE}, VNET_TYPE + "/virtualnetworkpeerings": {VNET_TYPE},
+                       ZONE_GROUP_TYPE: {ZONE_TYPE}}
+
+
+def own_hub_group(body, target):
+    """Live proof that a group outside the deletion belongs to a sibling scale set of the same factory: its enrollment
+    tags name this factory and another scale set, and it is neither a project group nor marked shared."""
+    tags = (body or {}).get("tags") or {}
+    fl.require(isinstance(tags, dict), "malformed-project-ownership-tags")
+    tags = {str(key).lower(): str(value) for key, value in tags.items()}
+    scale = tags.get(fl.TAG_KEYS["scaleset_id"])
+    return (tags.get(fl.TAG_KEYS["factory_id"]) == target["factory_id"] and bool(scale)
+            and scale != target["scaleset_id"] and not tags.get(fl.TAG_KEYS["project_id"])
+            and not fl.project_resource_shared(body))
+
+
+def _own_hub_candidates(document, resources):
+    """Referenced id -> referencing ids, for every reference outside the deletion's lock scopes of an attachment kind."""
+    ids = {row["id"].lower() for row in resources}
+    external = {value.lower() for value in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
+    found = {}
+    for row in resources:
+        kinds = OWN_HUB_ATTACHMENTS.get(str(row.get("type", "")).lower(), ())
+        for value in row.get("depends_on", []):
+            key = value.lower()
+            if (key not in ids and fl.NESTED_ID.fullmatch(key) and fl.arm_scope(key) not in external
+                    and fl.resource_type_from_id(key) in kinds):
+                found.setdefault(key, set()).add(row["id"].lower())
+    return found
+
+
+def _spoke_vnets(resources):
+    return {row["id"].lower() for row in resources
+            if row.get("delete") is True and str(row.get("type", "")).lower() == VNET_TYPE}
+
+
+def freeze_own_hub(cloud, document, resources):
+    """The own-hub plan of a whole-group scale-set deletion, or None: proven sibling hub groups, the attachments the
+    deleted resources name there, and the hub-side peerings and links that target a deleted VNet. A reference into a
+    group no live tag proves stays out, so validation still refuses it (unknown-resource-dependency)."""
+    found = _own_hub_candidates(document, resources)
+    groups = []
+    for group in sorted({fl.arm_scope(key) for key in found}):
+        status, _, body = cloud.arm("GET", group, fl.RG_API, allowed=(200, 404))
+        if status == 200 and own_hub_group(body, document["target"]):
+            groups.append(group)
+    attachments = sorted(key for key in found if fl.arm_scope(key) in groups)
+    if not attachments:
+        return None
+    spokes = _spoke_vnets(resources)
+    live, _ = _hub_inventory(cloud, groups, "own-hub-inventory-incomplete")
+    links = sorted(({"id": row["id"].lower(), "type": row["type"], "api_version": row["api_version"],
+                     "remote_virtual_network_id": row["remote_virtual_network_id"]}
+                    for row in live if row["remote_virtual_network_id"] in spokes), key=lambda row: row["id"])
+    # Azure clears a deleted VNet's zone links itself; the hub peering stays (Disconnected) and must be deleted.
+    verify_link_permissions(cloud, [row for row in links if row["type"] == PEERING_TYPE])
+    return {"contract": OWN_HUB_CONTRACT, "resource_group_ids": groups, "attachments": attachments, "links": links}
+
+
+def validate_own_hub(document, resources):
+    """Pure check of a frozen own-hub plan; returns allows(source_type, reference) for the dependency check."""
+    hub = document["deletion"]["own_hub"]
+    scopes = {value.lower() for value in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
+    found, spokes = _own_hub_candidates(document, resources), _spoke_vnets(resources)
+    groups = hub.get("resource_group_ids") if isinstance(hub, dict) else None
+    attachments = hub.get("attachments") if isinstance(hub, dict) else None
+    links = hub.get("links") if isinstance(hub, dict) else None
+    fl.require(isinstance(hub, dict) and set(hub) == {"contract", "resource_group_ids", "attachments", "links"}
+               and hub["contract"] == OWN_HUB_CONTRACT and _sorted_ids(groups, fl.RG_ID)
+               and not any(_overlaps(group, scope) for group in groups for scope in scopes)
+               and _sorted_ids(attachments, fl.NESTED_ID) and set(attachments) <= set(found)
+               and {fl.arm_scope(value) for value in attachments} == set(groups)
+               and isinstance(links, list) and all(isinstance(row, dict) for row in links)
+               and [row.get("id") for row in links] == _sorted_unique([row.get("id") for row in links])
+               and all(set(row) == {"id", "type", "api_version", "remote_virtual_network_id"}
+                       and _sorted_ids([row["id"]], fl.NESTED_ID) and row["type"] in HUB_LINK_TARGETS
+                       and row["type"] == fl.resource_type_from_id(row["id"])
+                       and row["api_version"] == HUB_LINK_COLLECTIONS[row["type"].rsplit("/", 1)[0]][1]
+                       and fl.arm_scope(row["id"]) in groups and row["remote_virtual_network_id"] in spokes
+                       for row in links),
+               "own-hub-attachments-invalid")
+    allowed = set(attachments)
+    return lambda kind, value: (value.lower() in allowed
+                                and fl.resource_type_from_id(value.lower()) in OWN_HUB_ATTACHMENTS.get(kind, ()))
+
+
+def verify_own_hub(cloud, document):
+    """Before the first DELETE: every hub group is still a sibling scale set's and the hub peerings stay deletable."""
+    hub = document["deletion"]["own_hub"]
+    for group in hub["resource_group_ids"]:
+        status, _, body = cloud.arm("GET", group, fl.RG_API, allowed=(200, 404))
+        fl.require(status == 200 and own_hub_group(body, document["target"]), "own-hub-group-ownership-changed")
+    verify_link_permissions(cloud, [row for row in hub["links"] if row["type"] == PEERING_TYPE])
+
+
+def unlink_own_hub(cloud, locks, document, receipt, persist, sleep=time.sleep):
+    """After the scale set's groups are gone: only its spoke VNet's peerings and links on the hub side."""
+    verify_own_hub(cloud, document)
+    _unlink_hub_links(cloud, locks, document, receipt, persist, document["deletion"]["own_hub"]["links"],
+                      "own-hub-link", sleep)
 
 
 def teardown_order(document, rows):

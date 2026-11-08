@@ -984,8 +984,13 @@ def validate_deletion(document):
                 "explicit-dependencies-required")
     deleted_ids = {item["id"].lower() for item in resources if item["delete"]}
     external_scopes = {scope.lower() for scope in document["locks"]["common_dependencies"]}
+    # A joined scale set's references into the factory's own hub (a sibling scale set's group), frozen and proven
+    # by freeze_deletion_inventory; without that plan they stay unknown.
+    own_hub = (factory_deletion_module().validate_own_hub(document, resources) if "own_hub" in data
+               else lambda kind, value: False)
     for item in resources:
-        require(all((value.lower() in ids or arm_scope(value) in external_scopes)
+        require(all((value.lower() in ids or arm_scope(value) in external_scopes
+                     or own_hub(str(item.get("type", "")).lower(), value))
                     and value.lower() != item["id"].lower() for value in item["depends_on"]),
                 "unknown-resource-dependency")
         require(item["delete"] or not any(value.lower() in deleted_ids for value in item["depends_on"]),
@@ -998,6 +1003,7 @@ def validate_deletion(document):
         require(isinstance(data.get("closure"), dict) and hash_value(data.get("closure_hash"))
                 and digest(data["closure"]) == data["closure_hash"], "complete-provider-closure-required")
     if not full:
+        require("own_hub" not in data, "own-hub-attachments-invalid")
         deletion_order(resources)
 
 
@@ -2227,6 +2233,23 @@ def inherited_new_resource_owner(resource_id, bodies):
 
 
 UNTAGGABLE_GROUP_EXTENSIONS = {"microsoft.authorization/roleassignments"}
+DNS_POLICY_EXEMPTION_CONTRACT = "aifactory-dns-policy-exemption-v1"
+
+
+def owned_group_extension(key, resource_type, bodies, group):
+    """An untaggable extension directly on an owned group that dies with it: a role assignment, or the DNS policy
+    exemption the bootstrap or scale-set enrollment wrote for exactly this group's factory and scale set (policy
+    exemptions carry metadata, not tags; Azure removes an exemption with its scope, aif-154 2026-11-08)."""
+    if resource_type in UNTAGGABLE_GROUP_EXTENSIONS:
+        return True
+    if resource_type != "microsoft.authorization/policyexemptions":
+        return False
+    metadata = ((bodies.get(key) or {}).get("properties") or {}).get("metadata")
+    tags = {str(name).lower(): str(value) for name, value in ((bodies[group].get("tags") or {}).items())}
+    return (isinstance(metadata, dict) and metadata.get("contract") == DNS_POLICY_EXEMPTION_CONTRACT
+            and bool(tags.get(TAG_KEYS["factory_id"])) and bool(tags.get(TAG_KEYS["scaleset_id"]))
+            and metadata.get("factory_id") == tags[TAG_KEYS["factory_id"]]
+            and metadata.get("scale_set_id") == tags[TAG_KEYS["scaleset_id"]])
 
 
 def endpoint_managed_nic_parent(key, bodies):
@@ -2258,7 +2281,7 @@ def managed_parent_id(resource_id, bodies, owner):
     else:
         parent = scope
     require(parent in bodies and parent != key and arm_scope(parent) == arm_scope(key)
-            and (parent != arm_scope(key) or resource_type in UNTAGGABLE_GROUP_EXTENSIONS)
+            and (parent != arm_scope(key) or owned_group_extension(key, resource_type, bodies, parent))
             and not (topic and resource_type_from_id(parent) == resource_type),
             "known-child-ownership-record-required")
     tags = {name.lower() for name in (bodies[parent].get("tags") or {})}
@@ -2380,6 +2403,9 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
     result = {"inventory_mode": "arm-provider-closure-v1", "inventory_complete": True,
               "revision": document["manifest_revision"], "resource_groups": groups, "resources": resources,
               "inventory_hash": digest(resources), "closure": closure, "closure_hash": digest(closure)}
+    own_hub = factory_deletion_module().freeze_own_hub(cloud, document, resources)
+    if own_hub:
+        result["own_hub"] = own_hub
     draft = {**document, "deletion": result}
     validate_deletion(draft)
     verify_full_inventory(cloud, draft)
@@ -3074,6 +3100,9 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
     require(all(group["delete"] for group in document["deletion"]["resource_groups"])
             and all(row["delete"] for row in document["deletion"]["resources"]), "whole-owned-groups-only")
     initial_cascades = verify_full_inventory(cloud, document)
+    own_hub = factory_deletion_module() if document["deletion"].get("own_hub") else None
+    if own_hub:
+        own_hub.verify_own_hub(cloud, document)
     resources = document["deletion"]["resources"]
     groups = document["deletion"]["resource_groups"]
     planned = {group["id"].lower(): {"id": group["id"], "delete": True, "depends_on": []} for group in groups}
@@ -3157,6 +3186,9 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
             removed.append(managed)
         receipt.pop("pending_resource_group", None)
         persist()
+    if own_hub:
+        # Last, once the spoke VNet is verifiably gone: its peerings and links on the own hub's side.
+        own_hub.unlink_own_hub(cloud, locks, document, receipt, persist, sleep)
 
 
 class _ExecutionClaim:
