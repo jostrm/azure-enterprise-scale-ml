@@ -65,6 +65,8 @@ param zoneAPIMExists bool = false
 param access_hub_mode string = ''
 param setup_hub_access bool = false
 var bootstrapManagedPrivateDns = !centralDnsZoneByPolicyInHub && toLower(access_hub_mode) == 'integrated' && setup_hub_access
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
 
 var resourceExists = {
   miACA: miACAExists
@@ -413,8 +415,11 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 // COMPUTED VARIABLES - Private DNS
 // ============================================================================
 
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName
-var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
+// Own access hub, added scale set: zones live in the bootstrap's DNS resource group, not in this scale set's.
+var ownHubPrivateDns = bootstrapManagedPrivateDns && startsWith(toLower(own_hub_private_dns_resource_group_id), '/subscriptions/')
+var ownHubPrivateDnsParts = split('${own_hub_private_dns_resource_group_id}////', '/')
+var privDnsResourceGroupName = ownHubPrivateDns ? ownHubPrivateDnsParts[4] : ((!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName)
+var privDnsSubscription = ownHubPrivateDns ? ownHubPrivateDnsParts[2] : ((!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd)
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup

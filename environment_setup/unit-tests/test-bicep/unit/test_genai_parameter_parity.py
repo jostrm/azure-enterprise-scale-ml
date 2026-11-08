@@ -24,8 +24,11 @@ from domain.pipeline_contracts import ADO_SERVICES, GHA_PHASE, deployments, load
 # module -> {parameter: (provider that passes it, reason the other one does not)}
 KNOWN_GAPS = {
     "01-foundation.bicep": {
-        name: ("ado", "GHA runs one network_env per job; per-environment keys are forbidden there")
-        for name in ("DEBUG_network_env_dev", "DEBUG_network_env_stage", "DEBUG_network_env_prod")
+        **{name: ("ado", "GHA runs one network_env per job; per-environment keys are forbidden there")
+           for name in ("DEBUG_network_env_dev", "DEBUG_network_env_stage", "DEBUG_network_env_prod")},
+        # 75d849e5: ADO has no access-hub variables yet; an undefined $(setup_hub_access) would stay literal.
+        **{name: ("gha", "own access hub is GHA-only; ADO does not define the access-hub variables yet")
+           for name in ("access_hub_mode", "setup_hub_access")},
     },
     "02-core-infrastructure.bicep": {
         "bingExists": ("ado", "declared but unused by 02"),

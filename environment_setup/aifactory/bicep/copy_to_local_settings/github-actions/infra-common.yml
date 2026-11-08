@@ -125,6 +125,8 @@ jobs:
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
+      own_hub_vnet_id: "${{ vars.OWN_HUB_VNET_ID || '' }}"
+      own_hub_private_dns_resource_group_id: "${{ vars.OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID || '' }}"
       databricksOID: "${{ vars.DATABRICKS_OID }}"
       cmk: "${{ vars.CMK || 'false' }}"
       cmkKeyName: "${{ vars.CMK_KEY_NAME || 'esml-cmk-key' }}"
@@ -458,6 +460,8 @@ jobs:
             --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+            --parameters own_hub_vnet_id="${{ env.own_hub_vnet_id }}" \
+            --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
@@ -609,6 +613,8 @@ jobs:
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
+      own_hub_vnet_id: "${{ vars.OWN_HUB_VNET_ID || '' }}"
+      own_hub_private_dns_resource_group_id: "${{ vars.OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID || '' }}"
       databricksOID: "${{ vars.DATABRICKS_OID }}"
       cmk: "${{ vars.CMK || 'false' }}"
       cmkKeyName: "${{ vars.CMK_KEY_NAME || 'esml-cmk-key' }}"
@@ -939,6 +945,8 @@ jobs:
             --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+            --parameters own_hub_vnet_id="${{ env.own_hub_vnet_id }}" \
+            --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
@@ -1092,6 +1100,8 @@ jobs:
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
+      own_hub_vnet_id: "${{ vars.OWN_HUB_VNET_ID || '' }}"
+      own_hub_private_dns_resource_group_id: "${{ vars.OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID || '' }}"
       databricksOID: "${{ vars.DATABRICKS_OID }}"
       cmk: "${{ vars.CMK || 'false' }}"
       cmkKeyName: "${{ vars.CMK_KEY_NAME || 'esml-cmk-key' }}"
@@ -1422,6 +1432,8 @@ jobs:
             --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+            --parameters own_hub_vnet_id="${{ env.own_hub_vnet_id }}" \
+            --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \

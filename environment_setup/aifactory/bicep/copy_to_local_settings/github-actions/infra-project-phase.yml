@@ -242,6 +242,8 @@ jobs:
       centralDnsZoneByPolicyInHub: ${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB || 'false' }}
       privDnsSubscription_param: ${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM || '' }}
       privDnsResourceGroup_param: ${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM || '' }}
+      own_hub_vnet_id: "${{ vars.OWN_HUB_VNET_ID || '' }}"
+      own_hub_private_dns_resource_group_id: "${{ vars.OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID || '' }}"
       commonResourceGroup_param: ${{ vars.COMMON_RESOURCE_GROUP_PARAM || '' }}
       datalakeName_param: ${{ vars.DATALAKE_NAME_PARAM || '' }}
       enableProjectLakeAccess: ${{ vars.ENABLE_PROJECT_LAKE_ACCESS || 'true' }}
@@ -1338,6 +1340,7 @@ jobs:
         shell: bash
         env:
           DNS_MANAGED_BY_POLICY: ${{ env.centralDnsZoneByPolicyInHub }}
+          OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID: ${{ env.own_hub_private_dns_resource_group_id }}
         run: |
             set -e
             if [ "${DNS_MANAGED_BY_POLICY,,}" = "true" ]; then
@@ -1350,6 +1353,10 @@ jobs:
             if [ "${{ env.centralDnsZoneByPolicyInHub }}" = "true" ]; then
               privDnsSubscription="${{ env.privDnsSubscription_param }}"
               privDnsRg="${{ env.privDnsResourceGroup_param }}"
+            elif [[ "${OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID,,}" == /subscriptions/* ]]; then
+              # Own access hub, added scale set: the bootstrap's zones, linked to this VNet by 13-rgLevel.
+              privDnsSubscription="$(cut -d/ -f3 <<< "$OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID")"
+              privDnsRg="$(cut -d/ -f5 <<< "$OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID")"
             else
               privDnsSubscription="${{ env.dev_test_prod_sub_id }}"
               privDnsRg="${{ env.vnetResourceGroup_resolved }}"
@@ -1991,6 +1998,7 @@ jobs:
               --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters miACAExists="${{ env.miACAExists }}" \
               --parameters miPrjExists="${{ env.miPrjExists }}" \
@@ -2175,6 +2183,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -2244,6 +2253,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -2402,6 +2412,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -2533,6 +2544,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -2659,6 +2671,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -2785,6 +2798,7 @@ jobs:
               --parameters skuDatabricksDev="${{ env.skuDatabricksDev }}" \
               --parameters skuDatabricksStageProd="${{ env.skuDatabricksStageProd }}" \
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters useCommonACR="${{ env.useCommonACR_override }}" \
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
@@ -2897,6 +2911,7 @@ jobs:
               --parameters projectPrefix="${{ env.projectPrefix }}" \
               --parameters projectSuffix="${{ env.projectSuffix }}" \
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters useCommonACR="${{ env.useCommonACR_override }}" \
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
@@ -2998,6 +3013,7 @@ jobs:
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -3616,6 +3632,7 @@ jobs:
               --parameters subnetCommon="${{ env.subnetCommon }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters tagsProject='${{ env.tagsProject }}' \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
@@ -3921,6 +3938,7 @@ jobs:
               --parameters subnetCommon="${{ env.subnetCommon }}" \
               --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
               --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+              --parameters own_hub_private_dns_resource_group_id="${{ env.own_hub_private_dns_resource_group_id }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
               --parameters tagsProject='${{ env.tagsProject }}' \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \

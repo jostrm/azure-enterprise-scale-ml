@@ -3005,6 +3005,7 @@ steps:
      --parameters privateDnsAndVnetLinkAllGlobalLocation="false" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
@@ -3159,6 +3160,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -3242,6 +3244,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -3373,6 +3376,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -3485,6 +3489,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -3585,6 +3590,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -3715,6 +3721,7 @@ steps:
      --parameters aml_cluster_test_prod_nodes_override="$(admin_aml_cluster_maxNodes_testProd_override)" \
      --parameters AMLStudioUIPrivate="$(AMLStudioUIPrivate)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
@@ -3838,6 +3845,7 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
@@ -3996,6 +4004,7 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -4726,6 +4735,7 @@ steps:
      --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters tagsProject='$(tagsProject)' \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -5257,6 +5267,7 @@ steps:
      --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters tagsProject='$(tagsProject)' \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \

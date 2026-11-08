@@ -103,6 +103,12 @@ param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 param access_hub_mode string = ''
 param setup_hub_access bool = false
 var bootstrapManagedPrivateDns = !centralDnsZoneByPolicyInHub && toLower(access_hub_mode) == 'integrated' && setup_hub_access
+@description('Own access hub, added scale set: ARM id of the factory own-hub VNet. Empty for the bootstrap scale set and every other topology.')
+param own_hub_vnet_id string = ''
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
+// A non-bootstrap scale set of an own-hub factory peers with the hub and links its common VNet to the bootstrap's zones.
+var joinOwnHub = bootstrapManagedPrivateDns && own_hub_vnet_id != ''
 @description('Common resource group name. If not set, it will be created as "{commonResourceName}-weu-dev-001"')
 param commonResourceGroup_param string = ''
 param vnetResourceGroup_param string = ''
@@ -157,8 +163,16 @@ var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'  // {commonResourceName}-weu-dev-002
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
 
-var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = (privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
+// Own access hub, added scale set: the zones are the bootstrap's, in own_hub_private_dns_resource_group_id
+// (default: the hub VNet's resource group). Padded splits keep the indexes valid when the parameters are empty.
+var ownHubVnetParts = split('${own_hub_vnet_id}/////////', '/') // ['', 'subscriptions', sub, 'resourceGroups', rg, 'providers', 'Microsoft.Network', 'virtualNetworks', name]
+// Valid scope even when not joining: a false-condition module still has its scope and dependsOn ids evaluated.
+var ownHubSubscriptionId = joinOwnHub ? ownHubVnetParts[2] : subscriptionIdDevTestProd
+var ownHubResourceGroupName = joinOwnHub ? ownHubVnetParts[4] : vnetResourceGroupName
+var ownHubPrivateDnsResourceGroupId = own_hub_private_dns_resource_group_id != '' ? own_hub_private_dns_resource_group_id : '/subscriptions/${ownHubVnetParts[2]}/resourceGroups/${ownHubVnetParts[4]}'
+var ownHubPrivateDnsParts = split('${ownHubPrivateDnsResourceGroupId}////', '/')
+var privDnsResourceGroupName = joinOwnHub ? ownHubPrivateDnsParts[4] : ((privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName)
+var privDnsSubscription = joinOwnHub ? ownHubPrivateDnsParts[2] : ((privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd)
 
 // DEPENDENCIES - should exist
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -524,6 +538,50 @@ module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bic
     vNetResourceGroup: vnetResourceGroupName
     location: location
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
+  }
+  dependsOn: [
+    esmlCommonResourceGroup
+  ]
+}
+
+// Own access hub, added scale set: join the bootstrap's hub. 12-networkCommon created this scale set's common VNet
+// earlier in the same job. Peering and link names are deterministic, so re-runs PUT the same children.
+module ownHubPeeringHubToSpoke '../../modules/networking/vnetPeering.bicep' = if (joinOwnHub) {
+  scope: resourceGroup(ownHubSubscriptionId, ownHubResourceGroupName)
+  name: take('ownHubPeerH2S-${uniqueInAIFenv}${commonResourceSuffix}${env}', 64)
+  params: {
+    vnetName: ownHubVnetParts[8]
+    peeringName: take('peer-${vnetNameFull}-${uniqueString(vnetId)}', 80)
+    remoteVnetId: vnetId
+    allowGatewayTransit: true
+    useRemoteGateways: false
+  }
+  dependsOn: [
+    esmlCommonResourceGroup
+  ]
+}
+module ownHubPeeringSpokeToHub '../../modules/networking/vnetPeering.bicep' = if (joinOwnHub) {
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
+  name: take('ownHubPeerS2H-${uniqueInAIFenv}${commonResourceSuffix}${env}', 64)
+  params: {
+    vnetName: vnetNameFull
+    peeringName: take('peer-${ownHubVnetParts[8]}-${uniqueString(own_hub_vnet_id)}', 80)
+    remoteVnetId: own_hub_vnet_id
+    allowGatewayTransit: false
+    useRemoteGateways: true
+  }
+  dependsOn: [
+    ownHubPeeringHubToSpoke
+  ]
+}
+module ownHubPrivateDnsLinks '../../modules/networking/privateDnsZoneVnetLinks.bicep' = if (joinOwnHub) {
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+  name: take('ownHubDnsLinks-${uniqueInAIFenv}${commonResourceSuffix}${env}', 64)
+  params: {
+    privateLinksDnsZones: privateLinksDnsZonesArray
+    vnetId: vnetId
+    location: location
+    allGlobal: privateDnsAndVnetLinkAllGlobalLocation
   }
   dependsOn: [
     esmlCommonResourceGroup

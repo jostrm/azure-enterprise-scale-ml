@@ -101,6 +101,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_logic_app_subnet.py",
         "unit/test_mcp_api_sp_script.py",
         "unit/test_monitoring_runbook_adapters.py",
+        "unit/test_own_hub_added_scale_set.py",
         "unit/test_persona_access.py",
         "unit/test_persona_end_to_end.py",
         "unit/test_persona_groups.py",

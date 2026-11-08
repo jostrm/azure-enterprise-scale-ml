@@ -152,6 +152,8 @@ param network_env string = ''
 param centralDnsZoneByPolicyInHub bool = false
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
 
 // Resource group configuration
 param commonResourceGroup_param string = ''
@@ -286,8 +288,12 @@ var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<ne
 var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 
 // Private DNS calculations
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId
+// Own access hub, added scale set: zones live in the bootstrap's DNS resource group, not in this scale set's.
+// A literal '$(own_hub_private_dns_resource_group_id)' (ADO, variable not defined) is not an id and is ignored.
+var ownHubPrivateDns = !centralDnsZoneByPolicyInHub && startsWith(toLower(own_hub_private_dns_resource_group_id), '/subscriptions/')
+var ownHubPrivateDnsParts = split('${own_hub_private_dns_resource_group_id}////', '/')
+var privDnsResourceGroupName = ownHubPrivateDns ? ownHubPrivateDnsParts[4] : ((!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName)
+var privDnsSubscription = ownHubPrivateDns ? ownHubPrivateDnsParts[2] : ((!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId)
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 
 // ============================================================================

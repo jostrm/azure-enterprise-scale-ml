@@ -24,6 +24,8 @@ param network_env string = ''
 param centralDnsZoneByPolicyInHub bool = false
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 param commonResourceName string = 'esml-common'
@@ -93,6 +95,7 @@ module deploymentContext '../modules/common/CmnServiceDeploymentContext.bicep' =
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     privDnsSubscription_param: privDnsSubscription_param
     privDnsResourceGroup_param: privDnsResourceGroup_param
+    own_hub_private_dns_resource_group_id: own_hub_private_dns_resource_group_id
     projectPrefix: projectPrefix
     projectSuffix: projectSuffix
     commonResourceName: commonResourceName

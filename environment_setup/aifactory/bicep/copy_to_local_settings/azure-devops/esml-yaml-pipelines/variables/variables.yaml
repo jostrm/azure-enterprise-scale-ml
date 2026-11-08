@@ -82,6 +82,8 @@ variables:
   enableAIFactoryHub: "false" # <optional>Own AI Factory Hub intent<default>false Both flags false: standalone; central DNS true: external Hub takes precedence. Configuration only, no deployment.
   privDnsSubscription_param: "<todo>_SubscriptionID" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity subscription ID where central private DNS zones are deployed.
   privDnsResourceGroup_param: "<todo>_ResourceGroup_name" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity resource group where central private DNS zones are deployed.
+  own_hub_vnet_id: "" # <optional>Own access hub: ARM id of the factory own-hub VNet<default>(empty)<keep-as-is> Set by the config wizard only for an added (non-bootstrap) scale set of a factory with its own access hub; peers this scale set with the hub.
+  own_hub_private_dns_resource_group_id: "" # <optional>Own access hub: ARM id of the resource group with the bootstrap private DNS zones<default>(empty)<keep-as-is> Set together with the own-hub VNet id; zone groups use these zones and the scale set VNet is linked to them.
   tenantId: "<todo>_TenantId" # <mandatory>Azure tenant ID<default><todo>_TenantId<ensure> find in Azure Portal > Entra ID > Overview (Directory ID).
   databricksOID: "<optional>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
   databricksPrivate: "true" # <optional>Databricks private control plane<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
