@@ -115,6 +115,8 @@ param network_env string = ''
 // Private DNS configuration
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
 
 // Resource group configuration
 param commonResourceGroup_param string = ''
@@ -202,8 +204,12 @@ var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<ne
 var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 
 // Private DNS calculations
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName
-var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
+// Own access hub, added scale set: zones live in the bootstrap's DNS resource group, not in this scale set's.
+// A literal '$(own_hub_private_dns_resource_group_id)' (ADO, variable not defined) is not an id and is ignored.
+var ownHubPrivateDns = !centralDnsZoneByPolicyInHub && startsWith(toLower(own_hub_private_dns_resource_group_id), '/subscriptions/')
+var ownHubPrivateDnsParts = split('${own_hub_private_dns_resource_group_id}////', '/')
+var privDnsResourceGroupName = ownHubPrivateDns ? ownHubPrivateDnsParts[4] : ((!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName)
+var privDnsSubscription = ownHubPrivateDns ? ownHubPrivateDnsParts[2] : ((!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd)
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 var commonSubnetName = !empty(subnetCommon)?replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 

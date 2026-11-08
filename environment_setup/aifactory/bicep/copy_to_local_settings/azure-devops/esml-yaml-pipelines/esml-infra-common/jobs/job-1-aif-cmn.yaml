@@ -239,6 +239,8 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters own_hub_vnet_id="$(own_hub_vnet_id)" \
+     --parameters own_hub_private_dns_resource_group_id="$(own_hub_private_dns_resource_group_id)" \
      --parameters tenantId="$(tenantId)" \
      --parameters databricksOID="$(databricksOID)" \
      --parameters enableAdminVM="$(enableAdminVM)" \

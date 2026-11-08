@@ -62,6 +62,8 @@
     "enableAIFactoryHub": false,
     "privDnsSubscription_param": "<todo>_SubscriptionID",
     "privDnsResourceGroup_param": "<todo>_ResourceGroup_name",
+    "own_hub_vnet_id": "",
+    "own_hub_private_dns_resource_group_id": "",
     "tenantId": "<todo>_TenantId",
     "databricksOID": "<optional>_ObjectID",
     "databricksPrivate": "true",

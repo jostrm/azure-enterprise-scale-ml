@@ -155,6 +155,12 @@ param webAppExists bool = false
 param enablePublicAccessWithPerimeter bool = false
 // Security / access
 param centralDnsZoneByPolicyInHub bool = false
+@description('Own access hub, added scale set: ARM id (/subscriptions/<sub>/resourceGroups/<rg>) of the resource group holding the bootstrap-managed private DNS zones. Empty for the bootstrap scale set and every other topology.')
+param own_hub_private_dns_resource_group_id string = ''
+// Own access hub, added scale set: zones live in the bootstrap's DNS resource group, not in this scale set's.
+// A literal '$(own_hub_private_dns_resource_group_id)' (ADO, variable not defined) is not an id and is ignored.
+var ownHubPrivateDns = !centralDnsZoneByPolicyInHub && startsWith(toLower(own_hub_private_dns_resource_group_id), '/subscriptions/')
+var ownHubPrivateDnsParts = split('${own_hub_private_dns_resource_group_id}////', '/')
 @description('Assign storage roles to Logic App system-assigned identity (disable to avoid transient first-run lookup issues)')
 param enableLogicAppSystemMiRoleAssignment bool = false
 
@@ -296,9 +302,9 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location
-    // Using same RG/subscription as target (adjust if central DNS zone used)
-    privDnsResourceGroupName: vnetResourceGroupName
-    privDnsSubscription: subscriptionIdDevTestProd
+    // Using same RG/subscription as target (adjust if central DNS zone used); own access hub: the bootstrap's zones
+    privDnsResourceGroupName: ownHubPrivateDns ? ownHubPrivateDnsParts[4] : vnetResourceGroupName
+    privDnsSubscription: ownHubPrivateDns ? ownHubPrivateDnsParts[2] : subscriptionIdDevTestProd
   }
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones

@@ -408,18 +408,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 409 |
-| `env` | 407 |
+| `yaml` | 411 |
+| `env` | 409 |
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 414 |
+| `json.dev` | 416 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 157, 433; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 158, 434; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 435, 459; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 159, 435; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 160, 436; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 437, 461; one reference row.
 
 ## YAML and variables.json reference
 
@@ -668,6 +668,8 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:network_env_dev --><!-- parameter json.dev:network_env_dev -->`network_env_dev` | `DEV_NETWORK_ENV` | O | Y: `"dev-"`<br>J.dev: `"dev-"` | DEV environment prefix for BYO subnets otherwise: set to empty string if not using environment-prefixed naming. |
 | <!-- parameter yaml:network_env_prod --><!-- parameter json.dev:network_env_prod -->`network_env_prod` | `PROD_NETWORK_ENV` | O | Y: `"prd-"`<br>J.dev: `"prd-"` | PROD environment prefix for BYO subnets otherwise: "prod-", "pr-", or empty string. |
 | <!-- parameter yaml:network_env_stage --><!-- parameter json.dev:network_env_stage -->`network_env_stage` | `STAGE_NETWORK_ENV` | O | Y: `"tst2-"`<br>J.dev: `"tst2-"` | STAGE environment prefix for BYO subnets otherwise: "test-", "tst-", or empty string. |
+| <!-- parameter yaml:own_hub_private_dns_resource_group_id --><!-- parameter json.dev:own_hub_private_dns_resource_group_id -->`own_hub_private_dns_resource_group_id` | `OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID` | O | Y: `""`<br>J.dev: `""` | Own access hub: ARM id of the resource group with the bootstrap private DNS zones keep-as-is: Set together with the own-hub VNet id; zone groups use these zones and the scale set VNet is linked to them. |
+| <!-- parameter yaml:own_hub_vnet_id --><!-- parameter json.dev:own_hub_vnet_id -->`own_hub_vnet_id` | `OWN_HUB_VNET_ID` | O | Y: `""`<br>J.dev: `""` | Own access hub: ARM id of the factory own-hub VNet keep-as-is: Set by the config wizard only for an added (non-bootstrap) scale set of a factory with its own access hub; peers this scale set with the hub. |
 | <!-- parameter yaml:privDnsResourceGroup_param --><!-- parameter json.dev:privDnsResourceGroup_param -->`privDnsResourceGroup_param` | `PRIV_DNS_RESOURCE_GROUP_PARAM` | C | Y: `"<todo>_ResourceGroup_name"`<br>J.dev: `"<todo>_ResourceGroup_name"` | Hub DNS resource group mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity resource group where central private DNS zones are deployed. |
 | <!-- parameter yaml:privDnsSubscription_param --><!-- parameter json.dev:privDnsSubscription_param -->`privDnsSubscription_param` | `PRIV_DNS_SUBSCRIPTION_PARAM` | C | Y: `"<todo>_SubscriptionID"`<br>J.dev: `"<todo>_SubscriptionID"` | Hub DNS subscription ID mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity subscription ID where central private DNS zones are deployed. |
 | <!-- parameter yaml:prod_cidr_range --><!-- parameter json.dev:prod_cidr_range -->`prod_cidr_range` | `PROD_CIDR_RANGE` | M | Y: `"128"`<br>J.dev: `"128"` | PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18. |
@@ -1118,6 +1120,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:KONG_GATEWAY_SUBNET_NAME -->`KONG_GATEWAY_SUBNET_NAME` | `kongGatewaySubnetName` | O | `"snet-kong-001"` | Kong gateway subnet name. |
 | <!-- parameter env:KONG_GATEWAY_VNET_NAME -->`KONG_GATEWAY_VNET_NAME` | `kongGatewayVnetName` | C | `""` | Kong gateway vnet name. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
 | <!-- parameter env:KONG_GATEWAY_VNET_RESOURCE_GROUP -->`KONG_GATEWAY_VNET_RESOURCE_GROUP` | `kongGatewayVnetResourceGroup` | C | `""` | Kong gateway vnet resource group. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
+| <!-- parameter env:OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID -->`OWN_HUB_PRIVATE_DNS_RESOURCE_GROUP_ID` | `own_hub_private_dns_resource_group_id` | O | `""` | Own access hub: ARM id of the resource group with the bootstrap private DNS zones keep-as-is: Set together with the own-hub VNet id; zone groups use these zones and the scale set VNet is linked to them. |
+| <!-- parameter env:OWN_HUB_VNET_ID -->`OWN_HUB_VNET_ID` | `own_hub_vnet_id` | O | `""` | Own access hub: ARM id of the factory own-hub VNet keep-as-is: Set by the config wizard only for an added (non-bootstrap) scale set of a factory with its own access hub; peers this scale set with the hub. |
 | <!-- parameter env:PRIV_DNS_RESOURCE_GROUP_PARAM -->`PRIV_DNS_RESOURCE_GROUP_PARAM` | `privDnsResourceGroup_param` | C | `"<todo>"` | Hub DNS resource group mandatory: if CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB:'true' ensure: Hub connectivity resource group. |
 | <!-- parameter env:PRIV_DNS_SUBSCRIPTION_PARAM -->`PRIV_DNS_SUBSCRIPTION_PARAM` | `privDnsSubscription_param` | C | `"<todo>"` | Hub DNS subscription ID mandatory: if CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB:'true' ensure: Hub connectivity subscription ID. |
 | <!-- parameter env:PROD_CIDR_RANGE -->`PROD_CIDR_RANGE` | `prod_cidr_range` | M | `"128"` | PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18. |
