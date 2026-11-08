@@ -454,6 +454,8 @@ jobs:
             --parameters adminUsername="${{ env.adminUsername }}" \
             --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
             --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+            --parameters access_hub_mode="${{ env.access_hub_mode }}" \
+            --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
             --parameters tenantId="${{ env.tenantId }}" \
@@ -933,6 +935,8 @@ jobs:
             --parameters adminUsername="${{ env.adminUsername }}" \
             --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
             --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+            --parameters access_hub_mode="${{ env.access_hub_mode }}" \
+            --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
             --parameters tenantId="${{ env.tenantId }}" \
@@ -1414,6 +1418,8 @@ jobs:
             --parameters adminUsername="${{ env.adminUsername }}" \
             --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
             --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+            --parameters access_hub_mode="${{ env.access_hub_mode }}" \
+            --parameters setup_hub_access="${{ env.setup_hub_access || 'false' }}" \
             --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
             --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
             --parameters tenantId="${{ env.tenantId }}" \
