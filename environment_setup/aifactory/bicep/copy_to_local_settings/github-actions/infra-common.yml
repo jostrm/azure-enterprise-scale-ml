@@ -262,11 +262,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
           # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
           enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |
@@ -744,11 +744,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
           # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
           enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |
@@ -1225,11 +1225,11 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
-          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
-          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
-          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
-          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
           # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
           enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |

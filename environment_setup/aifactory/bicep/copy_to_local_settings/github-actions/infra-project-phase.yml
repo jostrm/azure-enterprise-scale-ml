@@ -693,7 +693,7 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
