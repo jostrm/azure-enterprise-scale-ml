@@ -154,15 +154,41 @@ def _binding(state: dict) -> dict:
     })
 
 
-def _plan(request: PreparationRequest, state: dict) -> dict:
+def _active_version(agent: dict) -> dict:
+    selector = agent["agent_endpoint"].get("version_selector")
+    rules = selector.get("version_selection_rules") if isinstance(selector, dict) else None
+    uses_latest = not isinstance(rules, list) or not rules or any(
+        isinstance(rule, dict) and rule.get("traffic_percentage") != 0
+        and (rule.get("agent_version") == "@latest" or rule.get("type") == "Latest")
+        for rule in rules
+    )
+    result = {"version_selector": deepcopy(selector)}
+    if uses_latest:
+        versions = agent.get("versions")
+        latest = versions.get("latest") if isinstance(versions, dict) else None
+        latest = latest if isinstance(latest, dict) else {}
+        result["resolved_latest"] = {
+            key: latest[key] if isinstance(latest.get(key), str) and latest[key] else None
+            for key in ("version", "id")
+        }
+    return result
+
+
+def _plan(
+    request: PreparationRequest, state: dict, *,
+    authorization_scheme: str = "BotServiceRbac", allow_scope_change: bool = False,
+) -> dict:
     before = deepcopy(_endpoint(state["agent"]))
     after = deepcopy(before)
     schemes = after["authorization_schemes"]
-    if any(scheme["type"] == "BotServiceTenant" for scheme in schemes):
-        raise ValueError(
-            "BotServiceTenant conflicts with BotServiceRbac preparation; explicit operator handling "
-            "is required. No existing authorization scheme was changed."
-        )
+    conflicting = "BotServiceTenant" if authorization_scheme == "BotServiceRbac" else "BotServiceRbac"
+    if any(scheme["type"] == conflicting for scheme in schemes):
+        if not allow_scope_change:
+            raise ValueError(
+                f"{conflicting} conflicts with {authorization_scheme} preparation; explicit operator handling "
+                "is required. No existing authorization scheme was changed."
+            )
+        schemes[:] = [scheme for scheme in schemes if scheme["type"] != conflicting]
     activity = after["protocol_configuration"].setdefault("activity", {})
     if state["public_network_access"] == "Disabled" and not (
         request.enable_m365_public_endpoint or activity.get("enable_m365_public_endpoint") is True
@@ -176,12 +202,14 @@ def _plan(request: PreparationRequest, state: dict) -> dict:
         activity["enable_m365_public_endpoint"] = True
     if "protocols" in after and "activity" not in after["protocols"]:
         after["protocols"].append("activity")
-    if not any(scheme["type"] == "BotServiceRbac" for scheme in schemes):
-        schemes.append({"type": "BotServiceRbac"})
+    if not any(scheme["type"] == authorization_scheme for scheme in schemes):
+        schemes.append({"type": authorization_scheme})
     changed = {key: deepcopy(after[key]) for key in _PATCH_FIELDS if after[key] != before[key]}
     return {
         "mode": "plan", "status": "planned" if changed else "unchanged",
         "target": _binding(state), "warnings": [],
+        "active_version": _active_version(state["agent"]),
+        "authorization_scheme": authorization_scheme, "allow_scope_change": allow_scope_change,
         "enable_m365_public_endpoint": request.enable_m365_public_endpoint,
         "subscription_id": request.subscription_id, "tenant_id": request.tenant_id,
         "project_resource_id": request.project_resource_id,
@@ -193,7 +221,9 @@ def _plan(request: PreparationRequest, state: dict) -> dict:
         "before": before, "after": after,
         "patch": {"agent_endpoint": changed} if changed else {},
         "changed": bool(changed), "applied": False, "published": False, "teams_verified": False,
-        "remaining_manual_publication": _MANUAL_PUBLICATION,
+        "remaining_manual_publication": _MANUAL_PUBLICATION.replace(
+            "Shared (BotServiceRbac)", "Tenant (BotServiceTenant)"
+        ) if authorization_scheme == "BotServiceTenant" else _MANUAL_PUBLICATION,
     }
 
 
@@ -249,9 +279,14 @@ class FoundryPublishingPreparation:
     def run(
         self, request: PreparationRequest, *, apply: bool = False,
         reviewed_plan: dict | None = None,
+        authorization_scheme: str = "BotServiceRbac", allow_scope_change: bool = False,
     ) -> dict:
         if not isinstance(apply, bool):
             raise ValueError("apply must be a boolean.")
+        if authorization_scheme not in ("BotServiceRbac", "BotServiceTenant"):
+            raise ValueError("authorization_scheme must be BotServiceRbac or BotServiceTenant.")
+        if not isinstance(allow_scope_change, bool):
+            raise ValueError("allow_scope_change must be a boolean.")
         if request.skip_reason:
             return {
                 "mode": "apply" if apply else "plan", "target": {},
@@ -266,6 +301,9 @@ class FoundryPublishingPreparation:
             reviewed_before = _endpoint({"agent_endpoint": reviewed_plan.get("before")})
             if reviewed_plan.get("enable_m365_public_endpoint") is not request.enable_m365_public_endpoint:
                 raise ValueError("The reviewed network opt-in must match botEnableM365PublicEndpoint.")
+            if (reviewed_plan.get("authorization_scheme", "BotServiceRbac") != authorization_scheme
+                    or reviewed_plan.get("allow_scope_change", False) is not allow_scope_change):
+                raise ValueError("The reviewed authorization scheme and scope-change action must match.")
         subscription = _guid(request.subscription_id, "Subscription")
         tenant = _guid(request.tenant_id, "Tenant")
         _project_parts(request.project_resource_id, subscription)
@@ -279,7 +317,18 @@ class FoundryPublishingPreparation:
         current = self._read(request)
         if apply and reviewed_plan["target"] != _binding(current):
             raise RuntimeError("Live target/identity binding differs from the reviewed plan; no PATCH was sent.")
-        result = _plan(request, current)
+        if apply and allow_scope_change:
+            endpoint = current["agent"]["agent_endpoint"]
+            for field in ("authorization_schemes", "version_selector"):
+                if reviewed_before.get(field) != endpoint.get(field):
+                    raise RuntimeError(f"Live {field}/routing differs from the reviewed publication plan; no PATCH was sent.")
+            if reviewed_plan.get("public_network_access") != current["public_network_access"]:
+                raise RuntimeError("Live network settings differ from the reviewed publication plan; no PATCH was sent.")
+            if reviewed_plan.get("active_version") != _active_version(current["agent"]):
+                raise RuntimeError("Live active version differs from the reviewed publication plan; no PATCH was sent.")
+        result = _plan(
+            request, current, authorization_scheme=authorization_scheme, allow_scope_change=allow_scope_change,
+        )
         if not apply:
             return result
         result["mode"] = "apply"
@@ -301,16 +350,18 @@ class FoundryPublishingPreparation:
             headers={"Content-Type": "application/merge-patch+json"},
         )
         verified = self._read(request)
-        self._verify(current, verified, result["after"])
+        self._verify(current, verified, result["after"], bind_active_version=allow_scope_change)
         result.update(status="prepared", applied=True)
         return result
 
     @staticmethod
-    def _verify(before: dict, verified: dict, expected: dict) -> None:
+    def _verify(before: dict, verified: dict, expected: dict, *, bind_active_version: bool = False) -> None:
         if _binding(before) != _binding(verified):
             raise RuntimeError("Read-back verification failed: agent identity/binding changed.")
         if before["public_network_access"] != verified["public_network_access"]:
             raise RuntimeError("Read-back verification failed: account public network access changed.")
+        if bind_active_version and _active_version(before["agent"]) != _active_version(verified["agent"]):
+            raise RuntimeError("Read-back verification failed: active agent version changed.")
         actual = verified["agent"]["agent_endpoint"]
         if any(actual[key] != expected[key] for key in _PATCH_FIELDS):
             raise RuntimeError("Read-back verification failed: intended endpoint configuration was not applied exactly.")
@@ -325,5 +376,7 @@ class FoundryPublishingPreparation:
             if not required.issubset(actual.get("protocols", [])):
                 raise RuntimeError("Read-back verification failed: enabled protocols were not preserved.")
         for key in ("versions", "version_selector", "metadata", "agent_card", "description", "display_name"):
+            if key == "versions" and bind_active_version:
+                continue
             if before["agent"].get(key) != verified["agent"].get(key):
                 raise RuntimeError(f"Read-back verification failed: agent {key} was not preserved.")

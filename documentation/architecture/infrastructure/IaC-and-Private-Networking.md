@@ -16,6 +16,10 @@ sources:
   - environment_setup/aifactory/bicep/modules/botService.bicep
   - environment_setup/aifactory/bicep/scripts/prepare-foundry-publishing.py
   - usecase_code/40-agent-factory/agent_factory/foundry_publishing.py
+  - usecase_code/40-agent-factory/agent_factory/m365_publishing.py
+  - usecase_code/40-agent-factory/agent_factory/publishing_project.py
+  - environment_setup/aifactory/bicep/scripts/publish-foundry-agent.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-publishing/FoundryPublishing.psm1
   - environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1
   - environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1
   - environment_setup/aifactory/bicep/scripts/getProjectSubnetState.ps1
@@ -43,6 +47,9 @@ sources:
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-configuration.bicep
 tests:
   - usecase_code/40-agent-factory/tests/test_foundry_publishing.py
+  - usecase_code/40-agent-factory/tests/test_m365_publishing.py
+  - environment_setup/unit-tests/test-bicep/unit/test_foundry_publishing_wrappers.py
+  - environment_setup/unit-tests/test-bicep/unit/test_publishing_project_cli.py
   - environment_setup/unit-tests/test-bicep/unit/test_foundry_publishing_wiring.py
   - environment_setup/unit-tests/test-bicep/unit/test_aks_outbound_type.py
   - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
@@ -86,6 +93,23 @@ catalog publication, Agent Application, connection, RBAC grant, secret, or
 Microsoft App ID replacement is performed. Endpoint readiness is not evidence
 of Microsoft 365 publication, backend registration availability, or a Teams
 conversation; see the Bicep README for the Microsoft contracts and manual boundary.
+
+Project-team `publich-agent-to-TEAMS.ps1` and `publich-agent-to-Copilot.ps1` are
+thin operator entry points over one shared PowerShell UI and Python publication
+service. They select access instructions for one joint Teams/M365 publication,
+not independent bots or exclusive catalog targets. The existing CI preparation
+step remains preparation-only. Interactive publication resolves explicit project
+configuration, reads native identity and publish defaults, previews outbound
+metadata and any channel-authorization change, then requires confirmation.
+`WhatIf` is GET-only and creates no profile/receipt files. The shared preparation
+engine preserves non-channel auth, protocols, version routing and account PNA.
+Local profiles are target/environment-bound; durable pending receipts and an
+exclusive local lock prevent silent retry after an uncertain publish request.
+The POST is never blindly retried, and a publication receipt is not proof of
+store availability or a successful end-user conversation. Native registration
+feature availability, M365 approval and tenant app policy remain service/admin
+boundaries. Tokens are obtained through the existing explicit-subscription
+OAuth transport and are never saved in the project profile or receipt.
 
 Azure Managed Redis (main `789beb55` plus working tree, 2026-11-07):
 `enableRedisManaged` is an independent default-false flag, carried from JSON

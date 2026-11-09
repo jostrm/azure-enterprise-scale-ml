@@ -102,6 +102,89 @@ Sources:
 [agent model migration](https://learn.microsoft.com/azure/foundry/agents/how-to/migrate-agent-applications),
 [Bot identity settings](https://learn.microsoft.com/azure/bot-service/bot-service-manage-settings).
 
+### Project-aware PowerShell publication
+
+The operator scripts are copied with project-team automation:
+
+```text
+aifactory\automation\projectteam\foundry-publishing\publich-agent-to-TEAMS.ps1
+aifactory\automation\projectteam\foundry-publishing\publich-agent-to-Copilot.ps1
+```
+
+The `publich` spelling is intentional. Both wrappers use the same shared Python
+publisher and the same native Microsoft 365 publication. Microsoft does not
+provide a separate Teams-only versus Copilot-only switch in this publishing API.
+The wrapper selects access instructions, not a second bot/application or
+exclusive audience. Copilot here means Microsoft 365 Copilot/Copilot Chat, not
+the creation of a Copilot Studio agent.
+
+Requirements: PowerShell 7, Python 3, Azure CLI signed into the project's tenant,
+Foundry User permissions, and VPN/private-network connectivity. The copied
+wrappers locate the publisher in the consumer's `azure-enterprise-scale-ml`
+submodule. Keep that pin current; no packages or tools are installed by a wrapper.
+
+From a project folder containing its `variables.json`, no target parameters are
+needed. Use the actual path to the copied wrapper:
+
+```powershell
+& 'C:\path\to\consumer\aifactory\automation\projectteam\foundry-publishing\publich-agent-to-TEAMS.ps1' -WhatIf
+& 'C:\path\to\consumer\aifactory\automation\projectteam\foundry-publishing\publich-agent-to-TEAMS.ps1'
+```
+
+From elsewhere, add `-ConfigFile 'C:\path\to\project001\variables.json'`.
+Optional `-Environment` (default Dev), `-AgentName`, and `-ProjectResourceId`
+select a different explicit target; no subscription-wide first-match discovery
+occurs. Stage/Test/Prod do not inherit Dev's native target or network consent.
+An unresolved target fails with an actionable message rather than publishing an
+arbitrary agent.
+
+`-WhatIf` reads live state and prints the target, active version, missing
+metadata, exact publish body, scope, and network/authorization changes.
+It does not prompt, create temporary/profile/receipt files, configure the
+endpoint, register a bot, publish, or generate a ZIP.
+
+An interactive publishing run asks only for metadata not already supplied by
+the scoped local profile or live publish defaults. Descriptions, publisher name,
+website, privacy URL and terms URL must be approved operator input; agent prompts,
+secrets, and invented legal URLs are never substituted. The final confirmation
+shows what is submitted to **both** Microsoft 365/Teams catalogs and which users
+can access it. It also approves the source-filtered public Activity exception
+for private projects; the account's PNA and all other protocols remain unchanged.
+
+Scope defaults to `Shared` (initially visible only to the publisher, with
+`BotServiceRbac` access checks). `-Scope Tenant` explicitly requests tenant-wide
+channel access and admin-reviewed organization publication, and previews any
+authorization replacement. Existing Entra/direct-client authorization and
+protocol configuration are preserved. The wrapper does not change the active
+agent version, grant RBAC, recreate agents/Foundry, or replace a Bot's identity.
+
+Approved nonsecret metadata and publication receipts are stored beneath the
+selected project's `.foundry-publish` directory, which ignores its own contents.
+`-ProfileFile` can select an explicit alternative. Profiles are bound to project,
+tenant, subscription, environment and agent; they cannot silently supply data
+for a different target. Access tokens are never persisted or printed.
+
+Calling the other wrapper recognizes the same existing publication instead of
+automatically incrementing the version or posting a duplicate. Metadata updates
+use a reviewed new app version from service defaults. A pending receipt is saved
+before writes; a failed/uncertain attempt is not blindly reposted. Inspect the
+receipt and live state before using `-RetryUncertain`, which requires a fresh
+preview and confirmation. A concurrent local publisher is blocked by a lock;
+after a crash, confirm no publisher is running before removing its lock file.
+
+For automation, supply complete approved metadata in the scoped profile and
+use `-NonInteractive -Confirm:$false` only after review. Missing metadata fails
+instead of prompting. Noninteractive invocation without explicit confirmation
+suppression fails rather than implicitly authorizing publication.
+
+The native registration feature must be available for the project. If the
+service rejects `performBotRegistration`, the wrapper surfaces that error rather
+than creating a different Bot resource or weakening networking. Publication
+returns actual title/app IDs and approval state, not proof of installation or
+chat delivery. Tenant publication requires Microsoft 365 admin approval; store
+caching and tenant app policies may delay/block availability. A real conversation
+in the target client is the final acceptance step and is not sent automatically.
+
 ## AI Search provisioning-region recovery
 
 `aiSearchFallbackLocationArrayDev` and `aiSearchFallbackLocationArrayStageProd`

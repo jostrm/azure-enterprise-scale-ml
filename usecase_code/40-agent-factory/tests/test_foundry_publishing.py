@@ -661,6 +661,46 @@ class PreparationTests(unittest.TestCase):
         self.assertTrue(all(call[0] in ("GET", "PATCH") for call in self.azure.calls))
         self.assertTrue(all(call[1] in (PROJECT, ACCOUNT, AGENT_URL) for call in self.azure.calls))
 
+    def test_explicit_publication_scope_replacement_requires_matching_reviewed_action(self):
+        request = PreparationRequest.from_values(values())
+        service = FoundryPublishingPreparation(self.azure)
+        self.azure.agent["agent_endpoint"]["authorization_schemes"].append({"type": "BotServiceRbac"})
+        plan = service.run(request, authorization_scheme="BotServiceTenant", allow_scope_change=True)
+        self.assertEqual("BotServiceTenant", plan["authorization_scheme"])
+        self.assertTrue(plan["allow_scope_change"])
+        self.assertIn({"type": "BotServiceRbac"}, plan["before"]["authorization_schemes"])
+        self.assertNotIn({"type": "BotServiceRbac"}, plan["after"]["authorization_schemes"])
+        self.assertIn({"type": "BotServiceTenant"}, plan["after"]["authorization_schemes"])
+        with self.assertRaisesRegex(ValueError, "reviewed|scope|authorization"):
+            service.run(request, apply=True, reviewed_plan=plan)
+        self.assertEqual([], self.azure.writes)
+        result = service.run(request, apply=True, reviewed_plan=plan,
+                             authorization_scheme="BotServiceTenant", allow_scope_change=True)
+        self.assertTrue(result["applied"])
+
+    def test_explicit_scope_plan_rejects_live_auth_and_routing_drift(self):
+        for field in ("authorization_schemes", "version_selector"):
+            with self.subTest(field=field):
+                self.azure = FakeAzure()
+                request = PreparationRequest.from_values(values())
+                service = FoundryPublishingPreparation(self.azure)
+                plan = service.run(request, allow_scope_change=True)
+                if field == "authorization_schemes":
+                    self.azure.agent["agent_endpoint"][field].append({"type": "BotServiceTenant"})
+                else:
+                    self.azure.agent["agent_endpoint"][field] = {}
+                with self.assertRaisesRegex(RuntimeError, "reviewed|routing|authorization"):
+                    service.run(request, apply=True, reviewed_plan=plan, allow_scope_change=True)
+                self.assertEqual([], self.azure.writes)
+
+    def test_invalid_scope_options_fail_before_reads(self):
+        request = PreparationRequest.from_values(values())
+        service = FoundryPublishingPreparation(self.azure)
+        for options in ({"authorization_scheme": "Anonymous"}, {"allow_scope_change": "true"}):
+            with self.assertRaises(ValueError):
+                service.run(request, **options)
+        self.assertEqual([], self.azure.calls)
+
 
 if __name__ == "__main__":
     unittest.main()
