@@ -444,15 +444,18 @@ VOLATILE_FIELDS = {
         ("properties", "subnets", "*", "properties", "delegations", "*", "etag"),
         # The own hub's DNS-resolver subnet link carries it too (aif-154 2026-11-09, ESAF job 10657e03).
         ("properties", "subnets", "*", "properties", "serviceAssociationLinks", "*", "etag"),
+        ("properties", "subnets", "*", "properties", "serviceAssociationLinks", "*", "properties", "details"),
         ("properties", "subnets", "*", "properties", "purpose"),
         ("properties", "virtualNetworkPeerings", "*", "etag")),
     # Network RP sets a subnet's read-only purpose from what is in it; it leaves when the last private endpoint does
     # (aif-138 2026-11-02 run18).
     "microsoft.network/virtualnetworks/subnets": (
         ("etag",), ("properties", "delegations", "*", "etag"), ("properties", "serviceAssociationLinks", "*", "etag"),
-        ("properties", "purpose")),
-    # The link listed as a child resource carries the same rolled etag (aif-154 2026-11-09 run20, catalog run d80a0008).
-    "microsoft.network/virtualnetworks/subnets/serviceassociationlinks": (("etag",),),
+        ("properties", "serviceAssociationLinks", "*", "properties", "details"), ("properties", "purpose")),
+    # The link listed as a child resource carries the same rolled etag (aif-154 2026-11-09 run20, catalog run d80a0008),
+    # and from api-version 2026-07-01 platform-owned details[] with it and per-request context ids (run21, 071d4916).
+    # Its link and linked resource type still count.
+    "microsoft.network/virtualnetworks/subnets/serviceassociationlinks": (("etag",), ("properties", "details")),
     "microsoft.network/virtualnetworks/subnets/delegations": (("etag",),),
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
