@@ -623,10 +623,6 @@ def freeze(cloud, document, ownership_records, registered_projects):
                 owner = attached[1]
                 proof = {"ownership_source": "attached-subnets", "owner": owner,
                          "attached_virtual_network_ids": attached[0]}
-            nsg_child = None if adopted or attached else attached_nsg_child_owner(key, bodies, hub, core_owner)
-            if nsg_child:
-                owner = nsg_child[1]
-                proof = {"ownership_source": "managed-parent", "owner": owner, "managed_parent_id": nsg_child[0]}
         if hub_covers(hub, key):
             fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
             fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
@@ -1580,7 +1576,15 @@ def attached_subnet_owner(key, bodies, hub, core_owner):
     receipts cover only the project group, so the common VNet was retained. A VNet is owned by this factory's tags or
     the access-hub proof; the NSG then leaves with the common teardown, owned by the scale set (no project)."""
     if fl.resource_type_from_id(key) not in ATTACHED_SUBNET_TYPES:
-        return None
+        # A nested child (an NSG's built-in defaultSecurityRules, which have no ARM delete) leaves with the NSG this
+        # proves. aif-154 (2026-11-09, ESAF jobs 3b2e6a7e, 49200019): unowned they were retained and the whole-group
+        # teardown refused; a managed-parent proof through the untagged NSG then failed the worker's re-proof.
+        scope, _, relative = key.partition("/providers/")
+        parts = relative.split("/")
+        parent = scope + "/providers/" + "/".join(parts[:-2]) if len(parts) > 3 else ""
+        if fl.resource_type_from_id(parent) not in ATTACHED_SUBNET_TYPES or parent not in bodies:
+            return None
+        return attached_subnet_owner(parent, bodies, hub, core_owner)
     subnets = (bodies[key].get("properties") or {}).get("subnets")
     if not isinstance(subnets, list) or not subnets:
         return None
@@ -1596,21 +1600,6 @@ def attached_subnet_owner(key, bodies, hub, core_owner):
             return None
         vnets.add(vnet)
     return sorted(vnets), dict(core_owner)
-
-
-def attached_nsg_child_owner(key, bodies, hub, core_owner):
-    """(parent, owner) of a nested child of an NSG or route table that attached_subnet_owner proves, or None.
-
-    aif-154 (2026-11-09, job 3b2e6a7e): the own hub's untagged DNS-resolver NSG is owned through the subnet that uses
-    it, but its built-in defaultSecurityRules had no owner, were retained as outside-registered-ownership, and the
-    whole-group common teardown was refused. The child leaves with that NSG, exactly as option A's managed parent."""
-    scope, relative = key.rsplit("/providers/", 1) if "/providers/" in key else (key, "")
-    parts = relative.split("/")
-    if len(parts) <= 3:
-        return None
-    parent = scope + "/providers/" + "/".join(parts[:-2])
-    attached = parent in bodies and attached_subnet_owner(parent, bodies, hub, core_owner)
-    return (parent, attached[1]) if attached else None
 
 
 def absent_groups(cloud, scopes):
