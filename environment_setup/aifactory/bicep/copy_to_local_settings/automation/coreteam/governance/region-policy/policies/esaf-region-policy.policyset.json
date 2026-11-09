@@ -1,0 +1,54 @@
+{
+  "properties": {
+    "displayName": "ESAF: region policy",
+    "description": "Baseline regions for every regional resource type, more regions for the listed multi-region types (by default Azure AI Search), and the baseline regions for resource groups.",
+    "parameters": {
+      "baselineLocations": {
+        "type": "Array",
+        "metadata": { "displayName": "Baseline allowed locations", "strongType": "location" }
+      },
+      "multiRegionResourceTypes": {
+        "type": "Array",
+        "metadata": { "displayName": "Resource types that may use more regions", "strongType": "resourceTypes" }
+      },
+      "multiRegionLocations": {
+        "type": "Array",
+        "metadata": { "displayName": "Allowed locations for the multi-region types", "strongType": "location" }
+      },
+      "effect": {
+        "type": "String",
+        "defaultValue": "Deny",
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "metadata": { "displayName": "Effect" }
+      }
+    },
+    "policyDefinitions": [
+      {
+        "policyDefinitionReferenceId": "baselineLocations",
+        "policyDefinitionId": "{definitionScope}/providers/Microsoft.Authorization/policyDefinitions/esaf-allowed-locations-except-types",
+        "parameters": {
+          "allowedLocations": { "value": "[parameters('baselineLocations')]" },
+          "excludedResourceTypes": { "value": "[parameters('multiRegionResourceTypes')]" },
+          "effect": { "value": "[parameters('effect')]" }
+        }
+      },
+      {
+        "policyDefinitionReferenceId": "multiRegionTypes",
+        "policyDefinitionId": "{definitionScope}/providers/Microsoft.Authorization/policyDefinitions/esaf-allowed-locations-for-types",
+        "parameters": {
+          "resourceTypes": { "value": "[parameters('multiRegionResourceTypes')]" },
+          "allowedLocations": { "value": "[parameters('multiRegionLocations')]" },
+          "effect": { "value": "[parameters('effect')]" }
+        }
+      },
+      {
+        "policyDefinitionReferenceId": "resourceGroupLocations",
+        "policyDefinitionId": "{definitionScope}/providers/Microsoft.Authorization/policyDefinitions/esaf-allowed-locations-resource-groups",
+        "parameters": {
+          "allowedLocations": { "value": "[parameters('baselineLocations')]" },
+          "effect": { "value": "[parameters('effect')]" }
+        }
+      }
+    ]
+  }
+}
