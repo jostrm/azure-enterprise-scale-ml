@@ -354,7 +354,11 @@ def _unlink_hub_links(cloud, locks, document, receipt, persist, links, code, sle
 OWN_HUB_CONTRACT = "own-hub-spoke-attachments-v1"
 ZONE_GROUP_TYPE = "microsoft.network/privateendpoints/privatednszonegroups"
 ZONE_TYPE = "microsoft.network/privatednszones"
-OWN_HUB_ATTACHMENTS = {VNET_TYPE: {VNET_TYPE}, VNET_TYPE + "/virtualnetworkpeerings": {VNET_TYPE},
+# Gateway transit (useRemoteGateways): Azure lists the hub's VPN gateway in the spoke peering's remoteGateways, in the
+# peering and in the VNet's embedded copy (aif-154 video 06 Scenario 5, 2026-11-09). The gateway stays with the hub.
+GATEWAY_TYPE = "microsoft.network/virtualnetworkgateways"
+OWN_HUB_ATTACHMENTS = {VNET_TYPE: {VNET_TYPE, GATEWAY_TYPE},
+                       VNET_TYPE + "/virtualnetworkpeerings": {VNET_TYPE, GATEWAY_TYPE},
                        ZONE_GROUP_TYPE: {ZONE_TYPE}}
 
 

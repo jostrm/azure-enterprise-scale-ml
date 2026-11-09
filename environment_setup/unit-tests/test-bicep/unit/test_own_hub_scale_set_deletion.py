@@ -382,3 +382,30 @@ def test_the_own_hubs_links_to_a_joined_spoke_are_not_foreign_to_the_factory():
     with pytest.raises(fl.Blocked, match="^factory-delete-access-hub-foreign-link$"):
         fl.factory_deletion_module().verify_access_hub_network({**hub, "factory_resource_groups": [HUB_RG.lower()]},
                                                                bodies)
+
+
+def with_gateway_transit(cloud):
+    """As Azure returns it (aif-154 2026-11-09): a spoke peering with useRemoteGateways lists the hub's gateway in
+    remoteGateways, in the peering body and in the copy embedded in the spoke VNet."""
+    gateways = [{"id": GATEWAY}]
+    cloud.bodies[SPOKE_PEERING.lower()]["properties"]["remoteGateways"] = copy.deepcopy(gateways)
+    for row in cloud.bodies[SPOKE_VNET.lower()]["properties"]["virtualNetworkPeerings"]:
+        row["properties"]["remoteGateways"] = copy.deepcopy(gateways)
+    return cloud
+
+
+# Video 06 Scenario 5 (aif-154, 2026-11-09): delete_scale_set("002") was refused unknown-resource-dependency: the joined
+# spoke's VNet and peering reference the own hub's VPN gateway (gateway transit), which no attachment kind allowed.
+def test_the_hubs_gateway_a_joined_spoke_transits_is_an_own_hub_attachment():
+    document, cloud = frozen(with_gateway_transit(OwnHubCloud()))
+    fl.validate_manifest(document)
+    assert document["deletion"]["own_hub"]["attachments"] == sorted(
+        [HUB_VNET.lower(), GATEWAY.lower(), VAULT_ZONE.lower()])
+    receipt = delete(document, cloud)
+    assert GATEWAY.lower() in cloud.bodies and GATEWAY.lower() not in {
+        value.lower() for value in receipt["deleted_resources"]}
+
+
+def test_a_gateway_reference_into_an_unproven_group_still_blocks():
+    with pytest.raises(fl.Blocked, match="^unknown-resource-dependency$"):
+        frozen(with_gateway_transit(OwnHubCloud(hub_tags=None)))
