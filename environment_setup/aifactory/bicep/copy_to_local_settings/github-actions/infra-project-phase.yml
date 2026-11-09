@@ -363,6 +363,10 @@ jobs:
       logicAppType: ${{ vars.LOGIC_APP_TYPE || 'Standard' }}
       enableEventHubs: ${{ vars.ENABLE_EVENT_HUBS || 'false' }}
       enableBotService: ${{ vars.ENABLE_BOT_SERVICE || 'true' }}
+      # Native publishing preparation is configured per project through variables.json.
+      botFoundryProjectResourceId: ''
+      botFoundryAgentName: ''
+      botEnableM365PublicEndpoint: 'false'
       enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'true' }}
       cosmosKind: ${{ vars.COSMOS_KIND || 'GlobalDocumentDB' }}
       enablePostgreSQL: ${{ vars.ENABLE_POSTGRESQL || 'false' }}
@@ -2936,6 +2940,7 @@ jobs:
               --parameters enableBotService="${{ env.enableBotService }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}" \
               --parameters botServiceExists="${{ env.botServiceExists }}" \
+              --parameters botFoundryAgentName="$botFoundryAgentName" \
               --parameters logiAppType="${{ env.logicAppType }}" \
               --parameters byoASEv3="${{ env.byoASEv3 }}" \
               --parameters byoAseFullResourceId="${{ env.byoAseFullResourceId }}" \
@@ -4683,6 +4688,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 "$AIFACTORY_AGENT_REPOSITORY/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py" apply --apply
+
+      - name: Prepare Foundry agent for Microsoft 365
+        if: success() && inputs.phase == 'foundry' && env.enableBotService == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
+        shell: bash
+        env:
+          FOUNDRY_PUBLISHING_REPOSITORY: ${{ github.workspace }}/azure-enterprise-scale-ml
+        run: |
+          set -euo pipefail
+          plan=$(mktemp)
+          trap 'rm -f "$plan"' EXIT
+          launcher="$FOUNDRY_PUBLISHING_REPOSITORY/environment_setup/aifactory/bicep/scripts/prepare-foundry-publishing.py"
+          python3 "$launcher" plan > "$plan"
+          cat "$plan"
+          python3 "$launcher" apply --apply --reviewed-plan "$plan"
 
       - name: Remove run-specific reviewed configuration
         if: ${{ always() && inputs.deployment_id != '' }}

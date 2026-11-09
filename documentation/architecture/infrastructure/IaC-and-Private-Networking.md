@@ -13,6 +13,9 @@ sources:
   - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml
   - environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep
   - environment_setup/aifactory/bicep/esml-genai-1/11-integration.bicep
+  - environment_setup/aifactory/bicep/modules/botService.bicep
+  - environment_setup/aifactory/bicep/scripts/prepare-foundry-publishing.py
+  - usecase_code/40-agent-factory/agent_factory/foundry_publishing.py
   - environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1
   - environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1
   - environment_setup/aifactory/bicep/scripts/getProjectSubnetState.ps1
@@ -39,6 +42,8 @@ sources:
   - environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-configuration.bicep
 tests:
+  - usecase_code/40-agent-factory/tests/test_foundry_publishing.py
+  - environment_setup/unit-tests/test-bicep/unit/test_foundry_publishing_wiring.py
   - environment_setup/unit-tests/test-bicep/unit/test_aks_outbound_type.py
   - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
   - environment_setup/unit-tests/test-bicep/unit/test_common_network_preservation.py
@@ -66,6 +71,21 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 The maintained infrastructure path is Bicep-first, invoked through provider templates. Common networking and project phases are distinct. `esml-genai-1` contains foundation, core, cognitive/search, database, compute, AI/ML, RBAC, Foundry, dashboard and integration templates; flags and orchestration select the actual resources. A numbered filename is not proof that every deployment executes it.
 
 Foundation resolves common/project scopes, private DNS routing and managed identities. `centralDnsZoneByPolicyInHub` changes whether zone creation is local or delegated to central governance; explicit DNS subscription/resource-group parameters can differ from project placement. Private endpoint creation alone does not prove name resolution, connectivity or caller data-plane authorization.
+
+Native Foundry channel preparation (2026-11-09): `enableBotService` also gates
+the optional late `prepare-foundry-publishing.py` step. Explicit JSON
+`botFoundryProjectResourceId` and `botFoundryAgentName` select an existing native
+agent; empty targets skip all Azure access. The shared `agent_factory`
+preparation service uses the existing OAuth transport, validates target/tenant/
+identity, plans an additive Activity + BotServiceRbac change, preserves other
+protocols and routing, and verifies read-back. Private accounts require explicit
+`botEnableM365PublicEndpoint` for the Microsoft-source-filtered Activity exception;
+account-wide PNA and private endpoints never change. Native selection suppresses
+creation of an unrelated standalone bot, without deleting existing bots. No
+catalog publication, Agent Application, connection, RBAC grant, secret, or
+Microsoft App ID replacement is performed. Endpoint readiness is not evidence
+of Microsoft 365 publication, backend registration availability, or a Teams
+conversation; see the Bicep README for the Microsoft contracts and manual boundary.
 
 Azure Managed Redis (main `789beb55` plus working tree, 2026-11-07):
 `enableRedisManaged` is an independent default-false flag, carried from JSON

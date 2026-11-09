@@ -16,6 +16,92 @@ Start with setting up a common AIFactory environment, example, the DEV environme
 ## Alternative: Azure Devops
 - [Azure Devops - readme.md](./copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
 
+## Native Foundry preparation for Teams and Microsoft 365
+
+The current Foundry agent model has its own identity and stable Activity endpoint.
+A standalone Azure Bot registration is not a project connection and does not
+become selectable merely by adding tags, a Teams channel, RBAC, or a guessed
+`applications/agent-001` URL. Its Microsoft App ID cannot be rebound in place.
+The current private-project portal directs publishing to REST rather than
+offering a Bot Service picker. Do not recreate Foundry or enable account-wide
+public access to work around that restriction.
+
+Opt in per project in the canonical `variables.json` (main/v1.25+):
+
+```json
+{
+  "dev": {
+    "enableBotService": "true",
+    "enableAIFoundry": "true",
+    "botFoundryProjectResourceId": "/subscriptions/<subscription>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>",
+    "botFoundryAgentName": "<existing-native-agent>",
+    "botEnableM365PublicEndpoint": "true"
+  },
+  "stage_prod": {
+    "botFoundryProjectResourceId": "",
+    "botFoundryAgentName": "",
+    "botEnableM365PublicEndpoint": "false"
+  }
+}
+```
+
+Both target fields default to empty and preparation is skipped without Azure
+access. Unlike general settings inherited from `dev`, these three native
+publishing settings reset outside Dev before applying explicit `stage_prod`,
+`test`, or `prod` overrides. This also protects older project configuration
+files without the illustrated resets. Configure each later target explicitly.
+`botEnableM365PublicEndpoint` defaults to false. On a private account,
+preparation requires explicitly enabling this setting, unless that agent already
+has the exception. It enables **only** the Activity Protocol route, protected by
+Microsoft-managed source IP filtering and `BotServiceRbac`; management APIs,
+Responses, private endpoints, and account public-network settings are unchanged.
+This is not anonymous or tenant-wide authorization.
+
+ADO and GHA run the same stdlib-only preparation service after agent deployment.
+The runner must reach the project's private endpoint and have Foundry User
+(formerly Azure AI User) permissions for the selected project. The explicit
+project ARM ID is bound to the configured subscription and tenant; no
+first-match resource discovery or role grants occur. An existing native agent
+with its own identity is required; preparation never creates/replaces agents,
+changes a model/version selector, or migrates legacy applications.
+
+The late step prints a read-only JSON plan before applying its reviewed target.
+For a manual run, set the same configuration values as environment variables,
+including `dev_test_prod_sub_id`, `tenantId`, and the two deletion flags (`false`):
+
+```powershell
+python environment_setup\aifactory\bicep\scripts\prepare-foundry-publishing.py plan > preparation-plan.json
+# Review target, before/after, network exception and authorization.
+python environment_setup\aifactory\bicep\scripts\prepare-foundry-publishing.py apply --apply --reviewed-plan preparation-plan.json
+```
+
+Keep plan/evidence files outside the repository. Apply rereads the endpoint,
+preserves its other protocols/authorization settings, verifies the result, and
+performs no PATCH when already prepared. Clearing the target or disabling the
+Bot flag skips preparation; it does not revoke a previously enabled route.
+Revocation is a separate explicit agent configuration change.
+
+With `botFoundryAgentName` set, the integration Bicep phase does not create an
+unrelated standalone bot. Existing Bot resources are left untouched. With native
+preparation unconfigured, standalone bot provisioning remains available; an empty
+messaging endpoint reserves the registration, not a working Foundry integration.
+
+**Preparation is not publication.** Publishing remains a separate reviewed
+operation with approved display name/descriptions, developer/policy URLs, active
+agent version, and scope. The native direct-registration flow uses
+`performBotRegistration: true` when enabled for the project. Transitional
+bot-backed backends have a different `botServiceArmId` contract; the preparation
+step does not assume backend availability or create `M365Extensions` resources.
+Organization-wide publication requires Microsoft 365 admin approval; tenant
+Teams/app policies can impose additional requirements. Do not submit a package
+or claim a successful Teams conversation from an endpoint-preparation result.
+
+Sources:
+[current publishing](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-copilot),
+[private-network REST flow](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-copilot-virtual-network),
+[agent model migration](https://learn.microsoft.com/azure/foundry/agents/how-to/migrate-agent-applications),
+[Bot identity settings](https://learn.microsoft.com/azure/bot-service/bot-service-manage-settings).
+
 ## AI Search provisioning-region recovery
 
 `aiSearchFallbackLocationArrayDev` and `aiSearchFallbackLocationArrayStageProd`

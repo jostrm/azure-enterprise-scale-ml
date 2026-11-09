@@ -3798,6 +3798,8 @@ steps:
 - task: AzureCLI@2
   displayName: '68-integration'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  env:
+    BOT_FOUNDRY_AGENT_NAME: '$(botFoundryAgentName)'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3868,6 +3870,7 @@ steps:
      --parameters enableBotService="$(enableBotService)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
+     --parameters botFoundryAgentName="$BOT_FOUNDRY_AGENT_NAME" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -6182,6 +6185,11 @@ steps:
     phase: ${{ parameters.phase }}
 
 - template: job-aifactory-agent-live-voice.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
+- template: job-foundry-publishing.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}
