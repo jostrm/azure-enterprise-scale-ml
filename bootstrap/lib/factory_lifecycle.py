@@ -2809,6 +2809,36 @@ def freeze_project_deletion(cloud, document, ownership_records):
     return result
 
 
+def platform_dropped_delegations(frozen, live, removed):
+    """Delegation ids the platform dropped with a removed service association link of the same service.
+
+    aif-154 (2026-11-09, catalog run 8d03dc78): deleting the own hub's DNS resolver inbound endpoint removed the subnet's
+    dnsResolverLink (a reviewed child) and its dns-resolver delegation, which no plan row deletes; the worker stopped
+    with project-retained-parent-changed. Only a delegation whose serviceName is the linkedResourceType of a removed
+    link, and which no live subnet still holds, counts as gone; every other delegation and setting still compares."""
+    def subnets(body):
+        props = (body or {}).get("properties") or {}
+        if str((body or {}).get("type", "")).lower() == "microsoft.network/virtualnetworks":
+            return [item for item in props.get("subnets") or [] if isinstance(item, dict)]
+        return [body] if str((body or {}).get("type", "")).lower() == "microsoft.network/virtualnetworks/subnets" else []
+
+    present = {str(delegation.get("id", "")).lower() for body in live.values() for subnet in subnets(body)
+               for delegation in ((subnet.get("properties") or {}).get("delegations") or []) if isinstance(delegation, dict)}
+    dropped = set()
+    for body in frozen.values():
+        for subnet in subnets(body):
+            props = subnet.get("properties") or {}
+            services = {str((link.get("properties") or {}).get("linkedResourceType", "")).lower()
+                        for link in props.get("serviceAssociationLinks") or []
+                        if isinstance(link, dict) and str(link.get("id", "")).lower() in removed}
+            for delegation in props.get("delegations") or []:
+                identifier = str((delegation or {}).get("id", "")).lower() if isinstance(delegation, dict) else ""
+                service = str(((delegation or {}).get("properties") or {}).get("serviceName", "")).lower()
+                if identifier and service in services and identifier not in present:
+                    dropped.add(identifier)
+    return dropped
+
+
 def _without_deleted_children(body, removed):
     if isinstance(body, list):
         return [_without_deleted_children(item, removed) for item in body
@@ -2893,6 +2923,8 @@ def verify_project_inventory(cloud, document, removed=()):
     deletable = {row["id"].lower() for row in data["resources"] if row["delete"]}
     vanished = set(data["bodies"]) - removed - set(bodies) - {scope.lower() for scope in scopes}
     removed = removed | (vanished & deletable)
+    # The platform drops a subnet's delegation with its delegated service's last link (aif-154 2026-11-09, run 8d03dc78).
+    removed = removed | platform_dropped_delegations(data["bodies"], bodies, removed)
     # A provider-schema fingerprint is derived and warns, never blocks (as verify_full_inventory, 48b243f8; aif-138
     # 2026-11-01: the factory deletion's project stage under ARM throttling). The live closure decides.
     if not removed:
