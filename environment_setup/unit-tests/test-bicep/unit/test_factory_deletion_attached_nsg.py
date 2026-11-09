@@ -99,15 +99,22 @@ def frozen_with_default_rules():
     cloud.provider_schema, cloud.provider_operations, cloud.collection = provider_schema, provider_operations, child_collection
     unsealed = dict(document)
     unsealed["deletion"] = fl.freeze_factory_deletion_pipeline(cloud, unsealed, {}, projects)
-    return seal(unsealed)
+    return seal(unsealed), cloud
 
 
 def test_the_default_rules_of_an_attached_nsg_leave_with_it():
-    document = frozen_with_default_rules()
+    document, cloud = frozen_with_default_rules()
     fl.validate_manifest(document)
     rows = {row["id"].lower(): row for row in document["deletion"]["resources"]}
     assert rows[NSG.lower()]["delete"] is True
     rule = rows[DEFAULT_RULE.lower()]
     assert rule["delete"] is True, rule.get("retention_reason")
-    assert rule["ownership_source"] == "managed-parent" and rule["managed_parent_id"] == NSG.lower()
+    assert rule["ownership_source"] == "attached-subnets" and rule["attached_virtual_network_ids"] == [VNET.lower()]
     assert rule["owner"] == CORE and rule["delete_via_parent"] == NSG.lower()
+
+
+def test_the_execution_re_proves_an_attached_nsgs_default_rules():
+    # aif-154 run18 (2026-11-09, catalog run 90212922): the review passed, then the worker's fl.verify_project_inventory
+    # re-proved a managed-parent proof through the untagged NSG and blocked, known-child-ownership-record-required.
+    document, cloud = frozen_with_default_rules()
+    fl.verify_project_inventory(cloud, document)
