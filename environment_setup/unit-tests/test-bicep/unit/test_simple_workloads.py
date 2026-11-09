@@ -28,6 +28,7 @@ FLAGS = {
     "datafactory": ("enableDatafactory",),
     "event-hubs": ("enableEventHubs",),
     "postgresql": ("enablePostgreSQL",),
+    "redis-managed": ("enableRedisManaged",),
     "container-apps": ("enableContainerApps",),
 }
 SCENARIOS = [
@@ -38,6 +39,7 @@ SCENARIOS = [
     ["datafactory"],
     ["event-hubs"],
     ["postgresql"],
+    ["redis-managed"],
     ["application-insights", "container-apps"],
 ]
 PROVIDERS = {
@@ -50,8 +52,13 @@ PROVIDERS = {
     "datafactory": "Microsoft.DataFactory",
     "event-hubs": "Microsoft.EventHub",
     "postgresql": "Microsoft.DBforPostgreSQL",
+    "redis-managed": "Microsoft.Cache",
     "container-apps": "Microsoft.App",
 }
+
+
+def flag_value(flag, enabled):
+    return enabled if flag == "enableRedisManaged" else str(enabled).lower()
 
 
 def test_literal_additive_selection_metadata_and_catalog_defaults():
@@ -136,7 +143,8 @@ def test_compiled_container_apps_skip_search_rbac_when_search_is_unselected(tmp_
 def test_exhaustive_project_domain_rejects_incomplete_dependencies_and_maps_all_flags():
     catalog = CONFIG.SIMPLE_MODE_RESOURCE_CATALOG["project"]
     optional = [item["id"] for item in catalog if not item["required"]]
-    assert len(optional) == 13
+    assert len(optional) == len(FLAGS) == 14
+    assert set(optional) == set(FLAGS)
     for bits in itertools.product((False, True), repeat=len(optional)):
         selection = {key for key, on in zip(optional, bits) if on}
         invalid = (
@@ -153,7 +161,8 @@ def test_exhaustive_project_domain_rejects_incomplete_dependencies_and_maps_all_
         assert selected == [item["id"] for item in catalog if item["id"] in BASELINE | selection]
         values = CONFIG.simple_mode_values(project_resources=selected)
         for resource, flags in FLAGS.items():
-            assert all(values[flag] == str(resource in selection).lower() for flag in flags), selection
+            assert all(values[flag] == flag_value(flag, resource in selection) for flag in flags), selection
+        assert isinstance(values["enableRedisManaged"], bool)
         assert all(values[flag] == "false" for flag in CONFIG.SIMPLE_MODE_DISABLED)
         assert values["default_model_sku"] == values["modelGPTXSku"] == "DataZoneStandard"
         assert values["disableAgentNetworkInjection"] == str("foundry" not in selection).lower()
@@ -162,7 +171,7 @@ def test_exhaustive_project_domain_rejects_incomplete_dependencies_and_maps_all_
 @pytest.mark.parametrize("selection", SCENARIOS, ids=[items[-1] for items in SCENARIOS])
 @pytest.mark.parametrize("with_foundry", [False, True], ids=["foundry-off", "foundry-on"])
 @pytest.mark.parametrize("route", ["gha", "ado"])
-def test_eight_workloads_persist_real_flags_and_exports(tmp_path, selection, with_foundry, route):
+def test_workloads_persist_real_flags_and_exports(tmp_path, selection, with_foundry, route):
     selection = selection + (sorted(FOUNDRY) if with_foundry else [])
     (tmp_path / "aifactory").mkdir()
     json_path = tmp_path / "aifactory/variables.json"
@@ -187,14 +196,15 @@ def test_eight_workloads_persist_real_flags_and_exports(tmp_path, selection, wit
     text = target.read_text(encoding="utf-8")
     for resource, flags in FLAGS.items():
         for flag in flags:
-            assert values[flag] == str(resource in selection).lower()
+            assert values[flag] == flag_value(flag, resource in selection)
             if route == "ado":
-                assert f'  {flag}: "{expected[flag]}"' in text
+                assert f'  {flag}: "{str(expected[flag]).lower()}"' in text
             else:
                 aliases = CONFIG.simple_mode_env_values(expected | {flag: "selection-marker"})
                 names = [name for name, value in aliases.items() if value == "selection-marker"]
                 assert names, f"No actual workflow alias for {flag}"
-                assert all(f'{name}="{exports[name]}"' in text for name in names)
+                assert all(f'{name}="{str(exports[name]).lower()}"' in text for name in names)
+    assert isinstance(values["enableRedisManaged"], bool)
     assert all(values[key] == "false" for key in values if key.startswith("deployModel_"))
     assert values["default_model_sku"] == values["modelGPTXSku"] == "DataZoneStandard"
     assert values["skuEventHubsDev"] == "Standard"

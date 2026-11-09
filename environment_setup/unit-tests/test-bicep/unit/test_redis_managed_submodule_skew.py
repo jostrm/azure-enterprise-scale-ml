@@ -55,6 +55,9 @@ def run(pipeline, workdir, env):
     stub.mkdir(exist_ok=True)
     (stub / "az").write_text("#!/usr/bin/env bash\necho AzureCloud\n", encoding="utf-8", newline="\n")
     (stub / "python").write_text('#!/usr/bin/env bash\necho "VALIDATOR:$*"\n', encoding="utf-8", newline="\n")
+    # POSIX PATH lookup skips non-executable stubs and would run the host tools.
+    for executable in (stub / "az", stub / "python"):
+        executable.chmod(0o755)
     return subprocess.run(
         [str(bash()), "--noprofile", "--norc", "-c", 'export PATH="$PWD/bin:$PATH"; . ./case.sh'],
         cwd=workdir, capture_output=True, text=True, encoding="utf-8", timeout=20, env={**os.environ, **env},

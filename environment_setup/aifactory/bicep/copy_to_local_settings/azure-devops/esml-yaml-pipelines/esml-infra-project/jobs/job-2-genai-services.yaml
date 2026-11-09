@@ -38,6 +38,10 @@ steps:
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - template: ../../variables/logic-app-network-steps.yaml
+- template: ../../variables/persona-access-steps.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    scope: project
 - task: AzureCLI@2
   displayName: '00_validate_RedisManaged'
   condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'))
@@ -65,10 +69,6 @@ steps:
       fi
       python "$validator" \
         --environment "$(dev_test_prod)" --cloud "$cloud" --azure-devops
-- template: ../../variables/persona-access-steps.yaml
-  parameters:
-    serviceConnection: ${{ parameters.serviceConnection }}
-    scope: project
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate AI Search/model quota, Elasticsearch
 # policy/RP blocks, resource-provider registration and region support for THIS
