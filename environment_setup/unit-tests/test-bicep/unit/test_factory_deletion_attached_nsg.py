@@ -64,3 +64,50 @@ def test_validation_refuses_an_attached_subnets_proof_that_no_longer_holds():
     data["inventory_hash"], data["closure_hash"] = fl.digest(data["resources"]), fl.digest(data["closure"])
     with pytest.raises(fl.Blocked, match="^factory-delete-attached-subnets-proof-invalid$"):
         fl.validate_manifest(seal(document))
+
+
+DEFAULT_RULE = NSG + "/defaultSecurityRules/AllowVnetInBound"
+
+
+def frozen_with_default_rules():
+    # aif-154 (2026-11-09, video 06 Scenario 6, job 3b2e6a7e): the own hub's untagged DNS-resolver NSG is owned through
+    # the subnet that uses it, but its built-in defaultSecurityRules (no ARM delete of their own) had no owner, so they
+    # were retained as outside-registered-ownership and the whole-group common teardown was refused.
+    document, cloud, projects = factory_prepared()
+    cloud.bodies[NSG.lower()] = {"id": NSG, "type": "Microsoft.Network/networkSecurityGroups", "etag": '"nsg"',
+                                 "properties": {"subnets": [{"id": SUBNET}]}}
+    cloud.bodies[SUBNET.lower()]["properties"]["networkSecurityGroup"] = {"id": NSG}
+    cloud.bodies[DEFAULT_RULE.lower()] = {"id": DEFAULT_RULE, "etag": '"d"', "properties": {"priority": 65000},
+                                          "type": "Microsoft.Network/networkSecurityGroups/defaultSecurityRules"}
+    schema, operations, collection = cloud.provider_schema, cloud.provider_operations, cloud.collection
+
+    def provider_schema(namespace):
+        value = schema(namespace)
+        if namespace.lower() == "microsoft.network":
+            value = {"resourceTypes": [*value["resourceTypes"], {
+                "resourceType": "networkSecurityGroups/defaultSecurityRules", "apiVersions": ["2024-05-01"]}]}
+        return value
+
+    def provider_operations(namespace):
+        return [name for name in operations(namespace)
+                if name != "microsoft.network/networksecuritygroups/defaultsecurityrules/delete"]
+
+    def child_collection(path, api_version, extension=False):
+        if path.lower().endswith("/defaultsecurityrules"):
+            return [copy.deepcopy(body) for key, body in cloud.bodies.items() if key.startswith(path.lower() + "/")], None
+        return collection(path, api_version, extension)
+    cloud.provider_schema, cloud.provider_operations, cloud.collection = provider_schema, provider_operations, child_collection
+    unsealed = dict(document)
+    unsealed["deletion"] = fl.freeze_factory_deletion_pipeline(cloud, unsealed, {}, projects)
+    return seal(unsealed)
+
+
+def test_the_default_rules_of_an_attached_nsg_leave_with_it():
+    document = frozen_with_default_rules()
+    fl.validate_manifest(document)
+    rows = {row["id"].lower(): row for row in document["deletion"]["resources"]}
+    assert rows[NSG.lower()]["delete"] is True
+    rule = rows[DEFAULT_RULE.lower()]
+    assert rule["delete"] is True, rule.get("retention_reason")
+    assert rule["ownership_source"] == "managed-parent" and rule["managed_parent_id"] == NSG.lower()
+    assert rule["owner"] == CORE and rule["delete_via_parent"] == NSG.lower()
