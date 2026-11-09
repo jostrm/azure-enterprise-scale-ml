@@ -82,3 +82,29 @@ def test_a_delegation_child_ignores_its_etag_but_not_its_service():
     moved = dict(delegation, properties={"serviceName": "Microsoft.Web/serverFarms"})
     assert fl.resource_digest(rolled) == fl.resource_digest(delegation)
     assert fl.resource_digest(moved) != fl.resource_digest(delegation)
+
+
+def with_link_details(body, etag='W/"1"', request="5535399c-f819-4934-9d22-20b50a1092e3"):
+    # aif-154 run21 (2026-11-09, catalog run 071d4916): at api-version 2026-07-01 the link also embeds details[] with the
+    # rolled etag and per-request context ids; the worker stopped again on the link child with only those changed.
+    props = body["properties"]
+    if "subnets" in props:
+        props = props["subnets"][0]["properties"]
+    target = props["serviceAssociationLinks"][0] if "serviceAssociationLinks" in props else body
+    target["properties"]["details"] = [{"id": target["id"] + "/details/dnsResolverLinkDetail", "etag": etag,
+                                        "name": "dnsResolverLinkDetail",
+                                        "properties": {"primaryContextId": "a2faa707", "primaryContextRequestId": request,
+                                                       "provisioningState": "Succeeded"}}]
+    return body
+
+
+def link_child(**changes):
+    return with_link_details(with_resolver_link(subnet())["properties"]["serviceAssociationLinks"][0], **changes)
+
+
+def test_a_link_s_platform_details_leave_every_fingerprint_unchanged():
+    rolled = {"etag": 'W/"2"', "request": "dd5d9c69-d90a-4368-80ab-357da35d5c55"}
+    assert fl.resource_digest(dict(link_child(**rolled), etag='W/"2"')) == fl.resource_digest(link_child())
+    for build in (vnet, subnet):
+        assert (fl.resource_digest(with_link_details(with_resolver_link(build('W/"2"'), 'W/"2"'), **rolled))
+                == fl.resource_digest(with_link_details(with_resolver_link(build()))))
