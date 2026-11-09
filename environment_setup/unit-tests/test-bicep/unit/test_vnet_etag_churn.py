@@ -39,3 +39,26 @@ def test_a_changed_subnet_or_delegation_still_changes_the_fingerprints():
     assert fl.resource_digest(vnet(service="Microsoft.Web/serverFarms")) != fl.resource_digest(vnet())
     assert fl.resource_digest(subnet(prefix="10.0.2.0/24")) != fl.resource_digest(subnet())
     assert fl.resource_digest(subnet(service="Microsoft.Web/serverFarms")) != fl.resource_digest(subnet())
+
+
+def with_resolver_link(body, etag='W/"1"', linked="Microsoft.Network/dnsResolvers"):
+    # aif-154 (2026-11-09, ESAF job 10657e03, catalog runs 6842cfec and 5f26c110): the own hub's DNS-resolver subnet
+    # carries a serviceAssociationLink whose etag is the VNet's; each private endpoint connection the common stage deleted
+    # rolled it, and the worker stopped with project-resource-instance-changed on vnt-esmlcmn-sdc-dev-001.
+    subnets = body["properties"]["subnets"] if "subnets" in body["properties"] else [body]
+    subnets[0]["properties"]["serviceAssociationLinks"] = [{
+        "id": subnets[0]["id"] + "/serviceAssociationLinks/dnsResolverLink", "name": "dnsResolverLink", "etag": etag,
+        "type": "Microsoft.Network/virtualNetworks/subnets/serviceAssociationLinks",
+        "properties": {"linkedResourceType": linked, "link": "/subscriptions/x/resourceGroups/y/providers/" + linked + "/r"}}]
+    return body
+
+
+def test_an_etag_roll_in_a_service_association_link_leaves_the_fingerprints_unchanged():
+    assert fl.resource_digest(with_resolver_link(vnet('W/"2"'), 'W/"2"')) == fl.resource_digest(with_resolver_link(vnet()))
+    assert fl.resource_digest(with_resolver_link(subnet('W/"2"'), 'W/"2"')) == fl.resource_digest(with_resolver_link(subnet()))
+
+
+def test_a_changed_service_association_link_still_changes_the_fingerprints():
+    other = "Microsoft.Web/serverFarms"
+    assert fl.resource_digest(with_resolver_link(vnet(), linked=other)) != fl.resource_digest(with_resolver_link(vnet()))
+    assert fl.resource_digest(with_resolver_link(subnet(), linked=other)) != fl.resource_digest(with_resolver_link(subnet()))
