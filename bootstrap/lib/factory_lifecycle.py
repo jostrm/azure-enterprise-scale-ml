@@ -456,6 +456,9 @@ VOLATILE_FIELDS = {
     "microsoft.network/virtualnetworks/subnets": (
         ("etag",), ("properties", "delegations", "*", "etag"), ("properties", "serviceAssociationLinks", "*", "etag"),
         ("properties", "purpose")),
+    # The link listed as a child resource carries the same rolled etag (aif-154 2026-11-09 run20, catalog run d80a0008).
+    "microsoft.network/virtualnetworks/subnets/serviceassociationlinks": (("etag",),),
+    "microsoft.network/virtualnetworks/subnets/delegations": (("etag",),),
     # A peering's etag is its parent VNet's and rolls whenever the VNet changes (aif-138 COMMON added subnets and
     # endpoints to the factory VNet); its sync level is transient. Identity and every peering setting still count.
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": (("etag",), ("properties", "peeringSyncLevel")),

@@ -62,3 +62,23 @@ def test_a_changed_service_association_link_still_changes_the_fingerprints():
     other = "Microsoft.Web/serverFarms"
     assert fl.resource_digest(with_resolver_link(vnet(), linked=other)) != fl.resource_digest(with_resolver_link(vnet()))
     assert fl.resource_digest(with_resolver_link(subnet(), linked=other)) != fl.resource_digest(with_resolver_link(subnet()))
+
+
+def test_a_service_association_link_child_ignores_its_etag_but_not_its_link():
+    # aif-154 run20 (2026-11-09, catalog run d80a0008): the VNet passed with 098b48e2, then the link itself, listed as a
+    # child resource, stopped the worker with project-resource-instance-changed on the same rolled etag.
+    link = with_resolver_link(subnet())["properties"]["serviceAssociationLinks"][0]
+    rolled = dict(link, etag='W/"2"')
+    moved = dict(link, properties=dict(link["properties"], linkedResourceType="Microsoft.Web/serverFarms"))
+    assert fl.resource_digest(rolled) == fl.resource_digest(link)
+    assert fl.resource_digest(moved) != fl.resource_digest(link)
+
+
+def test_a_delegation_child_ignores_its_etag_but_not_its_service():
+    # Listed inline from its subnet (collect_resource_closure), a delegation carries the VNet's etag too: in aif-154 run19
+    # it rolled with the link's, so it would have been the next stop after the link.
+    delegation = subnet()["properties"]["delegations"][0]
+    rolled = dict(delegation, etag='W/"2"')
+    moved = dict(delegation, properties={"serviceName": "Microsoft.Web/serverFarms"})
+    assert fl.resource_digest(rolled) == fl.resource_digest(delegation)
+    assert fl.resource_digest(moved) != fl.resource_digest(delegation)
