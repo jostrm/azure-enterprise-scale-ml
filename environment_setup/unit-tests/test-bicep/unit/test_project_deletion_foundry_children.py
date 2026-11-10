@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from unit.test_project_deletion_lifecycle import (
-    FOUNDRY_ID, ROOT, body, deletion, error, invoke, DBX_ID, RESOURCE,
+    FOUNDRY_ID, ROOT, body, deletion, error, invoke, raw_error, DBX_ID, RESOURCE,
     forbid_real_commands,  # noqa: F401  (autouse fixture: no real Azure CLI calls)
 )
 
@@ -157,3 +157,63 @@ def test_project_teardown_order_matches_arm_dependencies():
 def test_helper_cli_lists_foundry_children_action():
     args = deletion.arguments(["--subscription", "s", "--resource-group", "g", *CHILDREN])
     assert args.action == "foundry-children" and args.name == "foundry"
+
+
+def caphost_gone(name="caphostproj"):
+    """The live answer (aif-157, 2026-11-10, byor-157 run 42749009783): ARM puts the message in the HTTP reason, so
+    az raises HTTPError(reason + '(' + body + ')') with no standard reason phrase and a UserError code."""
+    message = f"CapabilityHost '{name}' not found in workspace 'foundry@proj1@AML'"
+    return raw_error("ERROR: " + message + '({"error":{"code":"UserError","message":"' + message + '",'
+                     '"details":[],"additionalInfo":[{"type":"ComponentName","info":{"value":"managementfrontend"}}]}})')
+
+
+def test_project_caphost_not_found_user_error_is_absent_after_its_delete():
+    status, runner, _ = invoke([
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("GET", PROJECTS, page(child(PROJECT))),
+        ("GET", PROJECT_HOSTS, page(child(PROJECT_HOST))),
+        ("GET", PROJECT_HOST, child(PROJECT_HOST)), ("DELETE", PROJECT_HOST, None),
+        ("GET", PROJECT_HOST, caphost_gone()),
+        ("GET", ACCOUNT_HOSTS, page()),
+        ("GET", PROJECT, child(PROJECT)), ("DELETE", PROJECT, None), ("GET", PROJECT, error()),
+        ("GET", PROJECTS, page()),
+    ], CHILDREN, timeout=30)
+    assert status == 0
+    assert [call[1] for call in runner.calls if call[0] == "DELETE"] == [PROJECT_HOST, PROJECT]
+
+
+def test_project_caphost_listed_but_already_gone_needs_no_delete():
+    status, runner, _ = invoke([
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("GET", PROJECTS, page(child(PROJECT))),
+        ("GET", PROJECT_HOSTS, page(child(PROJECT_HOST))),
+        ("GET", PROJECT_HOST, caphost_gone()),
+        ("GET", ACCOUNT_HOSTS, page()),
+        ("GET", PROJECT, child(PROJECT)), ("DELETE", PROJECT, None), ("GET", PROJECT, error()),
+        ("GET", PROJECTS, page()),
+    ], CHILDREN, timeout=30)
+    assert status == 0
+    assert [call[1] for call in runner.calls if call[0] == "DELETE"] == [PROJECT]
+
+
+def test_user_error_not_found_is_absence_only_for_capability_hosts():
+    # The same text on another resource type stays a failure: absence is never inferred more widely.
+    status, runner, _ = invoke([
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("GET", PROJECTS, page(child(PROJECT))),
+        ("GET", PROJECT_HOSTS, page()),
+        ("GET", ACCOUNT_HOSTS, page()),
+        ("GET", PROJECT, caphost_gone()),
+    ], CHILDREN, timeout=30)
+    assert status != 0
+    assert not any(call[0] == "DELETE" for call in runner.calls)
+
+
+def test_a_caphost_user_error_that_is_not_not_found_still_fails():
+    status, _, _ = invoke([
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("GET", PROJECTS, page(child(PROJECT))),
+        ("GET", PROJECT_HOSTS, page(child(PROJECT_HOST))),
+        ("GET", PROJECT_HOST, raw_error('ERROR: Bad things({"error":{"code":"UserError","message":"Quota exceeded"}})')),
+    ], CHILDREN, timeout=30)
+    assert status != 0
