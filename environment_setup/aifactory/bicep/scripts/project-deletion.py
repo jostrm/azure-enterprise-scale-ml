@@ -108,6 +108,12 @@ def azure_error(result, resource_id):
         if wrapper and wrapper.group(1).lower() in http_reasons:
             statuses.append(http_reasons[wrapper.group(1).lower()])
             candidate = wrapper.group(2)
+        else:
+            # Some providers put their message in the HTTP reason (aif-157, 2026-11-10: "CapabilityHost 'x' not
+            # found in workspace 'y'({...})"); the JSON body after it still carries the error code.
+            reasoned = re.fullmatch(r"([^({]*?)\((\{.*\})\)", candidate, re.S)
+            if reasoned:
+                candidate = reasoned.group(2)
         try:
             value = json_value(candidate)
         except ValueError:
@@ -151,6 +157,18 @@ def azure_error(result, resource_id):
     ):
         return DeletionError(errors[0][0], errors[0][1], resource_id)
     return DeletionError("AzureCLIError", " ".join(raw) or "Azure CLI command failed.", resource_id)
+
+
+def absent(error):
+    """ARM's not-found codes, plus the UserError a Foundry capability host answers once it is gone (aif-157,
+    2026-11-10: "CapabilityHost 'x' not found in workspace 'y'"). Only for capability hosts: absence is never
+    inferred from a UserError on any other resource."""
+    if error.code in ABSENT_CODES:
+        return True
+    return (
+        error.code == "UserError" and "/capabilityhosts/" in error.resource_id.lower()
+        and re.search(r"(?i)\bcapabilityhost\b.*\bnot found\b", error.message) is not None
+    )
 
 
 def valid_name(value, label="resource name", maximum=260):
@@ -403,7 +421,7 @@ class Deletion:
                 item = self.rest("get", resource_id, version)
                 break
             except DeletionError as error:
-                if error.code in ABSENT_CODES:
+                if absent(error):
                     self.states[resource_id] = "Absent"
                     return None
                 # A read is safe to repeat; the deadline still bounds every attempt.
@@ -549,7 +567,7 @@ class Deletion:
                     if attempt + 1 >= MAX_DELETE_ATTEMPTS:
                         raise error
                     continue
-                if error.code in ABSENT_CODES:
+                if absent(error):
                     self.wait_absent(resource_id, version)
                     return
                 if error.code not in CONFLICT_CODES:
