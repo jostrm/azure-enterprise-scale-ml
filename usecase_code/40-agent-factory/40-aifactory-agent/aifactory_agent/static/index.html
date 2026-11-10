@@ -26,6 +26,9 @@
   <script src="/static/markdown.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/voice-orb.js" defer></script>
+  <script src="/static/audio-input.en.js" defer></script>
+  <script src="/static/audio-input.js" defer></script>
+  <script src="/static/audio-input-ui.js" defer></script>
   <script src="/static/voice.js" defer></script>
 <script src="/static/esaif-maui-layout-loader.js" defer></script>
 </head>
@@ -81,7 +84,7 @@
         <section id="voice-card" class="card voice-card" aria-labelledby="voice-heading" hidden>
           <h2 id="voice-heading">Talk to the Factory Agent</h2>
           <p id="voice-help" class="muted">Voice uses the same sign-in and governed read tools as typed chat. Typing remains available if voice fails.</p>
-          <details><summary>More info</summary><p class="muted">The microphone is used only during a voice session; this app does not store audio. Native voice audio and live transcripts are provisional until final citation checks; checked answers and sources appear below. Changing language restarts voice only.</p></details>
+          <details><summary>More info</summary><p class="muted">The microphone is used during a voice session or an explicit local permission check in Audio settings; this app does not store audio. Native voice audio and live transcripts are provisional until final citation checks; checked answers and sources appear below. Changing language restarts voice only.</p></details>
           <label for="voice-language">Voice language</label>
           <select id="voice-language" hidden aria-label="Voice language"></select>
           <div class="voice-stage">
@@ -95,6 +98,18 @@
             <button id="voice-use-text" type="button" class="secondary">Use typed chat</button>
             <button id="voice-retry" type="button" class="secondary">Check voice again</button>
           </div>
+          <details id="voice-audio-settings" class="voice-audio-settings" hidden>
+            <summary id="voice-input-heading"></summary>
+            <label id="voice-input-label" for="voice-input-device"></label>
+            <select id="voice-input-device" aria-describedby="voice-input-lifetime voice-input-status"></select>
+            <div class="voice-input-actions">
+              <button id="voice-input-refresh" class="secondary" type="button"></button>
+              <button id="voice-input-allow" class="secondary" type="button" aria-describedby="voice-input-explanation" disabled></button>
+            </div>
+            <p id="voice-input-explanation" class="muted"></p>
+            <p id="voice-input-lifetime" class="muted"></p>
+            <p id="voice-input-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          </details>
           <div id="voice-transcript" class="voice-transcript" aria-live="polite"></div>
           <p id="voice-error" class="error" role="status" hidden></p>
         </section>

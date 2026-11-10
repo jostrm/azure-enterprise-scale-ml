@@ -570,6 +570,22 @@ pulsing circular orb that reflects what the agent is doing: *connecting*,
 the orb stays still and the state is still announced as text. Typing keeps
 working when voice is disabled, unavailable or blocked.
 
+**Audio settings** in the voice panel selects a microphone or **System default**.
+The choice is kept only in memory for the current page; no device preference, audio,
+transcript or token is saved by these settings. **Refresh devices** only lists devices.
+**Allow microphone** explicitly requests browser/app permission, briefly opens a local
+stream to reveal labels, and immediately stops every track without transmitting audio.
+Device names may remain generic until permission is granted. Browser/app, OS privacy
+restrictions and the page's Permissions-Policy still apply; settings cannot bypass them.
+Changing inputs or losing the selected device stops voice and requires **Start talking**
+again. An unavailable selection stays visible; another microphone is never silently selected.
+
+The optional `audio-input.js` controller takes injected browser APIs and supplies exact
+device constraints to the existing voice capture path, before its first `await`.
+`audio-input-ui.js` binds only `voice-*` nodes inside the original voice card, with labels
+from `audio-input.en.js`; it does not depend on the three-panel layout or native host privileges.
+Legacy embeds without these assets keep their existing default-input behavior.
+
 Enable it with `"voice": {"enabled": true}` in the configuration. The project
 pipeline sets this when `enableAIFactoryAgentLiveVoice` is `true` next to
 `enableFactoryChatAgent`, which creates the Foundry Agent (see
