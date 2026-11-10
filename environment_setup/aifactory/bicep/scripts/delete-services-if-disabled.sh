@@ -1533,6 +1533,16 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
           2>&1 && echo "  ✅ Deleted project: $proj_name" || echo "  ⚠️  Could not delete project: $proj_name"
       done <<< "$aif2_projects"
       echo "All nested projects processed."
+      # A project DELETE answers 202: the project can stay listed (and block the account) for minutes
+      # (aif-157, 2026-11-10). Wait until the list is empty, about 5 minutes at most.
+      aif2_wait=0
+      while [ $aif2_wait -lt 60 ] && [ -n "$(az rest --method GET \
+          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2026-01-15-preview" \
+          --query "value[].name" -o tsv 2>/dev/null)" ]; do
+        aif2_wait=$((aif2_wait + 1))
+        echo "  ⏳ Waiting for nested projects to be gone (${aif2_wait}x5s)..."
+        sleep 5
+      done
     else
       echo "No nested projects found under $aif2_name"
     fi
@@ -1540,9 +1550,29 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
 
     delete_private_endpoints "$aif2_name" "AI Foundry V2"
     echo "Deleting AI Foundry V2 account: $aif2_name (soft-delete, purge by 04_Purge_SoftDeleted)"
-    az cognitiveservices account delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aif2_name" 2>&1 && echo "✅ Deleted AI Foundry V2 (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V2"
+    # ARM can still refuse the account with CannotDeleteResource for a project it lists as nested after the
+    # project's own GET answers 404 (aif-157, 2026-11-10): retry that refusal, 20 attempts 15 s apart.
+    aif2_deleted=false
+    for aif2_attempt in $(seq 1 20); do
+      if aif2_delete_output=$(az cognitiveservices account delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$aif2_name" 2>&1); then
+        aif2_deleted=true
+        break
+      fi
+      echo "$aif2_delete_output"
+      case "$aif2_delete_output" in
+        *CannotDeleteResource*)
+          echo "  ⏳ Nested resources still listed; retrying the account delete (${aif2_attempt}/20)..."
+          sleep 15 ;;
+        *) break ;;
+      esac
+    done
+    if [ "$aif2_deleted" = "true" ]; then
+      echo "✅ Deleted AI Foundry V2 (soft-deleted)"
+    else
+      echo "⚠️  Could not delete AI Foundry V2"
+    fi
   else
     echo "⚠️  AI Foundry V2 account not found with prefix: $aiFoundryV2Prefix"
   fi

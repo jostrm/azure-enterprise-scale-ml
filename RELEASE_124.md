@@ -2,6 +2,17 @@
 **Release Tag:** [release_124](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_124)  
 **Release Date:** January 2026
 
+## Deleting a project removes its AI Foundry account
+
+`delete-services-if-disabled.sh` (step 18 of the project pipeline, GitHub Actions and Azure
+DevOps) deleted the Foundry V2 projects and then the Foundry account straight away. A
+project DELETE is asynchronous: ARM can keep listing the project, and refuse the account
+with `CannotDeleteResource` ("nested resources exist"), for several minutes (aif-157,
+2026-11-10). On v1.24 that refusal was only a warning, so the account stayed behind. The
+script now waits until the project list is empty (about 5 minutes at most), then retries
+the account delete on `CannotDeleteResource`, 20 attempts 15 s apart. Other errors still
+end with the warning as before. No configuration change is needed.
+
 ## GitHub Actions preflight uses the run's own settings
 
 The "Preflight quota & policy checks" steps in `infra-common.yml` (Dev, Stage and Prod)
