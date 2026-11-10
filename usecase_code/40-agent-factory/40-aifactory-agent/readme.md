@@ -486,19 +486,35 @@ currency separation, forecast double-counting and unavailable data.
 
 ## Private application deployment
 
-The web interface follows the palettes in the MAUI Config Wizard's
-`ThemePaletteCatalog`. A **Color theme** selector below **Sign in** chooses
-**Gray and Blue** (the default; its dark values are the app's `GrayAndBlue`
-palette) or **Purple** (purple primary actions, lavender selected surfaces).
-Both palettes keep the same semantic status colors and work in light and dark
-mode. The system mode is respected unless `?scoutTheme=light` or
-`?scoutTheme=dark` explicitly selects one. The color theme comes from the
-page's own choice (kept in the URL fragment as `palette=`, and carried through
-sign-in in the OAuth state, never in browser storage), then the embedding app's
-`?scoutPalette=gray-blue|purple`, then Gray and Blue. The embedded app can
-change it live with the `esaif.agentChat.theme` message's optional `palette`
-field; unknown values are ignored. Error red is reserved for actual errors,
-not normal action buttons.
+The bare application URL `/` opens **Enterprise Scale Azure Factory Agent** in
+the three-panel companion layout by default. No `layout=companion` query is
+required (existing links still work). The same-origin loader works over HTTPS
+and loopback HTTP; embedded host integration remains HTTPS-only. An incompatible
+page keeps its original controls, and `?layout=legacy` is an explicit fallback.
+
+The left panel contains New conversation, audio, Azure/VPN information and
+**Theme**/**Appearance**. Conversation and composer occupy the center. The right
+panel contains **Behind the answer**, tool activity and live speech transcript,
+with **View** and **Actions** at the bottom. Existing forms, handlers, permissions
+and confirmations are preserved; the layout does not acquire tokens or start
+the microphone. The app-only browser launcher is not duplicated in a browser.
+
+Themes are **Gray**, **Purple** (purple accents on neutral gray surfaces), and
+**Blue / Yellow** (navy Dark or pale blue-gray Light surfaces with a yellow
+footer). Purple ESAF is removed. Appearance respects the system unless
+`?scoutTheme=light|dark` is supplied. Existing `palette=gray-blue|purple`
+fragment and `scoutPalette`/host-message contracts remain unchanged; Blue / Yellow
+is presentation-only and retained as `companionTheme=blue-yellow`. Old
+`companionTheme=purple-accent` links migrate to Purple. Error red remains reserved
+for errors, not normal action buttons.
+
+The thinking line is indeterminate, with a reduced-motion alternative. Current
+question and latest answer have local thumbs up/down, plain-text copy, and
+confirmed display-only deletion; these do not write feedback to a service or
+delete server operation history. The `esaif-maui-layout*` files are bundled in
+`aifactory_agent/static` for normal deployments, not injected by a development
+browser. They mirror the Config Wizard presentation resources; synchronize them
+with its `tools\Export-AgentChatPresentation.ps1` when changing the shared UX.
 
 Answers render Markdown headings, emphasis, nested lists, tables, blockquotes
 and code, with evidence markers linked to the corresponding source entries.
