@@ -143,17 +143,19 @@ def init_factory(*, creation_request: dict | None = None, retries: int | None = 
 
 def add_scale_set(scale_set: str, environment: str, *, cidr: str | None = None, max_projects: int | None = None,
                   subscription_id: str | None = None, tenant_id: str | None = None, orchestrator: str | None = None,
-                  version_ref: str | None = None, retries: int | None = None, wait: bool = False, poll: float = 1,
-                  session: Session | None = None) -> EsafJob:
+                  settings: dict | None = None, version_ref: str | None = None, retries: int | None = None,
+                  wait: bool = False, poll: float = 1, session: Session | None = None) -> EsafJob:
     """Scenario 2: register scale set <scale_set> in <environment> (if new), enroll it and deploy its common.
 
     cidr is the new scale set's VNet range; the pipeline computes the subnets (with BYOSubnet they already exist).
     Tenant, subscription and orchestrator default to the environment's existing scale set.
+    settings (flat wizard keys, e.g. BYO_subnets, vnetResourceGroup_param, vnetNameFull_param, byoASEv3,
+    byoAseFullResourceId) are saved at scale-set scope before the deploy.
     """
     return _submit("add_scale_set", "add-scale-set", {
         "scale_set": scale_set, "environment": _environment(environment), "cidr": cidr,
         "max_projects": max_projects, "subscription_id": subscription_id, "tenant_id": tenant_id,
-        "orchestrator": orchestrator, "version_ref": version_ref, "retries": retries},
+        "orchestrator": orchestrator, "settings": settings, "version_ref": version_ref, "retries": retries},
         wait=wait, poll=poll, session=session)
 
 

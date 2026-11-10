@@ -948,6 +948,7 @@ def add_esaf_commands(sub) -> None:
     added = scenario("add-scale-set", "Scenario 2: add (or resume) a scale set and deploy its common.", scale_set=True)
     added.add_argument("--cidr", help="The new scale set's VNet range; the pipeline computes the subnets.")
     added.add_argument("--max-projects", type=int)
+    added.add_argument("--settings-json", help="Optional JSON file of scale-set settings (BYO VNet, subnets, ASE v3).")
     upsert = scenario("upsert-project", "Scenario 3: add or update a project and deploy it.", project=True)
     upsert.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
     upsert.add_argument("--settings-json", help="Optional JSON file of project settings to replace.")
@@ -992,8 +993,9 @@ def cmd_esaf(args):
         creation = read_json_file(args.creation_request_json) if args.creation_request_json else None
         job = esaf.init_factory(creation_request=creation, retries=args.retries, wait=args.wait, session=session)
     elif route == "add-scale-set":
+        settings = read_json_file(args.settings_json) if args.settings_json else None
         job = esaf.add_scale_set(args.scale_set, args.environment, cidr=args.cidr, max_projects=args.max_projects,
-                                 **common)
+                                 settings=settings, **common)
     elif route == "upsert-project":
         settings = read_json_file(args.settings_json) if args.settings_json else None
         job = esaf.upsert_project(args.project, args.environment, scale_set=args.scale_set, settings=settings, **common)
