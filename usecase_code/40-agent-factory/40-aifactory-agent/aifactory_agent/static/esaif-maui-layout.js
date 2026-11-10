@@ -550,22 +550,15 @@
       deletion.close();
     });
 
-    let textPending = false;
     const renderThinking = () => {
+      const textPending = n["question-form"].getAttribute("aria-busy") === "true";
       const voicePending = !n["voice-card"].hidden && n["voice-state"].textContent.trim() === text.voiceThinkingState;
       thinking.hidden = !textPending && !voicePending;
       scroll.setAttribute("aria-busy", String(!thinking.hidden));
     };
-    observe(n.question, () => {
-      if (!n.question.disabled) textPending = false;
-      renderThinking();
-    }, { attributes: true, attributeFilter: ["disabled"] });
+    observe(n["question-form"], renderThinking, { attributes: true, attributeFilter: ["aria-busy"] });
     observe(n["voice-state"], renderThinking, { childList: true, subtree: true, characterData: true });
     observe(n["voice-card"], renderThinking, { attributes: true, attributeFilter: ["hidden"] });
-    observe(n["error-message"], () => {
-      if (!n["error-message"].hidden && n["error-message"].textContent.trim()) textPending = false;
-      renderThinking();
-    }, { attributes: true, attributeFilter: ["hidden"], childList: true, subtree: true, characterData: true });
     const syncView = () => {
       const selected = n["view-platform"].getAttribute("aria-pressed") === "true" ? "platform"
         : n["view-project"].getAttribute("aria-pressed") === "true" ? "project" : "";
@@ -610,8 +603,6 @@
       if (!n.question.disabled && !n.ask.disabled && n.question.value.trim()) n["question-form"].requestSubmit();
     });
     observe(n.answer, () => {
-      textPending = false;
-      renderThinking();
       answer.hidden = !n.answer.textContent.trim() && !n.answer.children.length;
       if (!answer.hidden) question.hidden = true;
     }, { childList: true, subtree: true, characterData: true });
@@ -645,7 +636,6 @@
         resetUserFeedback();
         question.hidden = true;
         status.textContent = "";
-        textPending = true;
         renderThinking();
         thinking.scrollIntoView({ block: "nearest" });
       });
@@ -662,7 +652,6 @@
       n.question.dispatchEvent(new Event("input", { bubbles: true }));
       document.getElementById("esaif-current-question-text").textContent = "";
       currentQuestion.hidden = true;
-      textPending = false;
       renderThinking();
       question.hidden = false;
       status.textContent = text.newDone;
@@ -670,7 +659,6 @@
     });
     n["scope-selector"].addEventListener("change", () => {
       currentQuestion.hidden = true;
-      textPending = false;
       renderThinking();
       document.getElementById("esaif-current-question-text").textContent = "";
     });
@@ -685,6 +673,7 @@
     syncVoice();
     syncTools();
     syncEvidence();
+    renderThinking();
     renderHost();
     root.setAttribute("data-esaif-layout-state", "ready");
     try { bridge?.postMessage({ type: "esaif.agentChat.layoutReady", version: 1 }); }

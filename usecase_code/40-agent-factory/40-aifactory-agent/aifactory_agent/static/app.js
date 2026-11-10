@@ -414,6 +414,7 @@
 
   function updateControls() {
     const authenticated = Boolean(state.token && state.context);
+    ui("question-form").setAttribute("aria-busy", String(authenticated && state.busy));
     ui("auth-status").textContent = hostBridge
       ? authenticated ? "Signed in via app sign-in · " + (state.hostAccount || "tenant-bound") : "Not connected · uses the app's Azure sign-in"
       : authenticated ? "Signed in · tenant-bound" : "Not signed in";
