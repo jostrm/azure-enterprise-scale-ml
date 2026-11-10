@@ -17,6 +17,8 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_settings.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout-loader.js
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout.js
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_costs.py
@@ -30,6 +32,7 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_realtime.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_companion.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
@@ -41,6 +44,23 @@ graph_symbols:
 reviewed_source: '66f7ea35 + native voice working tree; observed 2026-10-11; no native live deployment asserted'
 ---
 # Chat and grounding
+
+## Default browser presentation
+
+The application root serves the bundled three-panel companion by default over
+HTTPS or loopback HTTP. `layout=companion` is no longer required;
+`layout=legacy` explicitly retains the original interface. Frames and unknown
+host modes do not acquire companion host integration. The embedded MAUI mode
+still requires its HTTPS host marker and WebView message channel.
+
+The presentation Adapter moves original DOM nodes, retaining authentication,
+voice, scope/view handlers and action confirmations. It renders Gray, neutral
+Purple, and Blue / Yellow themes, a pending-answer sweep, and local-only message
+feedback/copy/display deletion. It does not call inference, capture audio,
+acquire tokens, submit feedback to a service or mutate operation history.
+`test_companion.py` covers bare-root wiring, static asset delivery, origin/host
+guards and the current template's DOM contract. Source parity does not prove a
+deployed Container App revision; live rollout is a separate observation.
 
 ## Observed baseline flow
 
