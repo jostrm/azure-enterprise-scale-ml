@@ -37,6 +37,9 @@ ABSENT_CODES = {"ResourceNotFound", "ResourceGroupNotFound"}
 CONFLICT_CODES = {"RequestConflict", "AnotherOperationInProgress", "ApplianceBeingDeleted"}
 BUSY_STATES = {"creating", "updating", "accepted"}
 MAX_DELETE_ATTEMPTS = 3
+# A Foundry account DELETE can be refused with CannotDeleteResource for a project ARM still lists as nested although
+# its own GET already answers 404 (aif-157, 2026-11-10). Wait that out: about 5 minutes at the 15 s service poll.
+NESTED_DELETE_ATTEMPTS = 20
 MAX_READ_ATTEMPTS = 3
 FOUNDRY_TYPE = "Microsoft.CognitiveServices/accounts"
 # Child API proven live by the pipeline's Foundry V2 project and capability-host reads.
@@ -550,7 +553,7 @@ class Deletion:
             if self.state(item) == "deleting":
                 self.wait_absent(resource_id, version, deleting=True)
                 return
-        for attempt in range(MAX_DELETE_ATTEMPTS):
+        for attempt in range(max(MAX_DELETE_ATTEMPTS, NESTED_DELETE_ATTEMPTS)):
             assert_group_allowed(self.args.subscription, resource_id, self.protected_patterns, item)
             try:
                 self.rest("delete", resource_id, version, read_json=False)
@@ -570,7 +573,8 @@ class Deletion:
                 if absent(error):
                     self.wait_absent(resource_id, version)
                     return
-                if error.code not in CONFLICT_CODES:
+                nested = error.code == "CannotDeleteResource" and FOUNDRY_TYPE.lower() in resource_id.lower()
+                if error.code not in CONFLICT_CODES and not nested:
                     raise
                 item = self.get(resource_id, version)
                 if item is None:
@@ -578,7 +582,7 @@ class Deletion:
                 if self.state(item) == "deleting":
                     self.wait_absent(resource_id, version, deleting=True)
                     return
-                if attempt + 1 >= MAX_DELETE_ATTEMPTS:
+                if attempt + 1 >= (NESTED_DELETE_ATTEMPTS if nested else MAX_DELETE_ATTEMPTS):
                     raise error
                 self.pause()
                 item = self.wait_ready(resource_id, version, self.get(resource_id, version))

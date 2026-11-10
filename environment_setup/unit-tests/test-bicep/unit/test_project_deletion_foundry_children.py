@@ -217,3 +217,50 @@ def test_a_caphost_user_error_that_is_not_not_found_still_fails():
         ("GET", PROJECT_HOST, raw_error('ERROR: Bad things({"error":{"code":"UserError","message":"Quota exceeded"}})')),
     ], CHILDREN, timeout=30)
     assert status != 0
+
+
+ACCOUNT = ["resource", "--resource-type", "Microsoft.CognitiveServices/accounts", "--name", "foundry"]
+NESTED = ("Cannot delete resource while nested resources exist. Some existing nested resource IDs include: "
+          "'Microsoft.CognitiveServices/accounts/foundry/projects/proj1'.")
+
+
+def test_account_delete_waits_out_a_project_arm_still_lists_as_nested():
+    """aif-157 (byor-157 run 42751438602, 2026-11-10): the project GET answered 404 and the list was empty, but the
+    account DELETE right after was refused with CannotDeleteResource for that project; minutes later it was gone."""
+    status, runner, clock = invoke([
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("DELETE", FOUNDRY_ID, error("CannotDeleteResource", NESTED)),
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        *[step for _ in range(4) for step in (
+            ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+            ("DELETE", FOUNDRY_ID, error("CannotDeleteResource", NESTED)),
+            ("GET", FOUNDRY_ID, body(FOUNDRY_ID)))],
+        ("GET", FOUNDRY_ID, body(FOUNDRY_ID)),
+        ("DELETE", FOUNDRY_ID, None),
+        ("GET", FOUNDRY_ID, error()),
+    ], ACCOUNT, timeout=600)
+    assert status == 0
+    assert sum(call[0] == "DELETE" for call in runner.calls) == 6
+
+
+def test_nested_refusal_is_bounded_and_then_fails():
+    from unit.test_project_deletion_lifecycle import deletion as module
+
+    attempts = module.NESTED_DELETE_ATTEMPTS
+    assert 10 <= attempts <= 40  # minutes of patience at the 15 s service poll, never unbounded
+    refused = ("DELETE", FOUNDRY_ID, error("CannotDeleteResource", NESTED))
+    steps = [("GET", FOUNDRY_ID, body(FOUNDRY_ID))]
+    steps += [refused, ("GET", FOUNDRY_ID, body(FOUNDRY_ID)), ("GET", FOUNDRY_ID, body(FOUNDRY_ID))] * (attempts - 1)
+    steps += [refused, ("GET", FOUNDRY_ID, body(FOUNDRY_ID))]
+    status, runner, _ = invoke(steps, ACCOUNT, timeout=3600)
+    assert status != 0
+    assert sum(call[0] == "DELETE" for call in runner.calls) == attempts
+
+
+def test_nested_refusal_is_not_retried_for_other_resource_types():
+    status, runner, _ = invoke([
+        ("GET", DBX_ID, body(DBX_ID)),
+        ("DELETE", DBX_ID, error("CannotDeleteResource", "Cannot delete resource while nested resources exist.")),
+    ], RESOURCE, timeout=600)
+    assert status != 0
+    assert sum(call[0] == "DELETE" for call in runner.calls) == 1
