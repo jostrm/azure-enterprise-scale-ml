@@ -64,6 +64,7 @@
       resources = null;
       if (!current) return;
       if (current.timer) env.clearInterval(current.timer);
+      for (const [track, ended] of current.trackListeners || []) track.removeEventListener("ended", ended);
       for (const track of current.stream ? current.stream.getTracks() : []) {
         try { track.stop(); } catch { /* already stopped */ }
       }
@@ -182,11 +183,12 @@
         pending: [], timer: null};
       resources = current;
       try {
+        const constraints = options.audioInput ? options.audioInput.constraints() : {audio: {
+          channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true}};
         const context = new env.AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "interactive"});
         current.context = context;
         // WebView2 requires this call to retain the explicit Start talking gesture.
-        const stream = await env.navigator.mediaDevices.getUserMedia({audio: {
-          channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true}});
+        const stream = await env.navigator.mediaDevices.getUserMedia(constraints);
         if (generation !== run.generation) {
           // Stopped or restarted while the permission prompt was open: the late stream must never keep the microphone on.
           for (const track of stream.getTracks()) {
@@ -195,6 +197,21 @@
           return;
         }
         current.stream = stream;
+        if (options.audioInput) {
+          current.trackListeners = [];
+          for (const track of stream.getTracks()) {
+            if (!track.addEventListener) continue;
+            const ended = () => {
+              if (generation !== run.generation) return;
+              options.audioInput.reportError({audioInputCode: "ended"});
+              finish("off", options.describeInput ? options.describeInput("ended") : "");
+              void options.audioInput.refresh();
+            };
+            track.addEventListener("ended", ended);
+            current.trackListeners.push([track, ended]);
+          }
+          options.audioInput.captured();
+        }
         await context.resume();
         if (generation !== run.generation) return;
         await context.audioWorklet.addModule("/static/voice-capture-worklet.js");
@@ -252,6 +269,11 @@
         current.timer = env.setInterval(levelTick, LEVEL_INTERVAL_MS);
       } catch (error) {
         if (generation !== run.generation) return;
+        if (options.audioInput && !current.stream) {
+          const code = options.audioInput.reportError(error);
+          finish("off", options.describeInput ? options.describeInput(code) : "");
+          return;
+        }
         const name = error && error.name;
         const text = name === "NotAllowedError" || name === "SecurityError"
           ? "Microphone access was blocked. Allow the microphone for this site and try again."
@@ -349,6 +371,12 @@
     let probedFor = null;
     let probeGeneration = 0;
     let embeddedGranted = !embedded;
+    let inputUI = null;
+    const inputAvailable = env.AIFactoryAudioInput && env.AIFactoryAudioInputUI && env.AIFactoryAudioInputText
+      && ["voice-audio-settings", "voice-input-device", "voice-input-refresh", "voice-input-allow", "voice-input-status"].every(element);
+    const audioInput = inputAvailable ? env.AIFactoryAudioInput.createAudioInput({
+      env, onInputChange: () => { void client.stop(); },
+    }) : null;
 
     const render = () => {
       transcript.replaceChildren();
@@ -372,10 +400,12 @@
       toggle.setAttribute("aria-pressed", String(live));
       mute.disabled = !live;
       interrupt.disabled = state !== "speaking" && state !== "thinking";
+      if (inputUI) inputUI.render();
     };
 
     const client = createVoiceClient({
-      env, getSession: () => host.voiceSession(),
+      env, audioInput, getSession: () => host.voiceSession(),
+      describeInput: code => inputUI ? inputUI.describe(code) : "",
       onState: (state) => {
         stateLabel.textContent = statusText(state, client.muted);
         if (orb) orb.setState(state);
@@ -396,6 +426,14 @@
         host.showAnswer(answer);
       },
       onMessage: message,
+    });
+    if (audioInput && env.AIFactoryAudioInputUI) inputUI = env.AIFactoryAudioInputUI.mount({
+      env, controller: audioInput,
+      canAllow: () => {
+        const session = enabled && !toggle.disabled && host.voiceSession();
+        return Boolean(session && session.expiresAt - Date.now() > MIN_TOKEN_LIFETIME_MS);
+      },
+      isLive: () => client.phase !== "off" && client.phase !== "error",
     });
 
     toggle.addEventListener("click", () => {
@@ -427,6 +465,7 @@
         toggle.disabled = true;
         probedFor = null;
         card.hidden = true;
+        if (audioInput) audioInput.cancelPermission();
         await client.stop();
         return;
       }
@@ -436,6 +475,7 @@
       toggle.disabled = true;
       probedFor = identity;
       const generation = ++probeGeneration;
+      if (audioInput) audioInput.cancelPermission();
       await client.stop();
       if (generation !== probeGeneration) return;
       try {
@@ -457,6 +497,7 @@
         enabled = status.enabled === true && compatible;
         card.hidden = !enabled;
         toggle.disabled = !enabled || status.ready !== true;
+        if (inputUI) inputUI.render();
         if (!compatible) {
           message("This deployment does not support native voice inside the app. Your Chat sign-in has not been changed.", false);
           return;
@@ -500,7 +541,11 @@
     probe();
     const retry = element("voice-retry");
     if (retry) retry.addEventListener("click", () => { probedFor = null; void probe(); });
-    return {client, probe, get enabled() { return enabled; }};
+    if (env.addEventListener) env.addEventListener("pagehide", () => {
+      if (audioInput) audioInput.cancelPermission();
+      void client.stop();
+    });
+    return {client, probe, audioInput, get enabled() { return enabled; }};
   }
 
   const exported = {createVoiceClient, initialize, rms, levelFromRms, statusText, languageLabel, LABELS};
