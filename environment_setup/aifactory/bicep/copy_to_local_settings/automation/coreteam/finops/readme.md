@@ -177,7 +177,7 @@ Two turn-key capabilities ship today, mapped to the FinOps Framework:
 - Works with teams calling Foundry **directly** (no AI Gateway) **and** teams behind an **AI
   Gateway** — with **zero change** to the project team's solution.
 
-➡ `./logicapps/aimodel-throttling-via-networkrule` (aimodel-throttling)
+➡ `./logicapps/aimodel-throttle` (aimodel-throttling)
 
 ---
 
@@ -210,7 +210,7 @@ Two turn-key capabilities ship today, mapped to the FinOps Framework:
 
 | Path | What it is |
 |------|------------|
-| `logicapps/aimodel-throttling-via-networkrule` | Consumption circuit breaker (Logic App + managed identity, budget / token triggers). |
+| `logicapps/aimodel-throttle` | Consumption circuit breaker (Logic App + managed identity, budget / token triggers). |
 | `../runbooks` | Foundry Token Report + PAYGO/PTU recommendations. |
 | `../runbooks/showback` | FinOps Showback report — cost per project / environment / cost center (replaces the legacy ADO `gov-cross-charging.yaml` pipeline). |
 
