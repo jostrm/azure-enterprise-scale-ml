@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" role="img" aria-labelledby="t">
+  <title id="t">Hub modes as three roads to one city</title>
+  <rect width="960" height="400" rx="28" fill="#faf8f5"/>
+  <!-- city -->
+  <g transform="translate(720 96)">
+    <ellipse cx="90" cy="232" rx="130" ry="22" fill="#efeae2"/>
+    <rect x="20" y="80" width="46" height="150" rx="6" fill="#6d28d9"/><rect x="70" y="20" width="54" height="210" rx="6" fill="#7c3aed"/><rect x="128" y="110" width="42" height="120" rx="6" fill="#5b21b6"/>
+    <g fill="#ede9fe"><rect x="82" y="40" width="12" height="12" rx="2"/><rect x="100" y="40" width="12" height="12" rx="2"/><rect x="82" y="66" width="12" height="12" rx="2"/><rect x="100" y="66" width="12" height="12" rx="2"/><rect x="82" y="92" width="12" height="12" rx="2"/><rect x="100" y="92" width="12" height="12" rx="2"/><rect x="30" y="98" width="10" height="10" rx="2"/><rect x="46" y="98" width="10" height="10" rx="2"/><rect x="138" y="128" width="10" height="10" rx="2"/><rect x="152" y="128" width="10" height="10" rx="2"/></g>
+  </g>
+  <!-- road A: shared highway through an external hub -->
+  <path d="M60 90C260 90 300 90 420 90S640 150 740 250" fill="none" stroke="#3b82f6" stroke-width="30" stroke-linecap="round"/>
+  <path d="M60 90C260 90 300 90 420 90S640 150 740 250" fill="none" stroke="#dbeafe" stroke-width="3" stroke-dasharray="16 14"/>
+  <path d="M250 40l60 50M250 140l60-50" fill="none" stroke="#3b82f6" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="330" cy="90" r="30" fill="#1d4ed8"/><circle cx="330" cy="90" r="12" fill="#dbeafe"/>
+  <!-- road B: private lane, no hub -->
+  <path d="M60 210C300 210 520 220 730 280" fill="none" stroke="#22c55e" stroke-width="16" stroke-linecap="round"/>
+  <path d="M60 210C300 210 520 220 730 280" fill="none" stroke="#dcfce7" stroke-width="2" stroke-dasharray="10 12"/>
+  <!-- road C: own bridge -->
+  <path d="M60 330C240 330 300 330 380 330C460 250 560 250 640 330C680 330 700 322 735 306" fill="none" stroke="#7c3aed" stroke-width="20" stroke-linecap="round"/>
+  <g stroke="#7c3aed" stroke-width="6" stroke-linecap="round"><path d="M430 284v70M510 268v86M590 284v70"/></g>
+  <path d="M360 356c60 16 240 16 300 0" fill="none" stroke="#93c5fd" stroke-width="10" stroke-linecap="round" opacity=".7"/>
+  <!-- start points -->
+  <g fill="#334155"><circle cx="60" cy="90" r="14"/><circle cx="60" cy="210" r="14"/><circle cx="60" cy="330" r="14"/></g>
+  <g fill="#faf8f5"><circle cx="60" cy="90" r="5"/><circle cx="60" cy="210" r="5"/><circle cx="60" cy="330" r="5"/></g>
+</svg>
