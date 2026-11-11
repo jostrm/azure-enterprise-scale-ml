@@ -1,0 +1,32 @@
+# Enterprise Scale Azure Factory (ESAF) documentation
+
+> End-user docs for ESAF v1.25 and later: set up an AI Factory with one call per scenario, then build agents and ML models in a project.
+
+## End-user pages
+
+- [Enterprise Scale Azure Factory (ESAF) documentation](README.md): Docs hub: two doors, Setup docs and Usage docs
+- [Setup docs: set up your AI Factory](quickstarts/README.md): Setup docs hub for the platform team
+- [Quickstart: Install the ESAF tools](quickstarts/01-install-esaf.md): Install a tool, start the Factory API, check the connection
+- [Quickstart: Create your AI Factory](quickstarts/02-create-factory.md): Create the AI Factory and project 001 (scenario 1)
+- [Quickstart: Add a project for your team](quickstarts/03-add-project.md): Add or update a project (scenario 3)
+- [Quickstart: Create your first agent by enabling ESAF Agent Chat](quickstarts/04-first-agent-chat.md): Enable ESAF Agent Chat and ask a first question
+- [Quickstart: Clean up](quickstarts/05-clean-up.md): Delete a project, a scale set or the Factory (scenarios 4-6)
+- [Set up ESAF: from an empty subscription to your first agent](20-29/24-end-2-end-setup.md): Set up ESAF: the five steps on one screen
+- [Usage docs: build agents, apps and ML in your ESAF project](usage/README.md): Usage docs hub for project teams
+- [Usage prerequisites](usage/prerequisites.md): What every Usage page assumes: an ESAF project, access, tools
+- [Quickstart: Run your first agent in your ESAF project](usage/01-first-agent.md): Plan, deploy and ask a prompt agent
+- [Quickstart: Train your first model in your ESAF project](usage/02-first-ml-model.md): Validate a scenario and train a model locally
+- [View your project dashboards](usage/dashboards.md): Where the project dashboards live and how to read cost, usage and health
+- [Hub and network modes](concepts/hub-and-network-modes.md): Hub modes and networking modes, and which combinations work
+- [The six ESAF scenarios](reference/scenarios.md): The six scenarios: one call per tool, parameters, jobs, errors
+- [Folder structure](reference/folder-structure.md): The azurefactory folder and the consumer repository layout
+- [Settings](reference/settings.md): Connection settings, naming limits, project settings
+
+## Optional
+
+- [Guide 18: Get started with Factory tools](10-19/18-cli-and-api-and-usage.md): the tools against a local demo service
+- [Guide 19: Add and update an AI factory](10-19/19-cli-and-api-and-usage.md): the step-by-step path with a review before each change
+- [Guide 20: Remove, observe and recover](10-19/20-cli-and-api-and-usage.md): reviewed deletes, job status, recovery
+- [Guide 21: Agent Factory chat and live voice](10-19/21-agent-factory-chat.md): security, operations, troubleshooting
+- [Onion architecture V2](10-19/10-factory-onion-architecture-v2.md): the five layers from a tool to Azure Resource Manager
+- [Maintainers: automation and review flow](reference/maintainers/automation-and-review-flow.md): contracts behind the facade
