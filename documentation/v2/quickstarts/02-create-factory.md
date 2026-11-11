@@ -62,7 +62,7 @@ A description in files has up to three small files. Each file goes with one scen
 |---|---|---|
 | `creation-request.json` | The Factory, its first scale set and project 001 | 1, on this page |
 | `scale-set-settings.json` | Your own VNet or subnets for a scale set | 2, in [Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets) |
-| `project-settings.json` | The services of a project, such as API Management and Agent Chat | 3, in [Add a project](03-add-project.md#change-a-setting) |
+| `project-settings.json` | The services of a project, such as the Factory MCP and Agent Chat | 3, in [Add a project](03-add-project.md#change-a-setting) |
 
 The creation request takes only the settings shown below and refuses other names. That's why the service
 switches and the network settings live in the two other files.
@@ -131,8 +131,6 @@ Then save the service switches as `project-settings.json`:
 
 ```json
 {
-  "ENABLE_KONG": "false",
-  "ENABLE_APIM": "true",
   "enableAIFactoryMCP": "true",
   "addAIFactoryMCP2APIM": "true",
   "enableFactoryChatAgent": "true"
@@ -142,6 +140,15 @@ Then save the service switches as `project-settings.json`:
 `addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
 for project 001 in Dev only. Agent Chat has its own prerequisites: see
 [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+The API Management and Kong switches are not project settings, and the Factory API refuses them in this
+file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
+the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
+
+```yaml
+ENABLE_KONG: "false"
+ENABLE_APIM: "true"
+```
 
 </details>
 
@@ -165,8 +172,6 @@ set itself, so your VNet goes to the scale set that you add next.
 
 ```json
 {
-  "ENABLE_KONG": "false",
-  "ENABLE_APIM": "true",
   "enableAIFactoryMCP": "true",
   "addAIFactoryMCP2APIM": "true",
   "enableFactoryChatAgent": "true"
@@ -176,6 +181,15 @@ set itself, so your VNet goes to the scale set that you add next.
 `addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
 for project 001 in Dev only. Agent Chat has its own prerequisites: see
 [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+The API Management and Kong switches are not project settings, and the Factory API refuses them in this
+file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
+the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
+
+```yaml
+ENABLE_KONG: "false"
+ENABLE_APIM: "true"
+```
 
 </details>
 
@@ -202,8 +216,6 @@ to the scale set that you add after scenario 1.
 
 ```json
 {
-  "ENABLE_KONG": "false",
-  "ENABLE_APIM": "true",
   "enableAIFactoryMCP": "true",
   "addAIFactoryMCP2APIM": "true",
   "enableFactoryChatAgent": "true"
@@ -213,6 +225,15 @@ to the scale set that you add after scenario 1.
 `addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
 for project 001 in Dev only. Agent Chat has its own prerequisites: see
 [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+The API Management and Kong switches are not project settings, and the Factory API refuses them in this
+file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
+the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
+
+```yaml
+ENABLE_KONG: "false"
+ENABLE_APIM: "true"
+```
 
 </details>
 

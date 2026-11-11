@@ -532,8 +532,10 @@ def test_lab_guide_links_say_it_needs_a_preview_code(page):
 CREATE = SETUP_QUICKSTARTS[1]
 DESCRIBE_OPTIONS = ["In a file: automated networking", "In a file: BYO VNet", "In a file: BYO subnets",
                     "In the app: Full bootstrap"]
-SERVICE_SWITCHES = {"ENABLE_KONG": "false", "ENABLE_APIM": "true", "addAIFactoryMCP2APIM": "true",
-                    "enableFactoryChatAgent": "true"}
+# The API refuses addAIFactoryMCP2APIM without the MCP itself, so the file turns on both.
+SERVICE_SWITCHES = {"enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true", "enableFactoryChatAgent": "true"}
+# Not project settings: the Factory API refuses them, and the AI gateway pipeline reads them from its own source.
+GATEWAY_SWITCHES = ('ENABLE_KONG: "false"', 'ENABLE_APIM: "true"')
 
 
 def describe_options():
@@ -552,11 +554,12 @@ def test_describe_your_factory_offers_three_file_options_and_the_app():
     assert list(options) == DESCRIBE_OPTIONS
     for label in DESCRIBE_OPTIONS[:3]:
         blocks = json_blocks(options[label])
-        switches = [block for block in blocks if "ENABLE_APIM" in block]
+        switches = [block for block in blocks if "enableFactoryChatAgent" in block]
         assert len(switches) == 1, f"{label} shows the service switches once."
-        assert SERVICE_SWITCHES.items() <= switches[0].items(), label
-        # The API refuses addAIFactoryMCP2APIM without the MCP itself.
-        assert switches[0].get("enableAIFactoryMCP") == "true", label
+        assert switches[0] == SERVICE_SWITCHES, label
+        assert not any(key in block for block in blocks for key in ("ENABLE_APIM", "ENABLE_KONG")), label
+        assert all(switch in options[label] for switch in GATEWAY_SWITCHES)
+        assert "AI gateway pipeline" in options[label], label
     vnet = [block for block in json_blocks(options["In a file: BYO VNet"]) if "vnetResourceGroup_param" in block]
     subnets = [block for block in json_blocks(options["In a file: BYO subnets"]) if "vnetResourceGroup_param" in block]
     assert len(vnet) == len(subnets) == 1
