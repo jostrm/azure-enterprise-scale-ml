@@ -153,22 +153,34 @@ def project_excerpt(text):
     return text.split(start, 1)[1].split(end, 1)[0].strip() + "\n"
 
 
-def site_url(url, source, repository=REPOSITORY, assets=None):
-    """Where a source-relative URL points on the site: a site page, a copied image, or the file on GitHub."""
+def site_url(url, source, repository=REPOSITORY, assets=None, html=False):
+    """Where a source-relative URL points on the site: a site page, a copied image, or the file on GitHub.
+
+    MkDocs rewrites Markdown links itself, so those stay relative to the source page. It leaves HTML attributes
+    alone: with html=True the result is relative to the page's URL folder, and a page is named by its URL.
+    """
     if url.startswith(("#", "/", "//")) or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", url):
         return url
     location, separator, fragment = url.partition("#")
     target = (source.parent / unquote(location)).resolve()
     mapped = SITE_SOURCES.get(target)
     source_uri = SITE_SOURCES.get(source.resolve())
+    folder = posixpath.dirname(source_uri) if source_uri else ""
+    if html and source_uri and posixpath.basename(source_uri) != "index.md":
+        folder = source_uri[:-len(".md")]
     if assets is not None and source_uri and target.suffix.lower() in IMAGE_SUFFIXES and target.is_file():
         asset = ASSETS + target.relative_to(repository.resolve()).as_posix()
         assets[asset] = target
-        destination = posixpath.relpath(asset, posixpath.dirname(source_uri))
+        destination = posixpath.relpath(asset, folder)
     elif mapped and source_uri and (
         mapped.startswith(DOCS_SECTIONS) or not fragment or fragment == "project-team-quickstart"
     ):
-        destination = posixpath.relpath(mapped, posixpath.dirname(source_uri))
+        if html:
+            page_url = posixpath.dirname(mapped) if posixpath.basename(mapped) == "index.md" else mapped[:-len(".md")]
+            relative = posixpath.relpath(page_url or ".", folder or ".")
+            destination = "./" if relative == "." else relative + "/"
+        else:
+            destination = posixpath.relpath(mapped, folder)
     elif target.parent == source.parent.resolve() and target.name in GUIDES:
         destination = target.name
     else:
@@ -205,7 +217,7 @@ def site_html(text, source, repository=REPOSITORY, assets=None):
     """The same for the URLs of HTML tags (<a>, <img>, <source>), which the docs use for sized images."""
     source, repository = Path(source), Path(repository)
     return outside_fences(text, lambda line: HTML_URL.sub(
-        lambda match: f'{match[1]}="{site_url(match[2], source, repository, assets)}"', line))
+        lambda match: f'{match[1]}="{site_url(match[2], source, repository, assets, html=True)}"', line))
 
 
 def docs_page(text, source, assets):
