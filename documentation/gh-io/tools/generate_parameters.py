@@ -20,6 +20,7 @@ COPY = SHARED / "bicep" / "copy_to_local_settings"
 GHA = COPY / "github-actions"
 YAML = COPY / "azure-devops" / "esml-yaml-pipelines" / "variables" / "variables.yaml"
 PAGE = ROOT / "documentation" / "gh-io" / "docs" / "parameters" / "advanced.md"
+VARIABLES_PAGE = PAGE.with_name("variables.md")
 SCHEMA = ROOT / "bootstrap" / "lib" / "aifactory_scaleset_config.py"
 CREATE = ROOT / "bootstrap" / "lib" / "create-new-aifactory-scaleset.sh"
 START = "<!-- BEGIN GENERATED PARAMETERS -->"
@@ -245,6 +246,73 @@ for names, text in (
      "Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation."),
 ):
     DESCRIPTIONS.update(dict.fromkeys(names, text))
+
+# Variables with no comment in the templates: explained here, each checked against the Bicep, pipeline or script
+# that reads it. A new variable needs a comment in variables.yaml or an entry here (see the parameter tests).
+GATEWAY_SOURCE = (" The AI gateway pipeline reads it from variables.yaml or the GitHub variables, "
+                  "not from variables.json.")
+SKIP_DIAGNOSTICS = ("Skips the {service} diagnostic setting, because an Azure Policy usually manages it. Set false to "
+                    "create it from Bicep; applies when {switch} is true.")
+DESCRIPTIONS.update({
+    "admin_projectType": "Selects the project type that sizes the project subnets: all (every subnet), genai-1 or "
+                         "esml. Any other value fails the networking step. Keep all.",
+    "aksSkuTier": "Sets the AKS pricing tier (Free, Standard or Premium) for the project's AKS clusters, including "
+                  "AKS for Azure ML. skuTierAksDev and skuTierAksStageProd replace it for their environment when set.",
+    "apimGatewayApiId": "Names the APIM API that the AI gateway pipeline creates for the pooled Azure OpenAI "
+                        "endpoint. Used only when ENABLE_APIM is true." + GATEWAY_SOURCE,
+    "apimGatewayApiPath": "Sets the URL path of the AI gateway API in APIM; clients call that path. Letters, digits, "
+                          "underscore and hyphen, with a slash between segments. Used only when ENABLE_APIM is true."
+                          + GATEWAY_SOURCE,
+    "apimGatewayBackendPoolName": "Names the APIM backend pool that groups the Azure OpenAI backends listed in "
+                                  "apimGatewayBackendsJson. Used only when ENABLE_APIM is true." + GATEWAY_SOURCE,
+    "apimGatewayRetryCount": "Sets how many times APIM retries after a backend answers 429 (throttled), from 1 to 50. "
+                             "Used only when ENABLE_APIM is true." + GATEWAY_SOURCE,
+    "botEnableM365PublicEndpoint": "Turns on only the Microsoft-filtered M365 Activity route of the chosen agent on a "
+                                   "private Foundry account when publishing is prepared. Account network settings stay "
+                                   "unchanged. Needs botFoundryAgentName. Outside Dev it resets to false.",
+    "botFoundryAgentName": "Names an existing Foundry agent (its exact name, not a version ID) to prepare for M365 and "
+                           "Teams publishing. When set, no standalone Bot is created. Empty skips the step. Needs "
+                           "enableBotService.",
+    "botFoundryProjectResourceId": "Sets the full ARM ID of the Foundry project that holds the agent to prepare for "
+                                   "publishing. Empty skips the step. Needs enableBotService.",
+    "enableProjectVM": "Turns on a private virtual machine in the project resource group, on the default subnet. An "
+                       "existing VM is not redeployed.",
+    "evictionPolicyRedisManaged": "Sets the Azure Managed Redis eviction policy: NoEviction (rejects writes when memory "
+                                  "is full), AllKeysLFU, AllKeysLRU, AllKeysRandom, VolatileLFU, VolatileLRU, "
+                                  "VolatileRandom or VolatileTTL. Used only when enableRedisManaged is true.",
+    "kongGatewayCpu": "Sets the CPU cores of the Kong gateway container, as a whole number. Used only when ENABLE_KONG "
+                      "is true." + GATEWAY_SOURCE,
+    "kongGatewayImage": "Sets the container image of the Kong gateway. Used only when ENABLE_KONG is true."
+                        + GATEWAY_SOURCE,
+    "kongGatewayMemoryGb": "Sets the memory of the Kong gateway container in GB, as a whole number. Used only when "
+                           "ENABLE_KONG is true." + GATEWAY_SOURCE,
+    "kongGatewaySubnetName": "Names the subnet that the pipeline creates for Kong in the existing VNet. Its range "
+                             "comes from kongGatewaySubnetCidr (/28 or larger). Used only when ENABLE_KONG is true."
+                             + GATEWAY_SOURCE,
+    "kongGatewayVnetName": "Names the existing VNet where the Kong subnet is created. Required when ENABLE_KONG is "
+                           "true." + GATEWAY_SOURCE,
+    "kongGatewayVnetResourceGroup": "Names the resource group of the existing VNet that holds the Kong subnet. "
+                                    "Required when ENABLE_KONG is true." + GATEWAY_SOURCE,
+    "skipDiagAISearch": "Skips creating the AI Search diagnostic setting; by default its logs go to Log Analytics. Set "
+                        "true when an Azure Policy already sends the same logs to the same workspace, which otherwise "
+                        "fails with a 409 conflict.",
+    "skipDiagAIServices": "Skips creating the AI Services diagnostic setting for a new account when enableAIServices is "
+                          "true. Set true when an Azure Policy already sends the same logs to the same workspace.",
+    "skipDiagAOAI": SKIP_DIAGNOSTICS.format(service="Azure OpenAI", switch="enableAzureOpenAI"),
+    "skipDiagContentSafety": SKIP_DIAGNOSTICS.format(service="Content Safety", switch="enableContentSafety"),
+    "skipDiagDocIntelligence": SKIP_DIAGNOSTICS.format(service="Document Intelligence", switch="enableAIDocIntelligence"),
+    "skipDiagSpeech": SKIP_DIAGNOSTICS.format(service="Speech", switch="enableAzureSpeech"),
+    "skipDiagVision": SKIP_DIAGNOSTICS.format(service="Vision", switch="enableAzureAIVision"),
+    "skuAISearchDevArray": "Sets the ordered fallback AI Search SKUs for Dev, as a JSON array of 1 to 3 SKUs. An older "
+                           "spelling of skuArrayAISearchDev. Used when aisearchRetryCapcityArray is true.",
+    "skuAISearchStageProdArray": "Sets the ordered fallback AI Search SKUs for Stage and Prod, as a JSON array of 1 to "
+                                 "3 SKUs. An older spelling of skuArrayAISearchStageProd. Used when "
+                                 "aisearchRetryCapcityArray is true.",
+    "skuRedisManagedStageProd": "Selects the Azure Managed Redis SKU for Stage and Prod: Balanced_B0, Balanced_B1, "
+                                "Balanced_B5 or Balanced_B10. Used only when enableRedisManaged is true.",
+    "updateRbac": "Set true to skip the role assignments for users, groups and service principals on the project "
+                  "storage accounts and resource group in the RBAC step. The default, false, makes those assignments.",
+})
 
 
 def description(key, entry):
@@ -580,6 +648,63 @@ def generate():
     return output, {source: len(values) for source, values in expected.items()}
 
 
+def explained(key, entry):
+    """True when the key has a real explanation: a reviewed description or a template comment, not just its name."""
+    comment = re.sub(r"^<(?:mandatory|optional)>", "", entry.get("comment", "")).split("<default>", 1)[0]
+    return key in DESCRIPTIONS or bool(re.sub(r"<[a-z-]+>", " ", comment).strip())
+
+
+def variables_inventory():
+    """Every variables.json key: its default in each section, whether it is required, and what it does."""
+    schema = load_schema()
+    yaml = parse_template(YAML, re.compile(r"^  ([\w-]+):\s*(.*)$"), schema)
+    env = parse_template(GHA / ".env.template", re.compile(r"^([A-Z][A-Z0-9_]*)=(.*)$"), schema)
+    document = json.loads((SHARED / "variables.json").read_text(encoding="utf-8-sig"))
+    keys = sorted({key for section in document.values() for key in section})
+    mapping = aliases(set(yaml) | set(keys), schema)
+    rows = []
+    for key in keys:
+        entry = yaml.get(key) or next((env[name] for name in sorted(mapping[key]) if name in env), {"comment": ""})
+        status, _ = requirement(key, entry["comment"])
+        rows.append({"key": key, "status": status, "text": description(key, entry), "explained": explained(key, entry),
+                     "defaults": {section: values[key] for section, values in document.items() if key in values}})
+    return document, rows
+
+
+def variables_markdown():
+    """The site page that lists every variables.json key with its default and its explanation."""
+    document, rows = variables_inventory()
+    groups = defaultdict(list)
+    for row in rows:
+        groups[category(row["key"])].append(row)
+    sections = ", ".join(code(section) for section in document)
+    lines = [
+        "# Every variable in variables.json", "",
+        "<!-- Generated by documentation/gh-io/tools/generate_parameters.py. Do not edit this page by hand. -->", "",
+        f"`variables.json` holds the settings of an AI Factory project and its scale set. This page lists all "
+        f"{len(rows)} variables of the shared template (section {sections}), with the default value and what each "
+        "one does.", "",
+        "Change a variable through a tool, not by hand: see "
+        "[change a setting](../setup/03-add-project.md#change-a-setting). For the matching Azure DevOps and GitHub "
+        "names, see the [complete reference](advanced.md).", "",
+        "**Required** says whether you must set the variable: *Yes*, *No*, or *Depends* when another choice decides "
+        "it. A default in quotes is text: `\"true\"` and `\"false\"` are written as text in this file.", "",
+        "The project pipelines read `variables.json`. The separate AI gateway pipeline does not: it reads the "
+        "`apimGateway…` and `kongGateway…` settings from `variables.yaml` (Azure DevOps) or the GitHub variables.", "",
+        "| Group | Variables |", "|---|---:|",
+    ]
+    anchor = lambda title: re.sub(r"[^a-z0-9 -]", "", title.lower()).replace(" ", "-")
+    lines += [f"| [{title}](#{anchor(title)}) | {len(members)} |" for title, members in groups.items()]
+    words = {"M": "Yes", "C": "Depends", "O": "No"}
+    for title, members in groups.items():
+        lines += ["", f"## {title}", "", "| Variable | Default | Required | What it does |", "|---|---|---|---|"]
+        for row in members:
+            defaults = [literal(value) if len(document) == 1 else f"{section}: {literal(value)}"
+                        for section, value in row["defaults"].items()]
+            lines.append(f"| {code(row['key'])} | {'<br>'.join(defaults)} | {words[row['status']]} | {row['text']} |")
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Validate exact source coverage and fail if the page is stale.")
@@ -589,12 +714,15 @@ def main():
     before, remainder = text.split(START, 1)
     _, after = remainder.split(END, 1)
     updated = before + output + after
+    variables = variables_markdown()
     if args.check:
-        if text != updated:
+        current = VARIABLES_PAGE.read_text(encoding="utf-8") if VARIABLES_PAGE.exists() else ""
+        if text != updated or current != variables:
             print("Parameter reference is stale; run generate_parameters.py.", file=sys.stderr)
             return 1
     else:
         PAGE.write_text(updated, encoding="utf-8", newline="\n")
+        VARIABLES_PAGE.write_text(variables, encoding="utf-8", newline="\n")
     print("Exact coverage, no duplicate rows: " + ", ".join(f"{key}={value}" for key, value in counts.items()))
     return 0
 

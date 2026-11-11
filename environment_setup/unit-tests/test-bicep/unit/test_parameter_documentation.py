@@ -170,6 +170,17 @@ class ParameterDocumentationTests(unittest.TestCase):
         self.assertIn("Legacy", page)
         self.assertIn("factory-tools/18-cli-and-api-and-usage.md", page)
 
+    def test_every_variables_json_key_is_listed_and_explained_on_the_variables_page(self):
+        document, rows = generator.variables_inventory()
+        keys = {key for section in document.values() for key in section}
+        self.assertEqual(keys, {row["key"] for row in rows})
+        self.assertEqual([], [row["key"] for row in rows if not row["explained"]],
+                         "Explain these variables: a comment in variables.yaml, or DESCRIPTIONS in the generator.")
+        page = generator.VARIABLES_PAGE.read_text(encoding="utf-8")
+        self.assertEqual(generator.variables_markdown(), page, "Run generate_parameters.py.")
+        for key in keys:
+            self.assertIn(f"| `{key}` |", page)
+
     def test_guide_navigation_has_no_next_self_link(self):
         guides = ROOT / "documentation" / "v2" / "10-19"
         for current, following, title in (
