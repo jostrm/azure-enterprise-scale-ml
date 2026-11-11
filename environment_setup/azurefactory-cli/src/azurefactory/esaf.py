@@ -137,11 +137,15 @@ def init_factory(*, creation_request: dict | None = None, scale_set_settings: di
     """Scenario 1: submit the connected folder's saved factory draft as one whole-workflow approval.
 
     creation_request (the creation API's full-bootstrap body) saves the factory and starts it in one call instead.
-    With it, scale_set_settings (the first Dev scale set: flat wizard keys such as BYO_subnets,
-    vnetResourceGroup_param, vnetNameFull_param) and project_settings (the initial project: enableFactoryChatAgent,
-    enableAIFactoryMCP, addAIFactoryMCP2APIM, ...) are saved before anything deploys, so one call creates a factory
-    on a BYO VNet or BYO subnets with its project switches set. One JSON file can hold all three:
-    esaf.init_factory(**json.load(file)).
+    With it, scale_set_settings (the first Dev scale set) and project_settings (the initial project:
+    enableFactoryChatAgent, enableAIFactoryMCP, addAIFactoryMCP2APIM, ...) are saved before anything deploys, so one
+    call creates a factory on a BYO VNet or BYO subnets with its project switches set. One JSON file can hold all
+    three: esaf.init_factory(**json.load(file)).
+
+    scale_set_settings by example. Automated networking: leave it out. BYO VNet: byoVnetResourcegroupName and
+    byoVnetName. BYO subnets: also enableByoSubnets=True and the subnet names (subnetCommon, subnetProjGenAI, ...).
+    The Factory API maps the three friendly names to the wizard's keys (vnetResourceGroup_param, vnetNameFull_param,
+    BYO_subnets), which still work.
     """
     return _submit("init_factory", "init-factory", {
         "creation_request": creation_request, "scale_set_settings": scale_set_settings,
@@ -156,8 +160,9 @@ def add_scale_set(scale_set: str, environment: str, *, cidr: str | None = None, 
 
     cidr is the new scale set's VNet range; the pipeline computes the subnets (with BYOSubnet they already exist).
     Tenant, subscription and orchestrator default to the environment's existing scale set.
-    settings (flat wizard keys, e.g. BYO_subnets, vnetResourceGroup_param, vnetNameFull_param, byoASEv3,
-    byoAseFullResourceId) are saved at scale-set scope before the deploy.
+    settings (flat wizard keys, e.g. byoVnetResourcegroupName, byoVnetName, enableByoSubnets, the subnet names,
+    byoASEv3, byoAseFullResourceId) are saved at scale-set scope before the deploy. The Factory API maps the three
+    friendly BYO names to vnetResourceGroup_param, vnetNameFull_param and BYO_subnets, which still work.
     """
     return _submit("add_scale_set", "add-scale-set", {
         "scale_set": scale_set, "environment": _environment(environment), "cidr": cidr,
