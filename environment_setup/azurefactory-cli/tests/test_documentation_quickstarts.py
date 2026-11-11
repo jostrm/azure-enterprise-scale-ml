@@ -592,18 +592,21 @@ def test_pages_link_back_and_next_along_the_reading_path(path):
         assert navigation_target(after, "Back") == before.resolve(), f"{name(after)}: Back"
 
 
-# --- Diagrams: labels fit their boxes, and the colors are the onion's. ---------------------------------------------
-ONION_COLORS = {"#080E1B", "#14243A", "#5AA9FF", "#2C2341", "#B07CFF", "#3C213A", "#FF6FD8", "#15362D", "#3DDC97",
-                "#ECF6FF", "#A0B5D0"}
+# --- Diagrams: dark gray boxes with rounded corners, borders in the onion's colors, labels that fit. ------------
+BOX_FILL = "#191919"
+BORDER_COLORS = {"#5AA9FF", "#B07CFF", "#FF6FD8", "#3DDC97"}
+TEXT_COLOR = "#ECF6FF"
 
 
 @pytest.mark.parametrize("page", END_USER, ids=name)
-def test_mermaid_diagrams_use_onion_colors_and_labels_that_fit(page):
+def test_mermaid_boxes_are_dark_gray_and_rounded_with_onion_borders(page):
     for diagram in re.findall(r"(?ms)^```mermaid\n(.*?)^```", read(page)):
         colors = {color.upper() for color in re.findall(r"#[0-9a-fA-F]{6}\b", diagram)}
-        assert colors <= {color.upper() for color in ONION_COLORS}, f"{name(page)}: {sorted(colors)}"
-        if not diagram.lstrip().startswith(("flowchart", "%%{init")):
+        assert colors <= BORDER_COLORS | {BOX_FILL, TEXT_COLOR}, f"{name(page)}: {sorted(colors)}"
+        for fill, stroke, text in re.findall(r"classDef \w+ fill:(#\w+),stroke:(#\w+),[^\n]*color:(#\w+)", diagram):
+            assert (fill, text) == (BOX_FILL, TEXT_COLOR) and stroke in BORDER_COLORS, name(page)
+        if not diagram.lstrip().startswith("flowchart"):
             continue
-        for label in re.findall(r"[\[{]([^\[\]{}\"]+)[\]}]", diagram):
-            lines = label.split("<br/>")
-            assert all(len(line) <= 20 for line in lines), f"{name(page)}: break the label {label!r}"
+        assert not re.search(r"\b\w+\[", diagram), f"{name(page)}: use rounded boxes, id(label), not id[label]"
+        for label in re.findall(r"[({]([^(){}\"]+)[)}]", diagram):
+            assert all(len(line) <= 20 for line in label.split("<br/>")), f"{name(page)}: break the label {label!r}"

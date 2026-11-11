@@ -48,13 +48,13 @@ or public networking.
 
 ```mermaid
 flowchart TD
-  A{Do you already<br/>own a hub?} -- Yes --> E[External hub]:::blue
+  A{Do you already<br/>own a hub?} -- Yes --> E(External hub):::blue
   A -- No --> B{Do you need<br/>private-only<br/>access?}
-  B -- Yes --> O[Own hub]:::purple
-  B -- No --> S[Standalone, no hub:<br/>hybrid or public]:::pink
-  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
-  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
-  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
+  B -- Yes --> O(Own hub):::purple
+  B -- No --> S(Standalone, no hub:<br/>hybrid or public):::pink
+  classDef blue fill:#191919,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#191919,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#191919,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
   class A,B blue
 ```
 

@@ -20,12 +20,12 @@ When you finish, you have this in your Dev subscription:
 
 ```mermaid
 flowchart LR
-  F[AI Factory]:::purple --> S[Dev<br/>scale set 001]:::purple
-  S --> C[Common<br/>resource group:<br/>network, DNS,<br/>monitoring]:::blue
-  S --> P[project001<br/>resource group:<br/>your team's<br/>AI services]:::pink
-  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
-  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
-  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
+  F(AI Factory):::purple --> S(Dev<br/>scale set 001):::purple
+  S --> C(Common<br/>resource group:<br/>network, DNS,<br/>monitoring):::blue
+  S --> P(project001<br/>resource group:<br/>your team's<br/>AI services):::pink
+  classDef blue fill:#191919,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#191919,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#191919,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
 ```
 
 ## Prerequisites
