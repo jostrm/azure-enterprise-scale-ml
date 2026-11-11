@@ -1,4 +1,4 @@
-[Docs](../README.md) › [Quickstarts](README.md)
+[Docs](../README.md) › [Setup docs](README.md)
 
 # Quickstart: Add a project for your team
 
@@ -6,16 +6,19 @@ In this quickstart, you add a project for a team with one call, then change one 
 call. A **project** is one team's own resource group, with its AI services and its access group.
 
 > [!TIP]
-> Prefer to watch first? The **ESAF Tutorials** lab guide plays the narrated video for this scenario and
-> checks your steps. [Download the ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide)
-> (watch the videos inside it).
+> **Run it guided.** The **ESAF Tutorials** app types this call for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1–3**.
+> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
+> preview code.
 
-<img src="../images/concepts/scale-set-floor.svg" width="640" alt="Illustration of a factory building where each floor is a scale set that holds project rooms.">
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/03-add-project.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with the checks of project 002 passed."></a>
 
-*AI-generated illustration.*
+*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
 
-A **scale set** is one floor of the Factory: a network and a subscription that hold up to seven projects by
-default. Your Factory starts with scale set 001 in Dev.
+Every project lives on a **scale set**, one floor of the Factory. This quickstart puts project 002 on Dev
+scale set 001, and names that scale set in every call. You must name it once Dev has more than one scale
+set, as it does after [Quickstart: Add a scale set](add-scale-set.md).
 
 ## Prerequisites
 
@@ -31,10 +34,12 @@ saved and is deployed again.
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-1. In the app, open **Projects**.
-2. Add project `002` to the Dev scale set 001.
-3. Review the plan, then confirm it.
-4. Follow the run in the integrated terminal.
+1. In the app, open the menu and select **Configuration wizard** > **Quick setup & tear down**.
+2. Select **3. Add or update project**.
+3. Set **Environment** to `dev`, **Project number** to `002` and **Project scale set** to `001`.
+4. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
+   **Run selected scenario**.
+5. Follow **Job status** on the same page until it shows that the job succeeded.
 
 </details>
 <!-- /factory-tool -->
@@ -43,7 +48,17 @@ saved and is deployed again.
 <summary>CLI (PowerShell)</summary>
 
 ```powershell
-azurefactory esaf upsert-project 002 dev --wait
+azurefactory esaf upsert-project 002 dev --scale-set 001 --wait
+```
+
+</details>
+<!-- /factory-tool -->
+
+<details markdown="1" data-factory-tool="CLI (bash)">
+<summary>CLI (bash)</summary>
+
+```bash
+azurefactory esaf upsert-project 002 dev --scale-set 001 --wait
 ```
 
 </details>
@@ -55,7 +70,7 @@ azurefactory esaf upsert-project 002 dev --wait
 ```python
 from azurefactory import esaf
 
-job = esaf.upsert_project("002", "dev")
+job = esaf.upsert_project("002", "dev", scale_set="001")
 state = job.wait()
 print(state["status"], "-", state["message"])
 ```
@@ -66,11 +81,12 @@ print(state["status"], "-", state["message"])
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
 
-In Git Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
+In Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
 [Quickstart: Create your AI Factory](02-create-factory.md#create-the-factory):
 
 ```bash
-jq -n --arg folder "$FOLDER" '{folder: $folder, approved: true, project: "002", environment: "dev"}' |
+jq -n --arg folder "$FOLDER" \
+  '{folder: $folder, approved: true, project: "002", environment: "dev", scale_set: "001"}' |
   curl --silent --show-error --fail-with-body -X POST "$API_URL/api/v1/esaf/upsert-project" \
     --header "X-API-Key: $API_KEY" --header 'Content-Type: application/json' --data @-
 ```
@@ -78,7 +94,7 @@ jq -n --arg folder "$FOLDER" '{folder: $folder, approved: true, project: "002", 
 </details>
 <!-- /factory-tool -->
 
-The run takes 25 to 30 minutes.
+A new project takes about an hour: the recorded runs took 50 to 65 minutes.
 
 ## Change a setting
 
@@ -87,9 +103,10 @@ Send the same call with the settings you want to change. Settings you leave out 
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-1. In the app, open **Projects** and select project `002`.
-2. Change the setting, for example the cost center tag.
-3. Review the plan, then confirm it.
+1. On the same page, select **3. Add or update project** and enter the same project.
+2. In **Optional settings JSON**, enter the settings to change, for example `{"tag_costcenter": "lab"}`.
+3. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
+   **Run selected scenario**.
 
 </details>
 <!-- /factory-tool -->
@@ -99,7 +116,18 @@ Send the same call with the settings you want to change. Settings you leave out 
 
 ```powershell
 '{"tag_costcenter": "lab"}' | Set-Content .\project-settings.json
-azurefactory esaf upsert-project 002 dev --settings-json .\project-settings.json --wait
+azurefactory esaf upsert-project 002 dev --scale-set 001 --settings-json .\project-settings.json --wait
+```
+
+</details>
+<!-- /factory-tool -->
+
+<details markdown="1" data-factory-tool="CLI (bash)">
+<summary>CLI (bash)</summary>
+
+```bash
+echo '{"tag_costcenter": "lab"}' > project-settings.json
+azurefactory esaf upsert-project 002 dev --scale-set 001 --settings-json ./project-settings.json --wait
 ```
 
 </details>
@@ -111,7 +139,7 @@ azurefactory esaf upsert-project 002 dev --settings-json .\project-settings.json
 ```python
 from azurefactory import esaf
 
-job = esaf.upsert_project("002", "dev", settings={"tag_costcenter": "lab"})
+job = esaf.upsert_project("002", "dev", scale_set="001", settings={"tag_costcenter": "lab"})
 print(job.wait()["status"])
 ```
 
@@ -123,7 +151,8 @@ print(job.wait()["status"])
 
 ```bash
 jq -n --arg folder "$FOLDER" \
-  '{folder: $folder, approved: true, project: "002", environment: "dev", settings: {tag_costcenter: "lab"}}' |
+  '{folder: $folder, approved: true, project: "002", environment: "dev", scale_set: "001",
+    settings: {tag_costcenter: "lab"}}' |
   curl --silent --show-error --fail-with-body -X POST "$API_URL/api/v1/esaf/upsert-project" \
     --header "X-API-Key: $API_KEY" --header 'Content-Type: application/json' --data @-
 ```
@@ -135,7 +164,7 @@ jq -n --arg folder "$FOLDER" \
 |---|---|
 | `project` | Sets the project number, three digits as a string: `"002"`. |
 | `environment` | Selects `"dev"`, `"stage"` or `"prod"`. It's required. |
-| `scale_set` | Selects the scale set. You need it only when the environment has more than one. |
+| `scale_set` | Selects the scale set. It's required when the environment has more than one. |
 | `settings` | Replaces the settings you name. |
 | `display_name` | Gives a new project a display name. |
 
@@ -147,7 +176,8 @@ The job ends with status `succeeded`, and your folder holds the new project:
 azurefactory\factories\<your factory>\scalesets\001\projects\project002\variables.json
 ```
 
-In Azure, you see one more resource group, for project 002.
+In Azure, you see one more resource group, for project 002. After the settings change, its resources carry
+the new cost center tag.
 
 If the call is refused:
 
@@ -175,6 +205,6 @@ See [Quickstart: Clean up](05-clean-up.md).
 
 Related:
 
-- [The six scenarios](../reference/scenarios.md): add a scale set when a floor is full.
+- [The six scenarios](../reference/scenarios.md): every call and its parameters.
 - [Usage docs](../usage/README.md): hand the project over to the team.
 - [Microsoft Entra groups and personas](../10-19/16-ad-groups-personas.md): who gets access to a project.

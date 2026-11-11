@@ -14,7 +14,7 @@ project's resource group, which your project's Entra group gives you.
 |---|---|---|
 | Project dashboard | Azure portal, in your project's resource group | A daily look at cost, usage and shortcuts to your services |
 | My Project - Usage and Cost workbook | Azure Monitor, linked from the project dashboard | Token usage per model, resources per region and health |
-| Monitoring in the ESAF app | The desktop app your platform team runs | Reports across projects: value, cost, quality and security |
+| Monitoring in the ESAF app | Enterprise Scale AI Factory, the desktop app your platform team runs | Reports across projects: value, cost, quality and security |
 
 All three read the same Azure sources: Cost Management for cost, and Azure Monitor for usage and health.
 
@@ -58,10 +58,10 @@ Change the time range at the top of the dashboard. It starts at the past 30 days
 ## Ask in the ESAF app
 
 Your platform team can also open your project in the ESAF app, under **Monitoring** > **My Project**. It
-shows usage and outcomes beside a separate **Cost** tab, for one project and one environment at a time. Ask
+shows a **Usage & outcomes** tab beside a separate **Cost** tab, for one project and one environment at a time. Ask
 them for a report when you need numbers across several projects.
 
 **Next:** [Usage docs](README.md)
 
-Related: [Tutorial: FinOps monitoring](../20-29/tutorial-fiops.md) ·
+Related: [Tutorial: FinOps monitoring](../20-29/tutorial-finops.md) ·
 [Monitoring: value, cost and trust](../30-39/32-dashboards.md), the full reference for platform teams

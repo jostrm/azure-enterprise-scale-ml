@@ -1,4 +1,4 @@
-[Docs](../README.md) › [Quickstarts](README.md)
+[Docs](../README.md) › [Setup docs](README.md)
 
 # Quickstart: Clean up
 
@@ -6,9 +6,15 @@ In this quickstart, you delete a project, a scale set or your whole AI Factory w
 removes the Azure resource groups that ESAF created, and nothing else.
 
 > [!TIP]
-> Prefer to watch first? The **ESAF Tutorials** lab guide plays narrated videos and checks your steps.
-> [Download the ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide)
-> (watch the videos inside it).
+> **Run it guided.** The **ESAF Tutorials** app types each command for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 4–6**.
+> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
+> preview code.
+
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/05-clean-up.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal after the delete project run succeeded."></a>
+
+*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
 
 | Scenario | What goes | What stays |
 |---|---|---|
@@ -28,14 +34,19 @@ removes the Azure resource groups that ESAF created, and nothing else.
 > A delete is permanent, and running it is the approval. Check the project number and the environment before
 > you press Enter. A delete never reaches another environment.
 
-Run only the lines you need. To remove everything, the last line is enough.
+Run only the lines you need. To remove everything, the last line is enough. The first two lines delete
+project 002 and scale set 002 from the earlier quickstarts. The recorded project delete took about 30
+minutes.
 
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-1. In the app, select what you want to delete: a project, a scale set or the whole Factory.
-2. Review the deletion plan, then confirm it.
-3. Follow the run in the integrated terminal.
+1. In the app, open the menu and select **Configuration wizard** > **Quick setup & tear down**.
+2. Select **4. Delete project**, **5. Delete scale set** or **6. Delete AI Factory**, and enter the target.
+3. In **Deletion phrase**, type the phrase that the page asks for. It names what you delete.
+4. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
+   **Run selected scenario**.
+5. Follow **Job status** on the same page until it shows that the job succeeded.
 
 </details>
 <!-- /factory-tool -->
@@ -44,6 +55,18 @@ Run only the lines you need. To remove everything, the last line is enough.
 <summary>CLI (PowerShell)</summary>
 
 ```powershell
+azurefactory esaf delete-project 002 dev --wait
+azurefactory esaf delete-scale-set 002 dev --wait
+azurefactory esaf delete-factory --wait
+```
+
+</details>
+<!-- /factory-tool -->
+
+<details markdown="1" data-factory-tool="CLI (bash)">
+<summary>CLI (bash)</summary>
+
+```bash
 azurefactory esaf delete-project 002 dev --wait
 azurefactory esaf delete-scale-set 002 dev --wait
 azurefactory esaf delete-factory --wait
@@ -74,7 +97,7 @@ print(job.scenario, job.result["status"])
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
 
-In Git Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
+In Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
 [Quickstart: Create your AI Factory](02-create-factory.md#create-the-factory):
 
 ```bash
@@ -117,6 +140,7 @@ Expected output: no resource group that starts with your Factory's prefix.
 | Job status | What to do |
 |---|---|
 | `blocked` | Another job is still running on the Factory, or a review refused the delete. Read `blockers` in the job. |
+| A scale-set call says the target is unknown | You skipped [Quickstart: Add a scale set](add-scale-set.md). Leave that line out. |
 | `failed` | Read `problem` in the job, then run the same call again. Deletes that are already done are skipped. |
 
 ## Clean up resources

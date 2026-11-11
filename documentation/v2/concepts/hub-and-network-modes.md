@@ -67,13 +67,18 @@ The app sets these for you. You only need the names when you automate the setup.
 | `network_mode` | `private`, `hybrid` or `public` | `hybrid` or `public` | `private`, `hybrid` or `public` |
 
 An external hub also needs four values that locate it: `access_hub_subscription_id`,
-`access_hub_resource_group`, `access_hub_vnet_name` and `access_hub_vnet_cidr`.
+`access_hub_resource_group`, `access_hub_vnet_name` and `access_hub_vnet_cidr`. An own hub also needs
+`vpn_client_cidr`, the address pool of its VPN clients. It must not overlap the Factory's VNet range.
+
+These settings go in the `config` part of the creation request. See
+[Quickstart: Create your AI Factory](../quickstarts/02-create-factory.md#describe-your-factory).
 
 ## Trade-offs
 
 - **External hub** gives you one VPN and one set of DNS zones for all Factories. It needs a team that owns
   the hub.
-- **Standalone, no hub** is the fastest to create and the easiest to delete. It can't be private-only.
+- **Standalone, no hub** is the fastest to create and the easiest to delete. It can't be private-only, and
+  with public networking it can't run [Agent Chat](../quickstarts/04-first-agent-chat.md).
 - **Own hub** is self-contained and private. Each Factory then pays for its own VPN gateway.
 
 A Factory delete keeps hub resource groups in every mode. See [Quickstart: Clean up](../quickstarts/05-clean-up.md).

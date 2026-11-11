@@ -27,18 +27,20 @@ Azure Machine Learning.
 
 ## Learn by watching
 
-The **ESAF Tutorials** lab guide is a desktop app that walks you through each scenario. It plays a narrated
-video for every lab and checks your steps.
+**ESAF Tutorials** is a desktop lab guide. It types each command for you, checks every step and plays a
+narrated video for each scenario. It has one tutorial for the CLI, one for the Python SDK and one for REST,
+and each runs the six scenarios in order.
 
-| Video in the lab guide | Hub mode | Networking |
-|---|---|---|
-| Scenarios 1-4 with the Python SDK | External hub | Private |
-| Scenarios 1-3 with the REST API | Standalone, no hub | Public |
-| Scenarios 1-3 with the Config Wizard app | Standalone, no hub | Public |
-| Scenarios 1-3 with the REST API | Own hub | Private |
+| Video in ESAF Tutorials | Tool | Hub mode | Networking | Length |
+|---|---|---|---|---|
+| Scenarios 1-4 | Python SDK | External hub | Private | 9 min |
+| Scenarios 1-3 | Python SDK | Standalone, no hub | Public | 7 min |
+| Scenarios 1-3 | Config Wizard app | Standalone, no hub | Public | 6 min |
+| Scenarios 1-3 | Python SDK | Own hub | Private | 8 min |
 
-[Download the ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide)
-(watch the videos inside it).
+[Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide), then open **Resources** > **Scenario videos**. It's a private preview:
+ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code. It runs on
+Windows. On Linux and macOS, follow the [Setup docs](quickstarts/README.md) with the CLI (bash) tab.
 
 ## Understand ESAF
 
@@ -62,7 +64,7 @@ video for every lab and checks your steps.
 | [21. Agent Factory chat and live voice](10-19/21-agent-factory-chat.md) | Operate, secure and troubleshoot Agent Chat. |
 | [22. Lifecycle Azure Function](10-19/22-lifecycle-azure-function.md) | Call the six scenarios from a hosted function. |
 | [Tutorial: configure, review and verify](20-29/28-tutorial-walkthrough.md) | Walk through the app and the read-only API. |
-| [Tutorial: FinOps monitoring](20-29/tutorial-fiops.md) | Turn usage and cost evidence into FinOps reports. |
+| [Tutorial: FinOps monitoring](20-29/tutorial-finops.md) | Turn usage and cost evidence into FinOps reports. |
 | [ITSM integration](20-29/29-ITSM-integrated.md) | Order projects from ServiceNow, Jira or your own portal. |
 
 **Next:** [Setup docs - platform team](quickstarts/README.md)

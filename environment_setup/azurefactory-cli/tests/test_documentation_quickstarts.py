@@ -2,12 +2,16 @@
 
 import ast
 from collections import Counter
+import inspect
 from pathlib import Path
 import re
+import shlex
 import textwrap
 from urllib.parse import unquote
 
 import pytest
+
+from azurefactory import cli, esaf
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -23,7 +27,8 @@ MAINTAINERS = V2 / "reference" / "maintainers" / "automation-and-review-flow.md"
 ONION_PAGE = V2 / "10-19" / "10-factory-onion-architecture-v2.md"
 
 SETUP_QUICKSTARTS = [V2 / "quickstarts" / name for name in (
-    "01-install-esaf.md", "02-create-factory.md", "03-add-project.md", "04-first-agent-chat.md", "05-clean-up.md")]
+    "01-install-esaf.md", "02-create-factory.md", "add-scale-set.md", "03-add-project.md",
+    "04-first-agent-chat.md", "05-clean-up.md")]
 USAGE_QUICKSTARTS = [V2 / "usage" / name for name in ("01-first-agent.md", "02-first-ml-model.md")]
 QUICKSTARTS = SETUP_QUICKSTARTS + USAGE_QUICKSTARTS
 USAGE_PAGES = [USAGE_HUB, USAGE_PREREQUISITES, *USAGE_QUICKSTARTS, V2 / "usage" / "dashboards.md"]
@@ -41,7 +46,8 @@ OFF_PATH = [
     V2 / "10-19" / "13-setup-aifactory.md",
 ]
 
-TOOL_LABELS = ["App", "CLI (PowerShell)", "Python SDK", "REST (curl)"]
+# CLI (bash) is for Linux and macOS (and Git Bash): the same azurefactory commands as the PowerShell tab.
+TOOL_LABELS = ["App", "CLI (PowerShell)", "CLI (bash)", "Python SDK", "REST (curl)"]
 TOOL_SECTION = re.compile(
     r'^<details markdown="1" data-factory-tool="([^"]+)"( open)?>\n<summary>\1</summary>\n\n(.*?)'
     r'^</details>\n<!-- /factory-tool -->', re.M | re.S)
@@ -136,7 +142,7 @@ def test_reading_path_uses_relative_links_that_follow_the_branch(page):
 def test_quickstart_follows_the_template(page):
     text = read(page)
     lines = text.splitlines()
-    hub = "Quickstarts" if page in SETUP_QUICKSTARTS else "Usage docs"
+    hub = "Setup docs" if page in SETUP_QUICKSTARTS else "Usage docs"  # the breadcrumb names the hub it opens
     assert lines[0] == f"[Docs](../README.md) › [{hub}](README.md)"
     titles = [line for line in lines if line.startswith("# ")]
     assert len(titles) == 1 and titles[0].startswith("# Quickstart: ") and not titles[0].endswith(".")
@@ -182,6 +188,32 @@ def test_tool_selectors_use_the_tested_markup(page):
             assert "curl" in content and "```python" not in content
         if label == "CLI (PowerShell)":
             assert "```powershell" in content
+        if label == "CLI (bash)":
+            assert "```bash" in content and "azurefactory " in content
+            assert "```powershell" not in content and "$env:" not in content, "No PowerShell in the bash tab."
+
+
+def esaf_commands(content):
+    """The azurefactory esaf commands of one tool tab, with file paths written the same way in both shells."""
+    return sorted(re.sub(r"\.[\\/]", "./", command.strip())
+                  for command in re.findall(r"azurefactory esaf [a-z][^\n`]*", content))
+
+
+@pytest.mark.parametrize("page", SETUP_QUICKSTARTS, ids=name)
+def test_cli_bash_tab_runs_the_same_commands_as_the_powershell_tab(page):
+    """Linux and macOS readers get the same calls: only the shell syntax around them differs."""
+    sections, powershell = TOOL_SECTION.findall(read(page)), None
+    for label, _, content in sections:
+        if label == "CLI (PowerShell)":
+            powershell = esaf_commands(content)
+        if label == "CLI (bash)":
+            assert esaf_commands(content) == powershell, name(page)
+
+
+def test_install_quickstart_says_which_app_package_serves_linux_and_macos():
+    text = read(SETUP_QUICKSTARTS[0])
+    assert "Linux" in text and "macOS" in text and "v0.47.100" in text
+    assert re.search(r"(?m)^- \*\*Linux or macOS", text), "The prerequisites name the Linux and macOS path."
 
 
 @pytest.mark.parametrize("page", END_USER + [V2 / "images" / "concepts" / "README.md"], ids=name)
@@ -332,3 +364,165 @@ def test_llms_index_lists_every_end_user_page():
         assert f"({page.relative_to(V2).as_posix()})" in index, name(page)
     for url in re.findall(r"\]\(([^)]+)\)", index):
         assert is_external(url) or (V2 / url).exists(), url
+
+
+# --- The docs cannot drift from the code: every call a page shows is one the facade really accepts. ---------------
+CLI_DOCS = ROOT / "environment_setup" / "azurefactory-cli" / "docs" / "esaf" / "readme.md"
+WIZARD_README = ROOT / "environment_setup" / "install_config_wizard" / "readme.md"
+DRIFT_CHECKED = [*END_USER, CLI_DOCS, WIZARD_README,
+                 *(V2 / "10-19" / f"{number}-cli-and-api-and-usage.md" for number in (17, 18, 19, 20))]
+ADD_SCALE_SET, ADD_PROJECT, AGENT_CHAT, CLEAN_UP = SETUP_QUICKSTARTS[2:]
+LAB_GUIDE = "environment_setup/install_tutorial_guide"
+PREVIEW_CONTACT = "https://www.linkedin.com/in/joakimastrom/"
+FENCE = r"(?ms)^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$"
+REST_CALL = r"(?s)jq -n.*?'(\{.*?\})'\s*\|\s*curl[^\n]*?/api/v1/esaf/([a-z-]+)"
+
+
+def code_spans(text):
+    """Every fenced block and inline code span of a page."""
+    return [body for _, body in re.findall(FENCE, text)] + re.findall(r"`([^`\n]+)`", re.sub(FENCE, "", text))
+
+
+def esaf_nodes(text):
+    """The parsed Python a page shows: fenced blocks and inline spans. Signature summaries do not parse; skip them."""
+    for span in code_spans(text):
+        if "esaf." in span or "job." in span:
+            try:
+                yield from ast.walk(ast.parse(textwrap.dedent(span)))
+            except SyntaxError:
+                continue
+
+
+def is_esaf_call(node, method=None):
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name) and node.func.value.id == "esaf"
+            and method in (None, node.func.attr))
+
+
+def accepted_rest_fields():
+    """The body each route takes, read by calling every scenario against a recording client."""
+    class Recorder:
+        def __init__(self):
+            self.bodies = {}
+
+        def esaf_submit(self, route, body):
+            self.bodies[route] = set(body)
+            return {"job_id": "recorded"}
+
+    recorder = Recorder()
+    session = esaf.Session("folder", recorder, "factory")
+    for function in (esaf.init_factory, esaf.add_scale_set, esaf.upsert_project, esaf.delete_project,
+                     esaf.delete_scale_set, esaf.delete_factory):
+        arguments = {parameter: ("dev" if parameter == "environment" else "x")
+                     for parameter in inspect.signature(function).parameters
+                     if parameter not in ("wait", "poll", "session")}
+        function(**arguments, session=session)
+    return recorder.bodies
+
+
+def top_level_keys(program):
+    depth, flat = 0, ""
+    for character in program.strip()[1:-1]:
+        depth += (character == "{") - (character == "}")
+        flat += character if depth == 0 and character != "}" else ""
+    return set(re.findall(r'(?:^|,)\s*"?(\w+)"?\s*:', flat))
+
+
+@pytest.mark.parametrize("page", DRIFT_CHECKED, ids=name)
+def test_every_esaf_command_shown_is_accepted_by_the_real_cli_parser(page, capsys):
+    parser, refused = cli.build_parser(), []
+    for span in code_spans(read(page)):
+        for line in span.splitlines():
+            shown = re.search(r"azurefactory (?:esaf [a-z]|health\b).*", line)
+            if not shown:
+                continue
+            command = re.sub(r"<[^>]+>", "PLACEHOLDER", shown[0]).strip()
+            try:
+                parser.parse_args(shlex.split(command, posix=False)[1:])
+            except SystemExit:
+                refused.append(command)
+    capsys.readouterr()  # argparse prints its usage on a refusal; the assertion below carries the message
+    assert not refused, f"{name(page)} shows commands the CLI refuses: {refused}"
+
+
+@pytest.mark.parametrize("page", DRIFT_CHECKED, ids=name)
+def test_every_python_call_shown_matches_the_real_esaf_signature(page):
+    problems = []
+    job_members = set(esaf.EsafJob.__dataclass_fields__) | {"status", "wait"}
+    for node in esaf_nodes(read(page)):
+        # In the step-by-step guides `job` is also a plain dict, so check job members where it is always an EsafJob.
+        if (page in [*END_USER, CLI_DOCS] and isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name) and node.value.id == "job"):
+            if node.attr not in job_members:
+                problems.append(f"job.{node.attr}")
+        if not is_esaf_call(node):
+            continue
+        try:
+            inspect.signature(getattr(esaf, node.func.attr)).bind(
+                *node.args, **{keyword.arg: 0 for keyword in node.keywords})
+        except (AttributeError, TypeError) as error:
+            problems.append(f"esaf.{node.func.attr}: {error}")
+    assert not problems, f"{name(page)} shows calls the SDK refuses: {problems}"
+
+
+@pytest.mark.parametrize("page", DRIFT_CHECKED, ids=name)
+def test_every_rest_route_and_body_field_shown_is_one_the_api_route_takes(page):
+    accepted, text = accepted_rest_fields(), read(page)
+    unknown = set(re.findall(r"/api/v1/esaf/([a-z][a-z-]*)", text)) - set(accepted) - {"jobs"}
+    assert not unknown, f"{name(page)} shows routes the SDK never calls: {unknown}"
+    for span in code_spans(text):
+        for program, route in re.findall(REST_CALL, span):
+            extra = top_level_keys(program) - accepted[route]
+            assert not extra, f"{name(page)} posts {extra} to {route}, which takes {sorted(accepted[route])}"
+
+
+# --- The quickstarts tell one story: what a page deletes or updates, an earlier page created. --------------------
+def shown_targets(page, command):
+    return set(re.findall(rf"azurefactory esaf {command} (\d{{3}}) (dev|stage|prod)", read(page)))
+
+
+def test_setup_hub_lists_the_quickstarts_in_reading_order():
+    linked = [url for url, _, _ in references(SETUP_HUB) if re.fullmatch(r"(?!README)[\w-]+\.md", url)]
+    in_table = linked[:-1] if linked and linked[-1] == linked[0] else linked  # the closing Next link repeats 01
+    assert in_table == [page.name for page in SETUP_QUICKSTARTS]
+
+
+def test_add_scale_set_quickstart_shows_scenario_two_in_every_tool():
+    text = read(ADD_SCALE_SET)
+    assert shown_targets(ADD_SCALE_SET, "add-scale-set") == {("002", "dev")}
+    assert 'esaf.add_scale_set("002", "dev", cidr=' in text and "/api/v1/esaf/add-scale-set" in text
+    assert "--cidr" in text and "overlap" in text, "A new scale set needs its own VNet range."
+
+
+def test_clean_up_only_deletes_what_an_earlier_quickstart_created():
+    assert shown_targets(CLEAN_UP, "delete-project") <= shown_targets(ADD_PROJECT, "upsert-project")
+    assert shown_targets(CLEAN_UP, "delete-scale-set") == shown_targets(ADD_SCALE_SET, "add-scale-set")
+    assert "esaf delete-factory" in read(CLEAN_UP)
+
+
+@pytest.mark.parametrize("page", [ADD_PROJECT, AGENT_CHAT], ids=name)
+def test_project_calls_name_the_scale_set_once_dev_has_two(page):
+    """After the add-scale-set quickstart, a project call without a scale set is refused as ambiguous."""
+    text = read(page)
+    commands = re.findall(r"azurefactory esaf upsert-project [^\n`|]*", text)
+    assert commands and all("--scale-set 001" in command for command in commands), commands
+    calls = [node for node in esaf_nodes(text) if is_esaf_call(node, "upsert_project")]
+    assert calls and all("scale_set" in {keyword.arg for keyword in call.keywords} for call in calls)
+    bodies = [program for span in code_spans(text) for program, route in re.findall(REST_CALL, span)
+              if route == "upsert-project"]
+    assert bodies and all("scale_set" in top_level_keys(program) for program in bodies)
+
+
+def test_topology_choice_warns_before_the_agent_chat_dead_end():
+    """Public networking is the smallest setup, but Agent Chat needs private or hybrid: say so where you choose."""
+    choice = read(SETUP_QUICKSTARTS[1]).split("## Choose your topology", 1)[1].split("\n## ", 1)[0]
+    assert AGENT_CHAT.name in choice and "hybrid" in choice
+
+
+@pytest.mark.parametrize("page", END_USER, ids=name)
+def test_lab_guide_links_say_it_needs_a_preview_code(page):
+    text = read(page)
+    if LAB_GUIDE not in text:
+        return
+    assert "preview code" in text and PREVIEW_CONTACT in text, "The ESAF Tutorials download is a private preview."
+    assert "dropbox.com" not in text

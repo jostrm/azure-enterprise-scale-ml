@@ -15,7 +15,7 @@ These pages are for the **platform team** (the core team) that creates and runs 
 </a>
 
 Every tool is an L1 client of the same Factory API, so the result is the same whichever you pick. The app,
-the `azurefactory` CLI, the Python SDK and REST all send the same six scenario calls. See the
+the `azurefactory` CLI (in PowerShell or Bash), the Python SDK and REST all send the same six scenario calls. See the
 [onion architecture](../10-19/10-factory-onion-architecture-v2.md) for the layers below your tool.
 
 ## Set up
@@ -23,8 +23,9 @@ the `azurefactory` CLI, the Python SDK and REST all send the same six scenario c
 | Quickstart | What you do |
 |---|---|
 | [Install the ESAF tools](01-install-esaf.md) | Install a tool, start the Factory API and check the connection. |
-| [Create your AI Factory](02-create-factory.md) | Create the Factory and its first project with one call. |
-| [Add a project for your team](03-add-project.md) | Add or update a project with one call. |
+| [Create your AI Factory](02-create-factory.md) | Create the Factory and its first project with one call. Scenario 1. |
+| [Add a scale set](add-scale-set.md) | Add a second network for more projects. Scenario 2, optional. |
+| [Add a project for your team](03-add-project.md) | Add or update a project with one call. Scenario 3. |
 
 ## Build your first agent
 
@@ -43,7 +44,16 @@ the `azurefactory` CLI, the Python SDK and REST all send the same six scenario c
 
 | Quickstart | What you do |
 |---|---|
-| [Clean up](05-clean-up.md) | Delete a project, a scale set or the whole Factory. |
+| [Clean up](05-clean-up.md) | Delete a project, a scale set or the whole Factory. Scenarios 4 to 6. |
+
+## Run it guided
+
+**ESAF Tutorials** is a desktop lab guide that runs the same quickstarts with you. It types each command,
+checks every step and plays a video of each scenario. Pick the tutorial for your tool (CLI, Python SDK or
+REST), then the track **Scenarios 1–3** to build or **Scenarios 4–6** to clean up. It runs on Windows. On
+Linux and macOS, follow the quickstarts with the CLI (bash), Python SDK or REST tab.
+[Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code.
 
 ## Try it first (preview)
 

@@ -1,4 +1,4 @@
-[Docs](../README.md) › [Quickstarts](README.md)
+[Docs](../README.md) › [Setup docs](README.md)
 
 # Quickstart: Create your first agent by enabling ESAF Agent Chat
 
@@ -7,9 +7,11 @@ Chat** is a Microsoft Foundry agent with a private web chat and live voice. It a
 Factory from your own documentation and code.
 
 > [!TIP]
-> Prefer to watch first? The **ESAF Tutorials** lab guide plays narrated videos and checks your steps.
-> [Download the ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide)
-> (watch the videos inside it).
+> **Run it guided.** The **ESAF Tutorials** app types the project calls for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1–3**.
+> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
+> preview code. The app has no Agent Chat lab yet.
 
 ```mermaid
 sequenceDiagram
@@ -26,9 +28,11 @@ sequenceDiagram
 ## Prerequisites
 
 - A project in **Dev** from [Quickstart: Add a project for your team](03-add-project.md), or project 001
-  from [Quickstart: Create your AI Factory](02-create-factory.md). Any project number works.
+  from [Quickstart: Create your AI Factory](02-create-factory.md). Any project number works. The examples
+  use project 001 on scale set 001.
 - On that project: `enableAIFoundry`, `enableAISearch` and `enableContainerApps` set to `"true"`.
-- Private or hybrid networking, so that the project's Container Apps environment is internal. See
+- Private or hybrid networking, so that the project's Container Apps environment is internal. A Factory
+  with public networking can't run Agent Chat. See
   [hub and network modes](../concepts/hub-and-network-modes.md).
 - A chat model deployment that succeeded. The project setting `modelGPTXName` names it.
 - A text-embedding deployment that succeeded, for example `text-embedding-3-large`.
@@ -41,7 +45,8 @@ sequenceDiagram
 
 ## Create the sign-in registration
 
-An Entra admin does this once per project. Pipelines never write to Microsoft Entra.
+An Entra admin does this once per project. Pipelines never write to Microsoft Entra. The commands in this
+section are PowerShell. In Bash, end a continued line with a backslash instead of a backtick.
 
 1. Find the address your chat app gets. The app name is `aifactory-agent-project<NNN>-dev`:
 
@@ -55,7 +60,7 @@ An Entra admin does this once per project. Pipelines never write to Microsoft En
 3. From that folder, plan the registration. Add `--apply` when the plan looks right:
 
    ```powershell
-   python -m aifactory_agent.browser_auth --config .\my-agent.json `
+   python -m aifactory_agent.browser_auth --config ./my-agent.json `
      --redirect-uri "https://aifactory-agent-project001-dev.<default domain>/" `
      --user-object-id "<your Entra object ID>"
    ```
@@ -68,8 +73,8 @@ The tool gives sign-in access to you only. Ask your Entra admin to assign the ot
 
 ## Turn on the four settings
 
-Agent Chat is an update of your project, so it's scenario 3 with four settings. Saving the settings alone
-deploys nothing; the run deploys it.
+Agent Chat is an update of your project, so it's scenario 3 with four settings. The call saves the settings
+and then deploys them.
 
 | Setting | What it does |
 |---|---|
@@ -94,10 +99,15 @@ deploys nothing; the run deploys it.
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-1. In the app, open your project's configuration.
-2. Go to **AI Factory Agent chat & live voice**. It's also on the Simple Mode card.
-3. Turn on both switches and enter the client ID and the reader object IDs.
-4. Review the plan, then confirm it.
+1. In the app, open the menu and select **Configuration wizard** > **Quick setup & tear down**.
+2. Select **3. Add or update project**, and enter your project: **Environment** `dev`, **Project number**
+   `001` and **Project scale set** `001`.
+3. In **Optional settings JSON**, enter the four settings, as in the `agent-chat.json` file on the CLI tabs.
+4. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
+   **Run selected scenario**.
+
+The same settings are checkboxes and fields under **AI Factory Agent chat & live voice**, on the **Simple
+Mode** page and in the **Configuration wizard**.
 
 </details>
 <!-- /factory-tool -->
@@ -113,7 +123,26 @@ deploys nothing; the run deploys it.
   aifactoryAgentReaderObjectIds = '<object ID 1>,<object ID 2>'
 } | ConvertTo-Json | Set-Content .\agent-chat.json
 
-azurefactory esaf upsert-project 001 dev --settings-json .\agent-chat.json --wait
+azurefactory esaf upsert-project 001 dev --scale-set 001 --settings-json .\agent-chat.json --wait
+```
+
+</details>
+<!-- /factory-tool -->
+
+<details markdown="1" data-factory-tool="CLI (bash)">
+<summary>CLI (bash)</summary>
+
+```bash
+cat > agent-chat.json <<'JSON'
+{
+  "enableFactoryChatAgent": "true",
+  "enableAIFactoryAgentLiveVoice": "true",
+  "aifactoryAgentEntraAppId": "<client ID>",
+  "aifactoryAgentReaderObjectIds": "<object ID 1>,<object ID 2>"
+}
+JSON
+
+azurefactory esaf upsert-project 001 dev --scale-set 001 --settings-json ./agent-chat.json --wait
 ```
 
 </details>
@@ -125,7 +154,7 @@ azurefactory esaf upsert-project 001 dev --settings-json .\agent-chat.json --wai
 ```python
 from azurefactory import esaf
 
-job = esaf.upsert_project("001", "dev", settings={
+job = esaf.upsert_project("001", "dev", scale_set="001", settings={
     "enableFactoryChatAgent": "true",
     "enableAIFactoryAgentLiveVoice": "true",
     "aifactoryAgentEntraAppId": "<client ID>",
@@ -140,11 +169,12 @@ print(job.wait()["status"])
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
 
-In Git Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
+In Bash, with `API_URL`, `API_KEY` and `FOLDER` set as in
 [Quickstart: Create your AI Factory](02-create-factory.md#create-the-factory):
 
 ```bash
 jq -n --arg folder "$FOLDER" '{folder: $folder, approved: true, project: "001", environment: "dev",
+  scale_set: "001",
   settings: {enableFactoryChatAgent: "true", enableAIFactoryAgentLiveVoice: "true",
     aifactoryAgentEntraAppId: "<client ID>", aifactoryAgentReaderObjectIds: "<object ID 1>,<object ID 2>"}}' |
   curl --silent --show-error --fail-with-body -X POST "$API_URL/api/v1/esaf/upsert-project" \

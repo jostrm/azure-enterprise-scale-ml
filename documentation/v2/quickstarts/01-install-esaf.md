@@ -1,4 +1,4 @@
-[Docs](../README.md) › [Quickstarts](README.md)
+[Docs](../README.md) › [Setup docs](README.md)
 
 # Quickstart: Install the ESAF tools
 
@@ -7,9 +7,11 @@ In this quickstart, you install one ESAF tool, start the Factory API and check t
 separately.
 
 > [!TIP]
-> Prefer to watch first? The **ESAF Tutorials** lab guide plays a narrated video for each lab and checks your
-> steps. [Download the ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide)
-> (watch the videos inside it).
+> **Run it guided.** The **ESAF Tutorials** app types each command for you and checks every step: it also
+> starts its own Factory API. Open an **ESAF** tutorial and the track **Scenarios 1–3**.
+> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
+> preview code.
 
 <a href="../10-19/10-factory-onion-architecture-v2.md">
 <picture>
@@ -23,24 +25,35 @@ Every tool is an L1 client of the same Factory API, so the result is the same wh
 
 ## Prerequisites
 
-- **Windows x64.** The one-call scenarios need the Windows package of the app, v0.47.100 or later. The Linux
-  and macOS packages are older and don't have them yet.
-- [Git for Windows](https://git-scm.com/downloads/win) with Git Bash, and
-  [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli-windows).
-- [Python](https://www.python.org/downloads/) 3.10 or later.
-- [PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) 7.3
-  or later, for the CLI.
+- **Windows x64:** [Git for Windows](https://git-scm.com/downloads/win), which includes Git Bash. For the
+  CLI (PowerShell) tab, also
+  [PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) 7.3
+  or later.
+- **Linux or macOS:** Git and Bash. Use the CLI (bash), Python SDK or REST tab. The one-call scenarios need
+  the app package v0.47.100 or later. Check the
+  [download table](../../../environment_setup/install_config_wizard/readme.md#download): a Linux or macOS
+  package older than that starts the API, but it doesn't have the one-call scenarios yet.
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) and
+  [Python](https://www.python.org/downloads/) 3.10 or later.
 - A Git repository for your Factory's configuration, in GitHub or Azure DevOps. This is your **consumer
   repository**.
 
 ## Start the Factory API
 
-1. Download the [ESAF Config Wizard for Windows](../../../environment_setup/install_config_wizard/readme.md#download).
-2. Extract the archive. Keep the `_internal` folder beside `aifactory-config.exe`.
-3. Open `aifactory-config.exe`.
-4. On **Quick setup**, select **Start API host**.
-5. Enter a private API key. You choose it; remember it for the next steps.
-6. Copy the API address from the success dialog. The default is `http://127.0.0.1:8765`.
+The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for Windows, Linux and macOS.
+
+1. Download the [AIFactory Config Wizard](../../../environment_setup/install_config_wizard/readme.md#download)
+   for your system.
+2. Extract the archive. On Windows, keep the `_internal` folder beside `aifactory-config.exe`.
+3. Open the app. On Windows, that's `aifactory-config.exe`. For the other systems, see
+   [macOS](../../../environment_setup/install_config_wizard/readme.md#macos) and
+   [Linux](../../../environment_setup/install_config_wizard/readme.md#linux).
+4. In the left menu, select **Quick setup**, then **Start API host**. Do this before you open any other
+   window in the app, so that you choose the key.
+5. In the **API Host Authentication** dialog, enter a private API key. You choose it; remember it for the
+   next steps.
+6. Copy the API address from the **API Host Started** dialog. The default is `http://127.0.0.1:8765`. The
+   status bar shows it too.
 
 Keep the app open. The API stops when you close it.
 
@@ -48,7 +61,7 @@ Keep the app open. The API stops when you close it.
 
 Your Factory's configuration lives in an `azurefactory` folder in your consumer repository.
 
-1. Open Git Bash in the root of your consumer repository.
+1. Open Bash in the root of your consumer repository. On Windows, that's Git Bash.
 2. Add this repository as a submodule and create the folder:
 
    ```bash
@@ -72,10 +85,14 @@ Choose one tool. You can add the others later; they all use the same API address
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-You already have the app open. Point it at your folder:
+The App tabs use **Enterprise Scale AI Factory**, the ESAF desktop app for Windows 11. It starts its own
+Factory API, so you can skip "Start the Factory API" above.
 
-1. In the app, open your consumer repository's `azurefactory` folder.
-2. Check that the status bar shows the API address you copied.
+1. Install the app from its [download folder](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_config_wizard/maui).
+   You need version 1.0.24 or later.
+2. Open **Enterprise Scale AI Factory** from Start.
+3. On **Start Guide**, under **Consumer repository root**, select **Browse repository** and pick your
+   consumer repository.
 
 </details>
 <!-- /factory-tool -->
@@ -96,10 +113,30 @@ azurefactory health
 </details>
 <!-- /factory-tool -->
 
+<details markdown="1" data-factory-tool="CLI (bash)">
+<summary>CLI (bash)</summary>
+
+Open Bash in the root of your consumer repository:
+
+```bash
+python3 -m pip install ./azure-enterprise-scale-ml/environment_setup/azurefactory-cli
+export AIFACTORY_API_URL='http://127.0.0.1:8765'
+read -r -s -p 'API key you entered in the app: ' AIFACTORY_API_KEY && export AIFACTORY_API_KEY
+export ESAF_FOLDER="$PWD/azurefactory"
+azurefactory health
+```
+
+In Git Bash on Windows, the API needs a Windows path:
+`export ESAF_FOLDER="$(cygpath -w "$PWD/azurefactory")"`.
+
+</details>
+<!-- /factory-tool -->
+
 <details markdown="1" data-factory-tool="Python SDK">
 <summary>Python SDK</summary>
 
-Install the SDK and set the connection once, in PowerShell:
+Install the SDK and set the connection once. This is PowerShell; on Linux or macOS, use the three `export`
+lines from the CLI (bash) tab instead:
 
 ```powershell
 python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
@@ -123,7 +160,7 @@ print([factory["key"] for factory in catalog["factories"]])
 <details markdown="1" data-factory-tool="REST (curl)">
 <summary>REST (curl)</summary>
 
-Open Git Bash. Health needs no key:
+Open Bash (on Windows: Git Bash). Health needs no key:
 
 ```bash
 curl --silent --show-error --fail-with-body http://127.0.0.1:8765/health
@@ -147,8 +184,8 @@ Your tool reaches the API, and your folder holds no factory yet.
 
 | Tool | Expected output |
 |---|---|
-| App | The status bar shows the API address, and the factory list is empty. |
-| CLI | `azurefactory health` prints `"status": "ok"`. |
+| App | The status light at the bottom shows **API connected**. |
+| CLI, in either shell | `azurefactory health` prints `"status": "ok"`. |
 | Python SDK | The script prints `[]`. |
 | REST | The second command lists seven routes that start with `/api/v1/esaf/`. |
 
@@ -166,7 +203,7 @@ If something goes wrong:
 | Message | Fix |
 |---|---|
 | `AIFACTORY_API_KEY is required`, or HTTP 401 | Set the key again. It must match the key you entered in the app. |
-| `The Factory API has no /api/v1/esaf routes` | Your app is older than v0.47.100. Download the current Windows package. |
+| `The Factory API has no /api/v1/esaf routes` | Your app package is older than v0.47.100. Download the current package. On Linux and macOS, check the download table for a package with that version. |
 | `Select an absolute local factory folder without traversal.` | Set `ESAF_FOLDER` with `Resolve-Path`, as shown. |
 | `ModuleNotFoundError: azurefactory` | Run the `pip install` line again with the same `python`. |
 

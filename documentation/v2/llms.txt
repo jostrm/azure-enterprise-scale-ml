@@ -8,6 +8,7 @@
 - [Setup docs: set up your AI Factory](quickstarts/README.md): Setup docs hub for the platform team
 - [Quickstart: Install the ESAF tools](quickstarts/01-install-esaf.md): Install a tool, start the Factory API, check the connection
 - [Quickstart: Create your AI Factory](quickstarts/02-create-factory.md): Create the AI Factory and project 001 (scenario 1)
+- [Quickstart: Add a scale set](quickstarts/add-scale-set.md): Add a second scale set for more projects (scenario 2, optional)
 - [Quickstart: Add a project for your team](quickstarts/03-add-project.md): Add or update a project (scenario 3)
 - [Quickstart: Create your first agent by enabling ESAF Agent Chat](quickstarts/04-first-agent-chat.md): Enable ESAF Agent Chat and ask a first question
 - [Quickstart: Clean up](quickstarts/05-clean-up.md): Delete a project, a scale set or the Factory (scenarios 4-6)

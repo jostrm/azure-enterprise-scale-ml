@@ -14,8 +14,9 @@ Python SDK and REST are clients of the same Factory API, so the outcome is the s
 | 5. Delete scale set | `esaf.delete_scale_set("002", "dev")` | Deletes the project and common resource groups, leaving an empty Azure subscription. |
 | 6. Delete AI Factory | `esaf.delete_factory()` | Deletes all project and common resource groups in every environment and removes the Factory's local configuration. Hub resource groups, Entra groups and Git repositories stay. |
 
-Running a scenario is the approval: it changes Azure. Start with the
-[quickstarts](../quickstarts/README.md) to run them step by step.
+Running a scenario is the approval: it changes Azure. Each scenario has a quickstart that runs it step by
+step: [1](../quickstarts/02-create-factory.md), [2](../quickstarts/add-scale-set.md),
+[3](../quickstarts/03-add-project.md) and [4 to 6](../quickstarts/05-clean-up.md).
 
 ## The same call in every tool
 
@@ -28,23 +29,24 @@ Running a scenario is the approval: it changes Azure. Start with the
 | 5 | `azurefactory esaf delete-scale-set 002 dev` | `POST /api/v1/esaf/delete-scale-set` |
 | 6 | `azurefactory esaf delete-factory` | `POST /api/v1/esaf/delete-factory` |
 
-Every REST body carries `"folder"` and `"approved": true`. The API answers `202 Accepted` with a `job_id`.
+The CLI commands are the same in PowerShell and in Bash. Every REST body carries `"folder"` and
+`"approved": true`. The API answers `202 Accepted` with a `job_id`.
 
 ## Parameters
 
 | Parameter | Used by | What it does |
 |---|---|---|
-| `scale_set` | Scenarios 2 and 5; optional in 3 and 4 | Names the scale set, three digits as a string: `"002"`. |
+| `scale_set` | Scenarios 2 and 5; in 3 and 4 when the environment has more than one | Names the scale set, three digits as a string: `"002"`. |
 | `project` | Scenarios 3 and 4 | Names the project, three digits as a string: `"002"`. |
 | `environment` | Scenarios 2 to 5, required | Selects `"dev"`, `"stage"` or `"prod"`. A delete never reaches another environment. |
 | `cidr` | Scenario 2 | Sets the new scale set's VNet range. The pipeline computes the subnets. |
 | `max_projects` | Scenario 2 | Sets how many projects the scale set holds. The default is 7. |
-| `subscription_id`, `tenant_id`, `orchestrator` | Scenario 2 | Default to the environment's existing scale set. `orchestrator` is `"gha"` or `"ado"`. |
+| `subscription_id`, `tenant_id`, `orchestrator` | Scenario 2, Python and REST | Default to the environment's existing scale set. `orchestrator` is `"gha"` or `"ado"`. The CLI has no option for them. |
 | `settings` | Scenario 3 | Replaces the project settings you name. Settings you leave out keep their value. |
 | `display_name` | Scenario 3 | Gives a new project a display name. |
 | `include_project_subnets` | Scenario 4 | Also deletes the project's subnets. The default is `False`. |
 | `include_keyvault_and_resource_group` | Scenario 4 | `False` deletes only the project's services. The default is `True`. |
-| `creation_request` | Scenario 1 | Saves a new Factory and starts it in one call. Leave it out to run the draft you saved. |
+| `creation_request` | Scenario 1 | Saves a new Factory and starts it in one call. Leave it out to run the draft you saved in the app. The CLI option is `--creation-request-json`. See [the example](../quickstarts/02-create-factory.md#describe-your-factory). |
 | `retries` | All | Sets how often the API runs the scenario again after a failed run: 0 to 5, default 2. |
 | `version_ref` | All | Deploys an explicit ESAF version instead of the Factory's own. |
 | `wait`, `poll` | All, Python only | `wait=True` follows the job to its end and reads it every `poll` seconds. |

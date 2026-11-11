@@ -21,6 +21,7 @@ scenario is one call.
 ```mermaid
 flowchart LR
   A[1 Install the tools]:::neutral --> B[2 Create your AI Factory]:::factory
+  B -.-> S[Optional: add a scale set]:::factory -.-> C
   B --> C[3 Add a project]:::factory --> D[4 Enable Agent Chat]:::good
   D -.-> E[5 Clean up]:::neutral
   classDef factory fill:#7c3aed,stroke:#5b21b6,color:#ffffff
@@ -31,10 +32,11 @@ flowchart LR
 | Step | Quickstart | The one call | Time |
 |---|---|---|---|
 | 1 | [Install the ESAF tools](../quickstarts/01-install-esaf.md) | `azurefactory health` | 15 minutes |
-| 2 | [Create your AI Factory](../quickstarts/02-create-factory.md) | `esaf.init_factory()` | About 1 hour |
-| 3 | [Add a project for your team](../quickstarts/03-add-project.md) | `esaf.upsert_project("002", "dev")` | 25 to 30 minutes |
-| 4 | [Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md) | `esaf.upsert_project("001", "dev", settings=...)` | About 1 hour |
-| 5 | [Clean up](../quickstarts/05-clean-up.md) | `esaf.delete_factory()` | When you're done |
+| 2 | [Create your AI Factory](../quickstarts/02-create-factory.md) | `esaf.init_factory()` | 1 to 1.5 hours |
+| Optional | [Add a scale set](../quickstarts/add-scale-set.md) | `esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")` | 15 to 30 minutes |
+| 3 | [Add a project for your team](../quickstarts/03-add-project.md) | `esaf.upsert_project("002", "dev", scale_set="001")` | About 1 hour |
+| 4 | [Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md) | `esaf.upsert_project("001", "dev", scale_set="001", settings=...)` | About 1 hour |
+| 5 | [Clean up](../quickstarts/05-clean-up.md) | `esaf.delete_factory()` | About 1 hour |
 
 ## Choose your tool
 
@@ -43,8 +45,8 @@ Every tool is a client of the same Factory API, so the result is the same whiche
 
 | Tool | Choose it when |
 |---|---|
-| App | You want forms, a review screen and a built-in terminal. |
-| CLI | You work in PowerShell: `azurefactory esaf init-factory`. |
+| App | You want forms and one button per scenario. It runs on Windows 11. |
+| CLI | You work in PowerShell or Bash, on Windows, Linux or macOS: `azurefactory esaf init-factory`. |
 | Python SDK | You script the setup: `from azurefactory import esaf`. |
 | REST | You call from another system: `POST /api/v1/esaf/init-factory`. |
 
@@ -70,5 +72,6 @@ you select it. It lists the permissions, the regions and the checklist for after
 
 Related: [Docs hub](../README.md) · [Folder structure](../reference/folder-structure.md) ·
 [Settings](../reference/settings.md) ·
-[ESAF Tutorials lab guide](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide) ·
+[ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide), the guided lab app (private preview: ask
+[Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code) ·
 [For maintainers: automation and review flow](../reference/maintainers/automation-and-review-flow.md)
