@@ -2669,15 +2669,17 @@ pass scale-set settings with the same call.</p>
 <tbody>
 <tr>
 <td>The VNet. ESAF creates the subnets in it.</td>
-<td><code>vnetResourceGroup_param</code> and <code>vnetNameFull_param</code></td>
+<td><code>byoVnetResourcegroupName</code> and <code>byoVnetName</code></td>
 </tr>
 <tr>
 <td>The VNet and its subnets</td>
-<td>The same two, and <code>BYO_subnets</code> set to <code>"true"</code></td>
+<td>The same two, <code>enableByoSubnets</code> set to <code>true</code>, and the names of your subnets</td>
 </tr>
 </tbody>
 </table>
-<p>Save the settings as <code>scale-set-settings.json</code>, as shown in
+<p>These are the friendly names of <code>vnetResourceGroup_param</code>, <code>vnetNameFull_param</code> and <code>BYO_subnets</code>. They need
+the app package v0.47.101 or later; the older names work in every version. Save the settings as
+<code>scale-set-settings.json</code>: they are the <code>scale_set_settings</code> part of the examples in
 <a href="../02-create-factory/#describe-your-factory">Quickstart: Create your AI Factory</a>. Then add them to the call:</p>
 <table>
 <thead>

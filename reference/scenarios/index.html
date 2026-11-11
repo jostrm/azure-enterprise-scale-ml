@@ -2639,6 +2639,11 @@ step: <a href="../../setup/02-create-factory/">1</a>, <a href="../../setup/add-s
 <td><code>False</code> deletes only the project's services. The default is <code>True</code>.</td>
 </tr>
 <tr>
+<td><code>scale_set_settings</code>, <code>project_settings</code></td>
+<td>Scenario 1, with <code>creation_request</code></td>
+<td>Save settings for the first scale set (your own VNet or subnets) and for project 001 (its services) before anything deploys. The CLI takes one file with all three parts: <code>--request-json</code>. Needs the app package v0.47.101 or later.</td>
+</tr>
+<tr>
 <td><code>creation_request</code></td>
 <td>Scenario 1</td>
 <td>Saves a new Factory and starts it in one call. Leave it out to run the draft you saved in the app. The CLI option is <code>--creation-request-json</code>. See <a href="../../setup/02-create-factory/#describe-your-factory">the example</a>.</td>
