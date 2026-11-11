@@ -42,7 +42,7 @@ The CLI commands are the same in PowerShell and in Bash. Every REST body carries
 | `cidr` | Scenario 2 | Sets the new scale set's VNet range. The pipeline computes the subnets. |
 | `max_projects` | Scenario 2 | Sets how many projects the scale set holds. The default is 7. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Scenario 2, Python and REST | Default to the environment's existing scale set. `orchestrator` is `"gha"` or `"ado"`. The CLI has no option for them. |
-| `settings` | Scenario 3 | Replaces the project settings you name. Settings you leave out keep their value. |
+| `settings` | Scenarios 2 and 3 | In scenario 3, replaces the project settings you name; settings you leave out keep their value. In scenario 2, sets scale-set settings such as your own VNet and subnets. |
 | `display_name` | Scenario 3 | Gives a new project a display name. |
 | `include_project_subnets` | Scenario 4 | Also deletes the project's subnets. The default is `False`. |
 | `include_keyvault_and_resource_group` | Scenario 4 | `False` deletes only the project's services. The default is `True`. |

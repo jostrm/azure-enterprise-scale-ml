@@ -72,6 +72,6 @@ you select it. It lists the permissions, the regions and the checklist for after
 
 Related: [Docs hub](../README.md) · [Folder structure](../reference/folder-structure.md) ·
 [Settings](../reference/settings.md) ·
-[ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide), the guided lab app (private preview: ask
+[ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md), the guided lab app (private preview: ask
 [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code) ·
 [For maintainers: automation and review flow](../reference/maintainers/automation-and-review-flow.md)

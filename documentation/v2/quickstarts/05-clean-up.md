@@ -6,15 +6,15 @@ In this quickstart, you delete a project, a scale set or your whole AI Factory w
 removes the Azure resource groups that ESAF created, and nothing else.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types each command for you and checks every step: open an
-> **ESAF** tutorial and the track **Scenarios 4–6**.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types each command for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 4-6**.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
 > preview code.
 
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/05-clean-up.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal after the delete project run succeeded."></a>
+<a href="../../../environment_setup/install_tutorial_guide/README.md"><img src="../images/videos/05-clean-up.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal after the delete project run succeeded."></a>
 
-*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
+*The scenario video, 9 minutes. Watch it in the ESAF Tutorial Guide under **Resources** > **Scenario videos**.*
 
 | Scenario | What goes | What stays |
 |---|---|---|

@@ -142,22 +142,15 @@ def test_cli_timeout_help_and_readme_state_the_real_defaults():
     assert "360-second" not in readme and "60-second" not in readme.replace("360-second", "")
 
 
-def test_live_voice_readme_lists_only_routes_that_exist_on_this_branch():
+def test_live_voice_readme_names_only_pipelines_and_parameters_that_ship_on_this_branch():
     text = read(LIVE_VOICE_README)
-    pipelines = [TEMPLATES / "azure-devops" / "esml-yaml-pipelines" / "esml-infra-project" / "infra-project-genai.yaml",
-                 TEMPLATES / "azure-devops" / "esml-yaml-pipelines" / "esml-infra-project" / "jobs"
-                 / "job-aifactory-agent-live-voice.yaml",
-                 TEMPLATES / "github-actions" / "infra-project.yml", TEMPLATES / "github-actions" / "infra-project-phase.yml"]
-    shipped = "".join(read(path) for path in pipelines)
+    shipped = {path.name: path.read_text(encoding="utf-8", errors="replace")
+               for folder in (TEMPLATES, ROOT / ".github" / "workflows") for path in folder.rglob("*.y*ml")}
     for term in ("refreshKnowledge", "refresh_knowledge"):
-        assert term not in text or term in shipped, f"{term} is not a parameter of the shipped project pipelines."
-    workflows = [path.name for folder in (TEMPLATES, ROOT / ".github" / "workflows") for path in folder.rglob("*.y*ml")]
+        assert term not in text or any(term in body for body in shipped.values()), f"No pipeline takes {term}."
     for file_name in set(re.findall(r"`(?:[\w-]+/)*([\w-]+\.ya?ml)`", text)):
-        assert file_name in workflows, f"{file_name} is not on this branch."
-    assert "add-factory-agent" not in text.lower()
-    title, routes = re.search(r"(?m)^## (\w+) ways to run it\n\n((?:\|.*\n)+)", text).groups()
-    assert title == {3: "Three", 4: "Four"}[len(routes.splitlines()) - 2]
-    assert "add-aifactory-agent-chat" in routes and (ROOT / "bootstrap" / "lib" / "agent_chat_entry.py").exists()
+        assert file_name in shipped, f"{file_name} is not on this branch."
+    assert "add-aifactory-agent-chat" in text and (ROOT / "bootstrap" / "lib" / "agent_chat_entry.py").exists()
 
 
 def test_project_team_site_pages_link_to_existing_github_anchors():

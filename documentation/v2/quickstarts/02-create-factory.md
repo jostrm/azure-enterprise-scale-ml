@@ -6,15 +6,15 @@ In this quickstart, you create your AI Factory and its first project with one ca
 shared part that every project uses: the network, private DNS, monitoring and the deployment pipelines.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types each command for you and checks every step: open an
-> **ESAF** tutorial and the track **Scenarios 1–3**.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types each command for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1-3**.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
 > preview code.
 
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/02-create-factory.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with every check of the new Factory passed."></a>
+<a href="../../../environment_setup/install_tutorial_guide/README.md"><img src="../images/videos/02-create-factory.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with every check of the new Factory passed."></a>
 
-*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
+*The scenario video, 9 minutes. Watch it in the ESAF Tutorial Guide under **Resources** > **Scenario videos**.*
 
 When you finish, you have this in your Dev subscription:
 
@@ -60,7 +60,7 @@ The Factory API needs to know what to build. You can describe it in two ways:
 
 Neither creates anything in Azure. To write the creation request, save this as `creation-request.json` in
 the root of your consumer repository. It describes the fastest first test: standalone, public networking
-and GitHub Actions. It's the same request that the ESAF Tutorials app writes for you.
+and GitHub Actions. It's the same request that the ESAF Tutorial Guide writes for you.
 
 ```json
 {

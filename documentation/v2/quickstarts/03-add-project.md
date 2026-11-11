@@ -6,15 +6,15 @@ In this quickstart, you add a project for a team with one call, then change one 
 call. A **project** is one team's own resource group, with its AI services and its access group.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types this call for you and checks every step: open an
-> **ESAF** tutorial and the track **Scenarios 1–3**.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types this call for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1-3**.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
 > preview code.
 
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/03-add-project.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with the checks of project 002 passed."></a>
+<a href="../../../environment_setup/install_tutorial_guide/README.md"><img src="../images/videos/03-add-project.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with the checks of project 002 passed."></a>
 
-*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
+*The scenario video, 9 minutes. Watch it in the ESAF Tutorial Guide under **Resources** > **Scenario videos**.*
 
 Every project lives on a **scale set**, one floor of the Factory. This quickstart puts project 002 on Dev
 scale set 001, and names that scale set in every call. You must name it once Dev has more than one scale

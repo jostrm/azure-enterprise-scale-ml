@@ -52,7 +52,7 @@ the alt text, and stay inside the size limit.
 ## Video thumbnails
 
 One frame of the scenario video, softened so that terminal text can't be read, with a play overlay and the
-length. Each one is 960 px wide and links to the ESAF Tutorials download, never to a video host: the videos open
+length. Each one is 960 px wide and links to the ESAF Tutorial Guide download, never to a video host: the videos open
 from inside the app.
 
 | File | Used on | Frame |
@@ -84,4 +84,4 @@ them again when you capture a screenshot.
 |---|---|---|
 | AIFactory Config Wizard (`aifactory-config.exe`; Windows, Linux, macOS) | Quickstart 01, to start the Factory API | **Quick setup** > **Start API host**; dialogs **API Host Authentication** and **API Host Started** |
 | Enterprise Scale AI Factory (Windows 11) | Every App tab | **Start Guide**, **Use Simple Mode**, **Use Full bootstrap**, **Save local configuration**; menu **Configuration wizard** > **Quick setup & tear down**; **1. Init AI Factory** to **6. Delete AI Factory**; **Run selected scenario**; **Deletion phrase**; **Monitoring** > **My Project** |
-| ESAF Tutorials (Windows) | The "Run it guided" tips | Tutorials **ESAF CLI**, **ESAF Python SDK** and **ESAF REST - scenarios 1-6**; tracks **Scenarios 1–3**, **Scenarios 4–6**; **Resources** > **Scenario videos** |
+| ESAF Tutorial Guide (installed as ESAF Tutorials; Windows) | The "Run it guided" tips | Tutorials **ESAF CLI**, **ESAF Python SDK** and **ESAF REST - scenarios 1-6**; tracks **Scenarios 1-3**, **Scenarios 4-6**; **Resources** > **Scenario videos** |

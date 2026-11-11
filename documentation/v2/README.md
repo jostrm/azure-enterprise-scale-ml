@@ -27,18 +27,18 @@ Azure Machine Learning.
 
 ## Learn by watching
 
-**ESAF Tutorials** is a desktop lab guide. It types each command for you, checks every step and plays a
+The **ESAF Tutorial Guide** is a Windows app (installed as **ESAF Tutorials**). It types each command for you, checks every step and plays a
 narrated video for each scenario. It has one tutorial for the CLI, one for the Python SDK and one for REST,
 and each runs the six scenarios in order.
 
-| Video in ESAF Tutorials | Tool | Hub mode | Networking | Length |
+| Video in the ESAF Tutorial Guide | Tool | Hub mode | Networking | Length |
 |---|---|---|---|---|
 | Scenarios 1-4 | Python SDK | External hub | Private | 9 min |
 | Scenarios 1-3 | Python SDK | Standalone, no hub | Public | 7 min |
 | Scenarios 1-3 | Config Wizard app | Standalone, no hub | Public | 6 min |
 | Scenarios 1-3 | Python SDK | Own hub | Private | 8 min |
 
-[Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide), then open **Resources** > **Scenario videos**. It's a private preview:
+[Download the ESAF Tutorial Guide](../../environment_setup/install_tutorial_guide/README.md), then open **Resources** > **Scenario videos**. It's a private preview:
 ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code. It runs on
 Windows. On Linux and macOS, follow the [Setup docs](quickstarts/README.md) with the CLI (bash) tab.
 

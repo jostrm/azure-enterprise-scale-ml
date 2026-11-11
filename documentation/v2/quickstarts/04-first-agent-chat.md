@@ -7,11 +7,11 @@ Chat** is a Microsoft Foundry agent with a private web chat and live voice. It a
 Factory from your own documentation and code.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types the project calls for you and checks every step: open an
-> **ESAF** tutorial and the track **Scenarios 1–3**.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types the project calls for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1-3**.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
-> preview code. The app has no Agent Chat lab yet.
+> preview code. The guide has no Agent Chat lab yet.
 
 ```mermaid
 sequenceDiagram

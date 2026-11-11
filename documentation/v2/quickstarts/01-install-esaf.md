@@ -7,9 +7,9 @@ In this quickstart, you install one ESAF tool, start the Factory API and check t
 separately.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types each command for you and checks every step: it also
-> starts its own Factory API. Open an **ESAF** tutorial and the track **Scenarios 1–3**.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types each command for you and checks every step: it also
+> starts its own Factory API. Open an **ESAF** tutorial and the track **Scenarios 1-3**.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
 > preview code.
 
@@ -88,7 +88,7 @@ Choose one tool. You can add the others later; they all use the same API address
 The App tabs use **Enterprise Scale AI Factory**, the ESAF desktop app for Windows 11. It starts its own
 Factory API, so you can skip "Start the Factory API" above.
 
-1. Install the app from its [download folder](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_config_wizard/maui).
+1. Install the app from its [download folder](../../../environment_setup/install_config_wizard/maui/readme.md).
    You need version 1.0.24 or later.
 2. Open **Enterprise Scale AI Factory** from Start.
 3. On **Start Guide**, under **Consumer repository root**, select **Browse repository** and pick your

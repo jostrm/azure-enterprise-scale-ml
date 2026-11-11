@@ -6,15 +6,15 @@ In this quickstart, you add a second scale set to your AI Factory with one call.
 of the Factory: a virtual network and a common resource group that hold up to seven projects by default.
 
 > [!TIP]
-> **Run it guided.** The **ESAF Tutorials** app types this call for you and checks every step: open an
-> **ESAF** tutorial and the track **Scenarios 1–3**. It runs on Windows.
-> [Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+> **Run it guided.** The **ESAF Tutorial Guide** types this call for you and checks every step: open an
+> **ESAF** tutorial and the track **Scenarios 1-3**. It runs on Windows.
+> [Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 > It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a
 > preview code.
 
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide"><img src="../images/videos/add-scale-set.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with the checks of scale set 002 passing."></a>
+<a href="../../../environment_setup/install_tutorial_guide/README.md"><img src="../images/videos/add-scale-set.png" width="480" alt="Screenshot of the scenario video: the lab guide beside a terminal, with the checks of scale set 002 passing."></a>
 
-*The scenario video, 9 minutes. Watch it in ESAF Tutorials under **Resources** > **Scenario videos**.*
+*The scenario video, 9 minutes. Watch it in the ESAF Tutorial Guide under **Resources** > **Scenario videos**.*
 
 <img src="../images/concepts/scale-set-floor.svg" width="640" alt="Illustration of a factory building where each floor is a scale set that holds project rooms.">
 
@@ -116,6 +116,7 @@ scale set twice.
 | `environment` | Selects `"dev"`, `"stage"` or `"prod"`. It's required. |
 | `cidr` | Sets the VNet range of the new scale set. It's required for a new scale set. |
 | `max_projects` | Sets how many projects the scale set holds. The default is 7. |
+| `settings` | Sets scale-set settings, for example your own VNet and subnets. The CLI option is `--settings-json`. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Place the scale set in another subscription. Without them, it uses the same ones as the environment's first scale set. The CLI has no option for them: use Python or REST. |
 
 ## Verify the result

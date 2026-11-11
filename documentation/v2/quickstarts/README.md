@@ -48,11 +48,11 @@ the `azurefactory` CLI (in PowerShell or Bash), the Python SDK and REST all send
 
 ## Run it guided
 
-**ESAF Tutorials** is a desktop lab guide that runs the same quickstarts with you. It types each command,
+The **ESAF Tutorial Guide** is a Windows app (installed as **ESAF Tutorials**) that runs the same quickstarts with you. It types each command,
 checks every step and plays a video of each scenario. Pick the tutorial for your tool (CLI, Python SDK or
-REST), then the track **Scenarios 1–3** to build or **Scenarios 4–6** to clean up. It runs on Windows. On
+REST), then the track **Scenarios 1-3** to build or **Scenarios 4-6** to clean up. It runs on Windows. On
 Linux and macOS, follow the quickstarts with the CLI (bash), Python SDK or REST tab.
-[Download ESAF Tutorials](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/install_tutorial_guide).
+[Download the ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md).
 It's a private preview: ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code.
 
 ## Try it first (preview)
