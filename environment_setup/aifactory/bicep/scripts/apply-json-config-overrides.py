@@ -36,6 +36,11 @@ GITHUB_IDENTITY_OUTPUTS = {
 }
 # Project ownership metadata is not a deployment input or runtime variable.
 METADATA_KEYS = frozenset({"org-department-name", "org-department-id"})
+NATIVE_FOUNDRY_ENVIRONMENT_DEFAULTS = {
+    "botFoundryProjectResourceId": "",
+    "botFoundryAgentName": "",
+    "botEnableM365PublicEndpoint": "false",
+}
 SCALING_MODES = ("own-subscriptions", "shared-subscriptions")
 RESERVED_PREFIXES = {
     "azure-devops": ("AGENT_", "BUILD_", "RELEASE_", "SYSTEM_"),
@@ -126,6 +131,9 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
         return result
 
     dev_values = canonical_values("dev")
+    # A Dev resource id and network consent must not select that agent in a later environment.
+    if environment != "dev" and NATIVE_FOUNDRY_ENVIRONMENT_DEFAULTS.keys() & dev_values.keys():
+        dev_values.update(NATIVE_FOUNDRY_ENVIRONMENT_DEFAULTS)
     section = "stage_prod" if environment != "dev" and "stage_prod" in config else "dev"
     section_values = canonical_values(section)
     values = {**dev_values, **section_values} if section == "stage_prod" else dev_values

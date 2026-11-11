@@ -1780,6 +1780,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     listed_bodies = {}  # LISTED_ONLY_CHILDREN rows as their parent's list returned them
     listed_rows = {}  # every listed child row, the fallback body for a child the platform refuses to read on its own
     ahead = reader.pool is not None
+    derived = set()  # resources whose api-version came from the provider schema, not a pin
+    referenced = set()  # resources only another body names; they may already be deleted (dangling reference)
     planned = set()  # queued resources whose child reads were already started
 
     def arm_read(path, api, allowed=None):
@@ -1850,32 +1852,6 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     derived = set()  # resources whose api-version came from the provider schema, not a pin
     referenced = set()  # resources only another body names; they may already be deleted (dangling reference)
 
-    def served(read, api, kind=None):
-        """(version used, read(version)). A version from the provider schema (kind given) that the region does
-        not serve (ApiVersionNotServed) retries the same schema's next older stable versions of that type, at
-        most API_VERSION_FALLBACKS. A pinned version never falls back. Exhausted, it fails with the read's own
-        code and diagnostic."""
-        try:
-            return api, read(api)
-        except ApiVersionNotServed as error:
-            failure = error
-        if kind is not None:
-            # The schema is consulted only after the region refused its version (no extra reads otherwise).
-            namespace, relative = kind.split("/", 1)
-            for candidate in sorted((value for value in provider(namespace).get(relative.lower(), [])
-                                     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
-                                    reverse=True)[:API_VERSION_FALLBACKS]:
-                try:
-                    return candidate, read(candidate)
-                except ApiVersionNotServed as error:
-                    failure = error
-        raise Blocked(failure.code, error_diagnostic=failure.error_diagnostic) from None
-
-    def adopt(resource_id, api, schema_derived):
-        versions[resource_id.lower()] = api
-        if schema_derived:
-            derived.add(resource_id.lower())
-
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
@@ -1890,6 +1866,29 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
 
+    def served(read, api, kind=None):
+        """(version used, read(version)). A version from the provider schema (kind given) that the region does
+        not serve (ApiVersionNotServed) retries the same schema's next older stable versions of that type, at
+        most API_VERSION_FALLBACKS. A pinned version never falls back. Exhausted, it fails with the read's own
+        code and diagnostic."""
+        candidates = [api]
+        if kind is not None:
+            namespace, relative = kind.split("/", 1)
+            candidates += sorted((value for value in provider(namespace).get(relative.lower(), [])
+                                  if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
+                                 reverse=True)[:API_VERSION_FALLBACKS]
+        for candidate in candidates:
+            try:
+                return candidate, read(candidate)
+            except ApiVersionNotServed as error:
+                failure = error
+        raise Blocked(failure.code, error_diagnostic=failure.error_diagnostic) from None
+
+    def adopt(resource_id, api, schema_derived):
+        versions[resource_id.lower()] = api
+        if schema_derived:
+            derived.add(resource_id.lower())
+
     def child_steps(resource_id, kind):
         """The walk's child-inventory steps for one resource, planned lazily in serial order."""
         namespace, relative = kind.split("/", 1)
@@ -1897,7 +1896,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         if kind in SEARCH_SERVICE_KINDS:
             # This documented ARM child must be inventoried even when omitted
             # from provider discovery; a failed list never means an empty list.
-            yield "collection", resource_id + "/sharedPrivateLinkResources", "2025-05-01", None
+            yield "collection", resource_id + "/sharedPrivateLinkResources", "2025-05-01", None, None
         for child in sorted(provider(namespace)):
             tail = child.removeprefix(relative + "/")
             if not child.startswith(relative + "/") or "/" in tail:
@@ -1906,21 +1905,24 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             if full_type in SEARCH_SHARED_LINK_KINDS:
                 continue
             if full_type in inline:
-                yield "inline", key + "/" + tail, None, None
+                yield "inline", key + "/" + tail, None, None, None
             elif full_type in FILTER_REQUIRED_CHILDREN:
                 # No unfiltered list exists (see FILTER_REQUIRED_CHILDREN): record it, never list it.
-                yield "metadata", key + "/" + tail, full_type, None
+                yield "metadata", key + "/" + tail, full_type, None, None
             elif (full_type + "/read" not in operations[namespace]
                   and "supportstags" not in resource_capabilities.get(full_type, set())):
                 # A schema child without a read operation (none at all, or write-only) is a provider endpoint,
                 # not an inventoriable child: record it, never list it. Actual references still classify strictly.
-                yield "metadata", key + "/" + tail, full_type, None
+                yield "metadata", key + "/" + tail, full_type, None, None
             elif classify(full_type) != "resource":
-                yield "metadata", key + "/" + tail, full_type, None
+                yield "metadata", key + "/" + tail, full_type, None, None
             else:
+                # The last field names the type whose schema version this is, so the read may fall back; a reviewed
+                # (pinned) version never falls back.
                 path = resource_id + "/" + tail
-                yield ("collection", path, resource_versions.get(path.lower()) or version(full_type),
-                       singleton.get(full_type))
+                pinned = resource_versions.get(path.lower())
+                yield ("collection", path, pinned or version(full_type), singleton.get(full_type),
+                       None if pinned else full_type)
 
     def extension_steps(scope):
         for kind, api in EXTENSION_COLLECTIONS:
@@ -1938,7 +1940,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             return
         planned.add(resource_id.lower())
         try:
-            for step, path, api, single in child_steps(resource_id, kind):
+            for step, path, api, single, _ in child_steps(resource_id, kind):
                 if step == "collection":
                     reader.prefetch(collection_read(path, api, single=single))
         except Exception:  # the serial walk raises it at its own position
@@ -1972,35 +1974,43 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         return sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and value < api),
                       reverse=True)[:2]
 
-    def add_collection(path, api, extension=False, single=None):
+    def add_collection(path, api, extension=False, single=None, kind=None):
         if single:
-            status, headers, body = reader.get(collection_read(path, api, single=single))
+            api, (status, headers, body) = served(
+                lambda value: reader.get(collection_read(path, value, single=single)), api, kind)
             rows, unsupported = ([] if status == 404 else [body]), None
         else:
             # Tolerant child inventory: Cloud.request already waits out throttling (Retry-After) and retries
-            # transport errors. A list that still fails is retried at the schema's next older stable
-            # api-versions, then recorded (not-listable / unreadable) so one child type never stops the run.
+            # transport errors, and served() falls back from a version the region does not serve. A list that
+            # still fails is retried at the schema's next older stable api-versions, then recorded
+            # (not-listable / unreadable) so one child type never stops the run.
             # aif-135: ACR registries/privateEndpointConnectionProxies answers 404 at every api-version.
             # Documented pinned children (Search sharedPrivateLinkResources) stay strict: a failed list there
             # never means an empty list.
             pinned = collection_resource_type(path) in SEARCH_SHARED_LINK_KINDS
-            candidates = [api, *([] if extension or pinned else older_stable_versions(path, api))]
-            for index, candidate in enumerate(candidates):
-                try:
-                    rows, unsupported = reader.get(collection_read(path, candidate, extension))
-                    api = candidate
-                    break
-                except Blocked as error:
-                    if pinned:
-                        raise
-                    if index + 1 < len(candidates):
-                        continue
-                    status = (getattr(error, "error_diagnostic", None) or {}).get("status")
+            try:
+                api, (rows, unsupported) = served(
+                    lambda value: reader.get(collection_read(path, value, extension)), api, kind)
+            except Blocked as error:
+                if pinned:
+                    raise
+                failure = error
+                # Continue below the last version served() already tried.
+                tried = (getattr(error, "error_diagnostic", None) or {}).get("api_version") or api
+                for candidate in [] if extension else older_stable_versions(path, tried):
+                    try:
+                        rows, unsupported = reader.get(collection_read(path, candidate, extension))
+                        api = candidate
+                        break
+                    except Blocked as later:
+                        failure = later
+                else:
+                    status = (getattr(failure, "error_diagnostic", None) or {}).get("status")
                     rows, unsupported = [], ("not-listable-" + str(status)
-                                             if error.code == "unsupported-child-inventory-endpoint"
-                                             and status in (400, 404, 405) else "unreadable-" + error.code)
+                                             if failure.code == "unsupported-child-inventory-endpoint"
+                                             and status in (400, 404, 405) else "unreadable-" + failure.code)
         try:
-            listed_kind = None if single or extension else collection_resource_type(path)
+            listed_kind = kind or (None if single or extension else collection_resource_type(path))
         except ValueError:
             listed_kind = None
         if listed_kind in LISTED_ONLY_CHILDREN:
@@ -2019,7 +2029,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         for row in rows:
             resource_id = row["id"].lower()
             if resource_id not in versions:
-                adopt(resource_id, resource_versions.get(resource_id, api), resource_id not in resource_versions)
+                adopt(resource_id, resource_versions.get(resource_id, api),
+                      kind is not None and resource_id not in resource_versions)
                 enqueue(row["id"])
 
     def extensions(scope):
@@ -2067,16 +2078,16 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             continue
         require(len(visited) < 10000, "resource-closure-too-large")
         visited.add(key)
-        kind, api = resource_type_from_id(resource_id), versions[key]
+        kind = resource_type_from_id(resource_id)
         if kind in LISTED_ONLY_CHILDREN and key in listed_bodies:
             body = listed_bodies[key]
             require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
             bodies[key] = body
-            closure["resources"][key] = {"type": kind, "api_version": api,
+            closure["resources"][key] = {"type": kind, "api_version": versions[key],
                                         "body_hash": resource_digest(body, kind), "etag": resource_etag(body, {}, kind)}
             closure["references"][key] = []
             continue
-        api, (status, headers, body) = served(lambda value: reader.get(resource_read(resource_id, value)), api,
+        api, (status, headers, body) = served(lambda value: reader.get(resource_read(resource_id, value)), versions[key],
                                               kind if key in derived else None)
         if status == 404:
             continue
@@ -2123,14 +2134,14 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             enqueue(reference)
         if kind in terminal_extensions:
             continue
-        for step, path, value, single in child_steps(resource_id, kind):
+        for step, path, value, single, child_kind in child_steps(resource_id, kind):
             read_children_ahead(resource_id, kind)
             if step == "inline":
                 closure["collections"][path] = {"inline_parent_hash": resource_digest(body, kind)}
             elif step == "metadata":
                 closure["collections"][path] = {"non_resource_metadata": value}
             else:
-                add_collection(path, value, single=single)
+                add_collection(path, value, single=single, kind=child_kind)
         extensions(resource_id)
     for reference, metadata in closure["inline"].items():
         parent = metadata["parent_id"]

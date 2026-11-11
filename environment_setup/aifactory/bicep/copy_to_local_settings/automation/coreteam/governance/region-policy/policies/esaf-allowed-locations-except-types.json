@@ -1,0 +1,35 @@
+{
+  "properties": {
+    "displayName": "ESAF: allowed locations for all resource types except the listed ones",
+    "description": "Denies regional resources outside the allowed locations. Resource types in excludedResourceTypes are governed by their own rule. Like the built-in Allowed locations, it skips resource groups, 'global' resources and B2C directories.",
+    "mode": "Indexed",
+    "parameters": {
+      "allowedLocations": {
+        "type": "Array",
+        "metadata": { "displayName": "Allowed locations", "strongType": "location" }
+      },
+      "excludedResourceTypes": {
+        "type": "Array",
+        "defaultValue": [],
+        "metadata": { "displayName": "Resource types governed by another rule", "strongType": "resourceTypes" }
+      },
+      "effect": {
+        "type": "String",
+        "defaultValue": "Deny",
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "metadata": { "displayName": "Effect" }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          { "field": "type", "notIn": "[parameters('excludedResourceTypes')]" },
+          { "field": "location", "notIn": "[parameters('allowedLocations')]" },
+          { "field": "location", "notEquals": "global" },
+          { "field": "type", "notEquals": "Microsoft.AzureActiveDirectory/b2cDirectories" }
+        ]
+      },
+      "then": { "effect": "[parameters('effect')]" }
+    }
+  }
+}

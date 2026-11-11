@@ -413,7 +413,7 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 416 |
+| `json.dev` | 419 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
@@ -582,6 +582,9 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:bastion_custom_name --><!-- parameter json.dev:bastion_custom_name -->`bastion_custom_name` | `BASTION_CUSTOM_NAME` | O | Y: `""`<br>J.dev: `""` | Bastion name override for common RG RBAC keep-as-is: Empty uses the standard Bastion naming convention. |
 | <!-- parameter yaml:bastion_subscription_resource_group --><!-- parameter json.dev:bastion_subscription_resource_group -->`bastion_subscription_resource_group` | `BASTION_SUBSCRIPTION_RESOURCE_GROUP` | O | Y: `""`<br>J.dev: `""` | Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
 | <!-- parameter yaml:bingCustomSearchSku --><!-- parameter json.dev:bingCustomSearchSku -->`bingCustomSearchSku` | `BING_CUSTOM_SEARCH_SKU` | O | Y: `"G2"`<br>J.dev: `"G2"` | Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding. |
+| <!-- parameter json.dev:botEnableM365PublicEndpoint -->`botEnableM365PublicEndpoint` | No verified binding | O | Y: absent<br>J.dev: `"false"` | Bot enable m365 public endpoint. |
+| <!-- parameter json.dev:botFoundryAgentName -->`botFoundryAgentName` | No verified binding | O | Y: absent<br>J.dev: `""` | Bot foundry agent name. |
+| <!-- parameter json.dev:botFoundryProjectResourceId -->`botFoundryProjectResourceId` | No verified binding | O | Y: absent<br>J.dev: `""` | Bot foundry project resource id. |
 | <!-- parameter yaml:clusteringPolicyRedisManaged --><!-- parameter json.dev:clusteringPolicyRedisManaged -->`clusteringPolicyRedisManaged` | `CLUSTERING_POLICY_REDIS_MANAGED` | O | Y: `"OSSCluster"`<br>J.dev: `"OSSCluster"` | OSSCluster&#124;EnterpriseCluster&#124;NoCluster |
 | <!-- parameter yaml:commonLakeNamePrefixMax8chars --><!-- parameter json.dev:commonLakeNamePrefixMax8chars -->`commonLakeNamePrefixMax8chars` | `COMMON_LAKE_NAME_PREFIX_MAX8CHARS` (not in .env template), `LAKE_PREFIX` | O | Y: `"mrvel"`<br>J.dev: `"mrvel"` | Data lake storage name prefix keep-as-is: Max 8 characters. |
 | <!-- parameter yaml:commonResourceGroup_param --><!-- parameter json.dev:commonResourceGroup_param -->`commonResourceGroup_param` | `COMMON_RESOURCE_GROUP_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common resource group name otherwise: provide a custom name for the common resource group. |

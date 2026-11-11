@@ -169,9 +169,13 @@ param enableLogicAppSystemMiRoleAssignment bool = false
 param enableBotService bool = false
 @description('Bot Service already exists (skip creation)')
 param botServiceExists bool = false
+@description('Existing native Foundry agent to prepare in the late publishing step. Nonempty skips standalone Bot creation; existing bots are preserved.')
+param botFoundryAgentName string = ''
+// Older ADO consumers can leave optional JSON variables as unexpanded macros.
+var useNativeFoundryPublishing = !empty(botFoundryAgentName) && !startsWith(botFoundryAgentName, '$(')
 @description('Microsoft App ID (Client ID) for bot authentication')
 param botMicrosoftAppId string = ''
-@description('AI Foundry agent endpoint URL for bot messaging')
+@description('Explicit messaging endpoint for a separately hosted bot. Empty reserves the registration; no Foundry application endpoint is fabricated.')
 param botAgentEndpoint string = ''
 @description('Bot Service SKU - Dev')
 @allowed(['F0', 'S1'])
@@ -330,12 +334,6 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
-var agentEndpointTemplate = 'https://{foundry}.services.ai.azure.com/api/projects/{project}/applications/{agent}/protocols/activityprotocol?api-version=2025-11-15-preview'
-var aifV2Name = addAIFoundry ? namingConvention.outputs.aifV2NameAdd : namingConvention.outputs.aifV2Name
-var aifV2ProjectName = addAIFoundry ? namingConvention.outputs.aifV2PrjNameAdd : namingConvention.outputs.aifV2PrjName
-var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
-var defaultBotAgentEndpoint = replace(replace(replace(agentEndpointTemplate, '{foundry}', aifV2Name), '{project}', defaultProjectName), '{agent}', 'agent-001')
-var resolvedBotAgentEndpoint = empty(botAgentEndpoint) ? defaultBotAgentEndpoint : botAgentEndpoint
 
 // ============== MODULE DEPLOYMENTS ==============
 
@@ -791,7 +789,7 @@ module logicAppConsumption 'br/public:avm/res/logic/workflow:0.5.3' = if(logiApp
 // ============================================================================
 // AZURE BOT SERVICE - for Microsoft Teams integration with AI Foundry agents
 // ============================================================================
-module botService '../modules/botService.bicep' = if(!botServiceExists && enableBotService) {
+module botService '../modules/botService.bicep' = if(!botServiceExists && enableBotService && !useNativeFoundryPublishing) {
   name: take('11-bot-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -800,13 +798,13 @@ module botService '../modules/botService.bicep' = if(!botServiceExists && enable
     botDescription: 'AI Foundry Agent integrated with Microsoft Teams for ${env} environment'
     location: location
     sku: botServiceSku
-    // Leave empty to auto-create managed identity (UserAssignedMSI), or pass AI Foundry agent's App ID (SingleTenant)
+    // This standalone registration is not a native Foundry agent identity.
     microsoftAppId: botMicrosoftAppId
     microsoftAppType: empty(botMicrosoftAppId) ? 'UserAssignedMSI' : 'SingleTenant'
     microsoftAppTenantId: tenant().tenantId
     userAssignedManagedIdentityResourceId: '' // Auto-create if empty
-    agentEndpoint: resolvedBotAgentEndpoint
-    messagingEndpoint: resolvedBotAgentEndpoint
+    agentEndpoint: botAgentEndpoint
+    messagingEndpoint: botAgentEndpoint
     tags: tags
     enableTeamsChannel: true
     enableDirectLineChannel: true

@@ -62,6 +62,13 @@ WORKFLOW_FALLBACKS = {
     "DISABLE_WHITELISTING_FOR_BUILT_AGENTS": "DISABLE_WHITELISTING_FOR_BUILD_AGENTS",
     "COMMON_SUBNET_NAME": "SUBNET_COMMON_BASE",
 }
+# Workflow vars.* names that registered repositories get from factory enrollment (bootstrap/lib/factory_enrollment.py)
+# while the .env route keeps the same value in a secret 03a uploads. Each is read only after that secret, in the same
+# expression (every read line must include it): name -> that secret.
+SECRET_FIRST = {
+    "AZURE_CLIENT_ID": "AZURE_CLIENT_ID",
+    "AZURE_TENANT_ID": "TENANT_ID",
+}
 OPERATOR_SWITCH = ("operator switch with a safe workflow default; no config template (.env.template, "
                    "variables.yaml, variables.json) defines it, so an operator sets it by hand")
 # Names the .env route never sets: name -> reason.
@@ -96,6 +103,11 @@ def variables_uploaded_by_03a():
     repo_level = re.search(r"^repo_level_vars=\((.*?)^\)", script, re.M | re.S).group(1)
     names = set(re.findall(r'^\s*"([A-Z][A-Z0-9_]*)"', repo_level, re.M))
     return names | set(re.findall(r'create_or_update_variable \S+ "([A-Z][A-Z0-9_]*)"', script))
+
+
+def secrets_uploaded_by_03a():
+    script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
+    return set(re.findall(r'create_or_update_secret \S+ "([A-Z][A-Z0-9_]*)"', script))
 
 
 def env_names_read_by_03a():
@@ -228,7 +240,7 @@ def test_every_env_key_the_github_workflows_read_is_uploaded_by_03a():
     env = set(re.findall(r"^([A-Z][A-Z0-9_]*)=", (GHA / ".env.template").read_text(encoding="utf-8"), re.M))
     read = {name for workflow in GHA.glob("*.yml")
             for name in re.findall(r"\bvars\.([A-Z][A-Z0-9_]*)", workflow.read_text(encoding="utf-8"))}
-    assert sorted((read & env) - variables_uploaded_by_03a()) == []
+    assert sorted((read & env) - variables_uploaded_by_03a() - SECRET_FIRST.keys()) == []
 
 
 def test_every_name_03a_uploads_comes_from_the_env_template_or_a_spelling_alias():
@@ -249,14 +261,18 @@ def test_every_variable_the_github_workflows_read_is_uploaded_by_03a_or_reviewed
     # .env route project users kept Contributor and RBAC Admin even when .env disabled them.
     reads, uploaded = workflow_var_reads(), variables_uploaded_by_03a()
     assert all(reason.strip() for reason in NOT_FROM_ENV.values())
-    exceptions = WORKFLOW_FALLBACKS.keys() | NOT_FROM_ENV.keys()
+    exceptions = WORKFLOW_FALLBACKS.keys() | NOT_FROM_ENV.keys() | SECRET_FIRST.keys()
     assert sorted(exceptions & uploaded) == [], "remove exceptions 03a now uploads"
     assert sorted(exceptions - reads.keys()) == [], "remove exceptions no workflow reads"
     assert sorted(set(WORKFLOW_FALLBACKS.values()) - uploaded) == [], "fallbacks must be uploaded names"
+    assert sorted(set(SECRET_FIRST.values()) - secrets_uploaded_by_03a()) == [], "must be secrets 03a uploads"
     assert sorted(reads.keys() - uploaded - exceptions) == []
     unguarded = [line for name, fallback in WORKFLOW_FALLBACKS.items()
                  for line in reads.get(name, []) if not re.search(rf"\bvars\.{fallback}\b", line)]
     assert unguarded == [], "a fallback name must always be read together with the name 03a uploads"
+    unguarded = [line for name, secret in SECRET_FIRST.items() for line in reads.get(name, [])
+                 if not re.search(rf"\bsecrets\.{secret}\s*\|\|\s*vars\.{name}\b", line)]
+    assert unguarded == [], "a registered-repository variable must always be read after the secret 03a uploads"
 
 
 PUBLIC_ACCESS = "ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET"

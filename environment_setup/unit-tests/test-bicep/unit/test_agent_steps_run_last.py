@@ -11,11 +11,13 @@ ADO_AGENT_TEMPLATES = (
     "- template: job-factory-chat-agent.yaml",
     "- template: job-aifactory-mcp-ai-gateway.yaml",
     "- template: job-aifactory-agent-live-voice.yaml",
+    "- template: job-foundry-publishing.yaml",
 )
 GHA_AGENT_STEPS = (
     "Deploy Factory Chat Agent in Foundry",
     "Deploy AI Factory MCP and AI Gateway SKU (project001 Dev)",
     "Deploy AI Factory Agent live voice (any project, Dev)",
+    "Prepare Foundry agent for Microsoft 365",
 )
 GHA_CLEANUP = "Remove run-specific reviewed configuration"
 

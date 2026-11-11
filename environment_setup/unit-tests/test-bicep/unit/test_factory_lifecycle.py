@@ -2349,19 +2349,18 @@ def test_closure_walk_falls_back_from_an_unserved_schema_api_version(workers):
 ])
 def test_closure_walk_never_falls_back_for_other_400_answers(body, kind, code):
     cloud = ApiRolloutCloud(kinds=(kind,), body=lambda api: body)
+    target = NSG.lower() if kind == "networksecuritygroups" else RULES
     if kind == "networksecuritygroups":
         with pytest.raises(fl.Blocked) as raised:
             fl.collect_resource_closure(cloud, [GROUP])
         assert raised.value.code == code
-        assert [api for _, path, api in cloud.reads if path == NSG.lower()] == [UNSERVED_API]
+        assert [api for _, path, api in cloud.reads if path == target] == [UNSERVED_API]
         return
-    # release/v1.25 keeps its tolerant child inventory (aif-135/136): a child list that still fails after the schema's
-    # older stable versions is recorded as not listable, never raised and never treated as empty. Here an older
-    # stable version answers, which that pre-existing retry already uses.
+    # A child list is tolerant: served() does not treat another 400 as an unserved version, but the walk's
+    # generic fallback tries the schema's older stable version, which lists the rules.
     closure, _ = fl.collect_resource_closure(cloud, [GROUP])
-    entry = closure["collections"][RULES]
-    assert entry["unsupported"] in (None, "not-listable-400")
-    assert entry["unsupported"] or entry["api_version"] != UNSERVED_API
+    assert closure["collections"][RULES]["api_version"] == "2024-05-01"
+    assert [api for _, path, api in cloud.reads if path == target] == [UNSERVED_API, "2024-05-01"]
 
 
 def test_pinned_resource_api_versions_never_fall_back():
@@ -2375,12 +2374,11 @@ def test_pinned_resource_api_versions_never_fall_back():
 def test_pinned_extension_api_versions_never_fall_back():
     api = dict(fl.EXTENSION_COLLECTIONS)["Microsoft.Insights/diagnosticSettings"]
     cloud = ApiRolloutCloud(unserved=(api,), kinds=())
-    # release/v1.25's tolerant walk records a failing extension list instead of raising; it never falls back.
+    # Never retried at another version; recorded as not listable instead of stopping the walk.
     closure, _ = fl.collect_resource_closure(cloud, [GROUP])
-    assert closure["collections"][NSG.lower() + "/providers/microsoft.insights/diagnosticsettings"]["unsupported"]         == "not-listable-400"
-    reads = [read for read in cloud.reads if read[1].endswith("/diagnosticsettings")]
-    assert ("collection", NSG.lower() + "/providers/microsoft.insights/diagnosticsettings", api) in reads
-    assert all(read[2] == api for read in reads)  # pinned: one read each, never another version
+    entry = closure["collections"][NSG.lower() + "/providers/microsoft.insights/diagnosticsettings"]
+    assert entry["api_version"] == api and entry["ids"] == [] and entry["unsupported"] == "not-listable-400"
+    assert {read[2] for read in cloud.reads if read[1].endswith("/diagnosticsettings")} == {api}
 
 
 @pytest.mark.parametrize("unserved,served", [
@@ -2394,13 +2392,12 @@ def test_api_version_fallback_is_bounded(unserved, served):
         closure, _ = fl.collect_resource_closure(cloud, [GROUP])
         assert closure["collections"][RULES]["api_version"] == "2024-05-01"
     else:
-        # Exhausted: release/v1.25's tolerant child inventory records the collection as not listable.
+        # served() stops after two fallbacks; the walk's generic older-version fallback then reaches the
+        # served 2024-05-01, so the rules are still listed instead of the run stopping.
         closure, _ = fl.collect_resource_closure(cloud, [GROUP])
-        assert closure["collections"][RULES]["unsupported"] == "not-listable-400"
+        assert closure["collections"][RULES]["api_version"] == "2024-05-01"
     tried = [api for kind, path, api in cloud.reads if path == RULES]
-    assert tried[:len(unserved)] == sorted(unserved, reverse=True)
-    if served:
-        assert tried[-1] == "2024-05-01"
+    assert tried == sorted(unserved, reverse=True) + ["2024-05-01"]
 
 
 def test_what_if_accepts_empty_202_polls_before_final_changes():
@@ -3078,8 +3075,6 @@ def test_closure_walk_inventories_platform_managed_tables_from_their_list_withou
     changed.tables[0]["properties"]["plan"] = "Basic"
     assert fl.collect_resource_closure(changed, [GROUP])[0]["resources"] != closure["resources"]
     assert closure == fl.collect_resource_closure(WorkspaceTablesCloud(), [GROUP])[0]
-
-
 SEARCH = GROUP + "/providers/Microsoft.Search/searchServices/aisearchprj002"
 
 

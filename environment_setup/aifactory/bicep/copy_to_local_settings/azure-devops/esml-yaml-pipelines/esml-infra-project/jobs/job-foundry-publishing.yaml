@@ -1,0 +1,36 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+# Prepare the endpoint only; never submit an agent to a Teams/M365 catalog.
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: phase
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: '74-prepare-foundry-publishing'
+    condition: and(succeeded(), eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableBotService'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        plan=$(mktemp)
+        trap 'rm -f "$plan"' EXIT
+        launcher="$FOUNDRY_PUBLISHING_REPOSITORY/environment_setup/aifactory/bicep/scripts/prepare-foundry-publishing.py"
+        python "$launcher" plan > "$plan"
+        cat "$plan"
+        python "$launcher" apply --apply --reviewed-plan "$plan"
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+    env:
+      FOUNDRY_PUBLISHING_REPOSITORY: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+      enableBotService: '$(enableBotService)'
+      enableAIFoundry: '$(enableAIFoundry)'
+      deleteAllServicesForProject: '$(deleteAllServicesForProject)'
+      deleteAllForProject: '$(deleteAllForProject)'
+      dev_test_prod_sub_id: '$(dev_test_prod_sub_id)'
+      tenantId: '$(tenantId)'
+      botFoundryProjectResourceId: '$(botFoundryProjectResourceId)'
+      botFoundryAgentName: '$(botFoundryAgentName)'
+      botEnableM365PublicEndpoint: '$(botEnableM365PublicEndpoint)'

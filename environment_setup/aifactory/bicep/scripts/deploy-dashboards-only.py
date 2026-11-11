@@ -214,6 +214,22 @@ def registered_ids(consumer: Path, cfg, tenant: str, values: dict,
     return matches[0]
 
 
+def registered_runner_os(consumer: Path, factory_id: str, scale_set_id: str) -> str:
+    """The runner OS of the matching register.json GitHub binding (target execution first), or ""."""
+    path = consumer / "azurefactory" / "register.json"
+    if not factory_id or not scale_set_id or (not path.exists() and not path.is_symlink()):
+        return ""
+    bindings = read_json(bounded_path(consumer, "azurefactory/register.json")).get("bindings")
+    binding = bindings.get(factory_id, {}).get("gha") if isinstance(bindings, dict) else None
+    if not isinstance(binding, dict):
+        return ""
+    targets = [item for item in binding.get("targets", [])
+               if isinstance(item, dict) and item.get("scale_set_id") == scale_set_id]
+    execution = (targets[0].get("execution") if len(targets) == 1 else None) or binding
+    runner = execution.get("runner") if isinstance(execution, dict) else None
+    return runner.get("os", "") if isinstance(runner, dict) else ""
+
+
 def load_configuration(args):
     consumer = Path(args.consumer_root).resolve()
     repo = bounded_path(consumer, args.repo_root, directory=True)
@@ -236,7 +252,7 @@ def load_configuration(args):
     return consumer, values, cfg, tenant, factory_id, scale_set_id
 
 
-def runner_settings(values: dict, provider: str, selection: str) -> dict:
+def runner_settings(values: dict, provider: str, selection: str, default_os: str = "Windows") -> dict:
     allowed = {"from-config", "self-hosted", "microsoft-hosted"} if provider == "ado" else {
         "from-config", "self-hosted", "github-hosted", "self-hosted-windows", "self-hosted-linux"
     }
@@ -253,7 +269,7 @@ def runner_settings(values: dict, provider: str, selection: str) -> dict:
 
     pool = label(values.get("adminVMBuildAgentPool") or "Default", "adminVMBuildAgentPool")
     os_name = {"self-hosted-windows": "Windows", "self-hosted-linux": "Linux"}.get(
-        selection, values.get("selfHostedRunnerOS") or "Windows"
+        selection, values.get("selfHostedRunnerOS") or default_os
     )
     if not isinstance(os_name, str) or os_name.lower() not in {"windows", "linux"}:
         raise ValueError("selfHostedRunnerOS must be Windows or Linux.")
@@ -653,7 +669,10 @@ def run(args, az=None) -> dict:
     if args.ci_output:
         if args.mode != "plan":
             raise ValueError("CI routing resolution must use plan mode.")
-        settings = runner_settings(values, args.ci_output, args.runner_selection)
+        # Registered project variables carry no selfHostedRunnerOS; their runner is the register.json binding's.
+        default_os = (registered_runner_os(consumer, factory_id, scale_set_id) if args.ci_output == "github"
+                      else "") or "Windows"
+        settings = runner_settings(values, args.ci_output, args.runner_selection, default_os)
         emit_ci_output(settings, args.ci_output)
         return settings
     azure = DashboardAzure(cfg, args.mode, az)

@@ -143,6 +143,13 @@ def test_short_project_numbers_are_normalized_to_three_digits(tmp_path):
     assert result == 0 and voice.calls[0]["environ"]["project_number_000"] == "012"
 
 
+def test_the_documented_short_form_to_project_option_is_accepted(tmp_path):
+    # "-addAIFactoryAgentChat -toProject 001" is the form the operators were given; it must mean --to-project.
+    root = registered(tmp_path)
+    result, _, voice = run(entry(), ["-toProject", "012", "--consumer-root", str(root)])
+    assert result == 0 and voice.calls[0]["environ"]["project_number_000"] == "012"
+
+
 # ---- entry: configuration resolution ---------------------------------------------------------------------------
 
 def test_a_registered_root_uses_the_projects_own_variables_file(tmp_path, capsys):
@@ -237,3 +244,22 @@ def test_the_report_never_echoes_identifiers_or_configuration_values(tmp_path, c
     run(entry(), ["--to-project", "012", "--consumer-root", str(root)])
     out = capsys.readouterr().out
     assert SUB not in out and TENANT not in out and READER not in out
+
+
+
+def test_skip_knowledge_is_passed_to_the_voice_step_only(tmp_path):
+    root = registered(tmp_path)
+    module = entry()
+    seen = []
+
+    def voice(args, environ):
+        seen.append(getattr(args, "skip_knowledge", None))
+        return {"mode": "plan"}
+
+    assert module.main(["ado", "--to-project", "012", "--consumer-root", str(root), "--skip-knowledge"],
+                       chat_runner=Recorder("chat"), voice_runner=voice) == 0
+    assert seen == [True]
+    seen.clear()
+    assert module.main(["ado", "--to-project", "012", "--consumer-root", str(root)],
+                       chat_runner=Recorder("chat"), voice_runner=voice) == 0
+    assert seen == [False]

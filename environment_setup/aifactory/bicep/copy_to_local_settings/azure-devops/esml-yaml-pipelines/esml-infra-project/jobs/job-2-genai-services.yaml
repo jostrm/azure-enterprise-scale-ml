@@ -69,6 +69,33 @@ steps:
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
     scope: project
+- task: AzureCLI@2
+  displayName: '00_validate_RedisManaged'
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -euo pipefail
+      cloud=""
+      enabled="${ENABLEREDISMANAGED:-false}"
+      validator="$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/redis_managed_config.py"
+      # The pipeline copy can be newer than the pinned submodule: call only what the checkout ships.
+      if [ ! -f "$validator" ]; then
+        if [ "${enabled,,}" = "true" ]; then
+          echo "##vso[task.logissue type=error]enableRedisManaged=true needs redis_managed_config.py, which the checked-out azure-enterprise-scale-ml submodule lacks. Update the submodule to a release with Azure Managed Redis."
+          exit 1
+        fi
+        echo "##vso[task.logissue type=warning]The checked-out azure-enterprise-scale-ml submodule predates Azure Managed Redis; validation skipped (enableRedisManaged is not true)."
+        exit 0
+      fi
+      if [ "${enabled,,}" = "true" ]; then
+        cloud="$(az cloud show --query name -o tsv)"
+        cloud="${cloud%$'\r'}"
+      fi
+      python "$validator" \
+        --environment "$(dev_test_prod)" --cloud "$cloud" --azure-devops
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate AI Search/model quota, Elasticsearch
 # policy/RP blocks, resource-provider registration and region support for THIS
@@ -3798,6 +3825,8 @@ steps:
 - task: AzureCLI@2
   displayName: '68-integration'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  env:
+    BOT_FOUNDRY_AGENT_NAME: '$(botFoundryAgentName)'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3868,6 +3897,7 @@ steps:
      --parameters enableBotService="$(enableBotService)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
+     --parameters botFoundryAgentName="$BOT_FOUNDRY_AGENT_NAME" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -6182,6 +6212,11 @@ steps:
     phase: ${{ parameters.phase }}
 
 - template: job-aifactory-agent-live-voice.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
+- template: job-foundry-publishing.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}

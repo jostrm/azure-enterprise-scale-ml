@@ -1,53 +1,9 @@
-// ============================================================================
-// AZURE BOT SERVICE MODULE
-// ============================================================================
-// This module creates an Azure Bot Service for integrating AI Foundry agents
-// with Microsoft Teams and other channels.
-//
-// Key features:
-// - Multi-channel bot registration (Teams, Web Chat, etc.)
-// - Integration with AI Foundry agent endpoints
-// - Managed identity support
-// - Diagnostic settings for monitoring
-//
-// CORRECT WORKFLOW (Verified from AI Foundry Portal):
-// ----------------------------------------------------
-// 1. Deploy AI Foundry + Project via IaC (with system-assigned identity)
-// 2. Deploy Bot Service via IaC BEFORE creating any agent (THIS MODULE)
-//    - Can leave microsoftAppId empty for auto-creation
-//    - OR provide the AI Foundry agent's Application ID if known
-// 3. In AI Foundry portal:
-//    - Create your agent
-//    - Click "Publish" > "Teams and Microsoft 365 Copilot"
-//    - The portal will show "Azure Bot Services" section
-//    - SELECT your pre-created Bot Service from the dropdown
-// 4. After publishing, the agent is connected to the Bot Service
-// 5. Use the Bot Service to access your agent from Teams/M365 Copilot
-//
-// MICROSOFT APP ID OPTIONS:
-// -------------------------
-// Option 1: Leave microsoftAppId EMPTY (Recommended)
-//   - Azure auto-creates an Azure AD App Registration during Bot Service creation
-//   - Simplest approach for new deployments
-//   - The Application ID shown in Foundry portal dialog is this auto-created ID
-//
-// Option 2: Use AI Foundry Agent's Application ID
-//   - Copy the "Application ID" from Foundry portal publish dialog
-//   - Pass it as microsoftAppId parameter
-//   - Creates single identity shared between agent and bot
-//   - Requires creating agent first, then Bot Service (reverse order)
-//
-// Option 3: Create separate App Registration manually
-//   - Register app in Azure AD before deployment
-//   - Provides separate identity and full control
-//   - Pass the App Registration's Client ID as microsoftAppId
-//
-// WHAT microsoftAppId IS:
-// - Application (Client) ID from Azure AD App Registration
-// - NOT a Service Principal Object ID
-// - NOT a Managed Identity Client ID (unless using UserAssignedMSI type)
-// - NOT a user identity
-// ============================================================================
+// Standalone Azure Bot registration for a separately hosted messaging endpoint.
+// ARM does not create an Entra app registration when microsoftAppId is empty.
+// This module can create a UAMI, but that identity does not link a Foundry agent.
+// Native Foundry uses the agent's own identity and Activity endpoint; prepare it
+// with scripts/prepare-foundry-publishing.py after the agent exists.
+// A Bot's Microsoft App ID is immutable. Never rebind an existing registration.
 
 @description('Name of the Azure Bot Service')
 param botName string
@@ -65,10 +21,10 @@ param location string = resourceGroup().location
 @allowed(['F0', 'S1'])
 param sku string = 'S1' // Default to Standard to match Foundry-aligned deployment
 
-@description('Microsoft App ID (Client ID) for bot authentication. REQUIRED for SingleTenant. Leave EMPTY when using UserAssignedMSI.')
+@description('Application client ID for SingleTenant, or the client ID of an explicitly supplied UAMI. Empty only when this module creates the UAMI.')
 param microsoftAppId string = ''
 
-@description('Type of Microsoft App authentication. MultiTenant is deprecated. Default aligns with Bot A (SingleTenant); UserAssignedMSI remains available.')
+@description('Type of Microsoft App authentication. MultiTenant creation is deprecated; neither type guarantees Foundry portal discovery.')
 @allowed(['SingleTenant', 'UserAssignedMSI'])
 param microsoftAppType string = 'SingleTenant'
 
@@ -78,7 +34,7 @@ param microsoftAppTenantId string = tenant().tenantId
 @description('User-assigned managed identity resource ID. Auto-created if empty and microsoftAppType is UserAssignedMSI.')
 param userAssignedManagedIdentityResourceId string = ''
 
-@description('AI Foundry agent endpoint URL (required for Foundry listing)')
+@description('Explicit messaging endpoint. Empty reserves a bot registration without claiming a deployed handler or Foundry link.')
 param agentEndpoint string
 
 @description('Tags to apply to resources')
@@ -103,40 +59,8 @@ param diagnosticSettingLevel string = 'silver'
 @description('Icon URL for the bot (optional)')
 param iconUrl string = ''
 
-@description('Endpoint for the bot messaging (configured automatically by Foundry when agent is published)')
+@description('Endpoint for the hosted bot messaging handler')
 param messagingEndpoint string = agentEndpoint
-
-// VERIFIED DEPLOYMENT WORKFLOW (per Foundry Portal):
-// ---------------------------------------------------
-// Step 1: Deploy infrastructure via IaC
-//   - Deploy AI Foundry account + project
-//   - Deploy Bot Service (this module) with empty microsoftAppId
-//   - Bot Service auto-creates App Registration
-//
-// Step 2: In AI Foundry portal
-//   - Create your agent
-//   - Test and refine agent in playground
-//
-// Step 3: Publish agent to Teams
-//   - Click "Publish" button in agent builder
-//   - Select "Teams and Microsoft 365 Copilot" destination
-//   - Portal shows "Application ID" and "Tenant ID" (from agent identity)
-//   - Portal shows "Azure Bot Services" dropdown
-//   - SELECT your pre-created Bot Service from the dropdown
-//   - Click publish
-//
-// Step 4: AI Foundry automatically configures
-//   - Bot Service messaging endpoint → Agent Application Activity Protocol URL
-//   - Agent identity permissions
-//   - Teams channel connectivity
-//
-// Step 5: Access agent
-//   - Open Microsoft Teams
-//   - Search for your bot by name
-//   - Start chatting with your AI agent
-//
-// NOTE: The "No Bot Services found" error in Foundry portal confirms
-// that Bot Service MUST be pre-created before agent publishing.
 
 @description('Enable streaming for bot responses')
 param isStreamingSupported bool = false

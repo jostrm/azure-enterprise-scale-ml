@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "displayName": "ESAF: allowed locations for the listed resource types",
+    "description": "Denies the listed resource types (for example Azure AI Search) outside their own allowed locations, so they can use more regions than the baseline.",
+    "mode": "Indexed",
+    "parameters": {
+      "resourceTypes": {
+        "type": "Array",
+        "metadata": { "displayName": "Resource types", "strongType": "resourceTypes" }
+      },
+      "allowedLocations": {
+        "type": "Array",
+        "metadata": { "displayName": "Allowed locations for these types", "strongType": "location" }
+      },
+      "effect": {
+        "type": "String",
+        "defaultValue": "Deny",
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "metadata": { "displayName": "Effect" }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          { "field": "type", "in": "[parameters('resourceTypes')]" },
+          { "field": "location", "notIn": "[parameters('allowedLocations')]" },
+          { "field": "location", "notEquals": "global" }
+        ]
+      },
+      "then": { "effect": "[parameters('effect')]" }
+    }
+  }
+}

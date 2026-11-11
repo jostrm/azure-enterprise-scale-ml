@@ -30,13 +30,19 @@ Setup installs per-user without administrator privileges. Uninstall from
 Windows Settings > Apps. User configuration/history under LocalAppData is
 retained when uninstalling. Setup does not delete unrelated files.
 
-Keep setup.exe and ALL matching setup-*.bin slices in the SAME directory.
-Each slice is below the GitHub 100 MiB per-file limit.
-Verify their SHA-256 hashes against SHA256SUMS.txt before installation.
+For MSI releases, extract the release ZIP and open the .msi file. The MSI
+contains its complete payload; no separate .bin files are needed. Verify the
+MSI SHA-256 hash against the included SHA256SUMS.txt. If upgrading from the old
+EXE installer manually, uninstall the old app first; the local build/install
+wrapper performs that migration automatically after creating the new MSI.
 
-This build is unsigned. Windows SmartScreen may show an unknown-publisher
+For legacy EXE releases, keep setup.exe and ALL matching setup-*.bin slices
+in the SAME directory and verify their hashes against SHA256SUMS.txt.
+
+Unsigned builds may show a Windows SmartScreen unknown-publisher
 warning. Production distribution should Authenticode-sign the application
 and setup with the publisher's certificate and trusted timestamp.
 
 Third-party component license texts and dependency inventory are included
-in the Licenses directory. Inno Setup is used under its 6.4.3 license.
+in the Licenses directory. MSI packaging uses WiX Toolset; legacy EXE packaging
+uses Inno Setup under its 6.4.3 license.

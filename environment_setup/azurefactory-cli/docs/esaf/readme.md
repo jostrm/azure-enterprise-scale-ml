@@ -157,7 +157,7 @@ It deploys the common Dev resource group, its network and the initial project001
 
 ```python
 esaf.add_scale_set(scale_set, environment, *, cidr=None, max_projects=None, subscription_id=None,
-                   tenant_id=None, orchestrator=None)
+                   tenant_id=None, orchestrator=None, settings=None)
 ```
 
 | Parameter | Meaning |
@@ -167,6 +167,7 @@ esaf.add_scale_set(scale_set, environment, *, cidr=None, max_projects=None, subs
 | `cidr` | The new scale set's **VNet range**, for example `"10.141.0.0/16"`. Required for a new scale set; the deployment pipeline computes its subnets (with BYOSubnet they already exist). It must not overlap the hub or any peered VNet. |
 | `max_projects` | Project capacity; default `7`. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Default to the environment's existing scale set; `orchestrator` is `"gha"` or `"ado"`. |
+| `settings` | Optional flat wizard settings saved at scale-set scope before deployment, such as `BYO_subnets`, `vnetResourceGroup_param`, `vnetNameFull_param`, `byoASEv3` or `byoAseFullResourceId`. |
 
 It registers the scale set (if new), extends the factory's single writer to it and deploys its common part. Calling
 it again for an existing scale set resumes: registration is skipped. About 15-30 minutes.

@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "displayName": "ESAF: allowed locations for resource groups",
+    "description": "Denies resource groups outside the allowed locations. Mode All, because Indexed mode skips resource groups.",
+    "mode": "All",
+    "parameters": {
+      "allowedLocations": {
+        "type": "Array",
+        "metadata": { "displayName": "Allowed locations", "strongType": "location" }
+      },
+      "effect": {
+        "type": "String",
+        "defaultValue": "Deny",
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "metadata": { "displayName": "Effect" }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          { "field": "type", "equals": "Microsoft.Resources/subscriptions/resourceGroups" },
+          { "field": "location", "notIn": "[parameters('allowedLocations')]" }
+        ]
+      },
+      "then": { "effect": "[parameters('effect')]" }
+    }
+  }
+}
