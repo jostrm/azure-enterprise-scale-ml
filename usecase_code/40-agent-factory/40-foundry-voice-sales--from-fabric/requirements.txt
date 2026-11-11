@@ -1,0 +1,13 @@
+azure-ai-projects==2.10.0
+azure-identity>=1.24,<2
+openai>=3,<4
+mcp>=1.26,<2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+httpx>=0.28,<1
+websockets>=14,<18
+python-dotenv>=1,<2
+jsonschema>=4.23,<5
+aiohttp>=3.11,<4
+anyio>=4.5,<5
+packaging>=24,<27

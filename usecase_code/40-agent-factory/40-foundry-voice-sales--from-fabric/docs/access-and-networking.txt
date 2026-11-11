@@ -1,0 +1,169 @@
+ACCESS, IDENTITY, AND NETWORKING — ADMINISTRATOR HANDOFF
+
+Supported identity baseline
+---------------------------
+An administrator provisions access outside this template. Each trusted DSVM OS
+user signs into Azure CLI with their own Entra user in the configured tenant.
+The backend uses AzureCliCredential with explicit tenant/subscription context,
+not a broad DefaultAzureCredential chain, managed identity, or shared app secret.
+Diagnose validates the expected tenant/subscription and optionally expected user.
+The workflow never runs az account set or rewrites global Azure configuration.
+Azure CLI interactive sign-in is the user's separate explicit action.
+
+The Fabric token scope is https://api.fabric.microsoft.com/.default. It is acquired
+server-side for THAT signed-in user. Tokens never belong in browser storage,
+notebook output, process arguments, application logs, source control, or .env.
+Azure CLI manages its own user credential cache; do not copy that cache between
+users. An expired sign-in is not a reason to introduce service-account credentials.
+
+Fabric Data Agent managed identity is explicitly unsupported. Service-principal
+access is preview, requires broader permissions and excludes KQL in that path;
+it is not selected here. There is no app-credential OBO implementation.
+
+Foundry caller and publisher are separate responsibilities
+---------------------------------------------------------
+For THIS implementation, the documented built-in role covering agent-version
+retrieval, project-level Responses, and conversations is Foundry User (formerly
+Azure AI User), scoped to the Foundry PROJECT. An administrator can grant it to
+the team group. It also permits authoring: this is not an inference-only role.
+A more restricted custom role requires a separate administrator-reviewed design.
+The application itself enables only the reviewed read-only question tool.
+
+Foundry Agent Consumer covers a dedicated endpoint-only client; its DataAction
+is endpoints/interact/action. It does NOT cover this version-validating project
+client. Foundry Project Runtime User's Responses-only actions are also insufficient
+for the additional version/conversation operations. Do not claim either role is
+sufficient just because a model inference succeeds.
+
+The script's Publish action only calls agents.create_version for a prompt agent.
+Foundry User at project scope covers that operation; it does not require Owner,
+Contributor or Foundry Project Manager merely because this command is named
+Publish. Separate channel/application publishing is not implemented. Ordinary
+users can use an administrator-provided name/version and skip Publish.
+
+For Voice Live, the documented Entra setup assigns Cognitive Services User and
+Foundry User on the VOICE RESOURCE. Project-scoped permissions do not extend
+upward to the account-level voice endpoint. This is Microsoft's documented setup,
+not a claim that both broad roles are a mathematically minimal permission set.
+The newer Cognitive Services Speech User role explicitly lists Voice Live data
+actions, but its standalone replacement of that setup must be validated separately.
+The backend requests https://ai.azure.com/.default for Voice Live.
+
+The local runtime uses the signed-in user for every boundary; it has no separate
+deployed application identity. Any project service/model identity remains an
+administrator-managed platform prerequisite and is never substituted for Fabric
+user authorization. No script assigns roles, changes groups or creates credentials.
+
+An Azure resource-group role does NOT grant Fabric agent or source access.
+AZURE_RESOURCE_GROUP is optional context. TEAM_GROUP_ID identifies an
+administrator-managed group for provisioning discussions; the local app does not
+authenticate users or enforce that group's membership. AZURE_EXPECTED_USER can
+detect accidental wrong-user sign-in but is not multi-user authentication.
+
+Fabric and underlying sources
+-----------------------------
+The administrator must confirm:
+* A supported paid Fabric F2+ or Power BI Premium P1+ capacity (not a trial claim).
+* The relevant Copilot/Azure OpenAI tenant settings and applicable cross-geography
+  settings, subject to the organization's data-residency approval.
+* Data Agent and its configured sources satisfy the documented same-tenant and
+  same-region requirements; no more than five sources per Data Agent.
+* The agent is published and shared with the actual caller (directly or by a
+  supported administrator-managed group), and the actual caller independently
+  has each underlying source permission:
+    Semantic model: Read; Build is not required by the Data Agent sharing guide.
+    Lakehouse: Read plus access to the needed tables.
+    Warehouse: appropriate SELECT on the queried data.
+    KQL database: Reader.
+* Source ACLs, row-level security and organizational sharing policies remain in
+  force. Never replace a denied user's token with an administrator's token.
+
+A group grant does not provision itself when a group ID is put in .env. Confirm
+membership, effective sharing, source grants and propagation separately.
+Discover proves access to the tool contract, not access to every underlying row.
+Use a known-answer query and an appropriately denied query as separate acceptance
+tests without expanding permissions merely to get a green result.
+
+Local host boundary
+-------------------
+The HTTP listener is only 127.0.0.1. No public interface, reverse proxy, remote
+team URL, container deployment or shared web-service identity is configured.
+Every OS user runs an independent instance and distinct port if necessary.
+Loopback binding itself DOES NOT authenticate other OS users; another account
+on the same untrusted machine may reach that loopback port. Same-origin/session
+cookie defenses do not solve that OS trust problem. Shared/untrusted multi-user
+hosts are unsupported. For a real team web server, design Entra authentication,
+per-user delegated OBO, isolation, authorization and private routing separately.
+
+DNS/TLS and private-routing acceptance
+-------------------------------------
+The DSVM needs authorized HTTPS reachability to the configured Foundry project,
+Fabric MCP and (only if voice is enabled) Voice Live endpoints, plus required
+Entra/Azure CLI authentication services. Native voice additionally needs WebSocket
+upgrade through the approved proxy/firewall path. Do not disable TLS verification
+or add ad-hoc public fallback endpoints to make a private test pass.
+
+Use the exact Fabric published MCP URL or exact administrator-approved workspace
+private endpoint; do not transform portal URLs, guess private DNS hostnames, or
+append arbitrary query parameters. Private DNS must resolve to the approved
+addresses on the DSVM, with routes and TLS hostnames/certificates intact.
+
+Connectivity -AllowAzure performs read-only DNS/TLS checks.
+Connectivity -AllowAzure -RequirePrivate requires private resolution checks.
+A private IP and successful TLS handshake alone do NOT prove all Azure runtime
+paths, agent/model storage paths, private endpoint approval, workspace security
+policies, or end-to-end service support. The administrator must validate the
+entire approved network design; do not claim that one probe certifies "all private".
+
+IMPORTANT DOCUMENTATION CONFLICT / CONDITIONAL SUPPORT:
+The Foundry Fabric IQ virtual-network-support documentation describes private
+MCP access, while Fabric's workspace-level private-link support page for Data
+Agent still says external Foundry integration is unsupported. Those statements
+must not be flattened into an unconditional supported all-private topology.
+This app executes its Fabric MCP request directly from the DSVM BFF, avoiding a
+Foundry-runtime outbound Fabric MCP connection. That different route does NOT
+prove that the workspace policy supports it. Obtain Microsoft confirmation for
+the exact tenant/capacity/endpoint combination and run DSVM DNS, TLS, discovery,
+known-answer text and denial tests before claiming private acceptance.
+
+Native voice and remote desktop
+------------------------------
+VOICE_ENABLED=false keeps text independent of microphone/voice availability.
+For voice, check the deployed model's actual availability and processing scope,
+not merely the resource's Sweden Central location. Global versus data-zone versus
+regional processing requires explicit policy approval.
+On the DSVM, Windows Sound must show a functioning input device; the browser's
+secure loopback context must permit navigator.mediaDevices.getUserMedia.
+Confirm Edge microphone site permissions, Windows microphone privacy settings,
+and supported remote-desktop audio-recording redirection. RDP redirecting sound
+output does not imply a microphone input exists. If unavailable, use text and
+record voice as NOT RUN, not passed.
+
+Official references
+-------------------
+Fabric MCP publication and prerequisites:
+https://learn.microsoft.com/en-us/fabric/data-science/data-agent-mcp-server
+Sharing and underlying source permissions:
+https://learn.microsoft.com/en-us/fabric/data-science/data-agent-sharing#underlying-data-source-permissions
+Service-principal preview and managed-identity limitation:
+https://learn.microsoft.com/en-us/fabric/data-science/data-agent-service-principal
+Foundry agent types and application function execution:
+https://learn.microsoft.com/en-us/azure/foundry/agents/overview#agent-types
+https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/tools/function-calling
+Current Foundry caller/developer roles and scopes:
+https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry
+Exact built-in role definitions:
+https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning#foundry-user
+https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning#foundry-agent-consumer
+Prompt-agent creation prerequisites:
+https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/configure-agent#prerequisites
+Voice Live authentication, roles and token scope:
+https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-api-reference-2026-07-15#authentication
+Hosted permissions (do not infer prompt permissions from the title):
+https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agent-permissions
+Contrasting Foundry private-MCP statement (IQ is NOT implemented in this app):
+https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/tools/fabric-iq#virtual-network-support
+Fabric workspace-private Data Agent limitation:
+https://learn.microsoft.com/en-us/fabric/security/security-workspace-level-private-links-support#data-agent
+Voice availability and processing scope:
+https://learn.microsoft.com/en-us/azure/ai-services/speech-service/regions?tabs=voice-live#llm-availability-and-processing-scope

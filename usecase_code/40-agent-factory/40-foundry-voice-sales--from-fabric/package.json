@@ -1,0 +1,8 @@
+{
+  "name": "foundry-voice-sales-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/frontend*.test.js"
+  }
+}
