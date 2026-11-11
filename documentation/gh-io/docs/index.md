@@ -10,6 +10,9 @@ need, and add projects without rebuilding every part of the platform.
 
 | Your task | Start here |
 | --- | --- |
+| Platform team: set up an AI Factory, step by step | [Setup docs](setup/index.md) — install the tools, create the Factory, add projects, enable Agent Chat |
+| Project team: build agents, apps and ML in your project | [Usage docs](usage/index.md) — first agent, first model, project dashboards |
+| Look up any variable in `variables.json` | [Every variable in variables.json](parameters/variables.md) — default value and what it does |
 | Core team: configure and administer | [Get started - CLI, SDK, API: Core team](factory-tools/18-cli-and-api-and-usage.md) — choose one linked tab for the whole tutorial |
 | Project team: build workload code | [Get started - Agent & ML Factory SDK: Project team](project-team/index.md) — native Python and CLI examples, offline first |
 | Configure a new factory or add a project | [Add and update](factory-tools/19-cli-and-api-and-usage.md) |

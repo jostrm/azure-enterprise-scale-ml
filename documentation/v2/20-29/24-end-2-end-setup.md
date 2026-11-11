@@ -20,13 +20,13 @@ scenario is one call.
 
 ```mermaid
 flowchart LR
-  A[1 Install<br/>the tools]:::blue --> B[2 Create your<br/>AI Factory]:::purple
-  B -.-> S[Optional:<br/>add a scale set]:::purple -.-> C
-  B --> C[3 Add<br/>a project]:::purple --> D[4 Enable<br/>Agent Chat]:::pink
-  D -.-> E[5 Clean up]:::blue
-  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
-  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
-  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
+  A(1 Install<br/>the tools):::blue --> B(2 Create your<br/>AI Factory):::purple
+  B -.-> S(Optional:<br/>add a scale set):::purple -.-> C
+  B --> C(3 Add<br/>a project):::purple --> D(4 Enable<br/>Agent Chat):::pink
+  D -.-> E(5 Clean up):::blue
+  classDef blue fill:#191919,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#191919,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#191919,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
 ```
 
 | Step | Quickstart | The one call | Time |
@@ -70,7 +70,8 @@ you select it. It lists the permissions, the regions and the checklist for after
 
 **Next:** [Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md)
 
-Related: [Docs hub](../README.md) · [Folder structure](../reference/folder-structure.md) ·
+Related: [Docs hub](../README.md) ·
+[Guide 17: the six scenarios, tool by tool](../10-19/17-cli-and-api-and-usage.md) · [Folder structure](../reference/folder-structure.md) ·
 [Settings](../reference/settings.md) ·
 [ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md), the guided lab app (private preview: ask
 [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code) ·

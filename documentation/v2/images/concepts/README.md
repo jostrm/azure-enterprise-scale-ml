@@ -14,18 +14,20 @@ This page is for people who add or replace images in the ESAF docs. It isn't par
 
 ## Colors carry meaning
 
-Diagrams use the colors of the [onion](../../10-19/10-factory-onion-architecture-v2.md): a dark fill, a bright
-border and light text (`#ECF6FF`). They read well on a white page and on a dark one.
+Every box in a diagram has the same dark gray fill (`#191919`), light text (`#ECF6FF`) and rounded corners.
+Only the border carries the color, and the border colors are the ones of the
+[onion](../../10-19/10-factory-onion-architecture-v2.md). The boxes read well on a white page and on a dark one.
 
-| Color | Use it for | Border | Fill |
-|---|---|---|---|
-| Blue | A neutral step, a tool or a client | `#5AA9FF` | `#14243A` |
-| Purple | The AI Factory itself | `#B07CFF` | `#2C2341` |
-| Pink | A project, an agent or the Factory API | `#FF6FD8` | `#3C213A` |
-| Green | A client layer or a working result | `#3DDC97` | `#15362D` |
+| Border | Use it for | Hex |
+|---|---|---|
+| Blue | A neutral step, a tool or a client | `#5AA9FF` |
+| Purple | The AI Factory itself | `#B07CFF` |
+| Pink | A project, an agent or the Factory API | `#FF6FD8` |
+| Green | A client layer or a working result | `#3DDC97` |
 
-Don't use red or orange in a step diagram. Red always means bad. Break a label after about 18 characters with
-`<br/>`, because GitHub cuts a longer line off at the edge of its box.
+Don't use red or orange in a step diagram. Red always means bad. In Mermaid, write a box as `id(label)` for
+rounded corners, and break a label after about 18 characters with `<br/>`, because GitHub cuts a longer line
+off at the edge of its box.
 
 ## Concept illustrations
 

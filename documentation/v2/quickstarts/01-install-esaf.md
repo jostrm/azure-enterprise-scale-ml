@@ -88,7 +88,7 @@ Choose one tool. You can add the others later; they all use the same API address
 The App tabs use **Enterprise Scale AI Factory**, the ESAF desktop app for Windows 11. It starts its own
 Factory API, so you can skip "Start the Factory API" above.
 
-1. Install the app from its [download folder](../../../environment_setup/install_config_wizard/maui/readme.md).
+1. Install the app from its [download folder](../../../environment_setup/install_config_wizard/maui).
    You need version 1.0.24 or later.
 2. Open **Enterprise Scale AI Factory** from Start.
 3. On **Start Guide**, under **Consumer repository root**, select **Browse repository** and pick your
