@@ -13,6 +13,29 @@ There are also **3 archived full stack examples**: including those gives **150 e
 
 > **Availability is not deployment certification.** These counts describe checked-in template implementations, not unique business problems or successful Azure runs. The ML factory's [recorded Azure matrix](50-ml-model-factory/readme.md#azure-test-status) reports only 8 of 105 implementation slots as “Tested and works”; prerequisites and limitations still apply.
 
+## Use case template example
+
+### Live Voice Agent Chat
+
+Meet your AI colleague: the [Enterprise Scale AI Factory Agent](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example) runs as a full-stack application in your **ESAF project in Azure**, combining **Azure Container Apps**, **Microsoft Foundry**, **Azure AI Search**, and optional **Azure Voice Live** with private networking and firewall controls. Use it in a **web browser** to type or talk about your project and explore grounded answers.
+
+For **double-encryption** requirements or extending the agent into **Microsoft Teams** through an authenticated **reverse proxy**, including the additional integration needed to join and speak in meetings, see the [template's security and Teams caveats](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example). These are not enabled automatically by deploying the browser template.
+
+<table>
+<tr>
+<td align="center" valign="top" width="50%">
+<a href="../documentation/v2/20-29/images/26-esaf-agent-chat-voice-light.png"><img src="../documentation/v2/20-29/images/26-esaf-agent-chat-voice-light.png" width="480" alt="Live Voice Agent Chat in light appearance, with a grounded answer and source citations"></a><br>
+<sub><b>Light appearance:</b> grounded answers, source citations and the active project scope.</sub>
+</td>
+<td align="center" valign="top" width="50%">
+<a href="../documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png"><img src="../documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png" width="480" alt="Live Voice Agent Chat with the Purple theme in dark appearance, showing voice controls and conversation starters"></a><br>
+<sub><b>Purple theme, dark appearance:</b> voice controls and suggested conversation starters.</sub>
+</td>
+</tr>
+</table>
+
+*Illustrative companion UI screenshots; appearance and enabled features depend on the deployed version and configuration. Select an image to view it at full size.*
+
 ## Explore six illustrated starting points
 
 The first row features three Agent Factory use cases. The second reproduces all three illustrated ML Factory entries: **usecase type**, **data**, and **ml environment**. Data and ML environment are supporting areas, not additional model templates in the totals.

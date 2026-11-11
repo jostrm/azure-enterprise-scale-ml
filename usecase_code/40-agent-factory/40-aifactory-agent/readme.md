@@ -14,6 +14,48 @@ You can also [ask about Azure dashboards and current project costs](#ask-about-a
 the chatbot can retrieve Azure Cost Management analysis for the selected project's
 resource group, rather than guessing spend from documentation or resource names.
 
+## Use case template example
+
+### Live Voice Agent Chat
+
+An AI colleague you can talk to or type to in a **web browser**, running in Azure
+inside your **Enterprise Scale AI Factory (ESAF) project**. This full-stack
+template combines a private **Azure Container Apps** web application,
+**Microsoft Foundry**, **Azure AI Search**, and optional **Azure Voice Live** with
+your project's private networking and firewall controls. Voice and typed chat
+share the same governed backend, project scope, authorization and grounded answers.
+
+**Security configuration:** encryption is a property of the deployed Azure
+services. **Double encryption** must be supported, explicitly configured and
+verified for each relevant service; it is not an end-to-end guarantee or an
+automatic default of this application.
+
+**Teams extension:** the solution can be extended with an approved **Microsoft
+Teams** integration and an authenticated **reverse proxy** to the private backend.
+The goal is an additional AI colleague in Teams, including meetings. Joining a
+meeting and speaking in it additionally requires a Teams calling/media bot
+integration and tenant approval; neither a reverse proxy nor this browser
+template alone provides meeting participation. Teams integration is separate
+from enabling [browser live voice](#live-voice-optional).
+
+<table>
+<tr>
+<td align="center" valign="top" width="50%">
+<a href="../../../documentation/v2/20-29/images/26-esaf-agent-chat-voice-light.png"><img src="../../../documentation/v2/20-29/images/26-esaf-agent-chat-voice-light.png" width="480" alt="Live Voice Agent Chat in light appearance, with a grounded answer and source citations"></a><br>
+<sub><b>Light appearance:</b> grounded answers, source citations and the active project scope.</sub>
+</td>
+<td align="center" valign="top" width="50%">
+<a href="../../../documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png"><img src="../../../documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png" width="480" alt="Live Voice Agent Chat with the Purple theme in dark appearance, showing voice controls and conversation starters"></a><br>
+<sub><b>Purple theme, dark appearance:</b> voice controls and suggested conversation starters.</sub>
+</td>
+</tr>
+</table>
+
+*Illustrative companion UI screenshots; appearance and enabled features depend on the deployed version and configuration. Select an image to view it at full size.*
+
+See [Private application deployment](#private-application-deployment) and
+[Live voice](#live-voice-optional) for setup and prerequisites.
+
 ## Boundaries
 
 - Use existing Foundry, Search, project data storage and internal Container Apps
