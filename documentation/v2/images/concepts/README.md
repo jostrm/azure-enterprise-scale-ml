@@ -14,14 +14,18 @@ This page is for people who add or replace images in the ESAF docs. It isn't par
 
 ## Colors carry meaning
 
-| Color | Meaning | Hex |
-|---|---|---|
-| Purple | The AI Factory itself | `#7c3aed` |
-| Green | Good: a working result | `#22c55e` |
-| Blue | Neutral | `#3b82f6` |
-| Orange | Caution | `#f59e0b` |
-| Pink | Weak | `#ec4899` |
-| Red | Bad, always | `#ef4444` |
+Diagrams use the colors of the [onion](../../10-19/10-factory-onion-architecture-v2.md): a dark fill, a bright
+border and light text (`#ECF6FF`). They read well on a white page and on a dark one.
+
+| Color | Use it for | Border | Fill |
+|---|---|---|---|
+| Blue | A neutral step, a tool or a client | `#5AA9FF` | `#14243A` |
+| Purple | The AI Factory itself | `#B07CFF` | `#2C2341` |
+| Pink | A project, an agent or the Factory API | `#FF6FD8` | `#3C213A` |
+| Green | A client layer or a working result | `#3DDC97` | `#15362D` |
+
+Don't use red or orange in a step diagram. Red always means bad. Break a label after about 18 characters with
+`<br/>`, because GitHub cuts a longer line off at the edge of its box.
 
 ## Concept illustrations
 

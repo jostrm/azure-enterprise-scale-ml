@@ -209,6 +209,8 @@ If something goes wrong:
 
 ## Next step
 
+**Back:** [Setup docs](README.md)
+
 **Next:** [Quickstart: Create your AI Factory](02-create-factory.md)
 
 Related:

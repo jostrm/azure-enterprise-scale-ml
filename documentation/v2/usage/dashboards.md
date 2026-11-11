@@ -61,6 +61,8 @@ Your platform team can also open your project in the ESAF app, under **Monitorin
 shows a **Usage & outcomes** tab beside a separate **Cost** tab, for one project and one environment at a time. Ask
 them for a report when you need numbers across several projects.
 
+**Back:** [Quickstart: Train your first model in your ESAF project](02-first-ml-model.md)
+
 **Next:** [Usage docs](README.md)
 
 Related: [Tutorial: FinOps monitoring](../20-29/tutorial-finops.md) ·

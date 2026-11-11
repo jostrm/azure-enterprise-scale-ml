@@ -237,6 +237,8 @@ or delete the whole project with [Quickstart: Clean up](05-clean-up.md).
 
 ## Next step
 
+**Back:** [Quickstart: Add a project for your team](03-add-project.md)
+
 **Next:** [Quickstart: Clean up](05-clean-up.md)
 
 Related:

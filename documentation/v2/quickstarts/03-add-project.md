@@ -201,6 +201,8 @@ See [Quickstart: Clean up](05-clean-up.md).
 
 ## Next step
 
+**Back:** [Quickstart: Add a scale set](add-scale-set.md)
+
 **Next:** [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md)
 
 Related:

@@ -119,6 +119,27 @@ scale set twice.
 | `settings` | Sets scale-set settings, for example your own VNet and subnets. The CLI option is `--settings-json`. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Place the scale set in another subscription. Without them, it uses the same ones as the environment's first scale set. The CLI has no option for them: use Python or REST. |
 
+## Use your own VNet or subnets
+
+By default, ESAF creates the VNet and its subnets from the range you give. To use your own network,
+pass scale-set settings with the same call.
+
+| You bring | Settings |
+|---|---|
+| The VNet. ESAF creates the subnets in it. | `vnetResourceGroup_param` and `vnetNameFull_param` |
+| The VNet and its subnets | The same two, and `BYO_subnets` set to `"true"` |
+
+Save the settings as `scale-set-settings.json`, as shown in
+[Quickstart: Create your AI Factory](02-create-factory.md#describe-your-factory). Then add them to the call:
+
+| Tool | Call |
+|---|---|
+| CLI, in either shell | `azurefactory esaf add-scale-set 002 dev --cidr <range of your VNet> --settings-json ./scale-set-settings.json --wait` |
+| Python SDK | `esaf.add_scale_set("002", "dev", cidr="<range of your VNet>", settings=settings)` |
+| REST | Add `"settings": {...}` to the body of `POST /api/v1/esaf/add-scale-set`. |
+
+The API saves the settings before it deploys the scale set.
+
 ## Verify the result
 
 The job ends with status `succeeded`, and your folder holds the new scale set:
@@ -157,6 +178,8 @@ Delete the scale set when it holds no project you need:
 See [Quickstart: Clean up](05-clean-up.md).
 
 ## Next step
+
+**Back:** [Quickstart: Create your AI Factory](02-create-factory.md)
 
 **Next:** [Quickstart: Add a project for your team](03-add-project.md)
 

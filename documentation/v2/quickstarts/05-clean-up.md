@@ -155,6 +155,8 @@ Then close the app. That stops the Factory API.
 
 ## Next step
 
+**Back:** [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md)
+
 **Next:** [Usage docs - project team](../usage/README.md)
 
 Related:

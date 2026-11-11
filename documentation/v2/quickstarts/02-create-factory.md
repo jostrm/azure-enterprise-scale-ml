@@ -20,11 +20,12 @@ When you finish, you have this in your Dev subscription:
 
 ```mermaid
 flowchart LR
-  F[AI Factory]:::factory --> S[Dev scale set 001]:::factory
-  S --> C[Common resource group<br/>network, DNS, monitoring]:::good
-  S --> P[project001 resource group<br/>your team's AI services]:::good
-  classDef factory fill:#7c3aed,stroke:#5b21b6,color:#ffffff
-  classDef good fill:#22c55e,stroke:#15803d,color:#052e16
+  F[AI Factory]:::purple --> S[Dev<br/>scale set 001]:::purple
+  S --> C[Common<br/>resource group:<br/>network, DNS,<br/>monitoring]:::blue
+  S --> P[project001<br/>resource group:<br/>your team's<br/>AI services]:::pink
+  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
 ```
 
 ## Prerequisites
@@ -52,15 +53,27 @@ part of how the Factory is built.
 
 ## Describe your Factory
 
-The Factory API needs to know what to build. You can describe it in two ways:
+The Factory API needs to know what to build. Choose one of four ways: three use files, for the CLI, the Python
+SDK and REST, and one uses the app. None of them creates anything in Azure.
 
-- **In the app:** fill in the form and save it. The saved form is your **draft**.
-- **In a file:** write a **creation request** and pass it with the call. Use this for the CLI, the Python SDK
-  and REST.
+A description in files has up to three small files. Each file goes with one scenario:
 
-Neither creates anything in Azure. To write the creation request, save this as `creation-request.json` in
-the root of your consumer repository. It describes the fastest first test: standalone, public networking
-and GitHub Actions. It's the same request that the ESAF Tutorial Guide writes for you.
+| File | What it describes | The scenario that takes it |
+|---|---|---|
+| `creation-request.json` | The Factory, its first scale set and project 001 | 1, on this page |
+| `scale-set-settings.json` | Your own VNet or subnets for a scale set | 2, in [Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets) |
+| `project-settings.json` | The services of a project, such as API Management and Agent Chat | 3, in [Add a project](03-add-project.md#change-a-setting) |
+
+The creation request takes only the settings shown below and refuses other names. That's why the service
+switches and the network settings live in the two other files.
+
+<details open>
+<summary>In a file: automated networking</summary>
+
+ESAF builds the VNet and its subnets from `dev_vnet_cidr`. This example is the fastest first test: standalone,
+public networking and GitHub Actions. It's the same request that the ESAF Tutorial Guide writes for you.
+
+Save this as `creation-request.json` in the root of your consumer repository:
 
 ```json
 {
@@ -114,6 +127,112 @@ Change these values before you use it:
 
 Keep `creation-request.json` out of Git if you treat your subscription IDs as private.
 
+Then save the service switches as `project-settings.json`:
+
+```json
+{
+  "ENABLE_KONG": "false",
+  "ENABLE_APIM": "true",
+  "enableAIFactoryMCP": "true",
+  "addAIFactoryMCP2APIM": "true",
+  "enableFactoryChatAgent": "true"
+}
+```
+
+`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
+for project 001 in Dev only. Agent Chat has its own prerequisites: see
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+</details>
+
+<details>
+<summary>In a file: BYO VNet</summary>
+
+You bring the VNet, and ESAF creates the subnets in it. Scenario 1 always builds the network of the first scale
+set itself, so your VNet goes to the scale set that you add next.
+
+1. Save `creation-request.json` as shown under "In a file: automated networking".
+2. Save the network settings as `scale-set-settings.json`:
+
+   ```json
+   {
+     "vnetResourceGroup_param": "<resource group of your VNet>",
+     "vnetNameFull_param": "<name of your VNet>"
+   }
+   ```
+
+3. Save the service switches as `project-settings.json`:
+
+```json
+{
+  "ENABLE_KONG": "false",
+  "ENABLE_APIM": "true",
+  "enableAIFactoryMCP": "true",
+  "addAIFactoryMCP2APIM": "true",
+  "enableFactoryChatAgent": "true"
+}
+```
+
+`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
+for project 001 in Dev only. Agent Chat has its own prerequisites: see
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+</details>
+
+<details>
+<summary>In a file: BYO subnets</summary>
+
+You bring the VNet and its subnets, and ESAF creates no network at all. As with a BYO VNet, your network goes
+to the scale set that you add after scenario 1.
+
+1. Save `creation-request.json` as shown under "In a file: automated networking".
+2. Save the network settings as `scale-set-settings.json`:
+
+   ```json
+   {
+     "BYO_subnets": "true",
+     "vnetResourceGroup_param": "<resource group of your VNet>",
+     "vnetNameFull_param": "<name of your VNet>"
+   }
+   ```
+
+   Your subnets must exist before the run. See [networking and private DNS](../10-19/14-networking-privateDNS.md)
+   for the subnets that a scale set and its projects need.
+3. Save the service switches as `project-settings.json`:
+
+```json
+{
+  "ENABLE_KONG": "false",
+  "ENABLE_APIM": "true",
+  "enableAIFactoryMCP": "true",
+  "addAIFactoryMCP2APIM": "true",
+  "enableFactoryChatAgent": "true"
+}
+```
+
+`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
+for project 001 in Dev only. Agent Chat has its own prerequisites: see
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
+
+</details>
+
+<details>
+<summary>In the app: Full bootstrap</summary>
+
+Use the **Enterprise Scale AI Factory** app from
+[Quickstart: Install the ESAF tools](01-install-esaf.md#connect-your-tool). The saved form is your **draft**.
+
+1. On **Start Guide**, select **Use Full bootstrap**. It supports GitHub Actions and Azure DevOps, every hub
+   mode and every networking mode.
+2. Under **Where will your pipelines run?**, choose GitHub Actions or Azure DevOps.
+3. Fill in the form. It asks for the same values as the creation request: subscription, tenant, region,
+   prefix, VNet range, team and repository.
+4. Select **Save local configuration**.
+
+For the smallest form, select **Use Simple Mode** instead: GitHub Actions, Dev and private networking.
+
+</details>
+
 ## Create the Factory
 
 > [!WARNING]
@@ -123,14 +242,12 @@ Keep `creation-request.json` out of Git if you treat your subscription IDs as pr
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 
-1. On **Start Guide**, select **Use Simple Mode**: GitHub Actions, Dev and private networking. For Azure
-   DevOps, an external hub or another networking mode, select **Use Full bootstrap**.
-2. Fill in the form, then select **Save local configuration**. That's your draft.
-3. To run it, open the menu and select **Configuration wizard** > **Quick setup & tear down**.
-4. Select **1. Init AI Factory**.
-5. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
+1. Save your draft as described under "In the app: Full bootstrap".
+2. Open the menu and select **Configuration wizard** > **Quick setup & tear down**.
+3. Select **1. Init AI Factory**.
+4. Tick **I approve this scenario: it runs at once and changes Azure.**, then select
    **Run selected scenario**.
-6. Follow **Job status** on the same page until it shows that the job succeeded.
+5. Follow **Job status** on the same page until it shows that the job succeeded.
 
 </details>
 <!-- /factory-tool -->
@@ -212,6 +329,17 @@ curl --silent --show-error --get "$API_URL/api/v1/esaf/jobs/<job ID>" \
 The run takes about one hour, and up to 90 minutes in the recorded runs. You can stop waiting at any time;
 the job keeps running while the app stays open.
 
+When the job has succeeded, apply your other files. Each one is one more call:
+
+| File | Call |
+|---|---|
+| `scale-set-settings.json` | `azurefactory esaf add-scale-set 002 dev --cidr <range of your VNet> --settings-json ./scale-set-settings.json --wait` |
+| `project-settings.json` | `azurefactory esaf upsert-project 001 dev --scale-set 001 --settings-json ./project-settings.json --wait` |
+
+In Python, pass the content of the file as `settings=`. Over REST, send it as `settings`. See
+[Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets) and
+[Add a project](03-add-project.md#change-a-setting).
+
 ## Verify the result
 
 The job ends with status `succeeded`:
@@ -253,6 +381,8 @@ To remove everything this quickstart created, delete the Factory with one call:
 See [Quickstart: Clean up](05-clean-up.md) for what stays and what goes.
 
 ## Next step
+
+**Back:** [Quickstart: Install the ESAF tools](01-install-esaf.md)
 
 **Next:** [Quickstart: Add a scale set](add-scale-set.md). It's optional: to stay on one scale set, go to
 [Quickstart: Add a project for your team](03-add-project.md).

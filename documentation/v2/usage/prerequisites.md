@@ -36,4 +36,6 @@ Factory yet, see [Setup docs - platform team](../quickstarts/README.md).
 | [Git](https://git-scm.com/downloads) | Current | Getting the templates in `usecase_code` |
 | PowerShell | 7 or later | Running the commands as written |
 
+**Back:** [Usage docs](README.md)
+
 **Next:** [Quickstart: Run your first agent in your ESAF project](01-first-agent.md)

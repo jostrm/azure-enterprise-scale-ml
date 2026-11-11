@@ -20,13 +20,13 @@ scenario is one call.
 
 ```mermaid
 flowchart LR
-  A[1 Install the tools]:::neutral --> B[2 Create your AI Factory]:::factory
-  B -.-> S[Optional: add a scale set]:::factory -.-> C
-  B --> C[3 Add a project]:::factory --> D[4 Enable Agent Chat]:::good
-  D -.-> E[5 Clean up]:::neutral
-  classDef factory fill:#7c3aed,stroke:#5b21b6,color:#ffffff
-  classDef good fill:#22c55e,stroke:#15803d,color:#052e16
-  classDef neutral fill:#3b82f6,stroke:#1d4ed8,color:#ffffff
+  A[1 Install<br/>the tools]:::blue --> B[2 Create your<br/>AI Factory]:::purple
+  B -.-> S[Optional:<br/>add a scale set]:::purple -.-> C
+  B --> C[3 Add<br/>a project]:::purple --> D[4 Enable<br/>Agent Chat]:::pink
+  D -.-> E[5 Clean up]:::blue
+  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
 ```
 
 | Step | Quickstart | The one call | Time |

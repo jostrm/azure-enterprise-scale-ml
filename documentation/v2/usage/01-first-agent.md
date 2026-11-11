@@ -108,6 +108,8 @@ Remove-Item -Recurse -Force .\.venv
 
 ## Next step
 
+**Back:** [Usage prerequisites](prerequisites.md)
+
 **Next:** [Quickstart: Train your first model in your ESAF project](02-first-ml-model.md)
 
 Related:

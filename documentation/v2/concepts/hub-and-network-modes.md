@@ -48,12 +48,14 @@ or public networking.
 
 ```mermaid
 flowchart TD
-  A{Do you already own a hub?} -- Yes --> E[External hub]:::good
-  A -- No --> B{Do you need private-only access?}
-  B -- Yes --> O[Own hub]:::good
-  B -- No --> S[Standalone, no hub<br/>hybrid or public]:::neutral
-  classDef good fill:#22c55e,stroke:#15803d,color:#052e16
-  classDef neutral fill:#3b82f6,stroke:#1d4ed8,color:#ffffff
+  A{Do you already<br/>own a hub?} -- Yes --> E[External hub]:::blue
+  A -- No --> B{Do you need<br/>private-only<br/>access?}
+  B -- Yes --> O[Own hub]:::purple
+  B -- No --> S[Standalone, no hub:<br/>hybrid or public]:::pink
+  classDef blue fill:#14243A,stroke:#5AA9FF,stroke-width:2px,color:#ECF6FF
+  classDef purple fill:#2C2341,stroke:#B07CFF,stroke-width:2px,color:#ECF6FF
+  classDef pink fill:#3C213A,stroke:#FF6FD8,stroke-width:2px,color:#ECF6FF
+  class A,B blue
 ```
 
 ## Settings behind the choices

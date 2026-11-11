@@ -89,6 +89,8 @@ Remove-Item -Recurse -Force .\ml-environment\outputs\diabetes, .\.venv
 
 ## Next step
 
+**Back:** [Quickstart: Run your first agent in your ESAF project](01-first-agent.md)
+
 **Next:** [View your project dashboards](dashboards.md)
 
 Related:

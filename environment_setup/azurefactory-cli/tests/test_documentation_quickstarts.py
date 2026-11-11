@@ -526,3 +526,84 @@ def test_lab_guide_links_say_it_needs_a_preview_code(page):
         return
     assert "preview code" in text and PREVIEW_CONTACT in text, "The ESAF Tutorials download is a private preview."
     assert "dropbox.com" not in text
+
+
+# --- Describe your Factory: three file options and the app, with settings the API really takes. ------------------
+CREATE = SETUP_QUICKSTARTS[1]
+DESCRIBE_OPTIONS = ["In a file: automated networking", "In a file: BYO VNet", "In a file: BYO subnets",
+                    "In the app: Full bootstrap"]
+SERVICE_SWITCHES = {"ENABLE_KONG": "false", "ENABLE_APIM": "true", "addAIFactoryMCP2APIM": "true",
+                    "enableFactoryChatAgent": "true"}
+
+
+def describe_options():
+    section = read(CREATE).split("## Describe your Factory", 1)[1].split("\n## ", 1)[0]
+    return {summary: body for summary, body in
+            re.findall(r"(?s)<details(?: open)?>\n<summary>([^<]+)</summary>\n(.*?)\n</details>", section)}
+
+
+def json_blocks(text):
+    import json
+    return [json.loads(block) for block in re.findall(r"(?ms)^[ \t]*```json\n(.*?)^[ \t]*```", text)]
+
+
+def test_describe_your_factory_offers_three_file_options_and_the_app():
+    options = describe_options()
+    assert list(options) == DESCRIBE_OPTIONS
+    for label in DESCRIBE_OPTIONS[:3]:
+        blocks = json_blocks(options[label])
+        switches = [block for block in blocks if "ENABLE_APIM" in block]
+        assert len(switches) == 1, f"{label} shows the service switches once."
+        assert SERVICE_SWITCHES.items() <= switches[0].items(), label
+        # The API refuses addAIFactoryMCP2APIM without the MCP itself.
+        assert switches[0].get("enableAIFactoryMCP") == "true", label
+    vnet = [block for block in json_blocks(options["In a file: BYO VNet"]) if "vnetResourceGroup_param" in block]
+    subnets = [block for block in json_blocks(options["In a file: BYO subnets"]) if "vnetResourceGroup_param" in block]
+    assert len(vnet) == len(subnets) == 1
+    assert "BYO_subnets" not in vnet[0] and subnets[0]["BYO_subnets"] == "true"
+    assert all(block.get("vnetNameFull_param") for block in (vnet[0], subnets[0]))
+    assert "Full bootstrap" in options["In the app: Full bootstrap"] and "```json" not in options[DESCRIBE_OPTIONS[3]]
+
+
+def test_creation_request_holds_only_the_fields_the_api_takes():
+    """The creation request is a closed set of lower-case fields; switches and BYO settings go in their own files."""
+    requests = [block for block in json_blocks(read(CREATE)) if "contract_version" in block]
+    assert requests, "Quickstart 02 shows the creation request."
+    for request in requests:
+        assert request["mode"] == "full-bootstrap" and request["action"] == "create-factory"
+        strangers = [key for key in request["config"] if not re.fullmatch(r"[a-z][a-z0-9_]*", key)]
+        assert not strangers, f"The API refuses these names in a creation request: {strangers}"
+
+
+# --- Navigation: every page in a reading path links back and forward. ---------------------------------------------
+READING_PATHS = [[SETUP_HUB, *SETUP_QUICKSTARTS],
+                 [USAGE_HUB, USAGE_PREREQUISITES, *USAGE_QUICKSTARTS, V2 / "usage" / "dashboards.md"]]
+
+
+def navigation_target(page, word):
+    found = re.search(rf"(?m)^\*\*{word}:\*\* \[[^\]]+\]\(([^)#]+)", read(page))
+    return (page.parent / found[1]).resolve() if found else None
+
+
+@pytest.mark.parametrize("path", READING_PATHS, ids=["setup", "usage"])
+def test_pages_link_back_and_next_along_the_reading_path(path):
+    for before, after in zip(path, path[1:]):
+        assert navigation_target(before, "Next") == after.resolve(), f"{name(before)}: Next"
+        assert navigation_target(after, "Back") == before.resolve(), f"{name(after)}: Back"
+
+
+# --- Diagrams: labels fit their boxes, and the colors are the onion's. ---------------------------------------------
+ONION_COLORS = {"#080E1B", "#14243A", "#5AA9FF", "#2C2341", "#B07CFF", "#3C213A", "#FF6FD8", "#15362D", "#3DDC97",
+                "#ECF6FF", "#A0B5D0"}
+
+
+@pytest.mark.parametrize("page", END_USER, ids=name)
+def test_mermaid_diagrams_use_onion_colors_and_labels_that_fit(page):
+    for diagram in re.findall(r"(?ms)^```mermaid\n(.*?)^```", read(page)):
+        colors = {color.upper() for color in re.findall(r"#[0-9a-fA-F]{6}\b", diagram)}
+        assert colors <= {color.upper() for color in ONION_COLORS}, f"{name(page)}: {sorted(colors)}"
+        if not diagram.lstrip().startswith(("flowchart", "%%{init")):
+            continue
+        for label in re.findall(r"[\[{]([^\[\]{}\"]+)[\]}]", diagram):
+            lines = label.split("<br/>")
+            assert all(len(line) <= 20 for line in lines), f"{name(page)}: break the label {label!r}"
