@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/">
       
       
-        <link rel="prev" href="../concepts/templates/genaiops/">
+        <link rel="prev" href="../code-templates/">
       
       
-        <link rel="next" href="../iac/bicep/">
+        <link rel="next" href="../factory-tools/18-cli-and-api-and-usage/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Automated Architectures - Enterprise Scale AI Factory</title>
+        <title>Architecture - Enterprise Scale AI Factory</title>
       
     
     
@@ -57,6 +57,8 @@
     
       <link rel="stylesheet" href="../assets/stylesheets/diagrams.css">
     
+      <link rel="stylesheet" href="../assets/stylesheets/libraries.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -82,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#choose-an-architecture" class="md-skip">
+        <a href="#architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Automated Architectures
+              Architecture
             
           </span>
         </div>
@@ -284,6 +286,46 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../code-templates/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Code templates library: Project team
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -350,6 +392,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Azure resource library
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -386,27 +447,6 @@
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-    
-  
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Automated Architectures
-
-      </a>
-    </li>
   
 
       
@@ -509,7 +549,9 @@
           
             
               
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -1025,6 +1067,151 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../code-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code templates library: Project team
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-numbers-on-the-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The numbers on the images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-each-connection-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How each connection works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watch-the-hub-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watch the hub options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#continue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continue
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
       
@@ -1049,10 +1236,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1070,8 +1257,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1204,7 +1391,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1226,14 +1413,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1340,10 +1527,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
             
   
   
@@ -1361,8 +1548,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1497,6 +1684,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure resource library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
       
@@ -1525,7 +1739,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1547,14 +1761,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1691,7 +1905,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1713,14 +1927,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_11" id="__nav_11_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1820,10 +2034,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_4" >
         
           
-          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_4" id="__nav_11_4_label" tabindex="0">
             
   
   
@@ -1841,8 +2055,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1983,130 +2197,6 @@
       
   
   
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Automated Architectures
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Automated Architectures
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#build-on-a-shared-foundation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build on a shared foundation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#connect-to-your-enterprise-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Connect to your enterprise environment
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Connect to your enterprise environment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#watch-the-hub-options" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Watch the hub options
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue-with-your-workload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue with your workload
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
   
   
     
@@ -2131,10 +2221,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
             
   
   
@@ -2152,8 +2242,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2254,10 +2344,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
             
   
   
@@ -2275,8 +2365,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2411,7 +2501,9 @@
             
             
               
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -2430,10 +2522,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#build-on-a-shared-foundation" class="md-nav__link">
+  <a href="#the-numbers-on-the-images" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build on a shared foundation
+        The numbers on the images
       
     </span>
   </a>
@@ -2441,18 +2533,17 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#connect-to-your-enterprise-environment" class="md-nav__link">
+  <a href="#how-each-connection-works" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Connect to your enterprise environment
+        How each connection works
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Connect to your enterprise environment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#watch-the-hub-options" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2462,17 +2553,12 @@
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
       
         <li class="md-nav__item">
-  <a href="#continue-with-your-workload" class="md-nav__link">
+  <a href="#continue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Continue with your workload
+        Continue
       
     </span>
   </a>
@@ -2493,66 +2579,252 @@
               <article class="md-content__inner md-typeset">
                 
                   
+  
+
 
 
   
   
 
 
-<h1 id="choose-an-architecture">Choose an architecture<a class="headerlink" href="#choose-an-architecture" title="Permanent link">&para;</a></h1>
-<p>AI Factory provides two main infrastructure families. Choose the workload first,
-then review the services, networking and environment you need.</p>
-<p><img alt="AI Factory architectures" src="../assets/images/10-two-architectures-v2.png" /></p>
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>An AI Factory has a common part and one resource group for each project. Every project starts from the same
+template, and the team switches on the Azure services it needs. You choose one of three
+<a href="../reference/hub-and-network-modes/">hub modes</a> when you create the Factory.</p>
+<p>Each image shows the Factory with one hub mode, and how it connects to Microsoft 365, Microsoft Power
+Platform, SharePoint, Microsoft Fabric and the AI gateway. A numbered blue circle is a code template for that
+part: select the circle, or find the number in <a href="#the-numbers-on-the-images">the table</a> below.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">External hub</label><label for="__tabbed_1_2">Own hub</label><label for="__tabbed_1_3">Standalone</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The Factory connects to a hub that you already own, with VNet peering. Your hub gives the VPN or
+ExpressRoute connection, the firewall and the private DNS zones. Choose it when you have a landing zone,
+or when several Factories share one hub.</p>
+<p><div class="esaf-architecture">
+  <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-external-hub.svg" aria-label="Diagram that shows the AI Factory connected to an external hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
+    <img src="../assets/architecture/esaf-architecture-external-hub.png" alt="Diagram that shows the AI Factory connected to an external hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+  </object>
+</div></p>
+<p><a href="../assets/architecture/esaf-architecture-external-hub.svg">Open the image at full size</a> |
+<a href="../assets/architecture/esaf-architecture-external-hub.png">PNG</a></p>
+</div>
+<div class="tabbed-block">
+<p>The Factory creates its own hub in its Dev network, with a VPN gateway, a DNS Private Resolver and
+Bastion. Choose it when you need private access and have no central hub.</p>
+<p><div class="esaf-architecture">
+  <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-own-hub.svg" aria-label="Diagram that shows the AI Factory with its own hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
+    <img src="../assets/architecture/esaf-architecture-own-hub.png" alt="Diagram that shows the AI Factory with its own hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+  </object>
+</div></p>
+<p><a href="../assets/architecture/esaf-architecture-own-hub.svg">Open the image at full size</a> |
+<a href="../assets/architecture/esaf-architecture-own-hub.png">PNG</a></p>
+</div>
+<div class="tabbed-block">
+<p>The Factory has no hub. It keeps its network and its private DNS zones in the common resource group, and
+people reach the services over the internet from the IP addresses you allow. Choose it to evaluate ESAF
+or to run a workshop. Networking is hybrid or public.</p>
+<p><div class="esaf-architecture">
+  <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-standalone.svg" aria-label="Diagram that shows a standalone AI Factory without a hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
+    <img src="../assets/architecture/esaf-architecture-standalone.png" alt="Diagram that shows a standalone AI Factory without a hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+  </object>
+</div></p>
+<p><a href="../assets/architecture/esaf-architecture-standalone.svg">Open the image at full size</a> |
+<a href="../assets/architecture/esaf-architecture-standalone.png">PNG</a></p>
+</div>
+</div>
+</div>
+<h2 id="the-numbers-on-the-images">The numbers on the images<a class="headerlink" href="#the-numbers-on-the-images" title="Permanent link">&para;</a></h2>
+<p>The numbers mean the same on all three images. Each row links to the template in the
+<a href="../code-templates/">code templates library</a> and to its folder.</p>
 <table>
 <thead>
 <tr>
-<th>Family</th>
-<th>Choose it for</th>
-<th>Typical building blocks</th>
+<th>No.</th>
+<th>Code template</th>
+<th>What you build with it</th>
+<th>Where on the image</th>
+<th>Code</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>ESML</strong></td>
-<td>Machine-learning training, batch scoring and online serving</td>
-<td>Azure Machine Learning, data storage, Key Vault, monitoring and selected compute; optional Databricks, Data Factory or AKS.</td>
+<td><strong>1</strong></td>
+<td><a href="../code-templates/#aifactory-agent">ESAF agent with a private web chat, ready for Teams</a></td>
+<td>A Foundry prompt agent grounded in Azure AI Search, with a private web chat. Publish it to Teams and Microsoft 365 Copilot with enableBotService and botFoundryAgentName.</td>
+<td>Microsoft 365, through Bot Service to the agent</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/40-aifactory-agent"><code>40-agent-factory/40-aifactory-agent</code></a></td>
 </tr>
 <tr>
-<td><strong>GenAI-1</strong></td>
-<td>Foundry agents, RAG and generative applications</td>
-<td>Foundry, storage, Key Vault, monitoring and the selected private-agent dependencies, such as Search and Cosmos DB.</td>
+<td><strong>2</strong></td>
+<td><a href="../code-templates/#aifactory-agent-live-voice">Live voice for the ESAF agent</a></td>
+<td>A pipeline step that deploys the private chat app with Azure Voice Live, so that people talk to the agent and hear it answer.</td>
+<td>Voice Live in the Foundry project</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice"><code>40-agent-factory/47-aifactory-agent-live-voice</code></a></td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td><a href="../code-templates/#foundry-voice-sales-from-fabric">Voice sales assistant on Fabric data</a></td>
+<td>A sales assistant in the browser: a Foundry prompt agent answers from a Fabric data agent over MCP, with optional live voice.</td>
+<td>Microsoft Fabric, into the Foundry tools</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric"><code>40-agent-factory/40-foundry-voice-sales--from-fabric</code></a></td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td><a href="../code-templates/#multi-agent-fabric-iq">Retail agents on Foundry IQ and Fabric IQ</a></td>
+<td>A supervisor routes retail questions to three prompt agents, grounded in a Foundry IQ knowledge base and a Fabric data agent.</td>
+<td>Fabric IQ beside Foundry IQ</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/42-multi-agent-fabric-iq"><code>40-agent-factory/42-multi-agent-fabric-iq</code></a></td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td><a href="../code-templates/#rag-split-tables-acl">RAG that keeps each reader's permissions</a></td>
+<td>RAG over several indexes that trims answers with the ADLS Gen2 access control lists, with an optional SharePoint sync and exact totals from a calculator tool.</td>
+<td>SharePoint, into Foundry IQ</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2"><code>40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2</code></a></td>
+</tr>
+<tr>
+<td><strong>6</strong></td>
+<td><a href="../code-templates/#azure-mcp-inventory">Private Azure MCP server for your agents</a></td>
+<td>A private, read-only Azure MCP server on Container Apps, so that Foundry agents can list the real resources of the project.</td>
+<td>Foundry tools: MCP</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/44-azure-mcp"><code>40-agent-factory/44-azure-mcp</code></a></td>
+</tr>
+<tr>
+<td><strong>7</strong></td>
+<td><a href="../code-templates/#aifactory-mcp-gateway">Factory MCP server on the AI gateway</a></td>
+<td>A pipeline step that hosts the read-only Factory MCP server on Container Apps and registers it on the AI gateway in API Management.</td>
+<td>AI gateway: API Management or Kong</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway"><code>40-agent-factory/45-aifactory-mcp-gateway</code></a></td>
+</tr>
+<tr>
+<td><strong>8</strong></td>
+<td><a href="../code-templates/#agent-training-ml-churn">Agent that trains and scores ML models</a></td>
+<td>A Foundry agent that creates, trains, retrains and batch-scores Azure Machine Learning models for churn prediction.</td>
+<td>From the Foundry agent to Azure Machine Learning</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction"><code>40-agent-factory/49-agent-training-ml-churn-prediction</code></a></td>
+</tr>
+<tr>
+<td><strong>9</strong></td>
+<td><a href="../code-templates/#single-agent">Single agent: prompt agent or hosted agent</a></td>
+<td>A helpdesk agent that answers from Foundry IQ. Choose a prompt agent, or a hosted agent in one of six frameworks.</td>
+<td>Prompt agents in the Foundry project</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/41-single-agent"><code>40-agent-factory/41-single-agent</code></a></td>
+</tr>
+<tr>
+<td><strong>10</strong></td>
+<td><a href="../code-templates/#multi-agent-helpdesk">Multi-agent helpdesk: retrieve, review, answer</a></td>
+<td>A hosted coordinator asks a knowledge agent for evidence, passes it to a reviewer agent and writes one reviewed answer.</td>
+<td>Hosted agents in the Foundry project</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/42-multi-agent"><code>40-agent-factory/42-multi-agent</code></a></td>
+</tr>
+<tr>
+<td><strong>11</strong></td>
+<td><a href="../code-templates/#rag-agent-shared-lake">RAG from the shared data lake or project storage</a></td>
+<td>Text RAG over a pinned corpus in the common data lake or in project storage, with one agent, index and knowledge base for each source.</td>
+<td>Azure AI Search</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/45-rag-agent"><code>40-agent-factory/45-rag-agent</code></a></td>
+</tr>
+<tr>
+<td><strong>12</strong></td>
+<td><a href="../code-templates/#data-helpdesk-corpus">Prepare a helpdesk corpus for RAG</a></td>
+<td>Prepares a public helpdesk dataset for private Foundry IQ retrieval, and keeps the evaluation answers apart from the searchable knowledge.</td>
+<td>Data Factory and Storage</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/43-data"><code>40-agent-factory/43-data</code></a></td>
+</tr>
+<tr>
+<td><strong>13</strong></td>
+<td><a href="../code-templates/#factory-chat-agent">ESAF Agent Chat: the agent behind it</a></td>
+<td>The pipeline step that creates or updates the Agent Chat prompt agent in the project when enableFactoryChatAgent is true.</td>
+<td>Container Apps: the Agent Chat app</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/46-factory-chat-agent"><code>40-agent-factory/46-factory-chat-agent</code></a></td>
+</tr>
+<tr>
+<td><strong>14</strong></td>
+<td><a href="../code-templates/#ml-model-factory">ML Model Factory</a></td>
+<td>Machine-learning examples for batch, online and streaming inference with Azure Machine Learning, AutoML and Databricks, driven by one scenario file.</td>
+<td>Azure Machine Learning and Databricks</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/50-ml-model-factory"><code>50-ml-model-factory</code></a></td>
+</tr>
+<tr>
+<td><strong>15</strong></td>
+<td><a href="../code-templates/#func-aifactory-lifecycle">Factory lifecycle as an Azure Function</a></td>
+<td>An Azure Function that runs the six ESAF scenarios, from creating a Factory to deleting it, so that a portal or a ticket system can order projects.</td>
+<td>Azure Functions</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/10-azure-function/12_func_aifactory_lifecycle"><code>10-azure-function/12_func_aifactory_lifecycle</code></a></td>
+</tr>
+<tr>
+<td><strong>16</strong></td>
+<td><a href="../code-templates/#func-read-from-storage">Azure Function that reads from storage</a></td>
+<td>An HTTP-triggered Azure Function that lists and reads blobs with its managed identity, with a health endpoint.</td>
+<td>Storage of the project</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/10-azure-function/11_func_read_from_storage"><code>10-azure-function/11_func_read_from_storage</code></a></td>
+</tr>
+<tr>
+<td><strong>17</strong></td>
+<td><a href="../code-templates/#foundry-prompt-rag-responses-api">Starter: prompt agent with RAG in one file</a></td>
+<td>One script that indexes a sample document in Azure AI Search and answers questions with a Foundry prompt agent on the Responses API.</td>
+<td>Models and Azure AI Search</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/20-agent-foundry/agent_04_prompt_rag_responses_api.py"><code>20-agent-foundry/agent_04_prompt_rag_responses_api.py</code></a></td>
+</tr>
+<tr>
+<td><strong>18</strong></td>
+<td><a href="../code-templates/#foundry-fabric-data-agent">Starter: prompt agent with a Fabric data agent</a></td>
+<td>One script in which a Foundry prompt agent answers questions through a Microsoft Fabric data agent tool.</td>
+<td>Microsoft Fabric data agent</td>
+<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/20-agent-foundry/agent_05_fabric_data_agent.py"><code>20-agent-foundry/agent_05_fabric_data_agent.py</code></a></td>
 </tr>
 </tbody>
 </table>
-<p>Service switches and dependencies vary by route. Do not assume every possible
-GenAI project requires the same model or that all optional services are deployed.
-The older Foundry Hub flags are not the recommended current Foundry path.</p>
-<h2 id="build-on-a-shared-foundation">Build on a shared foundation<a class="headerlink" href="#build-on-a-shared-foundation" title="Permanent link">&para;</a></h2>
-<p>A factory can share common network and platform services while projects have
-their own resources and settings. A project can have explicit placements in Dev,
-Stage and Prod; configuration does not automatically provision all three.</p>
-<p>See <a href="../concepts/">factory, scale-set and project concepts</a>,
-<a href="../concepts/enterprise-scale/">environment planning</a>, and the
-<a href="../parameters/standard/">Parameters checklist</a>.</p>
-<div class="admonition important">
-<p class="admonition-title">Plan changes before applying them</p>
-<p>Feature flags are inputs to reviewed deployment. They are not a guarantee
-that existing resources remain untouched, or that disabled services are
-deleted automatically.</p>
-</div>
-<h2 id="connect-to-your-enterprise-environment">Connect to your enterprise environment<a class="headerlink" href="#connect-to-your-enterprise-environment" title="Permanent link">&para;</a></h2>
-<p>Existing hub/spoke, central DNS and BYO network designs require the correct
-resource references, permissions, routes and private connectivity. A topology
-diagram is not a substitute for checking that setup.</p>
-<h3 id="watch-the-hub-options">Watch the hub options<a class="headerlink" href="#watch-the-hub-options" title="Permanent link">&para;</a></h3>
-<p>Compare the configuration wizard's three illustrative network designs. These
-lessons do not provision connectivity or discover your existing network.
-Choose a tab; reduced-motion preferences show still images.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">External hub</label><label for="__tabbed_1_2">Standalone - no hub</label><label for="__tabbed_1_3">Standalone - own hub</label></div>
+<h2 id="how-each-connection-works">How each connection works<a class="headerlink" href="#how-each-connection-works" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Connection</th>
+<th>How it works</th>
+<th>Settings and templates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Microsoft 365</strong>: Teams and Microsoft 365 Copilot</td>
+<td>You publish an agent of the Foundry project. Azure Bot Service passes each message from Teams or Copilot to that agent.</td>
+<td><code>enableBotService</code>, <code>botFoundryAgentName</code>, <code>botFoundryProjectResourceId</code>. Template 1.</td>
+</tr>
+<tr>
+<td><strong>Microsoft Power Platform</strong>: Copilot Studio and Power Automate</td>
+<td>The common virtual network has a subnet that is delegated to Power Platform (<code>common_pbi_subnet_name</code>). You connect your Power Platform environment to that subnet. Agents and flows then call the Factory over the private network.</td>
+<td><code>common_pbi_subnet_name</code>, <code>common_pbi_subnet_cidr</code>. No code template yet.</td>
+</tr>
+<tr>
+<td><strong>SharePoint</strong></td>
+<td>SharePoint is a knowledge source outside the Factory. Foundry IQ connects to it, and your agents answer from it.</td>
+<td>Template 5 keeps each reader's permissions and has an optional SharePoint sync.</td>
+</tr>
+<tr>
+<td><strong>AI gateway</strong>: API Management, or Kong</td>
+<td>One endpoint in front of a pool of model deployments, with retries when a backend is throttled. Kong is the alternative when your organization runs Kong. The gateway has its own pipeline.</td>
+<td><code>ENABLE_APIM</code> or <code>ENABLE_KONG</code>, and the <code>apimGateway...</code> and <code>kongGateway...</code> settings. Template 7. See <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/29-factory-AI-Gateways.md">AI gateways</a>.</td>
+</tr>
+<tr>
+<td><strong>Microsoft Fabric</strong></td>
+<td>A Fabric data agent answers questions about your Fabric data. A Foundry agent calls it as a tool.</td>
+<td>Templates 3, 4 and 18.</td>
+</tr>
+<tr>
+<td><strong>Azure Machine Learning</strong></td>
+<td>A Foundry agent trains, retrains and scores models in the workspace of the project.</td>
+<td><code>enableAzureMachineLearning</code>. Templates 8 and 14.</td>
+</tr>
+</tbody>
+</table>
+<p>Every setting is explained in <a href="../parameters/variables/">Every variable in variables.json</a>, and the
+<a href="../resources/">Azure resource library</a> lists the services by category.</p>
+<h2 id="watch-the-hub-options">Watch the hub options<a class="headerlink" href="#watch-the-hub-options" title="Permanent link">&para;</a></h2>
+<p>The configuration wizard has an animation for each hub mode. The tabs follow your choice above. If your
+device asks for reduced motion, you get a still image.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">External hub</label><label for="__tabbed_2_2">Own hub</label><label for="__tabbed_2_3">Standalone</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Reuse a separately owned enterprise hub with explicit connectivity and
-ownership checks.</p>
 <p><picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-external-hub.png">
   <img src="../assets/animations/factory-topology-external-hub.gif" alt="An AI Factory connects to a separately owned external enterprise hub." width="1400" height="943" loading="lazy">
@@ -2562,17 +2834,6 @@ ownership checks.</p>
 <a href="../assets/animations/factory-topology-external-hub.png">Still image</a></p>
 </div>
 <div class="tabbed-block">
-<p>Keep the factory standalone without assuming access through a central hub.</p>
-<p><picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-standalone.png">
-  <img src="../assets/animations/factory-topology-standalone.gif" alt="A standalone AI Factory operates without a hub connection." width="1400" height="889" loading="lazy">
-</picture></p>
-<p><a href="../assets/animations/factory-topology-standalone.svg">Animated SVG</a> |
-<a href="../assets/animations/factory-topology-standalone.gif">GIF</a> |
-<a href="../assets/animations/factory-topology-standalone.png">Still image</a></p>
-</div>
-<div class="tabbed-block">
-<p>Include a factory-owned hub and review its networking and access dependencies.</p>
 <p><picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-own-hub.png">
   <img src="../assets/animations/factory-topology-own-hub.gif" alt="A standalone AI Factory includes its own hub and connected project networks." width="1400" height="919" loading="lazy">
@@ -2581,28 +2842,25 @@ ownership checks.</p>
 <a href="../assets/animations/factory-topology-own-hub.gif">GIF</a> |
 <a href="../assets/animations/factory-topology-own-hub.png">Still image</a></p>
 </div>
+<div class="tabbed-block">
+<p><picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-standalone.png">
+  <img src="../assets/animations/factory-topology-standalone.gif" alt="A standalone AI Factory operates without a hub connection." width="1400" height="889" loading="lazy">
+</picture></p>
+<p><a href="../assets/animations/factory-topology-standalone.svg">Animated SVG</a> |
+<a href="../assets/animations/factory-topology-standalone.gif">GIF</a> |
+<a href="../assets/animations/factory-topology-standalone.png">Still image</a></p>
 </div>
 </div>
-<p><img alt="Enterprise landing-zone context" src="../assets/images/14-eslz-full-1.png" /></p>
-<h2 id="continue-with-your-workload">Continue with your workload<a class="headerlink" href="#continue-with-your-workload" title="Permanent link">&para;</a></h2>
+</div>
+<h2 id="continue">Continue<a class="headerlink" href="#continue" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../concepts/templates/genaiops/">Agent and GenAIOps templates</a></li>
-<li><a href="../concepts/templates/mlops/">ML Model Factory and MLOps</a></li>
-<li><a href="../concepts/templates/dataops/">DataOps and storage choices</a></li>
-<li><a href="../factory-tools/19-cli-and-api-and-usage/">Create or update through CLI, SDK or REST</a></li>
+<li><a href="../reference/hub-and-network-modes/">Choose a hub mode and a networking mode</a></li>
+<li><a href="../setup/02-create-factory/">Create your AI Factory</a></li>
+<li><a href="../code-templates/">Code templates library</a></li>
+<li><a href="../concepts/templates/genaiops/">Agent Factory</a>, <a href="../concepts/templates/mlops/">Model Factory</a> and
+  <a href="../concepts/templates/dataops/">DataOps</a></li>
 </ul>
-<details>
-<summary>More info</summary>
-<p>Fabric/OneLake and other existing services can be integration targets, not
-automatic additions to every factory. Check the selected workload's documented
-storage and authentication contract.</p>
-<p><img alt="ESML and Fabric integration concept" src="../assets/images/11-services-highlevel-esml_fabric.png" /></p>
-<p>Source families are
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-project"><code>esml-project</code></a>
-and <a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-genai-1"><code>esml-genai-1</code></a>,
-with shared common infrastructure. Template availability is not proof of
-capacity, regional service availability or a successful deployment.</p>
-</details>
 
 
 
@@ -2610,8 +2868,13 @@ capacity, regional service availability or a successful deployment.</p>
 
 
 
+  
+  
 
 
+
+
+  
 
 
 
@@ -2691,6 +2954,8 @@ capacity, regional service availability or a successful deployment.</p>
     
     
       <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="../assets/javascripts/libraries.js"></script>
       
     
   </body>

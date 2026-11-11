@@ -1,0 +1,2661 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.">
+      
+      
+        <meta name="author" content="Microsoft">
+      
+      
+        <link rel="canonical" href="https://jostrm.github.io/azure-enterprise-scale-ml/resources/">
+      
+      
+        <link rel="prev" href="../reference/settings/">
+      
+      
+        <link rel="next" href="../parameters/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Azure resource library - Enterprise Scale AI Factory</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/diagrams.css">
+    
+      <link rel="stylesheet" href="../assets/stylesheets/libraries.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#azure-resource-library" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Enterprise Scale AI Factory" class="md-header__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Enterprise Scale AI Factory
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Azure resource library
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        
+<a class="md-source" href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main" title="Browse AI Factory source on main">
+  <span class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </span>
+  <span class="md-source__repository">AI Factory - main</span>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../setup/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Setup docs: Platform team
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../usage/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Usage docs: Project team
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../code-templates/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Code templates library: Project team
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architectures/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../factory-tools/18-cli-and-api-and-usage/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started - CLI, SDK, API: Core team
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../project-team/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started - Agent & ML Factory SDK: Project team
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/scenarios/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Azure resource library
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../parameters/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Parameters
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../concepts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI Factory Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../iac/bicep/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  IaC
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../orchestrators/ado/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Orchestrators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../news/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  News
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../intelligence/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Monitor and operate
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Enterprise Scale AI Factory" class="md-nav__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    Enterprise Scale AI Factory
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a class="md-source" href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main" title="Browse AI Factory source on main">
+  <span class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </span>
+  <span class="md-source__repository">AI Factory - main</span>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup docs: Platform team
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setup docs: Platform team
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/01-install-esaf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install the ESAF tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/02-create-factory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create your AI Factory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/add-scale-set/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a scale set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/03-add-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/04-first-agent-chat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enable ESAF Agent Chat
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/05-clean-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clean up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../usage/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage docs: Project team
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Usage docs: Project team
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/prerequisites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/01-first-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run your first agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/02-first-ml-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train your first model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code templates library: Project team
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architectures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started - CLI, SDK, API: Core team
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started - CLI, SDK, API: Core team
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factory-tools/18-cli-and-api-and-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factory-tools/19-cli-and-api-and-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add and update
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factory-tools/20-cli-and-api-and-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remove and recover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../project-team/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started - Agent & ML Factory SDK: Project team
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started - Agent & ML Factory SDK: Project team
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project-team/agent-factory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Factory SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project-team/ml-model-factory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Model Factory SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The six scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/hub-and-network-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hub and network modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/folder-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Folder structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure resource library
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure resource library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#always-there" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Always there
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#switch-a-service-on-or-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switch a service on or off
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../parameters/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameters
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Parameters
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Every variable in variables.json
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/standard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Required inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    All parameters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Factory Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_11" id="__nav_11_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Factory Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/intelligence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/enterprise-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enterprise Grade & Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_11_4" id="__nav_11_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Templates
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/templates/iac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IaC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/templates/dataops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DataOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/templates/mlops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/templates/genaiops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GenAIOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IaC
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    IaC
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iac/bicep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BICEP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iac/terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BYO Terraform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orchestrators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Orchestrators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orchestrators/ado/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orchestrators/gh/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../news/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    News
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intelligence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitor and operate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" hidden>
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#always-there" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Always there
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#switch-a-service-on-or-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switch a service on or off
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+
+
+
+  
+  
+
+
+<h1 id="azure-resource-library">Azure resource library<a class="headerlink" href="#azure-resource-library" title="Permanent link">&para;</a></h1>
+<p>Every Azure service that a project or the common part of your AI Factory can switch on. Each card names the
+setting in <code>variables.json</code> and says whether it is on by default.</p>
+<p>Type in the search box, or select a category, a kind or where the resource is deployed. <strong>Full stack</strong> has
+what an application needs around its AI: the front end, databases, a cache, Container Apps, AKS and API
+Management.</p>
+<div class="esaf-library" data-library><div class="esaf-library__bar"><input type="search" class="esaf-library__search" placeholder="Search resources" aria-label="Search resources"><span class="esaf-library__count" aria-live="polite"><span data-count>44</span> of 44 resources</span><button type="button" class="esaf-library__clear" data-clear>Clear filters</button></div><div class="esaf-library__group"><span class="esaf-library__label">Category</span><button type="button" class="esaf-chip" data-filter="category" data-value="AI and agents" aria-pressed="false">AI and agents <span class="esaf-chip__count">16</span></button><button type="button" class="esaf-chip" data-filter="category" data-value="Machine learning" aria-pressed="false">Machine learning <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="category" data-value="Full stack" aria-pressed="false">Full stack <span class="esaf-chip__count">12</span></button><button type="button" class="esaf-chip" data-filter="category" data-value="Data and integration" aria-pressed="false">Data and integration <span class="esaf-chip__count">4</span></button><button type="button" class="esaf-chip" data-filter="category" data-value="Monitoring and security" aria-pressed="false">Monitoring and security <span class="esaf-chip__count">6</span></button><button type="button" class="esaf-chip" data-filter="category" data-value="Access and virtual machines" aria-pressed="false">Access and virtual machines <span class="esaf-chip__count">3</span></button></div><div class="esaf-library__group"><span class="esaf-library__label">Kind</span><button type="button" class="esaf-chip" data-filter="kind" data-value="front end" aria-pressed="false">front end <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="database" aria-pressed="false">database <span class="esaf-chip__count">4</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="cache" aria-pressed="false">cache <span class="esaf-chip__count">2</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="containers" aria-pressed="false">containers <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="API gateway" aria-pressed="false">API gateway <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="agents" aria-pressed="false">agents <span class="esaf-chip__count">5</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="models" aria-pressed="false">models <span class="esaf-chip__count">2</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="knowledge" aria-pressed="false">knowledge <span class="esaf-chip__count">4</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="speech and vision" aria-pressed="false">speech and vision <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="MCP" aria-pressed="false">MCP <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="training" aria-pressed="false">training <span class="esaf-chip__count">2</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="inference" aria-pressed="false">inference <span class="esaf-chip__count">2</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="data pipeline" aria-pressed="false">data pipeline <span class="esaf-chip__count">4</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="events" aria-pressed="false">events <span class="esaf-chip__count">1</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="monitoring" aria-pressed="false">monitoring <span class="esaf-chip__count">3</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="security" aria-pressed="false">security <span class="esaf-chip__count">5</span></button><button type="button" class="esaf-chip" data-filter="kind" data-value="access" aria-pressed="false">access <span class="esaf-chip__count">3</span></button></div><div class="esaf-library__group"><span class="esaf-library__label">Deployed in</span><button type="button" class="esaf-chip" data-filter="scope" data-value="Project" aria-pressed="false">Project <span class="esaf-chip__count">36</span></button><button type="button" class="esaf-chip" data-filter="scope" data-value="Common" aria-pressed="false">Common <span class="esaf-chip__count">6</span></button><button type="button" class="esaf-chip" data-filter="scope" data-value="AI gateway pipeline" aria-pressed="false">AI gateway pipeline <span class="esaf-chip__count">2</span></button></div><div class="esaf-library__cards"><article class="esaf-card" id="foundry" data-category="AI and agents" data-kind="agents|models" data-scope="Project" data-text="microsoft foundry the foundry account and project of the team: model deployments, prompt agents, hosted agents and foundry iq. enableaifoundry ai and agents project agents models"><h3 class="esaf-card__title">Microsoft Foundry</h3><p class="esaf-card__summary">The Foundry account and project of the team: model deployments, prompt agents, hosted agents and Foundry IQ.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">agents</span><span class="esaf-tag esaf-tag--tag">models</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAIFoundry</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Microsoft%20Foundry">22 code templates that use it</a></p></article><article class="esaf-card" id="foundry-caphost" data-category="AI and agents" data-kind="agents" data-scope="Project" data-text="foundry agent service with your own resources private agents that keep their threads, files and vectors in your cosmos db, storage and ai search. needs those three services. enableafoundrycaphost ai and agents project agents"><h3 class="esaf-card__title">Foundry agent service with your own resources</h3><p class="esaf-card__summary">Private agents that keep their threads, files and vectors in your Cosmos DB, Storage and AI Search. Needs those three services.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">agents</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAFoundryCaphost</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="ai-search" data-category="AI and agents" data-kind="knowledge" data-scope="Project" data-text="azure ai search the index for rag and foundry iq knowledge bases, and the vector store of private agents. enableaisearch ai and agents project knowledge"><h3 class="esaf-card__title">Azure AI Search</h3><p class="esaf-card__summary">The index for RAG and Foundry IQ knowledge bases, and the vector store of private agents.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">knowledge</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAISearch</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Azure%20AI%20Search">16 code templates that use it</a></p></article><article class="esaf-card" id="bot-service" data-category="AI and agents" data-kind="agents" data-scope="Project" data-text="azure bot service publishes a foundry agent to microsoft teams and microsoft 365 copilot. name the agent in botfoundryagentname. enablebotservice ai and agents project agents"><h3 class="esaf-card__title">Azure Bot Service</h3><p class="esaf-card__summary">Publishes a Foundry agent to Microsoft Teams and Microsoft 365 Copilot. Name the agent in botFoundryAgentName.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">agents</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableBotService</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Bot%20Service">1 code template that use it</a></p></article><article class="esaf-card" id="agent-chat" data-category="AI and agents" data-kind="agents" data-scope="Project" data-text="esaf agent chat a chat agent that answers questions about your factory and its documentation. needs foundry and a chat model deployment. enablefactorychatagent ai and agents project agents"><h3 class="esaf-card__title">ESAF Agent Chat</h3><p class="esaf-card__summary">A chat agent that answers questions about your Factory and its documentation. Needs Foundry and a chat model deployment.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">agents</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableFactoryChatAgent</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="agent-chat-voice" data-category="AI and agents" data-kind="agents|speech and vision" data-scope="Project" data-text="agent chat live voice talk to agent chat with azure voice live. needs agent chat, container apps, foundry and ai search. enableaifactoryagentlivevoice ai and agents project agents speech and vision"><h3 class="esaf-card__title">Agent Chat live voice</h3><p class="esaf-card__summary">Talk to Agent Chat with Azure Voice Live. Needs Agent Chat, Container Apps, Foundry and AI Search.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">agents</span><span class="esaf-tag esaf-tag--tag">speech and vision</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAIFactoryAgentLiveVoice</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Voice%20Live">2 code templates that use it</a></p></article><article class="esaf-card" id="azure-mcp" data-category="AI and agents" data-kind="MCP" data-scope="Project" data-text="private azure mcp server a private, read-only mcp server that gives your agents tools for the azure resources of the project. enableazuremcpserver ai and agents project mcp"><h3 class="esaf-card__title">Private Azure MCP server</h3><p class="esaf-card__summary">A private, read-only MCP server that gives your agents tools for the Azure resources of the project.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">MCP</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAzureMcpServer</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="factory-mcp" data-category="AI and agents" data-kind="MCP" data-scope="Project" data-text="factory mcp server the read-only tools of the factory as an mcp server on container apps. needs foundry and container apps. enableaifactorymcp ai and agents project mcp"><h3 class="esaf-card__title">Factory MCP server</h3><p class="esaf-card__summary">The read-only tools of the Factory as an MCP server on Container Apps. Needs Foundry and Container Apps.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">MCP</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAIFactoryMCP</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="ai-gateway" data-category="AI and agents" data-kind="API gateway|MCP" data-scope="Project" data-text="ai gateway in foundry creates or adopts the ai gateway of the foundry account. add the factory mcp server to it with addaifactorymcp2aigatewaysku. enableaigatewaysku ai and agents project api gateway mcp"><h3 class="esaf-card__title">AI gateway in Foundry</h3><p class="esaf-card__summary">Creates or adopts the AI gateway of the Foundry account. Add the Factory MCP server to it with addAIFactoryMCP2AIGatewaySKU.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">API gateway</span><span class="esaf-tag esaf-tag--tag">MCP</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAIGatewaySKU</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="azure-openai" data-category="AI and agents" data-kind="models" data-scope="Project" data-text="azure openai (standalone) a separate azure openai account, for workloads that need one beside foundry. enableazureopenai ai and agents project models"><h3 class="esaf-card__title">Azure OpenAI (standalone)</h3><p class="esaf-card__summary">A separate Azure OpenAI account, for workloads that need one beside Foundry.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">models</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAzureOpenAI</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="speech" data-category="AI and agents" data-kind="speech and vision" data-scope="Project" data-text="azure ai speech speech to text and text to speech. enableazurespeech ai and agents project speech and vision"><h3 class="esaf-card__title">Azure AI Speech</h3><p class="esaf-card__summary">Speech to text and text to speech.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">speech and vision</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAzureSpeech</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="vision" data-category="AI and agents" data-kind="speech and vision" data-scope="Project" data-text="azure ai vision image analysis and optical character recognition. enableazureaivision ai and agents project speech and vision"><h3 class="esaf-card__title">Azure AI Vision</h3><p class="esaf-card__summary">Image analysis and optical character recognition.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">speech and vision</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAzureAIVision</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="document-intelligence" data-category="AI and agents" data-kind="knowledge" data-scope="Project" data-text="azure ai document intelligence extracts text, tables and fields from documents, for example before indexing them. enableaidocintelligence ai and agents project knowledge"><h3 class="esaf-card__title">Azure AI Document Intelligence</h3><p class="esaf-card__summary">Extracts text, tables and fields from documents, for example before indexing them.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">knowledge</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAIDocIntelligence</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="content-safety" data-category="AI and agents" data-kind="security" data-scope="Project" data-text="azure ai content safety detects harmful content in prompts and answers. enablecontentsafety ai and agents project security"><h3 class="esaf-card__title">Azure AI Content Safety</h3><p class="esaf-card__summary">Detects harmful content in prompts and answers.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">security</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableContentSafety</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="bing" data-category="AI and agents" data-kind="knowledge" data-scope="Project" data-text="grounding with bing search lets an agent ground its answers in web search results. enablebing ai and agents project knowledge"><h3 class="esaf-card__title">Grounding with Bing Search</h3><p class="esaf-card__summary">Lets an agent ground its answers in web search results.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">knowledge</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableBing</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="bing-custom" data-category="AI and agents" data-kind="knowledge" data-scope="Project" data-text="grounding with bing custom search web grounding that is limited to the sites you choose. enablebingcustomsearch ai and agents project knowledge"><h3 class="esaf-card__title">Grounding with Bing Custom Search</h3><p class="esaf-card__summary">Web grounding that is limited to the sites you choose.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">AI and agents</span><span class="esaf-tag esaf-tag--tag">knowledge</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableBingCustomSearch</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="azure-ml" data-category="Machine learning" data-kind="training|inference" data-scope="Project" data-text="azure machine learning the workspace for training, pipelines, the model registry and endpoints. enableazuremachinelearning machine learning project training inference"><h3 class="esaf-card__title">Azure Machine Learning</h3><p class="esaf-card__summary">The workspace for training, pipelines, the model registry and endpoints.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Machine learning</span><span class="esaf-tag esaf-tag--tag">training</span><span class="esaf-tag esaf-tag--tag">inference</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAzureMachineLearning</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Azure%20Machine%20Learning">10 code templates that use it</a></p></article><article class="esaf-card" id="aks-for-ml" data-category="Machine learning" data-kind="inference|containers" data-scope="Project" data-text="aks for azure machine learning a private aks cluster attached to the workspace for online inference. needs azure machine learning. enableaksforazureml machine learning project inference containers"><h3 class="esaf-card__title">AKS for Azure Machine Learning</h3><p class="esaf-card__summary">A private AKS cluster attached to the workspace for online inference. Needs Azure Machine Learning.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Machine learning</span><span class="esaf-tag esaf-tag--tag">inference</span><span class="esaf-tag esaf-tag--tag">containers</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAksForAzureML</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="databricks" data-category="Machine learning" data-kind="training|data pipeline" data-scope="Project" data-text="azure databricks a databricks workspace for spark data processing and model training. enabledatabricks machine learning project training data pipeline"><h3 class="esaf-card__title">Azure Databricks</h3><p class="esaf-card__summary">A Databricks workspace for Spark data processing and model training.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Machine learning</span><span class="esaf-tag esaf-tag--tag">training</span><span class="esaf-tag esaf-tag--tag">data pipeline</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableDatabricks</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Databricks">1 code template that use it</a></p></article><article class="esaf-card" id="web-app" data-category="Full stack" data-kind="front end" data-scope="Project" data-text="azure web app app service for the web front end or the api of your application. enablewebapp full stack project front end"><h3 class="esaf-card__title">Azure Web App</h3><p class="esaf-card__summary">App Service for the web front end or the API of your application.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">front end</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableWebApp</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="function-app" data-category="Full stack" data-kind="front end" data-scope="Project" data-text="azure function app serverless functions for apis and event handlers. enablefunction full stack project front end"><h3 class="esaf-card__title">Azure Function App</h3><p class="esaf-card__summary">Serverless functions for APIs and event handlers.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">front end</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableFunction</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Azure%20Functions">2 code templates that use it</a></p></article><article class="esaf-card" id="container-apps" data-category="Full stack" data-kind="containers|front end" data-scope="Project" data-text="azure container apps runs your containers: chat apps, apis and mcp servers. enablecontainerapps full stack project containers front end"><h3 class="esaf-card__title">Azure Container Apps</h3><p class="esaf-card__summary">Runs your containers: chat apps, APIs and MCP servers.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">containers</span><span class="esaf-tag esaf-tag--tag">front end</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableContainerApps</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Container%20Apps">4 code templates that use it</a></p></article><article class="esaf-card" id="aks" data-category="Full stack" data-kind="containers" data-scope="Project" data-text="azure kubernetes service (aks) a standalone aks cluster in the project, for applications that need kubernetes. enableaks full stack project containers"><h3 class="esaf-card__title">Azure Kubernetes Service (AKS)</h3><p class="esaf-card__summary">A standalone AKS cluster in the project, for applications that need Kubernetes.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">containers</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAKS</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="sql" data-category="Full stack" data-kind="database" data-scope="Project" data-text="azure sql database a relational database for your application. enablesqldatabase full stack project database"><h3 class="esaf-card__title">Azure SQL Database</h3><p class="esaf-card__summary">A relational database for your application.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">database</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableSQLDatabase</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="postgresql" data-category="Full stack" data-kind="database" data-scope="Project" data-text="azure database for postgresql a postgresql flexible server for your application. enablepostgresql full stack project database"><h3 class="esaf-card__title">Azure Database for PostgreSQL</h3><p class="esaf-card__summary">A PostgreSQL flexible server for your application.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">database</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enablePostgreSQL</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="cosmos-db" data-category="Full stack" data-kind="database" data-scope="Project" data-text="azure cosmos db a nosql database for your application. private foundry agents also keep their threads here. enablecosmosdb full stack project database"><h3 class="esaf-card__title">Azure Cosmos DB</h3><p class="esaf-card__summary">A NoSQL database for your application. Private Foundry agents also keep their threads here.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">database</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableCosmosDB</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="redis-cache" data-category="Full stack" data-kind="cache" data-scope="Project" data-text="azure cache for redis an in-memory cache for sessions and fast lookups. enablerediscache full stack project cache"><h3 class="esaf-card__title">Azure Cache for Redis</h3><p class="esaf-card__summary">An in-memory cache for sessions and fast lookups.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">cache</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableRedisCache</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="redis-managed" data-category="Full stack" data-kind="cache" data-scope="Project" data-text="azure managed redis a private azure managed redis that accepts entra id sign-in only. enableredismanaged full stack project cache"><h3 class="esaf-card__title">Azure Managed Redis</h3><p class="esaf-card__summary">A private Azure Managed Redis that accepts Entra ID sign-in only.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">cache</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableRedisManaged</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="elasticsearch" data-category="Full stack" data-kind="database" data-scope="Project" data-text="elasticsearch elastic cloud as a managed search and analytics store. enableelasticsearch full stack project database"><h3 class="esaf-card__title">Elasticsearch</h3><p class="esaf-card__summary">Elastic Cloud as a managed search and analytics store.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">database</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableElasticsearch</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="apim" data-category="Full stack" data-kind="API gateway" data-scope="AI gateway pipeline" data-text="azure api management as the ai gateway one endpoint in front of a pool of model deployments, with retries when a backend is throttled. it can also publish the factory mcp server. enable_apim full stack ai gateway pipeline api gateway"><h3 class="esaf-card__title">Azure API Management as the AI gateway</h3><p class="esaf-card__summary">One endpoint in front of a pool of model deployments, with retries when a backend is throttled. It can also publish the Factory MCP server.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">API gateway</span><span class="esaf-tag esaf-tag--service">AI gateway pipeline</span></p><p class="esaf-card__path"><code>ENABLE_APIM</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=API%20Management">1 code template that use it</a></p></article><article class="esaf-card" id="kong" data-category="Full stack" data-kind="API gateway" data-scope="AI gateway pipeline" data-text="kong as the ai gateway the alternative to api management: an open-source kong gateway in the common network, alone or in front of api management. enable_kong full stack ai gateway pipeline api gateway"><h3 class="esaf-card__title">Kong as the AI gateway</h3><p class="esaf-card__summary">The alternative to API Management: an open-source Kong gateway in the common network, alone or in front of API Management.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Full stack</span><span class="esaf-tag esaf-tag--tag">API gateway</span><span class="esaf-tag esaf-tag--service">AI gateway pipeline</span></p><p class="esaf-card__path"><code>ENABLE_KONG</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="data-factory" data-category="Data and integration" data-kind="data pipeline" data-scope="Project" data-text="azure data factory orchestrates ingestion and data movement for the project. enabledatafactory data and integration project data pipeline"><h3 class="esaf-card__title">Azure Data Factory</h3><p class="esaf-card__summary">Orchestrates ingestion and data movement for the project.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Data and integration</span><span class="esaf-tag esaf-tag--tag">data pipeline</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableDatafactory</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Data%20Factory">2 code templates that use it</a></p></article><article class="esaf-card" id="data-factory-common" data-category="Data and integration" data-kind="data pipeline" data-scope="Common" data-text="azure data factory (common) a data factory in the common resource group, shared by the projects of the scale set. enabledatafactorycommon data and integration common data pipeline"><h3 class="esaf-card__title">Azure Data Factory (common)</h3><p class="esaf-card__summary">A Data Factory in the common resource group, shared by the projects of the scale set.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Data and integration</span><span class="esaf-tag esaf-tag--tag">data pipeline</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>enableDatafactoryCommon</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="event-hubs" data-category="Data and integration" data-kind="events" data-scope="Project" data-text="azure event hubs event streams, for example for streaming inference. enableeventhubs data and integration project events"><h3 class="esaf-card__title">Azure Event Hubs</h3><p class="esaf-card__summary">Event streams, for example for streaming inference.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Data and integration</span><span class="esaf-tag esaf-tag--tag">events</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableEventHubs</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a> <a href="../code-templates/?service=Event%20Hubs">1 code template that use it</a></p></article><article class="esaf-card" id="logic-apps" data-category="Data and integration" data-kind="data pipeline" data-scope="Project" data-text="azure logic apps workflows that connect your application to other systems. enablelogicapps data and integration project data pipeline"><h3 class="esaf-card__title">Azure Logic Apps</h3><p class="esaf-card__summary">Workflows that connect your application to other systems.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Data and integration</span><span class="esaf-tag esaf-tag--tag">data pipeline</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableLogicApps</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="app-insights" data-category="Monitoring and security" data-kind="monitoring" data-scope="Project" data-text="application insights telemetry of the project&#x27;s applications and agents. enableapplicationinsights monitoring and security project monitoring"><h3 class="esaf-card__title">Application Insights</h3><p class="esaf-card__summary">Telemetry of the project&#x27;s applications and agents.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">monitoring</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableApplicationInsights</code> On by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="app-insights-dashboard" data-category="Monitoring and security" data-kind="monitoring" data-scope="Project" data-text="application insights dashboard a portal dashboard on top of application insights. enableappinsightsdashboard monitoring and security project monitoring"><h3 class="esaf-card__title">Application Insights dashboard</h3><p class="esaf-card__summary">A portal dashboard on top of Application Insights.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">monitoring</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableAppInsightsDashboard</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="ampls" data-category="Monitoring and security" data-kind="monitoring|security" data-scope="Common" data-text="azure monitor private link scope private ingestion to application insights and log analytics. enableampls monitoring and security common monitoring security"><h3 class="esaf-card__title">Azure Monitor Private Link Scope</h3><p class="esaf-card__summary">Private ingestion to Application Insights and Log Analytics.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">monitoring</span><span class="esaf-tag esaf-tag--tag">security</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>enableAMPLS</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="defender-subscription" data-category="Monitoring and security" data-kind="security" data-scope="Common" data-text="defender for ai (subscription) switches on microsoft defender for ai for the whole subscription. enabledefenderforaisublevel monitoring and security common security"><h3 class="esaf-card__title">Defender for AI (subscription)</h3><p class="esaf-card__summary">Switches on Microsoft Defender for AI for the whole subscription.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">security</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>enableDefenderforAISubLevel</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="defender-resource" data-category="Monitoring and security" data-kind="security" data-scope="Project" data-text="defender for ai (resource) switches on microsoft defender for ai for each ai resource of the project. enabledefenderforairesourcelevel monitoring and security project security"><h3 class="esaf-card__title">Defender for AI (resource)</h3><p class="esaf-card__summary">Switches on Microsoft Defender for AI for each AI resource of the project.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">security</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableDefenderforAIResourceLevel</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="vm-backup" data-category="Monitoring and security" data-kind="security" data-scope="Common" data-text="azure backup for virtual machines backs up the admin and project virtual machines to a recovery services vault. enablevmbackup monitoring and security common security"><h3 class="esaf-card__title">Azure Backup for virtual machines</h3><p class="esaf-card__summary">Backs up the admin and project virtual machines to a Recovery Services vault.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Monitoring and security</span><span class="esaf-tag esaf-tag--tag">security</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>enableVmBackup</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="bastion" data-category="Access and virtual machines" data-kind="access" data-scope="Common" data-text="azure bastion a bastion host in the common resource group, to reach the virtual machines without a public ip address. addbastionhost access and virtual machines common access"><h3 class="esaf-card__title">Azure Bastion</h3><p class="esaf-card__summary">A Bastion host in the common resource group, to reach the virtual machines without a public IP address.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Access and virtual machines</span><span class="esaf-tag esaf-tag--tag">access</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>addBastionHost</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="admin-vm" data-category="Access and virtual machines" data-kind="access" data-scope="Common" data-text="admin virtual machine a virtual machine in the common resource group for the platform team. enableadminvm access and virtual machines common access"><h3 class="esaf-card__title">Admin virtual machine</h3><p class="esaf-card__summary">A virtual machine in the common resource group for the platform team.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Access and virtual machines</span><span class="esaf-tag esaf-tag--tag">access</span><span class="esaf-tag esaf-tag--service">Common</span></p><p class="esaf-card__path"><code>enableAdminVM</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article><article class="esaf-card" id="project-vm" data-category="Access and virtual machines" data-kind="access" data-scope="Project" data-text="project virtual machine a private virtual machine in the project resource group, for work inside the network. enableprojectvm access and virtual machines project access"><h3 class="esaf-card__title">Project virtual machine</h3><p class="esaf-card__summary">A private virtual machine in the project resource group, for work inside the network.</p><p class="esaf-card__tags"><span class="esaf-tag esaf-tag--factory">Access and virtual machines</span><span class="esaf-tag esaf-tag--tag">access</span><span class="esaf-tag esaf-tag--service">Project</span></p><p class="esaf-card__path"><code>enableProjectVM</code> Off by default</p><p class="esaf-card__links"><a href="../parameters/variables/">Its setting in variables.json</a></p></article></div><p class="esaf-library__empty" hidden>Nothing matches. Clear a filter or change the search.</p></div>
+
+<h2 id="always-there">Always there<a class="headerlink" href="#always-there" title="Permanent link">&para;</a></h2>
+<p>Every project also gets a Key Vault, a storage account, managed identities and its own subnets. The common
+part of a scale set has the network, the data lake, a Key Vault and monitoring. They have no switch.</p>
+<h2 id="switch-a-service-on-or-off">Switch a service on or off<a class="headerlink" href="#switch-a-service-on-or-off" title="Permanent link">&para;</a></h2>
+<p>Change the setting with a tool: see <a href="../factory-tools/19-cli-and-api-and-usage/">Add and update</a>, or pass
+<code>settings</code> to <code>esaf.upsert_project(...)</code> as in <a href="../setup/04-first-agent-chat/">Enable ESAF Agent Chat</a>. Every
+setting is explained in <a href="../parameters/variables/">Every variable in variables.json</a>.</p>
+<p>Before you switch a service off, read
+<a href="../#what-happens-when-you-switch-a-service-off">what happens when you switch a service off</a>.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+  
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/azure/Enterprise-Scale-AIFactory" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations" target="_blank" rel="noopener" title="learn.microsoft.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M0 32h214.6v214.6H0zm233.4 0H448v214.6H233.4zM0 265.4h214.6V480H0zm233.4 0H448V480H233.4z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="../assets/javascripts/libraries.js"></script>
+      
+    
+  </body>
+</html>
