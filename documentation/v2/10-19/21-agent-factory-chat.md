@@ -18,12 +18,13 @@ and a supported native model. The compatibility default is still a speech shell;
 enabling voice does not change that mode. Native live audio/transcripts are provisional
 until final source checks. A voice-only failure never signs you out of text chat.
 
-!!! note "What this chapter covers"
-
-    How the pieces fit, the switches that turn them on, the two ways to deploy (pipeline or operator),
-    how to use it, the security model, operating limits, and troubleshooting. Details for developers live
-    in the [application guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
-    and the [live voice step](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md).
+> [!NOTE]
+> **What this chapter covers**
+>
+> How the pieces fit, the switches that turn them on, the two ways to deploy (pipeline or operator),
+> how to use it, the security model, operating limits, and troubleshooting. Details for developers live
+> in the [application guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
+> and the [live voice step](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md).
 
 > Where this fits: [29. ESAIF Chat Agent](../20-29/29-ESAIF-Chat-Agent.md) (the flow from Bicep to agents), [29. AI Factory MCP](../20-29/29-factory-MCP.md), [29. AI Gateways](../20-29/29-factory-AI-Gateways.md), [29. Dual knowledge graphs](../20-29/29-dual-knowledge-graphs.md).
 
@@ -117,17 +118,10 @@ ESML** with sources instead of from memory.
 Set these in `variables.json` / ADO `variables.yaml` / GitHub variables (or in the Config Wizard, Simple Mode
 card, or the CLI), then run the project pipeline.
 
-| Setting (default) | GitHub variable | Purpose |
-|---|---|---|
-| `enableFactoryChatAgent` (`false`) | `ENABLE_FACTORY_CHAT_AGENT` | Creates the owned Foundry prompt agent. Requires `enableAIFoundry` and a succeeded `modelGPTXName`. |
-| `enableAIFactoryAgentLiveVoice` (`false`) | `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` | Deploys the chat app with voice. Requires `enableFactoryChatAgent`, `enableContainerApps`, `enableAIFoundry`, `enableAISearch`. |
-| `aifactoryAgentEntraAppId` | `AIFACTORY_AGENT_ENTRA_APP_ID` | Client ID (GUID) of the Entra registration. **Needed** for voice. |
-| `aifactoryAgentReaderObjectIds` | `AIFACTORY_AGENT_READER_OBJECT_IDS` | Comma-separated object IDs (1 to 20) with read-only access. **Needed** for voice. |
-| `aifactoryAgentContainerAppsEnvironment` | `AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | Internal environment name; empty picks the single one in the project resource group. |
-| `aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | Speech voice; empty uses `en-US-Ava:DragonHDLatestNeural`. |
-| `aifactoryAgentVoiceLanguages` | `AIFACTORY_AGENT_VOICE_LANGUAGES` | Comma-separated input languages; empty uses `en-US`. Swedish needs `sv-SE,en-US`. |
-| `aifactoryAgentModelDeployment` | `AIFACTORY_AGENT_MODEL_DEPLOYMENT` | Optional agent model deployment for steps 70 and 72; empty uses `modelGPTXName`. |
-| `aifactoryAgentConfigFile` | `AIFACTORY_AGENT_CONFIG_FILE` | Optional JSON file in your repository (for example `aifactory/agent/project001-dev.json`) merged over the generated configuration: realtime voice, language profiles, extra grants, costs, limits. It cannot change scopes, Azure resources or the Entra client. |
+The four switches, the five optional settings and the one call that deploys them are in
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md#turn-on-the-four-settings).
+Each setting also has a GitHub Actions variable in upper snake case, for example
+`ENABLE_FACTORY_CHAT_AGENT`, `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` and `AIFACTORY_AGENT_ENTRA_APP_ID`.
 
 Run it in one of three ways, all for one project in Dev:
 
@@ -155,12 +149,13 @@ carry the same seven settings side by side):
   *ON/OFF: App & Integration* page, above *MCP & AI Gateway*. Dependency and project001-scope problems block the
   draft; input problems show as warnings because the project pipeline checks them again before any Azure call.
 
-!!! warning "The step never replaces an app you deployed by hand"
-
-    The pipeline step generates a **read-only baseline** configuration. It creates or updates an app that it
-    created itself (tag `aifactory-integration: live-voice`). An app you deployed with `40-aifactory-agent/deploy.py`
-    (for example `aifactory-agent-project001-dev`) is adopted only when `aifactoryAgentConfigFile` names your
-    configuration, so the baseline never downgrades it. Without that file the step stops with guidance.
+> [!WARNING]
+> **The step never replaces an app you deployed by hand**
+>
+> The pipeline step generates a **read-only baseline** configuration. It creates or updates an app that it
+> created itself (tag `aifactory-integration: live-voice`). An app you deployed with `40-aifactory-agent/deploy.py`
+> (for example `aifactory-agent-project001-dev`) is adopted only when `aifactoryAgentConfigFile` names your
+> configuration, so the baseline never downgrades it. Without that file the step stops with guidance.
 
 Rules that always apply: any project number in Dev (the app is `aifactory-agent-project<NNN>-dev`; Stage and Prod skip); the model deployment,
 the Foundry agent and the Entra registration are prerequisites, never created by the live voice step; delete-all
@@ -240,14 +235,15 @@ revision is deactivated, so only one revision runs. With voice enabled it also a
    text form; it never submits automatically or changes your sign-in. **Check voice again** and
    **Start talking** allow a voice-only retry.
 
-!!! note "Embedded ESAIF Agent Chat"
-
-    Older desktop builds remain text-only; their explicit browser voice button is a workaround.
-    A compatible desktop build can open `host=esaif-maui&voice=on` after independently confirming
-    the pinned backend's authenticated native-voice capability (`embedded_voice_version: 1`,
-    `mode: realtime`, `protocol: 1`). Microphone access is confined to that origin and document
-    and starts only on **Start talking**. Speech-shell/incompatible deployments, the default embedded
-    page and `voice=off` stay text-only. This source contract does not establish what is installed.
+> [!NOTE]
+> **Embedded ESAIF Agent Chat**
+>
+> Older desktop builds remain text-only; their explicit browser voice button is a workaround.
+> A compatible desktop build can open `host=esaif-maui&voice=on` after independently confirming
+> the pinned backend's authenticated native-voice capability (`embedded_voice_version: 1`,
+> `mode: realtime`, `protocol: 1`). Microphone access is confined to that origin and document
+> and starts only on **Start talking**. Speech-shell/incompatible deployments, the default embedded
+> page and `voice=off` stay text-only. This source contract does not establish what is installed.
 
 ## Security and privacy
 
@@ -315,19 +311,22 @@ revision is deactivated, so only one revision runs. With voice enabled it also a
 - Saving configuration, running `plan`, or seeing a green pipeline step is not proof that the app is reachable or
   that speech works on your network. Open the page and run a short session.
 
-??? info "More info: verified deployment on 9 October 2026"
+<details>
+<summary>More info: verified deployment on 9 October 2026</summary>
 
-    A project001 Dev app was updated through the operator flow. The pipeline switches
-    `enableFactoryChatAgent` and `enableAIFactoryAgentLiveVoice` still default to `false`.
+A project001 Dev app was updated through the operator flow. The pipeline switches
+`enableFactoryChatAgent` and `enableAIFactoryAgentLiveVoice` still default to `false`.
 
-    - Deployment succeeded. Revision suffix `--0000008` was Healthy and Running with **100% traffic**;
-      `--0000007` was retained for rollback.
-    - The app identity held **Foundry User** and **Cognitive Services User** on the project Foundry account.
-    - Bundle upload succeeded after the private-storage network path was restored, with public access still disabled.
-    - An end-to-end browser voice session worked. A long spoken reply was shortened at
-      `max_spoken_characters = 1200`: a spoken-length setting to tune, not a failed voice session.
+- Deployment succeeded. Revision suffix `--0000008` was Healthy and Running with **100% traffic**;
+  `--0000007` was retained for rollback.
+- The app identity held **Foundry User** and **Cognitive Services User** on the project Foundry account.
+- Bundle upload succeeded after the private-storage network path was restored, with public access still disabled.
+- An end-to-end browser voice session worked. A long spoken reply was shortened at
+  `max_spoken_characters = 1200`: a spoken-length setting to tune, not a failed voice session.
 
-    This is a dated result from one environment, not proof that voice works in every tenant or network.
+This is a dated result from one environment, not proof that voice works in every tenant or network.
+
+</details>
 
 See also: [Agent Factory chat application guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md),
 [live voice pipeline step](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md),

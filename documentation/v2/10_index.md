@@ -1,5 +1,9 @@
 # Documentation - Full documentation
 
+> [!TIP]
+> **New here?** Start at the [docs hub](README.md). It opens with two doors:
+> [Setup docs - platform team](quickstarts/README.md) and [Usage docs - project team](usage/README.md).
+
 Quick Setup
 1) [Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md) - Estimated setup time: 1-2h
 - Note: Go here for the [Quick Documentation - parameter search tool](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/) where also the *AI Factory Configuration Wizard" can be downloaded. 
@@ -19,7 +23,7 @@ Quick Setup
 * [24) End-2-End setup tutorial: AIFactory (4-8 hours) - How-to](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to)
 * [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#25-personas-connecting-people--agents-to-processes-dataops-mlops-genaiops--toolsarchitectures-and-services)
 * [26) UPDATE AIFactory: Update with new features](../v2/20-29/26-update-AIFactory.md)
-* [26) EXTEND AIFactory project type: With new Services, Your BICEP](../v2/20-29/27-extend-AIF-pipelines.md)
+* [26) EXTEND AIFactory project type: With new Services, Your BICEP](./20-29/27-extend-AIF-pipelines.md)
 * [21) Agent Factory chat & live voice: talk to your AI Factory (10-19 series, CoreTeam + ProjectTeam)](./10-19/21-agent-factory-chat.md)
 * [22) AI Factory lifecycle Azure Function: six lifecycle scenarios over REST or the SDK, followed through GitHub events (10-19 series, CoreTeam)](./10-19/22-lifecycle-azure-function.md)
 * [10) AI Factory onion architecture: five layers from the SDK to Azure Resource Manager, time per layer for the six lifecycle scenarios and per code change (10-19 series, CoreTeam)](./10-19/10-factory-onion-architecture.md)
@@ -80,12 +84,12 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 ## 11) `Infra:AIFactory`: Static documentation (CoreTeam)
 Here you will see the definition of an AIFactory via lists and diagrams, and workflows how to add projects or members to an AIFactory.
 - [High-Level Diagram - AIFactory Capabilities ](../v2/10-19/11-architecture-diagrams.md#high-level-diagrams---architecture--capabilities)
-- [High-Level Diagram - ESML project: Overview services ](../v2/10-19/11-architecture-diagrams.md#ai-factory---esml-project-overview)
-- [High-Level Diagram - ESGenAI project: Overview services](../v2/10-19/11-architecture-diagrams.md#ai-factory---esgenai-project-overview)
-- [Mid-Level Diagram - Azure Services integration:ESML ](../v2/10-19/11-architecture-diagrams.md#high-level-diagram---services-integration-esml-project)
+- [High-Level Diagram - ESML project: Overview services ](../v2/10-19/11-architecture-diagrams.md#ai-factory---esml-project-overview-esml)
+- [High-Level Diagram - ESGenAI project: Overview services](../v2/10-19/11-architecture-diagrams.md#ai-factory---esgenai-project-overview-esgenai)
+- [Mid-Level Diagram - Azure Services integration:ESML ](../v2/10-19/11-architecture-diagrams.md#high-level-diagram---services-integration-esml)
 - [Mid-Level Diagram - Azure Services integration:ESGenAI ](../v2/10-19/11-architecture-diagrams.md#design-patterns-supported-esgenai)
-- [Low-Level Diagram - Infrastructure & LLMOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
-- [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
+- [Low-Level Diagram - Infrastructure & LLMOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---genai-esgenai)
+- [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops-esml)
 - [Networking Diagram - Hub-Spoke, ESLZ, Private DNS, FW ](../v2/10-19/14-networking-privateDNS.md)
     - Network Connectivity
         - Network topology: Hub/Spoke | VirtualWan (Vwan Hub)
@@ -178,7 +182,7 @@ Also how to get access to the private AIFactory.
 | Component | In section | Focus in section | Role in section | Index
 |-----------|------------|----------------|-------|----|
 | 1) Infra:AIFactory | Y | Usage & Get Access, Dashboards, Services | ProjectTeam | [31](#31-how-to-guide-get-access-to-the-aifactoryrbac--networking-projectteam),[32](#32-overview-dashboards-services--acceleration-in-aifactory-projectteam-coreteam) |
-| 2) Datalake template | Y | Usage & Get Access | ProjectTeam | [34](#34-setup-datalake-access-to-project-folder-how-to-onboard-your-own-data) |
+| 2) Datalake template | Y | Usage & Get Access | ProjectTeam | [34](#34-setup-datalake---project-folder-how-to-onboard-your-own-data-projectteam---rd-purpose) |
 | 3) Templates for: **DataOps, MLOps**, *LLMOps | Y | DataOps | ProjectTeam | 36,37 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | Setup SDK & Templates | ProjectTeam | [33](#33-setup-install-azureml-sdk-v1v2-and-esml-accelerator-library),[35](#35-setup-esml-sdk-accelerated-notebook-templates) |
 
@@ -231,7 +235,7 @@ Here you see HOWTO install AzureML SDK v1+v2 and ESML accelerator library, local
 The ESML AIFactory comes with Notebook templates, generic notebooks (not examples). See below: How to clone them, and configure them, to accelerate your projects.
 It also comes with DEMO data, per project team. 
 
-**Pre-requisite:** Get Datalake access - See section [34](#34-how-to-guide-get-access-to-datalake---project-folder-onboard-own-data)
+**Pre-requisite:** Get Datalake access - See section [34](#34-setup-datalake---project-folder-how-to-onboard-your-own-data-projectteam---rd-purpose)
 
 [HOWTO - Quickstart: Copy AI Factory notebook templates](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
 
