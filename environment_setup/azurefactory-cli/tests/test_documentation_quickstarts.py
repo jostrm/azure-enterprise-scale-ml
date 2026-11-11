@@ -528,14 +528,14 @@ def test_lab_guide_links_say_it_needs_a_preview_code(page):
     assert "dropbox.com" not in text
 
 
-# --- Describe your Factory: three file options and the app, with settings the API really takes. ------------------
+# --- Describe your Factory: three one-file examples and the app, in the shape the SDK really takes. ----------------
 CREATE = SETUP_QUICKSTARTS[1]
 DESCRIBE_OPTIONS = ["In a file: automated networking", "In a file: BYO VNet", "In a file: BYO subnets",
                     "In the app: Full bootstrap"]
-# The API refuses addAIFactoryMCP2APIM without the MCP itself, so the file turns on both.
-SERVICE_SWITCHES = {"enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true", "enableFactoryChatAgent": "true"}
-# Not project settings: the Factory API refuses them, and the AI gateway pipeline reads them from its own source.
-GATEWAY_SWITCHES = ('ENABLE_KONG: "false"', 'ENABLE_APIM: "true"')
+# The API refuses addAIFactoryMCP2APIM without the MCP itself, so the examples turn on both.
+SERVICE_SWITCHES = {"ENABLE_KONG": "false", "ENABLE_APIM": "true", "enableAIFactoryMCP": "true",
+                    "addAIFactoryMCP2APIM": "true", "enableFactoryChatAgent": "true"}
+BYO_VNET = {"byoVnetResourcegroupName", "byoVnetName"}
 
 
 def describe_options():
@@ -549,33 +549,41 @@ def json_blocks(text):
     return [json.loads(block) for block in re.findall(r"(?ms)^[ \t]*```json\n(.*?)^[ \t]*```", text)]
 
 
-def test_describe_your_factory_offers_three_file_options_and_the_app():
+def test_describe_your_factory_offers_three_one_file_examples_and_the_app():
     options = describe_options()
     assert list(options) == DESCRIBE_OPTIONS
+    files = {}
     for label in DESCRIBE_OPTIONS[:3]:
         blocks = json_blocks(options[label])
-        switches = [block for block in blocks if "enableFactoryChatAgent" in block]
-        assert len(switches) == 1, f"{label} shows the service switches once."
-        assert switches[0] == SERVICE_SWITCHES, label
-        assert not any(key in block for block in blocks for key in ("ENABLE_APIM", "ENABLE_KONG")), label
-        assert all(switch in options[label] for switch in GATEWAY_SWITCHES)
-        assert "AI gateway pipeline" in options[label], label
-    vnet = [block for block in json_blocks(options["In a file: BYO VNet"]) if "vnetResourceGroup_param" in block]
-    subnets = [block for block in json_blocks(options["In a file: BYO subnets"]) if "vnetResourceGroup_param" in block]
-    assert len(vnet) == len(subnets) == 1
-    assert "BYO_subnets" not in vnet[0] and subnets[0]["BYO_subnets"] == "true"
-    assert all(block.get("vnetNameFull_param") for block in (vnet[0], subnets[0]))
+        assert len(blocks) == 1, f"{label} is one file."
+        files[label] = blocks[0]
+        # One file is one call: its top-level names are the parameters esaf.init_factory really takes.
+        assert set(blocks[0]) <= set(inspect.signature(esaf.init_factory).parameters), label
+        assert blocks[0]["project_settings"] == SERVICE_SWITCHES, label
+    automated, vnet, subnets = (files[label] for label in DESCRIBE_OPTIONS[:3])
+    assert "scale_set_settings" not in automated and "dev_vnet_cidr" in automated["creation_request"]["config"]
+    assert set(vnet["scale_set_settings"]) == BYO_VNET
+    assert BYO_VNET <= set(subnets["scale_set_settings"]) and subnets["scale_set_settings"]["enableByoSubnets"] is True
+    assert any(key.startswith("subnet") for key in subnets["scale_set_settings"])
+    # The API refuses BYO subnets together with a VNet range for ESAF to build.
+    assert "dev_vnet_cidr" not in subnets["creation_request"]["config"]
     assert "Full bootstrap" in options["In the app: Full bootstrap"] and "```json" not in options[DESCRIBE_OPTIONS[3]]
 
 
 def test_creation_request_holds_only_the_fields_the_api_takes():
-    """The creation request is a closed set of lower-case fields; switches and BYO settings go in their own files."""
-    requests = [block for block in json_blocks(read(CREATE)) if "contract_version" in block]
-    assert requests, "Quickstart 02 shows the creation request."
+    """The creation request is a closed set of lower-case fields; switches and BYO settings sit beside it."""
+    requests = [block["creation_request"] for block in json_blocks(read(CREATE)) if "creation_request" in block]
+    assert len(requests) == 3, "Quickstart 02 shows the creation request in each file example."
     for request in requests:
         assert request["mode"] == "full-bootstrap" and request["action"] == "create-factory"
         strangers = [key for key in request["config"] if not re.fullmatch(r"[a-z][a-z0-9_]*", key)]
         assert not strangers, f"The API refuses these names in a creation request: {strangers}"
+
+
+def test_one_file_examples_name_the_app_version_that_takes_them():
+    text = read(CREATE)
+    assert "v0.47.101" in text.split("## Prerequisites", 1)[1].split("\n## ", 1)[0]
+    assert "azurefactory esaf init-factory --request-json" in text
 
 
 # --- Navigation: every page in a reading path links back and forward. ---------------------------------------------
