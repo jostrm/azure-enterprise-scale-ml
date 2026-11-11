@@ -7,6 +7,7 @@ name, value and dependency for the route you are using.
 | What you need | Open |
 | --- | --- |
 | Start configuring a registered factory | [CLI, Python SDK or REST tutorial](../factory-tools/18-cli-and-api-and-usage.md) |
+| See every variable in `variables.json`, with its default and what it does | [Every variable in variables.json](variables.md) |
 | Know which inputs to collect | [Required inputs](standard.md) |
 | Look up an exact key, default or format mapping | [All parameters](advanced.md) |
 | Change settings and deploy separately | [Add and update](../factory-tools/19-cli-and-api-and-usage.md) |

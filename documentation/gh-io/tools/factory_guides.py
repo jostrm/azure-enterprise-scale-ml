@@ -1,4 +1,4 @@
-"""Publish the maintained Factory guides without keeping a second Markdown copy."""
+"""Publish the maintained Factory guides and end-user docs without keeping a second Markdown copy."""
 
 from pathlib import Path
 import posixpath
@@ -16,9 +16,30 @@ PROJECT_GUIDES = {
     "project-team/agent-factory.md": REPOSITORY / "usecase_code" / "40-agent-factory" / "agent_factory" / "readme.md",
     "project-team/ml-model-factory.md": REPOSITORY / "usecase_code" / "50-ml-model-factory" / "user-config" / "readme.md",
 }
+V2 = REPOSITORY / "documentation" / "v2"
+# The end-user docs, published from their single source: site path -> source page, in navigation order.
+DOCS_PAGES = {
+    "setup/index.md": V2 / "quickstarts" / "README.md",
+    **{"setup/" + name: V2 / "quickstarts" / name for name in (
+        "01-install-esaf.md", "02-create-factory.md", "add-scale-set.md", "03-add-project.md",
+        "04-first-agent-chat.md", "05-clean-up.md")},
+    "usage/index.md": V2 / "usage" / "README.md",
+    **{"usage/" + name: V2 / "usage" / name for name in (
+        "prerequisites.md", "01-first-agent.md", "02-first-ml-model.md", "dashboards.md")},
+    "reference/scenarios.md": V2 / "reference" / "scenarios.md",
+    "reference/hub-and-network-modes.md": V2 / "concepts" / "hub-and-network-modes.md",
+    "reference/folder-structure.md": V2 / "reference" / "folder-structure.md",
+    "reference/settings.md": V2 / "reference" / "settings.md",
+}
+DOCS_SECTIONS = ("factory-tools/", "setup/", "usage/", "reference/")
+# Images a docs page shows are copied into the site under this folder, so no page depends on another host.
+ASSETS = "assets/repository/"
+IMAGE_SUFFIXES = (".png", ".gif", ".svg", ".jpg", ".jpeg", ".webp")
 SITE_SOURCES = {
     **{(SOURCE / name).resolve(): "factory-tools/" + name for name in GUIDES},
     **{path.resolve(): uri for uri, path in PROJECT_GUIDES.items()},
+    **{path.resolve(): uri for uri, path in DOCS_PAGES.items()},
+    (V2 / "README.md").resolve(): "index.md",  # the docs hub on GitHub is the site's home page
 }
 PROJECT_HOME = """# Get started - Agent & ML Factory SDK: Project team
 
@@ -53,6 +74,15 @@ TOOL_SECTION = re.compile(
     r'^</details>\r?\n<!-- /factory-tool -->',
     re.M | re.S,
 )
+TOOL_TAB = re.compile(
+    r'^<details markdown="1" data-factory-tool="([^"]+)"(?: open)?>\r?\n'
+    r'<summary>\1</summary>\r?\n\r?\n(.*?)'
+    r'^</details>\r?\n<!-- /factory-tool -->\r?\n?',
+    re.M | re.S,
+)
+DETAILS = re.compile(r"^<details( open)?>\r?\n<summary>([^<\n]+)</summary>\r?\n(.*?)^</details>[ \t]*\r?\n", re.M | re.S)
+HTML_URL = re.compile(r'\b(src|srcset|href)="([^"]+)"')
+BREADCRUMB = re.compile(r"\A\[Docs\]\([^)\n]*\)[^\n]*\n+")
 ALERT = re.compile(r"> ?\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*")
 ADMONITIONS = {"NOTE": "note", "TIP": "tip", "IMPORTANT": 'info "Important"', "WARNING": "warning",
                "CAUTION": 'danger "Caution"'}
@@ -98,6 +128,23 @@ def linked_tabs(text):
     return TOOL_SECTION.sub(tab, text)
 
 
+def indented(body):
+    return "\n".join("    " + line if line.strip() else "" for line in body.strip("\r\n").splitlines())
+
+
+def tool_tabs(text):
+    """Render every tool selector of a docs page as a Material tab set; adjacent sections form one set."""
+    return TOOL_TAB.sub(lambda section: f'=== "{section[1]}"\n\n{indented(section[2])}\n\n', text)
+
+
+def collapsibles(text):
+    """Render plain <details> blocks as collapsible notes: Markdown inside raw HTML is not rendered on the site."""
+    def note(block):
+        title = block[2].strip().replace('"', "'")
+        return f'{"???+" if block[1] else "???"} note "{title}"\n\n{indented(block[3])}\n\n'
+    return DETAILS.sub(note, text)
+
+
 def project_excerpt(text):
     """Publish only the canonical onboarding section, not the entire source guide."""
     start, end = "<!-- project-team:start -->", "<!-- project-team:end -->"
@@ -106,31 +153,32 @@ def project_excerpt(text):
     return text.split(start, 1)[1].split(end, 1)[0].strip() + "\n"
 
 
-def site_markdown(text, source, repository=REPOSITORY):
-    """Keep tutorial links local; point other source-relative links to GitHub."""
-    source, repository = Path(source), Path(repository)
+def site_url(url, source, repository=REPOSITORY, assets=None):
+    """Where a source-relative URL points on the site: a site page, a copied image, or the file on GitHub."""
+    if url.startswith(("#", "/", "//")) or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", url):
+        return url
+    location, separator, fragment = url.partition("#")
+    target = (source.parent / unquote(location)).resolve()
+    mapped = SITE_SOURCES.get(target)
+    source_uri = SITE_SOURCES.get(source.resolve())
+    if assets is not None and source_uri and target.suffix.lower() in IMAGE_SUFFIXES and target.is_file():
+        asset = ASSETS + target.relative_to(repository.resolve()).as_posix()
+        assets[asset] = target
+        destination = posixpath.relpath(asset, posixpath.dirname(source_uri))
+    elif mapped and source_uri and (
+        mapped.startswith(DOCS_SECTIONS) or not fragment or fragment == "project-team-quickstart"
+    ):
+        destination = posixpath.relpath(mapped, posixpath.dirname(source_uri))
+    elif target.parent == source.parent.resolve() and target.name in GUIDES:
+        destination = target.name
+    else:
+        relative = target.relative_to(repository.resolve())
+        destination = GITHUB + quote(relative.as_posix(), safe="/")
+    return destination + ("#" + fragment if separator else "")
 
-    def replace(match):
-        url = match[2]
-        if url.startswith(("#", "/", "//")) or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", url):
-            return match[0]
-        location, separator, fragment = url.partition("#")
-        target = (source.parent / unquote(location)).resolve()
-        mapped = SITE_SOURCES.get(target)
-        source_uri = SITE_SOURCES.get(source.resolve())
-        if mapped and source_uri and (
-            mapped.startswith("factory-tools/") or not fragment or fragment == "project-team-quickstart"
-        ):
-            destination = posixpath.relpath(mapped, posixpath.dirname(source_uri))
-        elif target.parent == source.parent.resolve() and target.name in GUIDES:
-            destination = target.name
-        else:
-            relative = target.relative_to(repository.resolve())
-            destination = GITHUB + quote(relative.as_posix(), safe="/")
-        if separator:
-            destination += "#" + fragment
-        return match[1] + destination + match[3]
 
+def outside_fences(text, rewrite):
+    """Apply `rewrite` to every line that is not inside a fenced code block."""
     result, fence = [], None
     for line in text.splitlines(keepends=True):
         marker = FENCE.match(line)
@@ -142,8 +190,28 @@ def site_markdown(text, source, repository=REPOSITORY):
                 fence = None
             result.append(line)
         else:
-            result.append(line if fence else LINK.sub(replace, line))
+            result.append(line if fence else rewrite(line))
     return "".join(result)
+
+
+def site_markdown(text, source, repository=REPOSITORY, assets=None):
+    """Keep tutorial links local; point other source-relative links to GitHub."""
+    source, repository = Path(source), Path(repository)
+    return outside_fences(text, lambda line: LINK.sub(
+        lambda match: match[1] + site_url(match[2], source, repository, assets) + match[3], line))
+
+
+def site_html(text, source, repository=REPOSITORY, assets=None):
+    """The same for the URLs of HTML tags (<a>, <img>, <source>), which the docs use for sized images."""
+    source, repository = Path(source), Path(repository)
+    return outside_fences(text, lambda line: HTML_URL.sub(
+        lambda match: f'{match[1]}="{site_url(match[2], source, repository, assets)}"', line))
+
+
+def docs_page(text, source, assets):
+    """One end-user docs page as the site shows it: tabs, collapsible notes, admonitions and site links."""
+    text = collapsibles(tool_tabs(site_alerts(BREADCRUMB.sub("", text))))
+    return site_html(site_markdown(text, source, assets=assets), source, assets=assets)
 
 
 def on_files(files, config):
@@ -166,4 +234,10 @@ def on_files(files, config):
         content = f"# {title}\n\n[Maintained source guide]({source_url}#project-team-quickstart)\n\n"
         content += site_markdown(project_excerpt(path.read_text(encoding="utf-8")), path)
         append(uri, content)
+    assets = {}
+    for uri, path in DOCS_PAGES.items():
+        append(uri, docs_page(path.read_text(encoding="utf-8"), path, assets))
+    for uri, path in sorted(assets.items()):
+        if files.get_file_from_path(uri) is None:
+            files.append(File.generated(config, uri, abs_src_path=str(path)))
     return files

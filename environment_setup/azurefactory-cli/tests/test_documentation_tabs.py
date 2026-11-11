@@ -193,7 +193,9 @@ def test_site_hook_adds_all_guides_to_mkdocs_navigation():
     files = config.plugins.on_files(Files([]), config=config)
     core_uris = ["factory-tools/" + name for name in hook.GUIDES]
     project_uris = ["project-team/index.md", *hook.PROJECT_GUIDES]
-    assert [file.src_uri for file in files] == core_uris + project_uris
+    # The same hook also publishes the end-user docs and their images: see test_documentation_site.py.
+    guides = [file.src_uri for file in files if file.src_uri.startswith(("factory-tools/", "project-team/"))]
+    assert guides == core_uris + project_uris
     assert all('=== "Python SDK"' in files.get_file_from_path(uri).content_string for uri in core_uris)
     assert "content.tabs.link" in config.theme["features"]
     navigation = next(section[CORE_TEAM] for section in config.nav if CORE_TEAM in section)
