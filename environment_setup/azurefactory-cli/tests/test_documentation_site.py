@@ -89,14 +89,38 @@ def test_every_link_and_image_on_a_published_page_resolves(site):
     for uri in hook.DOCS_PAGES:
         content = re.sub(r"(?ms)^[ \t]*(`{3,}).*?^[ \t]*\1[ \t]*$", "", page(site, uri))
         content = re.sub(r"`[^`\n]*`", "", content)
-        urls = re.findall(r"\]\(([^)\s]+)\)", content) + re.findall(r'(?:src|href|srcset)="([^"]+)"', content)
-        for url in urls:
-            if EXTERNAL.match(url):
-                continue
-            target = posixpath.normpath(posixpath.join(posixpath.dirname(uri), url.partition("#")[0]))
-            if target not in known:
-                broken.append(f"{uri}: {url}")
+        # MkDocs rewrites Markdown links, which are relative to the source page. It leaves HTML attributes alone,
+        # and the browser resolves those against the page's URL folder: setup/02-create-factory/ for that page.
+        folder = posixpath.dirname(uri)
+        url_folder = folder if posixpath.basename(uri) == "index.md" else uri[:-len(".md")]
+        for base, urls in ((folder, re.findall(r"\]\(([^)\s]+)\)", content)),
+                           (url_folder, re.findall(r'(?:src|href|srcset)="([^"]+)"', content))):
+            for url in urls:
+                if EXTERNAL.match(url):
+                    continue
+                target = posixpath.normpath(posixpath.join(base, url.partition("#")[0]))
+                page_urls = {target + ".md", posixpath.join(target, "index.md").lstrip("./")}
+                if target not in known and not (base == url_folder and page_urls & known):
+                    broken.append(f"{uri}: {url}")
     assert not broken, broken
+
+
+def test_html_urls_resolve_from_the_page_url_folder(site, tmp_path):
+    hook = site[0]
+    source = hook.DOCS_PAGES["setup/02-create-factory.md"]
+    html = '<a href="add-scale-set.md#x"><img src="../images/videos/02-create-factory.png" alt="a"></a>'
+    result = hook.site_html(html, source, assets={})
+    assert 'src="../../assets/repository/documentation/v2/images/videos/02-create-factory.png"' in result
+    assert 'href="../add-scale-set/#x"' in result
+    hub = hook.DOCS_PAGES["setup/index.md"]
+    assert 'href="01-install-esaf/"' in hook.site_html('<a href="01-install-esaf.md">x</a>', hub, assets={})
+
+
+def test_diagram_text_is_readable_on_the_dark_boxes(site):
+    _, config, _ = site
+    sheet = next(name for name in config.extra_css if "diagrams" in name)
+    css = (SITE / "docs" / sheet).read_text(encoding="utf-8")
+    assert "--md-mermaid-label-fg-color: #ECF6FF" in css and "--md-mermaid-label-bg-color: #191919" in css
 
 
 def test_site_ships_the_images_the_pages_show(site):

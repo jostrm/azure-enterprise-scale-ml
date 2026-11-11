@@ -64,6 +64,9 @@ plugins:
 hooks:
   - tools/factory_guides.py
 
+extra_css:
+  - assets/stylesheets/diagrams.css
+
 nav:
   - Overview: index.md
   - "Setup docs: Platform team":
