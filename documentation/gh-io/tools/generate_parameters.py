@@ -720,7 +720,9 @@ def variables_markdown():
         for row in members:
             defaults = [literal(value) if len(document) == 1 else f"{section}: {literal(value)}"
                         for section, value in row["defaults"].items()]
-            lines.append(f"| {code(row['key'])} | {'<br>'.join(defaults)} | {words[row['status']]} | {row['text']} |")
+            # The anchor lets the Azure resource library link to the row of a setting.
+            lines.append(f"| {code(row['key'])} | {'<br>'.join(defaults)} | {words[row['status']]} "
+                         f"| <a id=\"{row['key']}\"></a>{row['text']} |")
     return "\n".join(lines) + "\n"
 
 

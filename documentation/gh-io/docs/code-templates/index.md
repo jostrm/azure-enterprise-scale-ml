@@ -8,9 +8,9 @@ hide:
 Start from working code instead of an empty file. Each template runs inside a project of your AI Factory and
 uses the services that project already has.
 
-Type in the search box, or select a factory, an Azure service or a tag. Filters of different rows combine:
-**Agent Factory** with **Fabric** shows the agent templates that use Fabric. A blue number means the template
-has a place on the [architecture images](../architectures.md).
+Type in the search box, or tick a factory, an Azure service or a tag. Ticks in one row widen the choice, and
+rows narrow each other: **Agent Factory** with **Fabric** shows the agent templates that use Fabric. A blue
+number means the template has a place on the [architecture images](../architectures.md).
 
 <!-- code-templates:library -->
 

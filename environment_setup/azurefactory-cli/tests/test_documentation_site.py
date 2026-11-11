@@ -261,7 +261,7 @@ def test_code_templates_page_shows_every_template_with_filters(site):
                 for value in ([template["factory"]] if group == "factory" else template[group + "s"])}
         assert used == set(values), f"Every {group} filter matches at least one template, and none is missing."
         for value in values:
-            assert f'data-filter="{group}" data-value="{value}"' in page
+            assert f'type="checkbox" data-filter="{group}" data-value="{value}"' in page
     assert 'type="search"' in page
     assert {"Code templates library: Project team": "code-templates/index.md"} in config.nav
     script = next(name for name in config.extra_javascript if "libraries" in str(name))
@@ -270,7 +270,7 @@ def test_code_templates_page_shows_every_template_with_filters(site):
     assert "(code-templates/index.md)" in home and "(architectures.md)" in home
 
 
-def test_azure_resource_library_lists_every_service_switch(site):
+def test_azure_resource_library_lists_every_resource_a_setting_switches_on(site):
     import json
 
     _, config, _ = site
@@ -281,36 +281,61 @@ def test_azure_resource_library_lists_every_service_switch(site):
     assert len(identifiers) == len(set(identifiers))
     variables = json.loads((ROOT / "environment_setup" / "aifactory" / "variables.json").read_text(
         encoding="utf-8-sig"))["dev"]
-    gateway = (ROOT / "environment_setup" / "aifactory" / "bicep" / "copy_to_local_settings" / "github-actions" /
-               ".env.template").read_text(encoding="utf-8")
+    bootstrap = (ROOT / "bootstrap" / "lib" / "aifactory_scaleset_config.py").read_text(encoding="utf-8")
     services = set(library.load()["services"])
+    # The areas and categories are the ones of the repository README, plus Full stack across them.
+    assert list(data["areas"]) == ["Architectures", "Connectivity and security", "Tools and automation"]
+    categories = [category for members in data["areas"].values() for category in members] + [data["cross_category"]]
+    assert data["cross_category"] == "Full stack" and len(categories) == len(set(categories))
     for resource in resources:
-        setting = resource["setting"]
-        assert setting in variables or re.search(rf"^{setting}=", gateway, re.M), setting
-        assert resource["category"] in data["categories"], resource["id"]
-        assert resource["kinds"] and set(resource["kinds"]) <= set(data["kinds"]), resource["id"]
+        assert resource["categories"] and set(resource["categories"]) <= set(categories), resource["id"]
+        assert resource["categories"][0] != data["cross_category"], "Full stack is an extra category, never the only one."
+        for setting in resource["settings"]:
+            # A real key: in variables.json, or an input of the simple-mode bootstrap. Never an invented flag.
+            assert setting in variables or (setting.startswith("AIF_") and setting in bootstrap), setting
+        # A resource without a switch says what provides it instead.
+        assert bool(resource["settings"]) != bool(resource.get("without_setting")), resource["id"]
         assert resource.get("template_service", next(iter(services))) in services, resource["id"]
-    assert {resource["category"] for resource in resources} == set(data["categories"])
-    assert {kind for resource in resources for kind in resource["kinds"]} == set(data["kinds"])
-    # A new service switch in variables.json has to be added to the library, or to "not_listed" with the reason.
-    listed = {resource["setting"] for resource in resources}
+        assert 20 <= len(resource["summary"]) <= 220 and resource["summary"].endswith("."), resource["id"]
+    assert {category for resource in resources for category in resource["categories"]} == set(categories)
+    # A new switch in variables.json has to be added to the library, or to "not_listed" with the reason.
+    listed = {setting for resource in resources for setting in resource["settings"]}
     for key in variables:
-        if key.startswith("enable"):
+        if key.lower().startswith("enable"):
             assert (key in listed) != (key in data["not_listed"]), key
     # Full stack holds what an application needs around its AI.
-    full_stack = {kind for resource in resources if resource["category"] == "Full stack" for kind in resource["kinds"]}
-    assert {"front end", "database", "cache", "containers", "API gateway"} <= full_stack
-    names = {resource["name"] for resource in resources if resource["category"] == "Full stack"}
-    assert {"Azure Container Apps", "Azure Kubernetes Service (AKS)", "Azure API Management as the AI gateway"} <= names
+    names = {resource["name"] for resource in resources if "Full stack" in resource["categories"]}
+    assert {"Azure Web App", "Azure Container Apps", "Azure Kubernetes Service (AKS)", "Azure SQL Database",
+            "Azure Cache for Redis", "Azure API Management as the AI gateway"} <= names
+    # The names on Joakim's list that have no switch of their own are listed with what provides them.
+    by_name = {resource["name"]: resource for resource in resources}
+    assert by_name["Azure Cosmos DB for MongoDB"]["settings"] == ["enableCosmosDB", "cosmosKind"]
+    assert by_name["Microsoft OneLake and Fabric"]["without_setting"]
+    assert by_name["Azure VPN Gateway"]["settings"] == ["enableAIFactoryHub"]
+
     source = (SITE / "docs" / "resources" / "index.md").read_text(encoding="utf-8")
     page = library.render(source)
     assert library.RESOURCES in source and library.RESOURCES not in page and 'type="search"' in page
+    variables_page = (SITE / "docs" / "parameters" / "variables.md").read_text(encoding="utf-8")
     for resource in resources:
-        assert f'id="{resource["id"]}"' in page and resource["name"] in page and resource["setting"] in page
-    for group, values in (("category", data["categories"]), ("kind", data["kinds"])):
+        assert f'id="{resource["id"]}"' in page and html.escape(resource["name"]) in page
+        for setting in resource["settings"]:
+            assert f"<code>{setting}</code>" in page
+            if setting in variables:
+                assert f'href="../parameters/variables/#{setting}"' in page
+                assert f'<a id="{setting}"></a>' in variables_page, "Each card links to the row of its variable."
+    for group, values in (("area", list(data["areas"])), ("category", categories)):
         for value in values:
-            assert f'data-filter="{group}" data-value="{value}"' in page
+            assert f'type="checkbox" data-filter="{group}" data-value="{html.escape(value)}"' in page
+    # The numbers on the page are the numbers of the data: no rounded "35+".
+    switchable = sum(1 for resource in resources if resource["settings"])
+    assert page.count('<article class="esaf-card"') == len(resources)
+    assert f"**{len(resources)}** Azure resources" in page and f"**{switchable}** of them" in page
+    assert switchable >= 35, "The README promises more than 35 resources a team can switch on."
+    assert "35+" not in page and "+35" not in page
     assert {"Azure resource library": "resources/index.md"} in config.nav
+    code_templates = (SITE / "docs" / "code-templates" / "index.md").read_text(encoding="utf-8")
+    assert "(../resources/index.md)" in code_templates and "(../code-templates/index.md)" in source
 
 
 def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site):
@@ -323,6 +348,7 @@ def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site)
     source = (SITE / "docs" / "architectures.md").read_text(encoding="utf-8")
     assert library.NUMBERS in source and {"Architecture": "architectures.md"} in site[1].nav
     svg = "{http://www.w3.org/2000/svg}"
+    drawn_labels = ""
     for label, mode in (("External hub", "external-hub"), ("Own hub", "own-hub"), ("Standalone", "standalone")):
         assert source.count(f'=== "{label}"') == 2, "The image tab and the animation tab switch together."
         path = SITE / "docs" / "assets" / "architecture" / f"esaf-architecture-{mode}.svg"
@@ -343,11 +369,18 @@ def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site)
         for name in ("Microsoft 365", "Teams", "Bot Service", "Power Platform", "Copilot Studio", "Power Automate",
                      "SharePoint", "Foundry IQ", "API Management", "Kong", "Fabric", "Azure Machine Learning"):
             assert name in labels, f"{mode}: {name}"
+        drawn_labels += labels
         # The embedded Azure icons keep their official colors. Everything drawn around them uses the palette.
         drawn = re.sub(r"(?s)<defs>.*</defs>", "", text, count=1)
         colors = {color.upper() for color in re.findall(r"#[0-9A-Fa-f]{6}\b", drawn)}
         assert colors <= {color.upper() for color in drawing.PALETTE.values()}, "No red or orange: see the style guide."
         assert text.count("<symbol ") >= 30, "The services are drawn with the official Azure icons."
+    on_image = [resource for resource in library.load_resources()["resources"] if resource.get("label")]
+    assert len(on_image) >= 20, "The services on the images take their names from the resource library."
+    for resource in on_image:
+        for line in resource["label"]:
+            assert line in drawn_labels, f"The images name {resource['id']} as the resource library does."
+        assert f'"@{resource["id"]}"' in (SITE / "tools" / "generate_architecture.py").read_text(encoding="utf-8")
     table = library.render(source, data)
     for number, template in numbered.items():
         row = next(line for line in table.splitlines() if line.startswith(f"| **{number}** |"))

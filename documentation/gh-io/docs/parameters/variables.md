@@ -24,452 +24,452 @@ The project pipelines read `variables.json`. The separate AI gateway pipeline do
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `AMLStudioUIPrivate` | `"true"` | No | AML Studio UI private access otherwise: false, only data plane is private; control plane is public. |
-| `ENABLE_APIM` | `"false"` | No | Deploy APIM Azure OpenAI pool, token guard, 429-aware backend circuit breakers, and API policy. |
-| `ENABLE_KONG` | `"false"` | No | Deploys Kong as an optional private edge proxy to APIM. |
-| `acr_SKU` | `"Premium"` | Yes | ACR SKU mandatory: ACR SKU ensure: Premium required for private endpoints and CMK support. |
-| `acr_adminUserEnabled` | `"false"` | No | ACR admin user enabled recommended: false, disable admin user for security. otherwise: true, enable for simpler dev access. |
-| `acr_dedicated` | `"true"` | Yes | ACR dedicated (Premium tier) mandatory: ACR dedicated (Premium tier) ensure: must be true when using private endpoints or CMK. |
-| `addAIFactoryMCP2AIGatewaySKU` | `"false"` | No | Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources. |
-| `addAIFactoryMCP2APIM` | `"false"` | No | Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription. |
-| `addAIFoundry` | `"false"` | No | Add new AI Foundry instance with new name otherwise: true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance. |
-| `addAIFoundryHub` | `"false"` | No | DEPRECATED. Do not enable. keep-as-is: DEPRECATED. Do not enable. |
-| `addAISearch` | `"false"` | No | Add new AI Search instance otherwise: false, CreateIfNotExists logic. |
-| `addAzureMachineLearning` | `"false"` | No | Add new Azure ML workspace |
-| `addBastionHost` | `"false"` | No | Add Bastion Host in common RG |
-| `apimGatewayAggregateTpm` | `""` | Depends | 80-90% of the summed TPM across all GPT-5.5 backends. Required by the separate AI gateway workflow when APIM is enabled. |
-| `apimGatewayApiId` | `"azure-openai-gpt55"` | No | Names the APIM API that the AI gateway pipeline creates for the pooled Azure OpenAI endpoint. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `apimGatewayApiPath` | `"openai"` | No | Sets the URL path of the AI gateway API in APIM; clients call that path. Letters, digits, underscore and hyphen, with a slash between segments. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `apimGatewayAssignOpenAIUserRole` | `"false"` | No | Requires roleAssignments/write in every backend subscription. |
-| `apimGatewayBackendPoolName` | `"aoai-gpt55-pool"` | No | Names the APIM backend pool that groups the Azure OpenAI backends listed in apimGatewayBackendsJson. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `apimGatewayBackendsJson` | `"[]"` | Depends | JSON array; see esml-common/ai-gateway/apim/README.md. Required by the separate AI gateway workflow when APIM is enabled. |
-| `apimGatewayCallerTpm` | `"10000"` | No | Fair-use TPM allocation per APIM subscription. |
-| `apimGatewayConfigFile` | `""` | No | Consumer-relative APIM JSON for the reviewed runner (apimGatewayManagedProvisioning:'true') keep-as-is: Empty builds an existing-APIM configuration from the apimGateway* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json. |
-| `apimGatewayManagedProvisioning` | `"false"` | No | Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md. |
-| `apimGatewayResourceGroup` | `""` | Depends | Resource group containing the existing APIM service. Required by the separate AI gateway workflow when APIM is enabled. |
-| `apimGatewayRetryCount` | `"2"` | No | Sets how many times APIM retries after a backend answers 429 (throttled), from 1 to 50. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `apimGatewayServiceName` | `""` | Depends | Existing APIM service with system-assigned managed identity enabled. Required by the separate AI gateway workflow when APIM is enabled. |
-| `apimGatewaySku` | `"StandardV2"` | No | SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers. |
-| `apimGatewaySkuCapacity` | `1` | No | Number of units of the API Management SKU. Check the limits of the SKU and size it from the load you measure. |
-| `apimGatewaySubscriptionId` | `""` | No | Subscription containing APIM. Empty uses the environment subscription. |
-| `cleanFoundryCaphost` | `"false"` | No | Clean up capability host on deletion otherwise: false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project. |
-| `databricksOID` | `"<optional>_ObjectID"` | Depends | Databricks object ID mandatory: if enableDatabricks:'true' ensure: find Databricks object ID in Entra ID. |
-| `databricksPrivate` | `"true"` | No | Databricks private control plane otherwise: false, only data plane is private; control plane is public. |
-| `disable_whitelisting_for_build_agents` | `"false"` | No | Disable runner IP whitelisting otherwise: true, skip whitelisting (use only if runner already has network access). |
-| `elasticCompanyName` | `"Organization"` | Depends | Elastic Cloud company name mandatory: if enableElasticsearch:'true' |
-| `elasticDeploymentSize` | `"small"` | No | Elasticsearch deployment size otherwise: "medium" or "large". |
-| `elasticEmail` | `"admin@example.com"` | Depends | Elastic Cloud account email mandatory: if enableElasticsearch:'true' ensure: valid email address. |
-| `elasticFirstName` | `"AI"` | Depends | Elastic Cloud contact first name mandatory: if enableElasticsearch:'true' |
-| `elasticLastName` | `"Factory"` | Depends | Elastic Cloud contact last name mandatory: if enableElasticsearch:'true' |
-| `elasticSku` | `"ess-consumption-2024_Monthly"` | No | Elastic Cloud SKU |
-| `elasticType` | `"ElasticCloud"` | No | Elasticsearch deployment type otherwise: "SelfManagedOnAKS" (future support). |
-| `enableAFoundryCaphost` | `"true"` | Depends | Lets private Foundry agents keep their threads, files and vectors in your own Storage, AI Search and Cosmos DB. Needs those three services and enableAIFoundry. |
-| `enableAIDocIntelligence` | `"false"` | No | Deploy Azure AI Document Intelligence |
-| `enableAIFactoryAgentLiveVoice` | `"false"` | No | Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
-| `enableAIFactoryCreatedDefaultProjectForAIFv2` | `"true"` | No | AI Factory default project for AIFv2 otherwise: false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections. |
-| `enableAIFactoryHub` | `false` | No | Own AI Factory Hub intent |
-| `enableAIFactoryMCP` | `"false"` | No | Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
-| `enableAIFoundry` | `"true"` | Depends | Deploys the Microsoft Foundry account and project. Private agents also need enableAFoundryCaphost, AI Search, Cosmos DB and Storage. Check that your region offers the models you want. |
-| `enableAIFoundryHub` | `"false"` | No | DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. |
-| `enableAIGatewaySKU` | `"false"` | No | Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources. |
-| `enableAISearch` | `"true"` | Depends | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
-| `enableAISearchSharedPrivateLink` | `"true"` | No | AI Search shared private link otherwise: false, creates a private endpoint in the project vNet. |
-| `enableAIServices` | `"false"` | No | DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. |
-| `enableAKS` | `"false"` | No | Deploy standalone AKS cluster in project RG |
-| `enableAMPLS` | `"false"` | No | Enable AMPLS in Hub otherwise: true, AMPLS created in Hub subscription; AppInsights in private/private mode. |
-| `enableAdminVM` | `"false"` | No | Enable Admin VM in common RG |
-| `enableAksForAzureML` | `"false"` | No | Deploy AKS for Azure ML inference |
-| `enableAppInsightsDashboard` | `"false"` | No | Deploy Application Insights dashboard |
-| `enableApplicationInsights` | `"true"` | No | Deploy project Application Insights |
-| `enableAzureAIVision` | `"false"` | No | Deploy Azure AI Vision |
-| `enableAzureMachineLearning` | `"false"` | No | Deploy Azure ML workspace |
-| `enableAzureMcpServer` | `"false"` | No | Private, read-only MCP deployment; requires prepared project-scoped configuration. |
-| `enableAzureOpenAI` | `"false"` | No | Deploy standalone Azure OpenAI |
-| `enableAzureSpeech` | `"false"` | No | Deploy Azure AI Speech |
-| `enableBing` | `"false"` | No | Deploy Bing Search |
-| `enableBingCustomSearch` | `"false"` | No | Deploy Bing Custom Search |
-| `enableBotService` | `"true"` | No | Deploy Azure Bot Service keep-as-is: Required for Microsoft Foundry agent scenarios. |
-| `enableContainerApps` | `"false"` | No | Deploy Azure Container Apps |
-| `enableContentSafety` | `"false"` | No | Deploy Azure AI Content Safety |
-| `enableCosmosDB` | `"true"` | Depends | Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
-| `enableDatabricks` | `"false"` | No | Deploy Databricks workspace |
-| `enableDatafactory` | `"false"` | No | Deploy Azure Data Factory in project RG |
-| `enableDatafactoryCommon` | `"false"` | No | Deploy Azure Data Factory in common RG |
-| `enableDefenderforAIResourceLevel` | `"false"` | No | Defender for AI at resource level otherwise: true, enable Microsoft Defender for AI at per-resource level. |
-| `enableDefenderforAISubLevel` | `"false"` | No | Defender for AI at subscription level otherwise: true, enable Microsoft Defender for AI at subscription level. |
-| `enableDeleteForDisabledResources` | `"false"` | No | Decides what happens to a service that is switched off but exists in Azure. false, the default: the pipeline leaves it alone. true: the next run of the project pipeline deletes, in the project resource group, the resources that have the AI Factory name of a switched-off service, before it deploys the rest. It keeps Key Vault, storage accounts, Application Insights, dashboards and managed identities, and never touches the common resource group. Databases go with their data, and it purges deleted Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources, which cannot be undone. Review the switched-off services before you set it to true. |
-| `enableElasticsearch` | `"false"` | No | Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
-| `enableEncryptionAtHost` | `"true"` | No | Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
-| `enableEventHubs` | `"false"` | No | Deploy Azure Event Hubs |
-| `enableFactoryChatAgent` | `"false"` | No | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
-| `enableFunction` | `"false"` | No | Deploy Azure Function App |
-| `enableLogicApps` | `"false"` | No | Deploy Azure Logic Apps |
-| `enablePersonas` | `false` | No | True selects groups-v1; false preserves configured legacy human/group grants. |
-| `enablePostgreSQL` | `"false"` | No | Deploy Azure PostgreSQL |
-| `enableProjectVM` | `false` | No | Turns on a private virtual machine in the project resource group, on the default subnet. An existing VM is not redeployed. |
-| `enableRedisCache` | `"false"` | No | Deploy Azure Cache for Redis |
-| `enableRedisManaged` | `false` | No | Independent private, Entra-only Azure Managed Redis. |
-| `enableRetries` | `"false"` | No | Enable automatic job retries otherwise: true, enable automatic retries on failure for GenAI services deployment. |
-| `enableSQLDatabase` | `"false"` | No | Deploy Azure SQL Database |
-| `enableVmBackup` | `"false"` | No | Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
-| `enableWebApp` | `"false"` | No | Deploy Azure Web App |
-| `foundryApiManagementResourceId` | `""` | No | APIM resource ID for Foundry integration otherwise: provide existing API Management resource ID to integrate with Microsoft Foundry. |
-| `foundryDeploymentType` | `"2"` | No | &lt;deprecated&gt;Retained for configuration compatibility. AI Foundry now always uses the second-option account deployment. |
-| `kongGatewayApimHost` | `""` | Depends | APIM gateway hostname without protocol/path. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
-| `kongGatewayCpu` | `2` | No | Sets the CPU cores of the Kong gateway container, as a whole number. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `kongGatewayImage` | `"kong/kong-gateway:3.9"` | No | Sets the container image of the Kong gateway. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `kongGatewayMemoryGb` | `4` | No | Sets the memory of the Kong gateway container in GB, as a whole number. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `serviceSettingDeployProjectVM` | `"false"` | No | Deploy VM in project resource group otherwise: true, deploy a jumpbox VM for use with Azure Bastion. |
-| `updateAIFoundry` | `"false"` | No | Update AI Foundry properties otherwise: true, re-run to update AI Foundry properties and RBAC. |
-| `updateCommonACR` | `"true"` | No | Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled. |
+| `AMLStudioUIPrivate` | `"true"` | No | <a id="AMLStudioUIPrivate"></a>AML Studio UI private access otherwise: false, only data plane is private; control plane is public. |
+| `ENABLE_APIM` | `"false"` | No | <a id="ENABLE_APIM"></a>Deploy APIM Azure OpenAI pool, token guard, 429-aware backend circuit breakers, and API policy. |
+| `ENABLE_KONG` | `"false"` | No | <a id="ENABLE_KONG"></a>Deploys Kong as an optional private edge proxy to APIM. |
+| `acr_SKU` | `"Premium"` | Yes | <a id="acr_SKU"></a>ACR SKU mandatory: ACR SKU ensure: Premium required for private endpoints and CMK support. |
+| `acr_adminUserEnabled` | `"false"` | No | <a id="acr_adminUserEnabled"></a>ACR admin user enabled recommended: false, disable admin user for security. otherwise: true, enable for simpler dev access. |
+| `acr_dedicated` | `"true"` | Yes | <a id="acr_dedicated"></a>ACR dedicated (Premium tier) mandatory: ACR dedicated (Premium tier) ensure: must be true when using private endpoints or CMK. |
+| `addAIFactoryMCP2AIGatewaySKU` | `"false"` | No | <a id="addAIFactoryMCP2AIGatewaySKU"></a>Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources. |
+| `addAIFactoryMCP2APIM` | `"false"` | No | <a id="addAIFactoryMCP2APIM"></a>Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription. |
+| `addAIFoundry` | `"false"` | No | <a id="addAIFoundry"></a>Add new AI Foundry instance with new name otherwise: true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance. |
+| `addAIFoundryHub` | `"false"` | No | <a id="addAIFoundryHub"></a>DEPRECATED. Do not enable. keep-as-is: DEPRECATED. Do not enable. |
+| `addAISearch` | `"false"` | No | <a id="addAISearch"></a>Add new AI Search instance otherwise: false, CreateIfNotExists logic. |
+| `addAzureMachineLearning` | `"false"` | No | <a id="addAzureMachineLearning"></a>Add new Azure ML workspace |
+| `addBastionHost` | `"false"` | No | <a id="addBastionHost"></a>Add Bastion Host in common RG |
+| `apimGatewayAggregateTpm` | `""` | Depends | <a id="apimGatewayAggregateTpm"></a>80-90% of the summed TPM across all GPT-5.5 backends. Required by the separate AI gateway workflow when APIM is enabled. |
+| `apimGatewayApiId` | `"azure-openai-gpt55"` | No | <a id="apimGatewayApiId"></a>Names the APIM API that the AI gateway pipeline creates for the pooled Azure OpenAI endpoint. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `apimGatewayApiPath` | `"openai"` | No | <a id="apimGatewayApiPath"></a>Sets the URL path of the AI gateway API in APIM; clients call that path. Letters, digits, underscore and hyphen, with a slash between segments. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `apimGatewayAssignOpenAIUserRole` | `"false"` | No | <a id="apimGatewayAssignOpenAIUserRole"></a>Requires roleAssignments/write in every backend subscription. |
+| `apimGatewayBackendPoolName` | `"aoai-gpt55-pool"` | No | <a id="apimGatewayBackendPoolName"></a>Names the APIM backend pool that groups the Azure OpenAI backends listed in apimGatewayBackendsJson. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `apimGatewayBackendsJson` | `"[]"` | Depends | <a id="apimGatewayBackendsJson"></a>JSON array; see esml-common/ai-gateway/apim/README.md. Required by the separate AI gateway workflow when APIM is enabled. |
+| `apimGatewayCallerTpm` | `"10000"` | No | <a id="apimGatewayCallerTpm"></a>Fair-use TPM allocation per APIM subscription. |
+| `apimGatewayConfigFile` | `""` | No | <a id="apimGatewayConfigFile"></a>Consumer-relative APIM JSON for the reviewed runner (apimGatewayManagedProvisioning:'true') keep-as-is: Empty builds an existing-APIM configuration from the apimGateway* variables. Examples: copy_to_local_settings/ai-gateway/apim.*.example.json. |
+| `apimGatewayManagedProvisioning` | `"false"` | No | <a id="apimGatewayManagedProvisioning"></a>Run APIM through the reviewed plan -&gt; what-if -&gt; apply runner, which can also provision a private StandardV2 APIM keep-as-is: false keeps the classic deploy step. See esml-common/ai-gateway/apim/README.md. |
+| `apimGatewayResourceGroup` | `""` | Depends | <a id="apimGatewayResourceGroup"></a>Resource group containing the existing APIM service. Required by the separate AI gateway workflow when APIM is enabled. |
+| `apimGatewayRetryCount` | `"2"` | No | <a id="apimGatewayRetryCount"></a>Sets how many times APIM retries after a backend answers 429 (throttled), from 1 to 50. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `apimGatewayServiceName` | `""` | Depends | <a id="apimGatewayServiceName"></a>Existing APIM service with system-assigned managed identity enabled. Required by the separate AI gateway workflow when APIM is enabled. |
+| `apimGatewaySku` | `"StandardV2"` | No | <a id="apimGatewaySku"></a>SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers. |
+| `apimGatewaySkuCapacity` | `1` | No | <a id="apimGatewaySkuCapacity"></a>Number of units of the API Management SKU. Check the limits of the SKU and size it from the load you measure. |
+| `apimGatewaySubscriptionId` | `""` | No | <a id="apimGatewaySubscriptionId"></a>Subscription containing APIM. Empty uses the environment subscription. |
+| `cleanFoundryCaphost` | `"false"` | No | <a id="cleanFoundryCaphost"></a>Clean up capability host on deletion otherwise: false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project. |
+| `databricksOID` | `"<optional>_ObjectID"` | Depends | <a id="databricksOID"></a>Databricks object ID mandatory: if enableDatabricks:'true' ensure: find Databricks object ID in Entra ID. |
+| `databricksPrivate` | `"true"` | No | <a id="databricksPrivate"></a>Databricks private control plane otherwise: false, only data plane is private; control plane is public. |
+| `disable_whitelisting_for_build_agents` | `"false"` | No | <a id="disable_whitelisting_for_build_agents"></a>Disable runner IP whitelisting otherwise: true, skip whitelisting (use only if runner already has network access). |
+| `elasticCompanyName` | `"Organization"` | Depends | <a id="elasticCompanyName"></a>Elastic Cloud company name mandatory: if enableElasticsearch:'true' |
+| `elasticDeploymentSize` | `"small"` | No | <a id="elasticDeploymentSize"></a>Elasticsearch deployment size otherwise: "medium" or "large". |
+| `elasticEmail` | `"admin@example.com"` | Depends | <a id="elasticEmail"></a>Elastic Cloud account email mandatory: if enableElasticsearch:'true' ensure: valid email address. |
+| `elasticFirstName` | `"AI"` | Depends | <a id="elasticFirstName"></a>Elastic Cloud contact first name mandatory: if enableElasticsearch:'true' |
+| `elasticLastName` | `"Factory"` | Depends | <a id="elasticLastName"></a>Elastic Cloud contact last name mandatory: if enableElasticsearch:'true' |
+| `elasticSku` | `"ess-consumption-2024_Monthly"` | No | <a id="elasticSku"></a>Elastic Cloud SKU |
+| `elasticType` | `"ElasticCloud"` | No | <a id="elasticType"></a>Elasticsearch deployment type otherwise: "SelfManagedOnAKS" (future support). |
+| `enableAFoundryCaphost` | `"true"` | Depends | <a id="enableAFoundryCaphost"></a>Lets private Foundry agents keep their threads, files and vectors in your own Storage, AI Search and Cosmos DB. Needs those three services and enableAIFoundry. |
+| `enableAIDocIntelligence` | `"false"` | No | <a id="enableAIDocIntelligence"></a>Deploy Azure AI Document Intelligence |
+| `enableAIFactoryAgentLiveVoice` | `"false"` | No | <a id="enableAIFactoryAgentLiveVoice"></a>Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
+| `enableAIFactoryCreatedDefaultProjectForAIFv2` | `"true"` | No | <a id="enableAIFactoryCreatedDefaultProjectForAIFv2"></a>AI Factory default project for AIFv2 otherwise: false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections. |
+| `enableAIFactoryHub` | `false` | No | <a id="enableAIFactoryHub"></a>Own AI Factory Hub intent |
+| `enableAIFactoryMCP` | `"false"` | No | <a id="enableAIFactoryMCP"></a>Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
+| `enableAIFoundry` | `"true"` | Depends | <a id="enableAIFoundry"></a>Deploys the Microsoft Foundry account and project. Private agents also need enableAFoundryCaphost, AI Search, Cosmos DB and Storage. Check that your region offers the models you want. |
+| `enableAIFoundryHub` | `"false"` | No | <a id="enableAIFoundryHub"></a>DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. |
+| `enableAIGatewaySKU` | `"false"` | No | <a id="enableAIGatewaySKU"></a>Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources. |
+| `enableAISearch` | `"true"` | Depends | <a id="enableAISearch"></a>Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
+| `enableAISearchSharedPrivateLink` | `"true"` | No | <a id="enableAISearchSharedPrivateLink"></a>AI Search shared private link otherwise: false, creates a private endpoint in the project vNet. |
+| `enableAIServices` | `"false"` | No | <a id="enableAIServices"></a>DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. |
+| `enableAKS` | `"false"` | No | <a id="enableAKS"></a>Deploy standalone AKS cluster in project RG |
+| `enableAMPLS` | `"false"` | No | <a id="enableAMPLS"></a>Enable AMPLS in Hub otherwise: true, AMPLS created in Hub subscription; AppInsights in private/private mode. |
+| `enableAdminVM` | `"false"` | No | <a id="enableAdminVM"></a>Enable Admin VM in common RG |
+| `enableAksForAzureML` | `"false"` | No | <a id="enableAksForAzureML"></a>Deploy AKS for Azure ML inference |
+| `enableAppInsightsDashboard` | `"false"` | No | <a id="enableAppInsightsDashboard"></a>Deploy Application Insights dashboard |
+| `enableApplicationInsights` | `"true"` | No | <a id="enableApplicationInsights"></a>Deploy project Application Insights |
+| `enableAzureAIVision` | `"false"` | No | <a id="enableAzureAIVision"></a>Deploy Azure AI Vision |
+| `enableAzureMachineLearning` | `"false"` | No | <a id="enableAzureMachineLearning"></a>Deploy Azure ML workspace |
+| `enableAzureMcpServer` | `"false"` | No | <a id="enableAzureMcpServer"></a>Private, read-only MCP deployment; requires prepared project-scoped configuration. |
+| `enableAzureOpenAI` | `"false"` | No | <a id="enableAzureOpenAI"></a>Deploy standalone Azure OpenAI |
+| `enableAzureSpeech` | `"false"` | No | <a id="enableAzureSpeech"></a>Deploy Azure AI Speech |
+| `enableBing` | `"false"` | No | <a id="enableBing"></a>Deploy Bing Search |
+| `enableBingCustomSearch` | `"false"` | No | <a id="enableBingCustomSearch"></a>Deploy Bing Custom Search |
+| `enableBotService` | `"true"` | No | <a id="enableBotService"></a>Deploy Azure Bot Service keep-as-is: Required for Microsoft Foundry agent scenarios. |
+| `enableContainerApps` | `"false"` | No | <a id="enableContainerApps"></a>Deploy Azure Container Apps |
+| `enableContentSafety` | `"false"` | No | <a id="enableContentSafety"></a>Deploy Azure AI Content Safety |
+| `enableCosmosDB` | `"true"` | Depends | <a id="enableCosmosDB"></a>Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
+| `enableDatabricks` | `"false"` | No | <a id="enableDatabricks"></a>Deploy Databricks workspace |
+| `enableDatafactory` | `"false"` | No | <a id="enableDatafactory"></a>Deploy Azure Data Factory in project RG |
+| `enableDatafactoryCommon` | `"false"` | No | <a id="enableDatafactoryCommon"></a>Deploy Azure Data Factory in common RG |
+| `enableDefenderforAIResourceLevel` | `"false"` | No | <a id="enableDefenderforAIResourceLevel"></a>Defender for AI at resource level otherwise: true, enable Microsoft Defender for AI at per-resource level. |
+| `enableDefenderforAISubLevel` | `"false"` | No | <a id="enableDefenderforAISubLevel"></a>Defender for AI at subscription level otherwise: true, enable Microsoft Defender for AI at subscription level. |
+| `enableDeleteForDisabledResources` | `"false"` | No | <a id="enableDeleteForDisabledResources"></a>Decides what happens to a service that is switched off but exists in Azure. false, the default: the pipeline leaves it alone. true: the next run of the project pipeline deletes, in the project resource group, the resources that have the AI Factory name of a switched-off service, before it deploys the rest. It keeps Key Vault, storage accounts, Application Insights, dashboards and managed identities, and never touches the common resource group. Databases go with their data, and it purges deleted Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources, which cannot be undone. Review the switched-off services before you set it to true. |
+| `enableElasticsearch` | `"false"` | No | <a id="enableElasticsearch"></a>Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
+| `enableEncryptionAtHost` | `"true"` | No | <a id="enableEncryptionAtHost"></a>Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
+| `enableEventHubs` | `"false"` | No | <a id="enableEventHubs"></a>Deploy Azure Event Hubs |
+| `enableFactoryChatAgent` | `"false"` | No | <a id="enableFactoryChatAgent"></a>Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
+| `enableFunction` | `"false"` | No | <a id="enableFunction"></a>Deploy Azure Function App |
+| `enableLogicApps` | `"false"` | No | <a id="enableLogicApps"></a>Deploy Azure Logic Apps |
+| `enablePersonas` | `false` | No | <a id="enablePersonas"></a>True selects groups-v1; false preserves configured legacy human/group grants. |
+| `enablePostgreSQL` | `"false"` | No | <a id="enablePostgreSQL"></a>Deploy Azure PostgreSQL |
+| `enableProjectVM` | `false` | No | <a id="enableProjectVM"></a>Turns on a private virtual machine in the project resource group, on the default subnet. An existing VM is not redeployed. |
+| `enableRedisCache` | `"false"` | No | <a id="enableRedisCache"></a>Deploy Azure Cache for Redis |
+| `enableRedisManaged` | `false` | No | <a id="enableRedisManaged"></a>Independent private, Entra-only Azure Managed Redis. |
+| `enableRetries` | `"false"` | No | <a id="enableRetries"></a>Enable automatic job retries otherwise: true, enable automatic retries on failure for GenAI services deployment. |
+| `enableSQLDatabase` | `"false"` | No | <a id="enableSQLDatabase"></a>Deploy Azure SQL Database |
+| `enableVmBackup` | `"false"` | No | <a id="enableVmBackup"></a>Azure Backup for the admin and project VMs otherwise: true, creates or reuses a Recovery Services vault with a daily Enhanced policy and protects the VM. |
+| `enableWebApp` | `"false"` | No | <a id="enableWebApp"></a>Deploy Azure Web App |
+| `foundryApiManagementResourceId` | `""` | No | <a id="foundryApiManagementResourceId"></a>APIM resource ID for Foundry integration otherwise: provide existing API Management resource ID to integrate with Microsoft Foundry. |
+| `foundryDeploymentType` | `"2"` | No | <a id="foundryDeploymentType"></a>&lt;deprecated&gt;Retained for configuration compatibility. AI Foundry now always uses the second-option account deployment. |
+| `kongGatewayApimHost` | `""` | Depends | <a id="kongGatewayApimHost"></a>APIM gateway hostname without protocol/path. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
+| `kongGatewayCpu` | `2` | No | <a id="kongGatewayCpu"></a>Sets the CPU cores of the Kong gateway container, as a whole number. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `kongGatewayImage` | `"kong/kong-gateway:3.9"` | No | <a id="kongGatewayImage"></a>Sets the container image of the Kong gateway. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `kongGatewayMemoryGb` | `4` | No | <a id="kongGatewayMemoryGb"></a>Sets the memory of the Kong gateway container in GB, as a whole number. Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `serviceSettingDeployProjectVM` | `"false"` | No | <a id="serviceSettingDeployProjectVM"></a>Deploy VM in project resource group otherwise: true, deploy a jumpbox VM for use with Azure Bastion. |
+| `updateAIFoundry` | `"false"` | No | <a id="updateAIFoundry"></a>Update AI Foundry properties otherwise: true, re-run to update AI Foundry properties and RBAC. |
+| `updateCommonACR` | `"true"` | No | <a id="updateCommonACR"></a>Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled. |
 
 ## Factory, project, naming and orchestration
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `AZURE_CLIENT_ID` | `""` | No | Preferred credentialless deployment identity: client ID of a federated app or user-assigned managed identity. When set, workflows use OIDC instead of AZURE_CREDENTIALS. |
-| `GITHUB_NEW_REPO` | `""` | Yes | New GitHub repository path mandatory: New GitHub repository path ensure: format: |
-| `GITHUB_NEW_REPO_VISIBILITY` | `"public"` | No | New repository visibility otherwise: private or internal. |
-| `GITHUB_TEMPLATE_REPO` | `"azure/enterprise-scale-aifactory"` | No | GitHub template repository keep-as-is: Leave as-is if BYO repo. |
-| `GITHUB_USERNAME` | `""` | Yes | GitHub username or org mandatory: GitHub username or org |
-| `GITHUB_USE_SSH` | `"false"` | No | Use SSH for git operations otherwise: true, use SSH instead of HTTPS. |
-| `aca_w_registry_image` | `"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"` | No | Container Apps default image otherwise: replace with your own ACR image. |
-| `adminUsername` | `"esmladmin"` | No | VM admin username |
-| `admin_aiSearchTier` | `"basic"` | Yes | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'] |
-| `admin_aifactoryPrefixRG` | `"mrvel-1-"` | No | AI Factory resource group prefix keep-as-is: Max 6 chars. otherwise: set your company prefix, e.g. "acme-ai-", "contoso-". |
-| `admin_aifactorySuffixRG` | `"-001"` | Yes | AI Factory scaleset suffix mandatory: AI Factory scaleset suffix keep-as-is: For 1st scaleset. otherwise: increment to '-002', '-003' for additional scalesets. |
-| `admin_commonResourceSuffix` | `"-001"` | No | Common resources suffix otherwise: change to reprovision new services in the same common RG while keeping old ones. |
-| `admin_hybridBenefit` | `"false"` | No | Azure Hybrid Benefit for VMs otherwise: true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided). |
-| `admin_ip_fw` | `""` | No | Leave empty. Will be automatically set by the pipeline to the build agent IP. keep-as-is: Leave empty. Will be automatically set by the pipeline to the build agent IP. |
-| `admin_keyvaultSoftDeleteDays` | `7` | Depends | Key Vault soft delete days mandatory: if cmk:'true' (purge protection required). otherwise: 90 days recommended; 0 to disable. |
-| `admin_location` | `"eastus2"` | Yes | Azure region mandatory: Azure region |
-| `admin_locationSuffix` | `"eus2"` | Yes | Region short name mandatory: Region short name |
-| `admin_prjResourceSuffix` | `"-001"` | No | Project resources suffix otherwise: change to reprovision new services in the same project RG while keeping old ones. |
-| `admin_projectType` | `"all"` | Yes | Selects the project type that sizes the project subnets: all (every subnet), genai-1 or esml. Any other value fails the networking step. Keep all. |
-| `admin_semanticSearchTier` | `"free"` | Yes | Semantic search tier mandatory: Semantic search tier |
-| `aiGatewaySkuResourceId` | `""` | No | Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
-| `aiSearchFallbackLocationArrayDev` | `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | No | Up to five Search fallback regions in order, Germany last; [] or blank disables regional fallback independently of SKU retries. |
-| `aiSearchFallbackLocationArrayStageProd` | `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | No | Up to five Search fallback regions for Test/Stage and Prod in order, Germany last; [] or blank disables regional fallback. Only Search service placement changes. |
-| `aiSearchLocation` | `""` | No | AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable. |
-| `aifactory-dash-01` | `""` | No | Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard. |
-| `aifactoryAgentConfigFile` | `""` | No | Your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when enableAIFactoryAgentLiveVoice:'true'. |
-| `aifactoryAgentContainerAppsEnvironment` | `""` | No | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
-| `aifactoryAgentEntraAppId` | `""` | Depends | Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph. |
-| `aifactoryAgentReaderObjectIds` | `""` | Depends | Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline. |
-| `aifactoryAgentVoiceLanguages` | `""` | No | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'. |
-| `aifactoryAgentVoiceName` | `""` | No | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
-| `aifactoryMcpApiImage` | `""` | Depends | Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
-| `aifactoryMcpClassicApimResourceIds` | `""` | No | Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
-| `aifactoryMcpContainerAppResourceId` | `""` | No | Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app. |
-| `aifactoryMcpContainerAppsEnvironment` | `""` | No | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
-| `aifactoryMcpEntraAppId` | `""` | Depends | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
-| `aifactoryMcpImage` | `""` | Depends | Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format |
-| `aifactory_branch_chosen` | `"release/v1.24"` | No | Submodule release branch |
-| `aifactory_mcp_AppID_seeding_kv_name` | `"<optional>esml-project001-mcp-app-id"` | No | Seeding Key Vault secret name holding the AI Factory MCP API app registration client ID, written by esml-util/29b-create-mcp-api-sp-for-projects.sh. The MCP step uses it when aifactoryMcpEntraAppId is empty. |
-| `aifactory_salt` | `""` | No | Leave empty, 5 characters.  A deteministic unique value, from COMMON RG |
-| `aifactory_salt_random` | `""` | No | Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. keep-as-is: Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. |
-| `aifactory_version_major` | `"1"` | No | AI Factory major version keep-as-is: Used to determine which bicep files to use. |
-| `aifactory_version_minor` | `"24"` | No | AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24 |
-| `aisearchRetryCapcityArray` | `"true"` | No | Validate all candidates' quota headroom and retry only Azure AI Search capacity failures. |
-| `aseSku` | `"IsolatedV2"` | No | App Service Environment SKU keep-as-is: Used only if byoASEv3:'true' or a dedicated ASE is provisioned. |
-| `aseSkuCode` | `"I1v2"` | No | App Service Environment SKU code |
-| `aseSkuWorkers` | `1` | No | App Service Environment worker count |
-| `bastion_custom_name` | `""` | No | Bastion name override for common RG RBAC keep-as-is: Empty uses the standard Bastion naming convention. |
-| `bastion_subscription_resource_group` | `""` | No | Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
-| `bingCustomSearchSku` | `"G2"` | No | Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding. |
-| `botEnableM365PublicEndpoint` | `"false"` | No | Turns on only the Microsoft-filtered M365 Activity route of the chosen agent on a private Foundry account when publishing is prepared. Account network settings stay unchanged. Needs botFoundryAgentName. Outside Dev it resets to false. |
-| `botFoundryAgentName` | `""` | No | Names an existing Foundry agent (its exact name, not a version ID) to prepare for M365 and Teams publishing. When set, no standalone Bot is created. Empty skips the step. Needs enableBotService. |
-| `botFoundryProjectResourceId` | `""` | No | Sets the full ARM ID of the Foundry project that holds the agent to prepare for publishing. Empty skips the step. Needs enableBotService. |
-| `clusteringPolicyRedisManaged` | `"OSSCluster"` | No | OSSCluster&#124;EnterpriseCluster&#124;NoCluster |
-| `commonLakeNamePrefixMax8chars` | `"mrvel"` | No | Data lake storage name prefix keep-as-is: Max 8 characters. |
-| `commonResourceGroup_param` | `""` | No | BYO common resource group name otherwise: provide a custom name for the common resource group. |
-| `containerAppsRetryCapacityArray` | `"true"` | No | Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3. |
-| `cosmosKind` | `"GlobalDocumentDB"` | No | Cosmos DB kind otherwise: "MongoDB". |
-| `datalakeName_param` | `""` | No | BYO data lake storage account name otherwise: provide a custom storage account name. |
-| `dev_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Yes | DEV seeding KV subscription ID mandatory: DEV seeding KV subscription ID ensure: subscription where the DEV seeding Key Vault resides. |
-| `dev_admin_bicep_kv_fw` | `"<todo>_Name_Dev"` | Yes | DEV seeding KV name mandatory: DEV seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. |
-| `dev_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_DEV"` | Yes | DEV seeding KV resource group mandatory: DEV seeding KV resource group ensure: resource group where the DEV seeding Key Vault resides. |
-| `dev_sub_id` | `"<todo>_SubID"` | Yes | DEV subscription ID mandatory: DEV subscription ID |
-| `evictionPolicyRedisManaged` | `"NoEviction"` | No | Sets the Azure Managed Redis eviction policy: NoEviction (rejects writes when memory is full), AllKeysLFU, AllKeysLRU, AllKeysRandom, VolatileLFU, VolatileLRU, VolatileRandom or VolatileTTL. Used only when enableRedisManaged is true. |
-| `functionRuntime` | `"dotnet"` | No | Azure Function runtime otherwise: "python", "node", "java", "powershell". |
-| `functionVersion` | `"v7.0"` | No | Azure Function runtime version |
-| `highAvailabilityRedisManaged` | `"Enabled"` | No | Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported. |
-| `kvNameFromCOMMON_param` | `""` | No | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
-| `lakeContainerName` | `"lake3"` | No | Data lake container name |
-| `logicAppType` | `"Standard"` | No | Logic Apps hosting type |
-| `org-department-id` | `""` | No | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
-| `org-department-name` | `""` | No | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
-| `persona_access_manifest` | `""` | No | Repository-relative reviewed manifest for this environment/project. |
-| `persona_access_mode` | `"legacy"` | No | Derived from enablePersonas; mode-only opt-in is supported when the flag is absent. |
-| `postGresAdminEmails` | `"email_adress_only"` | Depends | PostgreSQL admin emails mandatory: if enablePostgreSQL:'true' ensure: valid comma-separated email addresses. |
-| `postgreSQLRetryCapacityArray` | `"true"` | No | Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3. |
-| `prod_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Depends | PROD seeding KV subscription ID mandatory: PROD seeding KV subscription ID ensure: subscription where the PROD seeding Key Vault resides. Required when deploying that environment. |
-| `prod_admin_bicep_kv_fw` | `"<todo>_Name_Prod"` | Depends | PROD seeding KV name mandatory: PROD seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
-| `prod_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_Prod"` | Depends | PROD seeding KV resource group mandatory: PROD seeding KV resource group ensure: resource group where the PROD seeding Key Vault resides. Required when deploying that environment. |
-| `prod_sub_id` | `"<todo>_SubID"` | Depends | PROD subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment. |
-| `projectPrefix` | `"esml-"` | No | Project resource group prefix |
-| `projectSuffix` | `"-rg"` | No | Project resource group suffix |
-| `project_number_000` | `"001"` | Yes | Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc. |
-| `skipDiagAISearch` | `false` | No | Skips creating the AI Search diagnostic setting; by default its logs go to Log Analytics. Set true when an Azure Policy already sends the same logs to the same workspace, which otherwise fails with a 409 conflict. |
-| `skipDiagAIServices` | `false` | No | Skips creating the AI Services diagnostic setting for a new account when enableAIServices is true. Set true when an Azure Policy already sends the same logs to the same workspace. |
-| `skipDiagAOAI` | `true` | No | Skips the Azure OpenAI diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureOpenAI is true. |
-| `skipDiagContentSafety` | `true` | No | Skips the Content Safety diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableContentSafety is true. |
-| `skipDiagDocIntelligence` | `true` | No | Skips the Document Intelligence diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAIDocIntelligence is true. |
-| `skipDiagSpeech` | `true` | No | Skips the Speech diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureSpeech is true. |
-| `skipDiagVision` | `true` | No | Skips the Vision diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureAIVision is true. |
-| `tag_costcenter` | `"1234"` | No | Project cost center tag keep-as-is: Metadata for per-project cost tracking on resource group level. |
-| `tag_costceter_common` | `"9999"` | No | Common cost center tag keep-as-is: Metadata for Resource group cost tracking. |
-| `tag_repository` | `"aifactory"` | No | Repository name tag |
-| `tag_repository_branch` | `"aifactory-001"` | No | Repository branch tag otherwise: per scaleset 'aifactory-002', or per project 'aifactory-001/project001-main'. |
-| `tags` | `"{\"CostCenter\":\"$(tag_costceter_common)\",\"Description\":\"AI Factory common\",\"AIF-Repo\":\"$(tag_repository)\",\"AIF-Branch\":\"$(tag_repository_branch)\",\"AIF-Version\":\"$(aifactory_version_major).$(aifactory_version_minor)\",\"AIF-Submodule-Chosen-Branch\":\"$(aifactory_branch_chosen)\",\"AIF-Scaleset\":\"$(admin_aifactorySuffixRG)\",\"AIF-Environment\":\"$(dev_test_prod)\",\"AIF-Project Owners\":\"$(technical_admins_email)\",\"AIFactory project\":\"$(project_number_000)\",\"AIF-Networking\":\"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"$(enableAIFactoryCreatedDefaultProjectForAIFv2)\",\"AIF-disableAgentNetworkInjection\":\"$(disableAgentNetworkInjection)\",\"AIF-byoASEv3\":\"$(byoASEv3)\",\"AIF-BYO_subnets\":\"$(BYO_subnets)\"}"` | No | Common resource tags as a JSON string; Azure DevOps macro expressions are preserved. |
-| `tagsProject` | `"{\"CostCenter\":\"$(tag_costcenter)\",\"Description\":\"RAG Chat 1\",\"AIF-Branch\":\"$(tag_repository_branch)/project$(project_number_000)\",\"AIF-Scaleset\":\"$(admin_aifactorySuffixRG)\",\"AIF-Environment\":\"$(dev_test_prod)\",\"AIF-Project Owners\":\"$(technical_admins_email)\",\"AIFactory project\":\"$(project_number_000)\",\"AIF-Networking\":\"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"$(enableAIFactoryCreatedDefaultProjectForAIFv2)\",\"AIF-disableAgentNetworkInjection\":\"$(disableAgentNetworkInjection)\",\"AIF-byoASEv3\":\"$(byoASEv3)\",\"AIF-BYO_subnets\":\"$(BYO_subnets)\"}"` | No | Project resource tags as a JSON string; Azure DevOps macro expressions are preserved. |
-| `test_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Depends | STAGE seeding KV subscription ID mandatory: STAGE seeding KV subscription ID ensure: subscription where the STAGE seeding Key Vault resides. Required when deploying that environment. |
-| `test_admin_bicep_kv_fw` | `"<todo>_Name_Test"` | Depends | STAGE seeding KV name mandatory: STAGE seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
-| `test_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_Test"` | Depends | STAGE seeding KV resource group mandatory: STAGE seeding KV resource group ensure: resource group where the STAGE seeding Key Vault resides. Required when deploying that environment. |
-| `test_sub_id` | `"<todo>_SubID"` | Depends | STAGE subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment. |
-| `useCommonACR` | `"true"` | No | Use shared ACR across projects otherwise: false, each project gets its own ACR (higher cost). |
-| `useCommonACR_override` | `"true"` | No | Use shared ACR override otherwise: false, each project gets its own ACR (higher cost). |
-| `webAppRuntime` | `"python"` | No | Azure Web App runtime otherwise: "dotnet", "node", "java". |
-| `webAppRuntimeVersion` | `"3.11"` | No | Azure Web App runtime version |
+| `AZURE_CLIENT_ID` | `""` | No | <a id="AZURE_CLIENT_ID"></a>Preferred credentialless deployment identity: client ID of a federated app or user-assigned managed identity. When set, workflows use OIDC instead of AZURE_CREDENTIALS. |
+| `GITHUB_NEW_REPO` | `""` | Yes | <a id="GITHUB_NEW_REPO"></a>New GitHub repository path mandatory: New GitHub repository path ensure: format: |
+| `GITHUB_NEW_REPO_VISIBILITY` | `"public"` | No | <a id="GITHUB_NEW_REPO_VISIBILITY"></a>New repository visibility otherwise: private or internal. |
+| `GITHUB_TEMPLATE_REPO` | `"azure/enterprise-scale-aifactory"` | No | <a id="GITHUB_TEMPLATE_REPO"></a>GitHub template repository keep-as-is: Leave as-is if BYO repo. |
+| `GITHUB_USERNAME` | `""` | Yes | <a id="GITHUB_USERNAME"></a>GitHub username or org mandatory: GitHub username or org |
+| `GITHUB_USE_SSH` | `"false"` | No | <a id="GITHUB_USE_SSH"></a>Use SSH for git operations otherwise: true, use SSH instead of HTTPS. |
+| `aca_w_registry_image` | `"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"` | No | <a id="aca_w_registry_image"></a>Container Apps default image otherwise: replace with your own ACR image. |
+| `adminUsername` | `"esmladmin"` | No | <a id="adminUsername"></a>VM admin username |
+| `admin_aiSearchTier` | `"basic"` | Yes | <a id="admin_aiSearchTier"></a>AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'] |
+| `admin_aifactoryPrefixRG` | `"mrvel-1-"` | No | <a id="admin_aifactoryPrefixRG"></a>AI Factory resource group prefix keep-as-is: Max 6 chars. otherwise: set your company prefix, e.g. "acme-ai-", "contoso-". |
+| `admin_aifactorySuffixRG` | `"-001"` | Yes | <a id="admin_aifactorySuffixRG"></a>AI Factory scaleset suffix mandatory: AI Factory scaleset suffix keep-as-is: For 1st scaleset. otherwise: increment to '-002', '-003' for additional scalesets. |
+| `admin_commonResourceSuffix` | `"-001"` | No | <a id="admin_commonResourceSuffix"></a>Common resources suffix otherwise: change to reprovision new services in the same common RG while keeping old ones. |
+| `admin_hybridBenefit` | `"false"` | No | <a id="admin_hybridBenefit"></a>Azure Hybrid Benefit for VMs otherwise: true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided). |
+| `admin_ip_fw` | `""` | No | <a id="admin_ip_fw"></a>Leave empty. Will be automatically set by the pipeline to the build agent IP. keep-as-is: Leave empty. Will be automatically set by the pipeline to the build agent IP. |
+| `admin_keyvaultSoftDeleteDays` | `7` | Depends | <a id="admin_keyvaultSoftDeleteDays"></a>Key Vault soft delete days mandatory: if cmk:'true' (purge protection required). otherwise: 90 days recommended; 0 to disable. |
+| `admin_location` | `"eastus2"` | Yes | <a id="admin_location"></a>Azure region mandatory: Azure region |
+| `admin_locationSuffix` | `"eus2"` | Yes | <a id="admin_locationSuffix"></a>Region short name mandatory: Region short name |
+| `admin_prjResourceSuffix` | `"-001"` | No | <a id="admin_prjResourceSuffix"></a>Project resources suffix otherwise: change to reprovision new services in the same project RG while keeping old ones. |
+| `admin_projectType` | `"all"` | Yes | <a id="admin_projectType"></a>Selects the project type that sizes the project subnets: all (every subnet), genai-1 or esml. Any other value fails the networking step. Keep all. |
+| `admin_semanticSearchTier` | `"free"` | Yes | <a id="admin_semanticSearchTier"></a>Semantic search tier mandatory: Semantic search tier |
+| `aiGatewaySkuResourceId` | `""` | No | <a id="aiGatewaySkuResourceId"></a>Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
+| `aiSearchFallbackLocationArrayDev` | `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | No | <a id="aiSearchFallbackLocationArrayDev"></a>Up to five Search fallback regions in order, Germany last; [] or blank disables regional fallback independently of SKU retries. |
+| `aiSearchFallbackLocationArrayStageProd` | `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | No | <a id="aiSearchFallbackLocationArrayStageProd"></a>Up to five Search fallback regions for Test/Stage and Prod in order, Germany last; [] or blank disables regional fallback. Only Search service placement changes. |
+| `aiSearchLocation` | `""` | No | <a id="aiSearchLocation"></a>AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable. |
+| `aifactory-dash-01` | `""` | No | <a id="aifactory-dash-01"></a>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard. |
+| `aifactoryAgentConfigFile` | `""` | No | <a id="aifactoryAgentConfigFile"></a>Your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when enableAIFactoryAgentLiveVoice:'true'. |
+| `aifactoryAgentContainerAppsEnvironment` | `""` | No | <a id="aifactoryAgentContainerAppsEnvironment"></a>Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
+| `aifactoryAgentEntraAppId` | `""` | Depends | <a id="aifactoryAgentEntraAppId"></a>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph. |
+| `aifactoryAgentReaderObjectIds` | `""` | Depends | <a id="aifactoryAgentReaderObjectIds"></a>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline. |
+| `aifactoryAgentVoiceLanguages` | `""` | No | <a id="aifactoryAgentVoiceLanguages"></a>Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'. |
+| `aifactoryAgentVoiceName` | `""` | No | <a id="aifactoryAgentVoiceName"></a>Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
+| `aifactoryMcpApiImage` | `""` | Depends | <a id="aifactoryMcpApiImage"></a>Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
+| `aifactoryMcpClassicApimResourceIds` | `""` | No | <a id="aifactoryMcpClassicApimResourceIds"></a>Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
+| `aifactoryMcpContainerAppResourceId` | `""` | No | <a id="aifactoryMcpContainerAppResourceId"></a>Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app. |
+| `aifactoryMcpContainerAppsEnvironment` | `""` | No | <a id="aifactoryMcpContainerAppsEnvironment"></a>Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
+| `aifactoryMcpEntraAppId` | `""` | Depends | <a id="aifactoryMcpEntraAppId"></a>Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
+| `aifactoryMcpImage` | `""` | Depends | <a id="aifactoryMcpImage"></a>Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format |
+| `aifactory_branch_chosen` | `"release/v1.24"` | No | <a id="aifactory_branch_chosen"></a>Submodule release branch |
+| `aifactory_mcp_AppID_seeding_kv_name` | `"<optional>esml-project001-mcp-app-id"` | No | <a id="aifactory_mcp_AppID_seeding_kv_name"></a>Seeding Key Vault secret name holding the AI Factory MCP API app registration client ID, written by esml-util/29b-create-mcp-api-sp-for-projects.sh. The MCP step uses it when aifactoryMcpEntraAppId is empty. |
+| `aifactory_salt` | `""` | No | <a id="aifactory_salt"></a>Leave empty, 5 characters.  A deteministic unique value, from COMMON RG |
+| `aifactory_salt_random` | `""` | No | <a id="aifactory_salt_random"></a>Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. keep-as-is: Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. |
+| `aifactory_version_major` | `"1"` | No | <a id="aifactory_version_major"></a>AI Factory major version keep-as-is: Used to determine which bicep files to use. |
+| `aifactory_version_minor` | `"24"` | No | <a id="aifactory_version_minor"></a>AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24 |
+| `aisearchRetryCapcityArray` | `"true"` | No | <a id="aisearchRetryCapcityArray"></a>Validate all candidates' quota headroom and retry only Azure AI Search capacity failures. |
+| `aseSku` | `"IsolatedV2"` | No | <a id="aseSku"></a>App Service Environment SKU keep-as-is: Used only if byoASEv3:'true' or a dedicated ASE is provisioned. |
+| `aseSkuCode` | `"I1v2"` | No | <a id="aseSkuCode"></a>App Service Environment SKU code |
+| `aseSkuWorkers` | `1` | No | <a id="aseSkuWorkers"></a>App Service Environment worker count |
+| `bastion_custom_name` | `""` | No | <a id="bastion_custom_name"></a>Bastion name override for common RG RBAC keep-as-is: Empty uses the standard Bastion naming convention. |
+| `bastion_subscription_resource_group` | `""` | No | <a id="bastion_subscription_resource_group"></a>Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
+| `bingCustomSearchSku` | `"G2"` | No | <a id="bingCustomSearchSku"></a>Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding. |
+| `botEnableM365PublicEndpoint` | `"false"` | No | <a id="botEnableM365PublicEndpoint"></a>Turns on only the Microsoft-filtered M365 Activity route of the chosen agent on a private Foundry account when publishing is prepared. Account network settings stay unchanged. Needs botFoundryAgentName. Outside Dev it resets to false. |
+| `botFoundryAgentName` | `""` | No | <a id="botFoundryAgentName"></a>Names an existing Foundry agent (its exact name, not a version ID) to prepare for M365 and Teams publishing. When set, no standalone Bot is created. Empty skips the step. Needs enableBotService. |
+| `botFoundryProjectResourceId` | `""` | No | <a id="botFoundryProjectResourceId"></a>Sets the full ARM ID of the Foundry project that holds the agent to prepare for publishing. Empty skips the step. Needs enableBotService. |
+| `clusteringPolicyRedisManaged` | `"OSSCluster"` | No | <a id="clusteringPolicyRedisManaged"></a>OSSCluster&#124;EnterpriseCluster&#124;NoCluster |
+| `commonLakeNamePrefixMax8chars` | `"mrvel"` | No | <a id="commonLakeNamePrefixMax8chars"></a>Data lake storage name prefix keep-as-is: Max 8 characters. |
+| `commonResourceGroup_param` | `""` | No | <a id="commonResourceGroup_param"></a>BYO common resource group name otherwise: provide a custom name for the common resource group. |
+| `containerAppsRetryCapacityArray` | `"true"` | No | <a id="containerAppsRetryCapacityArray"></a>Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3. |
+| `cosmosKind` | `"GlobalDocumentDB"` | No | <a id="cosmosKind"></a>Cosmos DB kind otherwise: "MongoDB". |
+| `datalakeName_param` | `""` | No | <a id="datalakeName_param"></a>BYO data lake storage account name otherwise: provide a custom storage account name. |
+| `dev_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Yes | <a id="dev_admin_bicep_input_keyvault_subscription"></a>DEV seeding KV subscription ID mandatory: DEV seeding KV subscription ID ensure: subscription where the DEV seeding Key Vault resides. |
+| `dev_admin_bicep_kv_fw` | `"<todo>_Name_Dev"` | Yes | <a id="dev_admin_bicep_kv_fw"></a>DEV seeding KV name mandatory: DEV seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. |
+| `dev_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_DEV"` | Yes | <a id="dev_admin_bicep_kv_fw_rg"></a>DEV seeding KV resource group mandatory: DEV seeding KV resource group ensure: resource group where the DEV seeding Key Vault resides. |
+| `dev_sub_id` | `"<todo>_SubID"` | Yes | <a id="dev_sub_id"></a>DEV subscription ID mandatory: DEV subscription ID |
+| `evictionPolicyRedisManaged` | `"NoEviction"` | No | <a id="evictionPolicyRedisManaged"></a>Sets the Azure Managed Redis eviction policy: NoEviction (rejects writes when memory is full), AllKeysLFU, AllKeysLRU, AllKeysRandom, VolatileLFU, VolatileLRU, VolatileRandom or VolatileTTL. Used only when enableRedisManaged is true. |
+| `functionRuntime` | `"dotnet"` | No | <a id="functionRuntime"></a>Azure Function runtime otherwise: "python", "node", "java", "powershell". |
+| `functionVersion` | `"v7.0"` | No | <a id="functionVersion"></a>Azure Function runtime version |
+| `highAvailabilityRedisManaged` | `"Enabled"` | No | <a id="highAvailabilityRedisManaged"></a>Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported. |
+| `kvNameFromCOMMON_param` | `""` | No | <a id="kvNameFromCOMMON_param"></a>BYO common Key Vault name otherwise: provide a custom Key Vault name. |
+| `lakeContainerName` | `"lake3"` | No | <a id="lakeContainerName"></a>Data lake container name |
+| `logicAppType` | `"Standard"` | No | <a id="logicAppType"></a>Logic Apps hosting type |
+| `org-department-id` | `""` | No | <a id="org-department-id"></a>Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
+| `org-department-name` | `""` | No | <a id="org-department-name"></a>Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
+| `persona_access_manifest` | `""` | No | <a id="persona_access_manifest"></a>Repository-relative reviewed manifest for this environment/project. |
+| `persona_access_mode` | `"legacy"` | No | <a id="persona_access_mode"></a>Derived from enablePersonas; mode-only opt-in is supported when the flag is absent. |
+| `postGresAdminEmails` | `"email_adress_only"` | Depends | <a id="postGresAdminEmails"></a>PostgreSQL admin emails mandatory: if enablePostgreSQL:'true' ensure: valid comma-separated email addresses. |
+| `postgreSQLRetryCapacityArray` | `"true"` | No | <a id="postgreSQLRetryCapacityArray"></a>Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3. |
+| `prod_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Depends | <a id="prod_admin_bicep_input_keyvault_subscription"></a>PROD seeding KV subscription ID mandatory: PROD seeding KV subscription ID ensure: subscription where the PROD seeding Key Vault resides. Required when deploying that environment. |
+| `prod_admin_bicep_kv_fw` | `"<todo>_Name_Prod"` | Depends | <a id="prod_admin_bicep_kv_fw"></a>PROD seeding KV name mandatory: PROD seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
+| `prod_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_Prod"` | Depends | <a id="prod_admin_bicep_kv_fw_rg"></a>PROD seeding KV resource group mandatory: PROD seeding KV resource group ensure: resource group where the PROD seeding Key Vault resides. Required when deploying that environment. |
+| `prod_sub_id` | `"<todo>_SubID"` | Depends | <a id="prod_sub_id"></a>PROD subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment. |
+| `projectPrefix` | `"esml-"` | No | <a id="projectPrefix"></a>Project resource group prefix |
+| `projectSuffix` | `"-rg"` | No | <a id="projectSuffix"></a>Project resource group suffix |
+| `project_number_000` | `"001"` | Yes | <a id="project_number_000"></a>Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc. |
+| `skipDiagAISearch` | `false` | No | <a id="skipDiagAISearch"></a>Skips creating the AI Search diagnostic setting; by default its logs go to Log Analytics. Set true when an Azure Policy already sends the same logs to the same workspace, which otherwise fails with a 409 conflict. |
+| `skipDiagAIServices` | `false` | No | <a id="skipDiagAIServices"></a>Skips creating the AI Services diagnostic setting for a new account when enableAIServices is true. Set true when an Azure Policy already sends the same logs to the same workspace. |
+| `skipDiagAOAI` | `true` | No | <a id="skipDiagAOAI"></a>Skips the Azure OpenAI diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureOpenAI is true. |
+| `skipDiagContentSafety` | `true` | No | <a id="skipDiagContentSafety"></a>Skips the Content Safety diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableContentSafety is true. |
+| `skipDiagDocIntelligence` | `true` | No | <a id="skipDiagDocIntelligence"></a>Skips the Document Intelligence diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAIDocIntelligence is true. |
+| `skipDiagSpeech` | `true` | No | <a id="skipDiagSpeech"></a>Skips the Speech diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureSpeech is true. |
+| `skipDiagVision` | `true` | No | <a id="skipDiagVision"></a>Skips the Vision diagnostic setting, because an Azure Policy usually manages it. Set false to create it from Bicep; applies when enableAzureAIVision is true. |
+| `tag_costcenter` | `"1234"` | No | <a id="tag_costcenter"></a>Project cost center tag keep-as-is: Metadata for per-project cost tracking on resource group level. |
+| `tag_costceter_common` | `"9999"` | No | <a id="tag_costceter_common"></a>Common cost center tag keep-as-is: Metadata for Resource group cost tracking. |
+| `tag_repository` | `"aifactory"` | No | <a id="tag_repository"></a>Repository name tag |
+| `tag_repository_branch` | `"aifactory-001"` | No | <a id="tag_repository_branch"></a>Repository branch tag otherwise: per scaleset 'aifactory-002', or per project 'aifactory-001/project001-main'. |
+| `tags` | `"{\"CostCenter\":\"$(tag_costceter_common)\",\"Description\":\"AI Factory common\",\"AIF-Repo\":\"$(tag_repository)\",\"AIF-Branch\":\"$(tag_repository_branch)\",\"AIF-Version\":\"$(aifactory_version_major).$(aifactory_version_minor)\",\"AIF-Submodule-Chosen-Branch\":\"$(aifactory_branch_chosen)\",\"AIF-Scaleset\":\"$(admin_aifactorySuffixRG)\",\"AIF-Environment\":\"$(dev_test_prod)\",\"AIF-Project Owners\":\"$(technical_admins_email)\",\"AIFactory project\":\"$(project_number_000)\",\"AIF-Networking\":\"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"$(enableAIFactoryCreatedDefaultProjectForAIFv2)\",\"AIF-disableAgentNetworkInjection\":\"$(disableAgentNetworkInjection)\",\"AIF-byoASEv3\":\"$(byoASEv3)\",\"AIF-BYO_subnets\":\"$(BYO_subnets)\"}"` | No | <a id="tags"></a>Common resource tags as a JSON string; Azure DevOps macro expressions are preserved. |
+| `tagsProject` | `"{\"CostCenter\":\"$(tag_costcenter)\",\"Description\":\"RAG Chat 1\",\"AIF-Branch\":\"$(tag_repository_branch)/project$(project_number_000)\",\"AIF-Scaleset\":\"$(admin_aifactorySuffixRG)\",\"AIF-Environment\":\"$(dev_test_prod)\",\"AIF-Project Owners\":\"$(technical_admins_email)\",\"AIFactory project\":\"$(project_number_000)\",\"AIF-Networking\":\"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"$(enableAIFactoryCreatedDefaultProjectForAIFv2)\",\"AIF-disableAgentNetworkInjection\":\"$(disableAgentNetworkInjection)\",\"AIF-byoASEv3\":\"$(byoASEv3)\",\"AIF-BYO_subnets\":\"$(BYO_subnets)\"}"` | No | <a id="tagsProject"></a>Project resource tags as a JSON string; Azure DevOps macro expressions are preserved. |
+| `test_admin_bicep_input_keyvault_subscription` | `"<todo>_SubID"` | Depends | <a id="test_admin_bicep_input_keyvault_subscription"></a>STAGE seeding KV subscription ID mandatory: STAGE seeding KV subscription ID ensure: subscription where the STAGE seeding Key Vault resides. Required when deploying that environment. |
+| `test_admin_bicep_kv_fw` | `"<todo>_Name_Test"` | Depends | <a id="test_admin_bicep_kv_fw"></a>STAGE seeding KV name mandatory: STAGE seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
+| `test_admin_bicep_kv_fw_rg` | `"<todo>_ResourceGroup_Test"` | Depends | <a id="test_admin_bicep_kv_fw_rg"></a>STAGE seeding KV resource group mandatory: STAGE seeding KV resource group ensure: resource group where the STAGE seeding Key Vault resides. Required when deploying that environment. |
+| `test_sub_id` | `"<todo>_SubID"` | Depends | <a id="test_sub_id"></a>STAGE subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment. |
+| `useCommonACR` | `"true"` | No | <a id="useCommonACR"></a>Use shared ACR across projects otherwise: false, each project gets its own ACR (higher cost). |
+| `useCommonACR_override` | `"true"` | No | <a id="useCommonACR_override"></a>Use shared ACR override otherwise: false, each project gets its own ACR (higher cost). |
+| `webAppRuntime` | `"python"` | No | <a id="webAppRuntime"></a>Azure Web App runtime otherwise: "dotnet", "node", "java". |
+| `webAppRuntimeVersion` | `"3.11"` | No | <a id="webAppRuntimeVersion"></a>Azure Web App runtime version |
 
 ## Networking, DNS and existing resources
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `BYOContributorRoleID` | `"b24988ac-6180-42a0-ab88-20f7382dd24c"` | No | Contributor role ID keep-as-is: Azure built-in Contributor. otherwise: provide a custom role ID for finer-grained access control. |
-| `BYO_subnets` | `"false"` | No | Bring your own subnets otherwise: true, uses pre-existing subnets defined by the BYO subnet variables below. |
-| `acr_IP_whitelist` | `""` | No | ACR IP allowlist otherwise: provide comma-separated IPv4 addresses if ACR network restrictions are needed. |
-| `aiGatewaySkuOutboundSubnetId` | `""` | Depends | Subnet ID for AI Gateway outbound VNet integration mandatory: if addAIFactoryMCP2AIGatewaySKU:'true' with a new gateway. Delegated to Microsoft.Web/serverFarms, /27 or larger. |
-| `allowPublicAccessWhenBehindVnet` | `"true"` | No | Public UI access when behind vNet recommended: false to enable fully private networking. |
-| `byoASEv3` | `"false"` | No | Use BYO App Service Environment v3 otherwise: true, use an existing ASEv3 specified in byoAseFullResourceId. |
-| `byoAseAppServicePlanResourceId` | `""` | No | BYO App Service Plan resource ID otherwise: provide full ARM resource ID of an existing App Service Plan within the ASEv3. |
-| `byoAseFullResourceId` | `"subscriptions/...yourASEnameS2"` | Depends | BYO ASEv3 ARM resource ID. Note - remove leading slash / in Resource ID mandatory: if byoASEv3:'true' ensure: full ARM resource ID of the existing ASEv3. |
-| `centralDnsZoneByPolicyInHub` | `false` | No | Centralized DNS via Hub policy otherwise: true, uses central private DNS zones in HUB resource group managed by Azure Policy. |
-| `common_bastion_subnet_cidr` | `"172.16.XX.192/26"` | Yes | Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
-| `common_bastion_subnet_name` | `"AzureBastionSubnet"` | Yes | Bastion subnet name mandatory: Bastion subnet name keep-as-is: Required name for Azure Bastion. ensure: within common_vnet_cidr. |
-| `common_pbi_subnet_cidr` | `"172.16.XX.128/26"` | Yes | Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
-| `common_pbi_subnet_name` | `"snet-esml-cmn-pbi-001"` | Yes | Power BI gateway subnet name mandatory: Power BI gateway subnet name ensure: within common_vnet_cidr. |
-| `common_subnet_cidr` | `"172.16.XX.0/26"` | Yes | Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
-| `common_subnet_name` | `"snet-esml-cmn-001"` | No | Common subnet name |
-| `common_subnet_scoring_cidr` | `"172.16.XX.64/26"` | Yes | Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
-| `common_vnet_cidr` | `"172.16.XX.0/18"` | Yes | Common vNet CIDR mandatory: Common vNet CIDR keep-as-is: XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering. |
-| `dev_cidr_range` | `"0"` | Yes | DEV network-aligned XX value mandatory: DEV network-aligned XX value keep-as-is: VNet 172.16.0.0/18. |
-| `disableAgentNetworkInjection` | `"false"` | No | Disable agent network injection keep-as-is: false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. otherwise: true, disables network injection. |
-| `disableSubnetJoinAction` | `"false"` | No | Disable VNet subnet join RBAC recommended: false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). otherwise: true, skip if subnet permissions managed externally. |
-| `enablePublicAccessWithPerimeter` | `"true"` | No | Public access with network perimeter recommended: false to enable fully private networking. |
-| `enablePublicGenAIAccess` | `"true"` | No | Public GenAI access (control plane) recommended: false to enable fully private networking. |
-| `kongGatewaySubnetCidr` | `""` | Depends | Dedicated, unused /28 or larger subnet. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
-| `kongGatewaySubnetName` | `"snet-kong-001"` | No | Names the subnet that the pipeline creates for Kong in the existing VNet. Its range comes from kongGatewaySubnetCidr (/28 or larger). Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `kongGatewayVnetName` | `""` | Depends | Names the existing VNet where the Kong subnet is created. Required when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `kongGatewayVnetResourceGroup` | `""` | Depends | Names the resource group of the existing VNet that holds the Kong subnet. Required when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
-| `network_env_dev` | `"dev-"` | No | DEV environment prefix for BYO subnets otherwise: set to empty string if not using environment-prefixed naming. |
-| `network_env_prod` | `"prd-"` | No | PROD environment prefix for BYO subnets otherwise: "prod-", "pr-", or empty string. |
-| `network_env_stage` | `"tst2-"` | No | STAGE environment prefix for BYO subnets otherwise: "test-", "tst-", or empty string. |
-| `own_hub_private_dns_resource_group_id` | `""` | No | Own access hub: ARM id of the resource group with the bootstrap private DNS zones keep-as-is: Set together with the own-hub VNet id; zone groups use these zones and the scale set VNet is linked to them. |
-| `own_hub_vnet_id` | `""` | No | Own access hub: ARM id of the factory own-hub VNet keep-as-is: Set by the config wizard only for an added (non-bootstrap) scale set of a factory with its own access hub; peers this scale set with the hub. |
-| `privDnsResourceGroup_param` | `"<todo>_ResourceGroup_name"` | Depends | Hub DNS resource group mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity resource group where central private DNS zones are deployed. |
-| `privDnsSubscription_param` | `"<todo>_SubscriptionID"` | Depends | Hub DNS subscription ID mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity subscription ID where central private DNS zones are deployed. |
-| `prod_cidr_range` | `"128"` | Yes | PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18. |
-| `project_IP_whitelist` | `""` | Depends | Project UI IP allowlist mandatory: if using IP-whitelisting networking mode ensure: comma-separated IPv4 addresses without spaces, e.g. "10.123.456.10,124.56.78.0/24". |
-| `runNetworkingVar` | `"true"` | Yes | Run networking module mandatory: Run networking module keep-as-is: true when creating or updating a project. otherwise: false, to skip networking on service-only updates. |
-| `scaling-mode` | `"shared-subscriptions"` | No | Address-planning preset: own-subscriptions or shared-subscriptions. Does not create subscriptions, resize networks, or establish peering. |
-| `subnetCommon` | `"snet-dev-esml-cmn-001"` | Depends | BYO common subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists in your vNet. |
-| `subnetCommonPowerbiGw` | `"snet-esml-cmn-pbi-001"` | Depends | BYO Power BI gateway subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
-| `subnetCommonScoring` | `"snet-<network_env>esml-cmn-001-scoring"` | Depends | BYO scoring subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
-| `subnetProjACA` | `"snt-prj<xxx>-aca"` | Depends | ContainerApps subnet. BYO project Container Apps subnet mandatory: if BYO_subnets:'true' ensure: subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'. |
-| `subnetProjACA2` | `"snt-prj<xxx>-aca-002"` | Depends | Agent subnet. BYO project secondary Container Apps subnet mandatory: if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false' |
-| `subnetProjAKS` | `"snt-prj<xxx>-aks"` | Depends | BYO project AKS subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
-| `subnetProjAKS2` | `"snt-<network_env>prj<xxx>-aks2"` | Depends | BYO project secondary AKS subnet mandatory: if BYO_subnets:'true' ensure: subnet exists. |
-| `subnetProjDatabricksPrivate` | `"snt-prj<xxx>-dbxpriv"` | Depends | BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
-| `subnetProjDatabricksPublic` | `"snt-prj001-dbxpub"` | Depends | BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
-| `subnetProjGenAI` | `"snt-dev-prj<xxx>-genai"` | Depends | Name of the existing subnet of the project for its AI services. Required when BYO_subnets is true; the subnet must exist. |
-| `subnetProjLogicapp` | `""` | Depends | BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: if BYO_subnets:'true', enableLogicApps:'true', logicAppType:'Standard', byoASEv3:'false' and enablePublicAccessWithPerimeter:'false'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
-| `subnetProjWebapp` | `"snt-prj<xxx>-webapp"` | Depends | App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists. |
-| `test_cidr_range` | `"64"` | Yes | STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18. |
-| `vnetNameBase` | `"vnt-esmlcmn"` | No | Common vNet base name otherwise: ignored if vnetNameFull_param is set (BYOvNet). |
-| `vnetNameFull_param` | `""` | No | BYO vNet full name otherwise: provide the full name of your existing vNet. |
-| `vnetResourceGroupBase` | `"esml-common"` | No | Common vNet resource group base otherwise: ignored if vnetResourceGroup_param is set (BYOvNet). |
-| `vnetResourceGroup_param` | `""` | No | BYO vNet resource group otherwise: provide the full RG name of your existing vNet. |
+| `BYOContributorRoleID` | `"b24988ac-6180-42a0-ab88-20f7382dd24c"` | No | <a id="BYOContributorRoleID"></a>Contributor role ID keep-as-is: Azure built-in Contributor. otherwise: provide a custom role ID for finer-grained access control. |
+| `BYO_subnets` | `"false"` | No | <a id="BYO_subnets"></a>Bring your own subnets otherwise: true, uses pre-existing subnets defined by the BYO subnet variables below. |
+| `acr_IP_whitelist` | `""` | No | <a id="acr_IP_whitelist"></a>ACR IP allowlist otherwise: provide comma-separated IPv4 addresses if ACR network restrictions are needed. |
+| `aiGatewaySkuOutboundSubnetId` | `""` | Depends | <a id="aiGatewaySkuOutboundSubnetId"></a>Subnet ID for AI Gateway outbound VNet integration mandatory: if addAIFactoryMCP2AIGatewaySKU:'true' with a new gateway. Delegated to Microsoft.Web/serverFarms, /27 or larger. |
+| `allowPublicAccessWhenBehindVnet` | `"true"` | No | <a id="allowPublicAccessWhenBehindVnet"></a>Public UI access when behind vNet recommended: false to enable fully private networking. |
+| `byoASEv3` | `"false"` | No | <a id="byoASEv3"></a>Use BYO App Service Environment v3 otherwise: true, use an existing ASEv3 specified in byoAseFullResourceId. |
+| `byoAseAppServicePlanResourceId` | `""` | No | <a id="byoAseAppServicePlanResourceId"></a>BYO App Service Plan resource ID otherwise: provide full ARM resource ID of an existing App Service Plan within the ASEv3. |
+| `byoAseFullResourceId` | `"subscriptions/...yourASEnameS2"` | Depends | <a id="byoAseFullResourceId"></a>BYO ASEv3 ARM resource ID. Note - remove leading slash / in Resource ID mandatory: if byoASEv3:'true' ensure: full ARM resource ID of the existing ASEv3. |
+| `centralDnsZoneByPolicyInHub` | `false` | No | <a id="centralDnsZoneByPolicyInHub"></a>Centralized DNS via Hub policy otherwise: true, uses central private DNS zones in HUB resource group managed by Azure Policy. |
+| `common_bastion_subnet_cidr` | `"172.16.XX.192/26"` | Yes | <a id="common_bastion_subnet_cidr"></a>Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
+| `common_bastion_subnet_name` | `"AzureBastionSubnet"` | Yes | <a id="common_bastion_subnet_name"></a>Bastion subnet name mandatory: Bastion subnet name keep-as-is: Required name for Azure Bastion. ensure: within common_vnet_cidr. |
+| `common_pbi_subnet_cidr` | `"172.16.XX.128/26"` | Yes | <a id="common_pbi_subnet_cidr"></a>Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
+| `common_pbi_subnet_name` | `"snet-esml-cmn-pbi-001"` | Yes | <a id="common_pbi_subnet_name"></a>Power BI gateway subnet name mandatory: Power BI gateway subnet name ensure: within common_vnet_cidr. |
+| `common_subnet_cidr` | `"172.16.XX.0/26"` | Yes | <a id="common_subnet_cidr"></a>Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
+| `common_subnet_name` | `"snet-esml-cmn-001"` | No | <a id="common_subnet_name"></a>Common subnet name |
+| `common_subnet_scoring_cidr` | `"172.16.XX.64/26"` | Yes | <a id="common_subnet_scoring_cidr"></a>Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr. |
+| `common_vnet_cidr` | `"172.16.XX.0/18"` | Yes | <a id="common_vnet_cidr"></a>Common vNet CIDR mandatory: Common vNet CIDR keep-as-is: XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering. |
+| `dev_cidr_range` | `"0"` | Yes | <a id="dev_cidr_range"></a>DEV network-aligned XX value mandatory: DEV network-aligned XX value keep-as-is: VNet 172.16.0.0/18. |
+| `disableAgentNetworkInjection` | `"false"` | No | <a id="disableAgentNetworkInjection"></a>Disable agent network injection keep-as-is: false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. otherwise: true, disables network injection. |
+| `disableSubnetJoinAction` | `"false"` | No | <a id="disableSubnetJoinAction"></a>Disable VNet subnet join RBAC recommended: false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). otherwise: true, skip if subnet permissions managed externally. |
+| `enablePublicAccessWithPerimeter` | `"true"` | No | <a id="enablePublicAccessWithPerimeter"></a>Public access with network perimeter recommended: false to enable fully private networking. |
+| `enablePublicGenAIAccess` | `"true"` | No | <a id="enablePublicGenAIAccess"></a>Public GenAI access (control plane) recommended: false to enable fully private networking. |
+| `kongGatewaySubnetCidr` | `""` | Depends | <a id="kongGatewaySubnetCidr"></a>Dedicated, unused /28 or larger subnet. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret. |
+| `kongGatewaySubnetName` | `"snet-kong-001"` | No | <a id="kongGatewaySubnetName"></a>Names the subnet that the pipeline creates for Kong in the existing VNet. Its range comes from kongGatewaySubnetCidr (/28 or larger). Used only when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `kongGatewayVnetName` | `""` | Depends | <a id="kongGatewayVnetName"></a>Names the existing VNet where the Kong subnet is created. Required when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `kongGatewayVnetResourceGroup` | `""` | Depends | <a id="kongGatewayVnetResourceGroup"></a>Names the resource group of the existing VNet that holds the Kong subnet. Required when ENABLE_KONG is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
+| `network_env_dev` | `"dev-"` | No | <a id="network_env_dev"></a>DEV environment prefix for BYO subnets otherwise: set to empty string if not using environment-prefixed naming. |
+| `network_env_prod` | `"prd-"` | No | <a id="network_env_prod"></a>PROD environment prefix for BYO subnets otherwise: "prod-", "pr-", or empty string. |
+| `network_env_stage` | `"tst2-"` | No | <a id="network_env_stage"></a>STAGE environment prefix for BYO subnets otherwise: "test-", "tst-", or empty string. |
+| `own_hub_private_dns_resource_group_id` | `""` | No | <a id="own_hub_private_dns_resource_group_id"></a>Own access hub: ARM id of the resource group with the bootstrap private DNS zones keep-as-is: Set together with the own-hub VNet id; zone groups use these zones and the scale set VNet is linked to them. |
+| `own_hub_vnet_id` | `""` | No | <a id="own_hub_vnet_id"></a>Own access hub: ARM id of the factory own-hub VNet keep-as-is: Set by the config wizard only for an added (non-bootstrap) scale set of a factory with its own access hub; peers this scale set with the hub. |
+| `privDnsResourceGroup_param` | `"<todo>_ResourceGroup_name"` | Depends | <a id="privDnsResourceGroup_param"></a>Hub DNS resource group mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity resource group where central private DNS zones are deployed. |
+| `privDnsSubscription_param` | `"<todo>_SubscriptionID"` | Depends | <a id="privDnsSubscription_param"></a>Hub DNS subscription ID mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity subscription ID where central private DNS zones are deployed. |
+| `prod_cidr_range` | `"128"` | Yes | <a id="prod_cidr_range"></a>PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18. |
+| `project_IP_whitelist` | `""` | Depends | <a id="project_IP_whitelist"></a>Project UI IP allowlist mandatory: if using IP-whitelisting networking mode ensure: comma-separated IPv4 addresses without spaces, e.g. "10.123.456.10,124.56.78.0/24". |
+| `runNetworkingVar` | `"true"` | Yes | <a id="runNetworkingVar"></a>Run networking module mandatory: Run networking module keep-as-is: true when creating or updating a project. otherwise: false, to skip networking on service-only updates. |
+| `scaling-mode` | `"shared-subscriptions"` | No | <a id="scaling-mode"></a>Address-planning preset: own-subscriptions or shared-subscriptions. Does not create subscriptions, resize networks, or establish peering. |
+| `subnetCommon` | `"snet-dev-esml-cmn-001"` | Depends | <a id="subnetCommon"></a>BYO common subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists in your vNet. |
+| `subnetCommonPowerbiGw` | `"snet-esml-cmn-pbi-001"` | Depends | <a id="subnetCommonPowerbiGw"></a>BYO Power BI gateway subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| `subnetCommonScoring` | `"snet-<network_env>esml-cmn-001-scoring"` | Depends | <a id="subnetCommonScoring"></a>BYO scoring subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| `subnetProjACA` | `"snt-prj<xxx>-aca"` | Depends | <a id="subnetProjACA"></a>ContainerApps subnet. BYO project Container Apps subnet mandatory: if BYO_subnets:'true' ensure: subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'. |
+| `subnetProjACA2` | `"snt-prj<xxx>-aca-002"` | Depends | <a id="subnetProjACA2"></a>Agent subnet. BYO project secondary Container Apps subnet mandatory: if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false' |
+| `subnetProjAKS` | `"snt-prj<xxx>-aks"` | Depends | <a id="subnetProjAKS"></a>BYO project AKS subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| `subnetProjAKS2` | `"snt-<network_env>prj<xxx>-aks2"` | Depends | <a id="subnetProjAKS2"></a>BYO project secondary AKS subnet mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| `subnetProjDatabricksPrivate` | `"snt-prj<xxx>-dbxpriv"` | Depends | <a id="subnetProjDatabricksPrivate"></a>BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
+| `subnetProjDatabricksPublic` | `"snt-prj001-dbxpub"` | Depends | <a id="subnetProjDatabricksPublic"></a>BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
+| `subnetProjGenAI` | `"snt-dev-prj<xxx>-genai"` | Depends | <a id="subnetProjGenAI"></a>Name of the existing subnet of the project for its AI services. Required when BYO_subnets is true; the subnet must exist. |
+| `subnetProjLogicapp` | `""` | Depends | <a id="subnetProjLogicapp"></a>BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: if BYO_subnets:'true', enableLogicApps:'true', logicAppType:'Standard', byoASEv3:'false' and enablePublicAccessWithPerimeter:'false'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
+| `subnetProjWebapp` | `"snt-prj<xxx>-webapp"` | Depends | <a id="subnetProjWebapp"></a>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists. |
+| `test_cidr_range` | `"64"` | Yes | <a id="test_cidr_range"></a>STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18. |
+| `vnetNameBase` | `"vnt-esmlcmn"` | No | <a id="vnetNameBase"></a>Common vNet base name otherwise: ignored if vnetNameFull_param is set (BYOvNet). |
+| `vnetNameFull_param` | `""` | No | <a id="vnetNameFull_param"></a>BYO vNet full name otherwise: provide the full name of your existing vNet. |
+| `vnetResourceGroupBase` | `"esml-common"` | No | <a id="vnetResourceGroupBase"></a>Common vNet resource group base otherwise: ignored if vnetResourceGroup_param is set (BYOvNet). |
+| `vnetResourceGroup_param` | `""` | No | <a id="vnetResourceGroup_param"></a>BYO vNet resource group otherwise: provide the full RG name of your existing vNet. |
 
 ## Operations, diagnostics and lifecycle
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `adminVMBuildAgentName` | `""` | No | Azure DevOps agent name override keep-as-is: Leave empty for the Bicep-generated admin VM name; set to an existing VM agent name such as vm-test when reusing one. |
-| `adminVMBuildAgentPool` | `"Default"` | No | Azure DevOps pool hosting the admin VM agent keep-as-is: Change only when the agent is registered in a custom pool. |
-| `debugEnableCleaning` | `"false"` | No | Enable error cleanup tasks otherwise: true, enables cleanup tasks (71-73) that delete resources on deployment failures. Use only when debugging. |
-| `debug_disable_05_build_acr_image` | `"false"` | No | Skip ACR image build step otherwise: true, skip. Cannot be disabled if enableContainerApps:'true'. |
-| `debug_disable_10_aifactory_dashboards` | `"true"` | No | Skip AI Factory dashboards step |
-| `debug_disable_61_foundation` | `"false"` | No | Skip foundation step otherwise: true, skip: Resource groups, User-Assigned Managed Identities, VMs. |
-| `debug_disable_62_core_infrastructure` | `"false"` | No | Skip core infrastructure step otherwise: true, skip: Application Insights, Key Vault, Storage, ACR. |
-| `debug_disable_63_cognitive_services` | `"false"` | No | Skip cognitive services step otherwise: true, skip: AI Search, OpenAI, Vision, Speech, etc. |
-| `debug_disable_64_databases` | `"false"` | No | Skip databases step otherwise: true, skip: Cosmos DB, SQL Database, etc. |
-| `debug_disable_65_compute_services` | `"false"` | No | Skip compute services step otherwise: true, skip: Container Apps, Web App, Function App. |
-| `debug_disable_66_ai_platform` | `"false"` | No | Skip AI platform step otherwise: true, skip: AI Foundry Hub (V1) with default project and connections. |
-| `debug_disable_67_data_ml_platform` | `"false"` | No | Skip ML platform step otherwise: true, skip: Azure Machine Learning, Data Factory, Databricks. |
-| `debug_disable_68_integration` | `"false"` | No | Skip integration step otherwise: true, skip: Logic Apps, Event Hubs. |
-| `debug_disable_69_aifoundry_2025` | `"false"` | No | Skip AI Foundry V2 step otherwise: true, skip: AI Foundry V2 including RBAC and default project. |
-| `debug_disable_validation_tasks` | `"false"` | No | Disable validation tasks otherwise: true, skip subnet validation, submodule check, DNS zones check to speed up re-runs. |
-| `deleteAllForProject` | `"false"` | No | true deletes everything in the project resource group, the resource group itself, and the subnets and network security groups of the project in the common resource group. Review the project and the environment first. |
-| `deleteAllServicesForProject` | `"false"` | No | true deletes all services in the project resource group in the next project pipeline run, then ends the run. Key Vault stays unless deleteKeyvaultAlso is true. Review the project and the environment first. |
-| `deleteKeyvaultAlso` | `"false"` | No | With deleteAllServicesForProject, true also deletes the Key Vault of the project. Review the secrets and keys it holds first. The soft delete of Azure Key Vault still applies. |
-| `diagnosticSettingLevel` | `"gold"` | No | Diagnostics level otherwise: silver or bronze for less verbose (lower cost) logging. |
-| `maxRetryAttempts` | `"2"` | No | Max total retry attempts keep-as-is: Total attempts (1 original + N retries). Valid values: 1, 2, or 3. |
-| `policyExemptionAssignmentIds` | `"[]"` | No | JSON array of policy assignment IDs (deployIfNotExists or auditIfNotExists) to exempt on the VNet RG otherwise: e.g. '["/subscriptions/ |
-| `policyExemptionDefinitionReferenceIds` | `"[]"` | No | JSON array of policyDefinitionReferenceIds within an initiative to narrow the exemption keep-as-is: Leave empty to exempt the full assignment. |
-| `retryMinutes` | `"5"` | No | Retry wait (minutes) 1st attempt keep-as-is: Minutes between 1st and 2nd retry. |
-| `retryMinutesExtended` | `"15"` | No | Retry wait (minutes) 2nd attempt keep-as-is: Minutes between 2nd and 3rd retry. |
-| `selfHostedRunnerLabel` | `"aifactory-admin-vm"` | No | GitHub self-hosted runner label |
-| `useSelfHostedBuildAgent` | `"false"` | No | Use a self-hosted build agent/runner keep-as-is: ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel. |
+| `adminVMBuildAgentName` | `""` | No | <a id="adminVMBuildAgentName"></a>Azure DevOps agent name override keep-as-is: Leave empty for the Bicep-generated admin VM name; set to an existing VM agent name such as vm-test when reusing one. |
+| `adminVMBuildAgentPool` | `"Default"` | No | <a id="adminVMBuildAgentPool"></a>Azure DevOps pool hosting the admin VM agent keep-as-is: Change only when the agent is registered in a custom pool. |
+| `debugEnableCleaning` | `"false"` | No | <a id="debugEnableCleaning"></a>Enable error cleanup tasks otherwise: true, enables cleanup tasks (71-73) that delete resources on deployment failures. Use only when debugging. |
+| `debug_disable_05_build_acr_image` | `"false"` | No | <a id="debug_disable_05_build_acr_image"></a>Skip ACR image build step otherwise: true, skip. Cannot be disabled if enableContainerApps:'true'. |
+| `debug_disable_10_aifactory_dashboards` | `"true"` | No | <a id="debug_disable_10_aifactory_dashboards"></a>Skip AI Factory dashboards step |
+| `debug_disable_61_foundation` | `"false"` | No | <a id="debug_disable_61_foundation"></a>Skip foundation step otherwise: true, skip: Resource groups, User-Assigned Managed Identities, VMs. |
+| `debug_disable_62_core_infrastructure` | `"false"` | No | <a id="debug_disable_62_core_infrastructure"></a>Skip core infrastructure step otherwise: true, skip: Application Insights, Key Vault, Storage, ACR. |
+| `debug_disable_63_cognitive_services` | `"false"` | No | <a id="debug_disable_63_cognitive_services"></a>Skip cognitive services step otherwise: true, skip: AI Search, OpenAI, Vision, Speech, etc. |
+| `debug_disable_64_databases` | `"false"` | No | <a id="debug_disable_64_databases"></a>Skip databases step otherwise: true, skip: Cosmos DB, SQL Database, etc. |
+| `debug_disable_65_compute_services` | `"false"` | No | <a id="debug_disable_65_compute_services"></a>Skip compute services step otherwise: true, skip: Container Apps, Web App, Function App. |
+| `debug_disable_66_ai_platform` | `"false"` | No | <a id="debug_disable_66_ai_platform"></a>Skip AI platform step otherwise: true, skip: AI Foundry Hub (V1) with default project and connections. |
+| `debug_disable_67_data_ml_platform` | `"false"` | No | <a id="debug_disable_67_data_ml_platform"></a>Skip ML platform step otherwise: true, skip: Azure Machine Learning, Data Factory, Databricks. |
+| `debug_disable_68_integration` | `"false"` | No | <a id="debug_disable_68_integration"></a>Skip integration step otherwise: true, skip: Logic Apps, Event Hubs. |
+| `debug_disable_69_aifoundry_2025` | `"false"` | No | <a id="debug_disable_69_aifoundry_2025"></a>Skip AI Foundry V2 step otherwise: true, skip: AI Foundry V2 including RBAC and default project. |
+| `debug_disable_validation_tasks` | `"false"` | No | <a id="debug_disable_validation_tasks"></a>Disable validation tasks otherwise: true, skip subnet validation, submodule check, DNS zones check to speed up re-runs. |
+| `deleteAllForProject` | `"false"` | No | <a id="deleteAllForProject"></a>true deletes everything in the project resource group, the resource group itself, and the subnets and network security groups of the project in the common resource group. Review the project and the environment first. |
+| `deleteAllServicesForProject` | `"false"` | No | <a id="deleteAllServicesForProject"></a>true deletes all services in the project resource group in the next project pipeline run, then ends the run. Key Vault stays unless deleteKeyvaultAlso is true. Review the project and the environment first. |
+| `deleteKeyvaultAlso` | `"false"` | No | <a id="deleteKeyvaultAlso"></a>With deleteAllServicesForProject, true also deletes the Key Vault of the project. Review the secrets and keys it holds first. The soft delete of Azure Key Vault still applies. |
+| `diagnosticSettingLevel` | `"gold"` | No | <a id="diagnosticSettingLevel"></a>Diagnostics level otherwise: silver or bronze for less verbose (lower cost) logging. |
+| `maxRetryAttempts` | `"2"` | No | <a id="maxRetryAttempts"></a>Max total retry attempts keep-as-is: Total attempts (1 original + N retries). Valid values: 1, 2, or 3. |
+| `policyExemptionAssignmentIds` | `"[]"` | No | <a id="policyExemptionAssignmentIds"></a>JSON array of policy assignment IDs (deployIfNotExists or auditIfNotExists) to exempt on the VNet RG otherwise: e.g. '["/subscriptions/ |
+| `policyExemptionDefinitionReferenceIds` | `"[]"` | No | <a id="policyExemptionDefinitionReferenceIds"></a>JSON array of policyDefinitionReferenceIds within an initiative to narrow the exemption keep-as-is: Leave empty to exempt the full assignment. |
+| `retryMinutes` | `"5"` | No | <a id="retryMinutes"></a>Retry wait (minutes) 1st attempt keep-as-is: Minutes between 1st and 2nd retry. |
+| `retryMinutesExtended` | `"15"` | No | <a id="retryMinutesExtended"></a>Retry wait (minutes) 2nd attempt keep-as-is: Minutes between 2nd and 3rd retry. |
+| `selfHostedRunnerLabel` | `"aifactory-admin-vm"` | No | <a id="selfHostedRunnerLabel"></a>GitHub self-hosted runner label |
+| `useSelfHostedBuildAgent` | `"false"` | No | <a id="useSelfHostedBuildAgent"></a>Use a self-hosted build agent/runner keep-as-is: ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel. |
 
 ## Per-environment SKUs and compute sizing
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `adminVMSize` | `"Standard_D2s_v5"` | No | Admin VM size keep-as-is: Override when the regional SKU is unavailable. |
-| `admin_aks_gpu_sku_dev_override` | `"Standard_D4s_v5"` | No | AKS system node VM SKU for DEV ensure: use an AKS-supported system-pool SKU; configure GPU workloads in a separate user pool. |
-| `admin_aks_gpu_sku_test_prod_override` | `"Standard_DS13-2_v2"` | No | AKS node VM SKU for TEST/PROD |
-| `admin_aks_nodes_dev_override` | `2` | No | AKS system node count for DEV |
-| `admin_aks_nodes_testProd_override` | `3` | No | AKS node count for TEST/PROD |
-| `admin_aks_version_override` | `"1.35.7"` | No | AKS Kubernetes version ensure: version has standard support in your region. |
-| `admin_aml_cluster_maxNodes_dev_override` | `3` | No | AML cluster max nodes for DEV |
-| `admin_aml_cluster_maxNodes_testProd_override` | `5` | No | AML cluster max nodes for TEST/PROD |
-| `admin_aml_cluster_sku_dev_override` | `"Standard_DS3_v2"` | No | AML cluster VM SKU for DEV |
-| `admin_aml_cluster_sku_testProd_override` | `"Standard_D13_v2"` | No | AML cluster VM SKU for TEST/PROD |
-| `admin_aml_computeInstance_dev_sku_override` | `"Standard_DS11_v2"` | No | AML compute instance SKU for DEV |
-| `admin_aml_computeInstance_testProd_sku_override` | `"Standard_ND96amsr_A100_v4"` | No | AML compute instance SKU for TEST/PROD otherwise: change to a lower-cost SKU to save cost. |
-| `aksAzureFirewallPrivateIp` | `""` | Depends | AKS Azure Firewall private IP mandatory: if aksOutboundType:'userDefinedRouting' ensure: IP within the Azure Firewall subnet range. |
-| `aksEnablePrivateCluster` | `"true"` | No | Enable private AKS cluster otherwise: false for public access. |
-| `aksOutboundType` | `"loadBalancer"` | No | AKS outbound traffic type otherwise: userDefinedRouting, if you have Azure Firewall and UDR configured. |
-| `aksPrivateDNSZone` | `"system"` | No | AKS private DNS zone otherwise: "none" or full resource ID of a private DNS zone. |
-| `aksSkuName` | `"Base"` | No | AKS SKU name otherwise: "Standard" for production workloads. |
-| `aksSkuTier` | `"Standard"` | No | Sets the AKS pricing tier (Free, Standard or Premium) for the project's AKS clusters, including AKS for Azure ML. skuTierAksDev and skuTierAksStageProd replace it for their environment when set. |
-| `skuAISearchDev` | `"basic"` | No | AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
-| `skuAISearchDevArray` | `["basic","standard","standard2"]` | No | Sets the ordered fallback AI Search SKUs for Dev, as a JSON array of 1 to 3 SKUs. An older spelling of skuArrayAISearchDev. Used when aisearchRetryCapcityArray is true. |
-| `skuAISearchStageProd` | `"standard"` | No | AI Search SKU Stage/Prod |
-| `skuAISearchStageProdArray` | `["basic","standard","standard2"]` | No | Sets the ordered fallback AI Search SKUs for Stage and Prod, as a JSON array of 1 to 3 SKUs. An older spelling of skuArrayAISearchStageProd. Used when aisearchRetryCapcityArray is true. |
-| `skuAIServicesDev` | `"S0"` | No | Azure AI Services (multi-service account) SKU Dev |
-| `skuAIServicesStageProd` | `"S0"` | No | Azure AI Services (multi-service account) SKU Stage/Prod |
-| `skuAksDev` | `"Standard_D4s_v5"` | No | AKS dev node VM size keep-as-is: empty=template default Standard_B4ms. |
-| `skuAksStageProd` | `""` | No | AKS test/prod node VM size keep-as-is: empty=template default Standard_DS13-2_v2. |
-| `skuArrayAISearchDev` | `"basic,standard,standard2"` | No | Ordered fallback SKUs; the configured Dev SKU is attempted first. |
-| `skuArrayAISearchStageProd` | `"basic,standard,standard2"` | No | Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first. |
-| `skuArrayContainerAppsDev` | `"Consumption,D4,D8"` | No | Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
-| `skuArrayContainerAppsStageProd` | `"Consumption,D4,D8"` | No | Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
-| `skuArrayPostgreSQLDev` | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | No | Ordered capacity fallback SKUs; the selected Dev SKU is attempted first. |
-| `skuArrayPostgreSQLStageProd` | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | No | Ordered capacity fallback SKUs; the selected Stage/Prod SKU is attempted first. |
-| `skuAzureMLDev` | `"basic"` | No | Azure ML workspace SKU Dev ['basic','standard'] |
-| `skuAzureMLStageProd` | `"basic"` | No | Azure ML workspace SKU Stage/Prod |
-| `skuBingDev` | `"G2"` | No | Bing Custom Search SKU Dev ['G2'] |
-| `skuBingStageProd` | `"G2"` | No | Bing Custom Search SKU Stage/Prod |
-| `skuBotServiceDev` | `"S1"` | No | Bot Service SKU Dev ['F0','S1'] |
-| `skuBotServiceStageProd` | `"S1"` | No | Bot Service SKU Stage/Prod |
-| `skuContainerAppsDev` | `"Consumption"` | No | Container Apps workload profile Dev ['Consumption','D4','D8'] |
-| `skuContainerAppsStageProd` | `"Consumption"` | No | Container Apps workload profile Stage/Prod |
-| `skuContentSafetyDev` | `"S0"` | No | Content Safety SKU Dev |
-| `skuContentSafetyStageProd` | `"S0"` | No | Content Safety SKU Stage/Prod |
-| `skuDatabricksDev` | `"premium"` | No | Databricks SKU Dev ['trial','premium'] |
-| `skuDatabricksStageProd` | `"premium"` | No | Databricks SKU Stage/Prod |
-| `skuDocIntelligenceDev` | `"S0"` | No | Document Intelligence SKU Dev |
-| `skuDocIntelligenceStageProd` | `"S0"` | No | Document Intelligence SKU Stage/Prod |
-| `skuElasticDev` | `"ess-consumption-2024_Monthly"` | No | Elastic Cloud SKU Dev |
-| `skuElasticStageProd` | `"ess-consumption-2024_Monthly"` | No | Elastic Cloud SKU Stage/Prod |
-| `skuEventHubsDev` | `"Basic"` | No | Event Hubs tier Dev ['Basic','Standard','Premium'] |
-| `skuEventHubsStageProd` | `"Basic"` | No | Event Hubs tier Stage/Prod |
-| `skuFunctionDev` | `"EP1"` | No | Function plan SKU Dev |
-| `skuFunctionStageProd` | `"EP1"` | No | Function plan SKU Stage/Prod |
-| `skuLogicAppsDev` | `"WS1"` | No | Logic Apps plan SKU Dev ['WS1','WS2','WS3','EP1','EP2','EP3','P1V2','P2V2','P3V2','P1V3','P2V3','P3V3'] |
-| `skuLogicAppsStageProd` | `"WS1"` | No | Logic Apps plan SKU Stage/Prod |
-| `skuOpenAIDev` | `"S0"` | No | Azure OpenAI SKU Dev |
-| `skuOpenAIStageProd` | `"S0"` | No | Azure OpenAI SKU Stage/Prod |
-| `skuPostgreSQLDev` | `"Standard_B1ms"` | No | PostgreSQL compute SKU Dev |
-| `skuPostgreSQLStageProd` | `"Standard_B1ms"` | No | PostgreSQL compute SKU Stage/Prod |
-| `skuRedisDev` | `"Standard"` | No | Redis SKU Dev ['Basic','Standard','Premium'] |
-| `skuRedisManagedDev` | `"Balanced_B1"` | No | Balanced_B0&#124;Balanced_B1&#124;Balanced_B5&#124;Balanced_B10 |
-| `skuRedisManagedStageProd` | `"Balanced_B5"` | No | Selects the Azure Managed Redis SKU for Stage and Prod: Balanced_B0, Balanced_B1, Balanced_B5 or Balanced_B10. Used only when enableRedisManaged is true. |
-| `skuRedisStageProd` | `"Standard"` | No | Redis SKU Stage/Prod |
-| `skuSQLDatabaseDev` | `"S0"` | No | Azure SQL DB (DTU model) SKU Dev |
-| `skuSQLDatabaseStageProd` | `"S0"` | No | Azure SQL DB (DTU model) SKU Stage/Prod |
-| `skuSpeechDev` | `"S0"` | No | Azure AI Speech SKU Dev |
-| `skuSpeechStageProd` | `"S0"` | No | Azure AI Speech SKU Stage/Prod |
-| `skuStorageAccountDev` | `"Standard_LRS"` | No | Project Storage Account SKU Dev ['Standard_LRS','Standard_GRS','Standard_RAGRS','Standard_ZRS','Premium_LRS','Premium_ZRS','Standard_GZRS','Standard_RAGZRS'] |
-| `skuStorageAccountStageProd` | `"Standard_LRS"` | No | Project Storage Account SKU Stage/Prod |
-| `skuTierAksDev` | `"Standard"` | No | AKS SKU tier Dev |
-| `skuTierAksStageProd` | `"Standard"` | No | AKS SKU tier Stage/Prod |
-| `skuTierAzureMLDev` | `"basic"` | No | Azure ML workspace tier Dev |
-| `skuTierAzureMLStageProd` | `"basic"` | No | Azure ML workspace tier Stage/Prod |
-| `skuTierFunctionDev` | `"ElasticPremium"` | No | Function plan tier Dev |
-| `skuTierFunctionStageProd` | `"ElasticPremium"` | No | Function plan tier Stage/Prod |
-| `skuTierPostgreSQLDev` | `"Burstable"` | No | PostgreSQL tier Dev ['Burstable','GeneralPurpose','MemoryOptimized'] |
-| `skuTierPostgreSQLStageProd` | `"Burstable"` | No | PostgreSQL tier Stage/Prod |
-| `skuTierSQLDatabaseDev` | `"Standard"` | No | Azure SQL DB tier Dev ['Basic','Standard','Premium'] |
-| `skuTierSQLDatabaseStageProd` | `"Standard"` | No | Azure SQL DB tier Stage/Prod |
-| `skuTierWebAppDev` | `"PremiumV3"` | No | Web App plan tier Dev |
-| `skuTierWebAppStageProd` | `"PremiumV3"` | No | Web App plan tier Stage/Prod |
-| `skuVisionDev` | `"S1"` | No | Azure AI Vision SKU Dev |
-| `skuVisionStageProd` | `"S1"` | No | Azure AI Vision SKU Stage/Prod |
-| `skuWebAppDev` | `"P1v3"` | No | Web App plan SKU Dev |
-| `skuWebAppStageProd` | `"P1v3"` | No | Web App plan SKU Stage/Prod |
+| `adminVMSize` | `"Standard_D2s_v5"` | No | <a id="adminVMSize"></a>Admin VM size keep-as-is: Override when the regional SKU is unavailable. |
+| `admin_aks_gpu_sku_dev_override` | `"Standard_D4s_v5"` | No | <a id="admin_aks_gpu_sku_dev_override"></a>AKS system node VM SKU for DEV ensure: use an AKS-supported system-pool SKU; configure GPU workloads in a separate user pool. |
+| `admin_aks_gpu_sku_test_prod_override` | `"Standard_DS13-2_v2"` | No | <a id="admin_aks_gpu_sku_test_prod_override"></a>AKS node VM SKU for TEST/PROD |
+| `admin_aks_nodes_dev_override` | `2` | No | <a id="admin_aks_nodes_dev_override"></a>AKS system node count for DEV |
+| `admin_aks_nodes_testProd_override` | `3` | No | <a id="admin_aks_nodes_testProd_override"></a>AKS node count for TEST/PROD |
+| `admin_aks_version_override` | `"1.35.7"` | No | <a id="admin_aks_version_override"></a>AKS Kubernetes version ensure: version has standard support in your region. |
+| `admin_aml_cluster_maxNodes_dev_override` | `3` | No | <a id="admin_aml_cluster_maxNodes_dev_override"></a>AML cluster max nodes for DEV |
+| `admin_aml_cluster_maxNodes_testProd_override` | `5` | No | <a id="admin_aml_cluster_maxNodes_testProd_override"></a>AML cluster max nodes for TEST/PROD |
+| `admin_aml_cluster_sku_dev_override` | `"Standard_DS3_v2"` | No | <a id="admin_aml_cluster_sku_dev_override"></a>AML cluster VM SKU for DEV |
+| `admin_aml_cluster_sku_testProd_override` | `"Standard_D13_v2"` | No | <a id="admin_aml_cluster_sku_testProd_override"></a>AML cluster VM SKU for TEST/PROD |
+| `admin_aml_computeInstance_dev_sku_override` | `"Standard_DS11_v2"` | No | <a id="admin_aml_computeInstance_dev_sku_override"></a>AML compute instance SKU for DEV |
+| `admin_aml_computeInstance_testProd_sku_override` | `"Standard_ND96amsr_A100_v4"` | No | <a id="admin_aml_computeInstance_testProd_sku_override"></a>AML compute instance SKU for TEST/PROD otherwise: change to a lower-cost SKU to save cost. |
+| `aksAzureFirewallPrivateIp` | `""` | Depends | <a id="aksAzureFirewallPrivateIp"></a>AKS Azure Firewall private IP mandatory: if aksOutboundType:'userDefinedRouting' ensure: IP within the Azure Firewall subnet range. |
+| `aksEnablePrivateCluster` | `"true"` | No | <a id="aksEnablePrivateCluster"></a>Enable private AKS cluster otherwise: false for public access. |
+| `aksOutboundType` | `"loadBalancer"` | No | <a id="aksOutboundType"></a>AKS outbound traffic type otherwise: userDefinedRouting, if you have Azure Firewall and UDR configured. |
+| `aksPrivateDNSZone` | `"system"` | No | <a id="aksPrivateDNSZone"></a>AKS private DNS zone otherwise: "none" or full resource ID of a private DNS zone. |
+| `aksSkuName` | `"Base"` | No | <a id="aksSkuName"></a>AKS SKU name otherwise: "Standard" for production workloads. |
+| `aksSkuTier` | `"Standard"` | No | <a id="aksSkuTier"></a>Sets the AKS pricing tier (Free, Standard or Premium) for the project's AKS clusters, including AKS for Azure ML. skuTierAksDev and skuTierAksStageProd replace it for their environment when set. |
+| `skuAISearchDev` | `"basic"` | No | <a id="skuAISearchDev"></a>AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
+| `skuAISearchDevArray` | `["basic","standard","standard2"]` | No | <a id="skuAISearchDevArray"></a>Sets the ordered fallback AI Search SKUs for Dev, as a JSON array of 1 to 3 SKUs. An older spelling of skuArrayAISearchDev. Used when aisearchRetryCapcityArray is true. |
+| `skuAISearchStageProd` | `"standard"` | No | <a id="skuAISearchStageProd"></a>AI Search SKU Stage/Prod |
+| `skuAISearchStageProdArray` | `["basic","standard","standard2"]` | No | <a id="skuAISearchStageProdArray"></a>Sets the ordered fallback AI Search SKUs for Stage and Prod, as a JSON array of 1 to 3 SKUs. An older spelling of skuArrayAISearchStageProd. Used when aisearchRetryCapcityArray is true. |
+| `skuAIServicesDev` | `"S0"` | No | <a id="skuAIServicesDev"></a>Azure AI Services (multi-service account) SKU Dev |
+| `skuAIServicesStageProd` | `"S0"` | No | <a id="skuAIServicesStageProd"></a>Azure AI Services (multi-service account) SKU Stage/Prod |
+| `skuAksDev` | `"Standard_D4s_v5"` | No | <a id="skuAksDev"></a>AKS dev node VM size keep-as-is: empty=template default Standard_B4ms. |
+| `skuAksStageProd` | `""` | No | <a id="skuAksStageProd"></a>AKS test/prod node VM size keep-as-is: empty=template default Standard_DS13-2_v2. |
+| `skuArrayAISearchDev` | `"basic,standard,standard2"` | No | <a id="skuArrayAISearchDev"></a>Ordered fallback SKUs; the configured Dev SKU is attempted first. |
+| `skuArrayAISearchStageProd` | `"basic,standard,standard2"` | No | <a id="skuArrayAISearchStageProd"></a>Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first. |
+| `skuArrayContainerAppsDev` | `"Consumption,D4,D8"` | No | <a id="skuArrayContainerAppsDev"></a>Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
+| `skuArrayContainerAppsStageProd` | `"Consumption,D4,D8"` | No | <a id="skuArrayContainerAppsStageProd"></a>Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
+| `skuArrayPostgreSQLDev` | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | No | <a id="skuArrayPostgreSQLDev"></a>Ordered capacity fallback SKUs; the selected Dev SKU is attempted first. |
+| `skuArrayPostgreSQLStageProd` | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | No | <a id="skuArrayPostgreSQLStageProd"></a>Ordered capacity fallback SKUs; the selected Stage/Prod SKU is attempted first. |
+| `skuAzureMLDev` | `"basic"` | No | <a id="skuAzureMLDev"></a>Azure ML workspace SKU Dev ['basic','standard'] |
+| `skuAzureMLStageProd` | `"basic"` | No | <a id="skuAzureMLStageProd"></a>Azure ML workspace SKU Stage/Prod |
+| `skuBingDev` | `"G2"` | No | <a id="skuBingDev"></a>Bing Custom Search SKU Dev ['G2'] |
+| `skuBingStageProd` | `"G2"` | No | <a id="skuBingStageProd"></a>Bing Custom Search SKU Stage/Prod |
+| `skuBotServiceDev` | `"S1"` | No | <a id="skuBotServiceDev"></a>Bot Service SKU Dev ['F0','S1'] |
+| `skuBotServiceStageProd` | `"S1"` | No | <a id="skuBotServiceStageProd"></a>Bot Service SKU Stage/Prod |
+| `skuContainerAppsDev` | `"Consumption"` | No | <a id="skuContainerAppsDev"></a>Container Apps workload profile Dev ['Consumption','D4','D8'] |
+| `skuContainerAppsStageProd` | `"Consumption"` | No | <a id="skuContainerAppsStageProd"></a>Container Apps workload profile Stage/Prod |
+| `skuContentSafetyDev` | `"S0"` | No | <a id="skuContentSafetyDev"></a>Content Safety SKU Dev |
+| `skuContentSafetyStageProd` | `"S0"` | No | <a id="skuContentSafetyStageProd"></a>Content Safety SKU Stage/Prod |
+| `skuDatabricksDev` | `"premium"` | No | <a id="skuDatabricksDev"></a>Databricks SKU Dev ['trial','premium'] |
+| `skuDatabricksStageProd` | `"premium"` | No | <a id="skuDatabricksStageProd"></a>Databricks SKU Stage/Prod |
+| `skuDocIntelligenceDev` | `"S0"` | No | <a id="skuDocIntelligenceDev"></a>Document Intelligence SKU Dev |
+| `skuDocIntelligenceStageProd` | `"S0"` | No | <a id="skuDocIntelligenceStageProd"></a>Document Intelligence SKU Stage/Prod |
+| `skuElasticDev` | `"ess-consumption-2024_Monthly"` | No | <a id="skuElasticDev"></a>Elastic Cloud SKU Dev |
+| `skuElasticStageProd` | `"ess-consumption-2024_Monthly"` | No | <a id="skuElasticStageProd"></a>Elastic Cloud SKU Stage/Prod |
+| `skuEventHubsDev` | `"Basic"` | No | <a id="skuEventHubsDev"></a>Event Hubs tier Dev ['Basic','Standard','Premium'] |
+| `skuEventHubsStageProd` | `"Basic"` | No | <a id="skuEventHubsStageProd"></a>Event Hubs tier Stage/Prod |
+| `skuFunctionDev` | `"EP1"` | No | <a id="skuFunctionDev"></a>Function plan SKU Dev |
+| `skuFunctionStageProd` | `"EP1"` | No | <a id="skuFunctionStageProd"></a>Function plan SKU Stage/Prod |
+| `skuLogicAppsDev` | `"WS1"` | No | <a id="skuLogicAppsDev"></a>Logic Apps plan SKU Dev ['WS1','WS2','WS3','EP1','EP2','EP3','P1V2','P2V2','P3V2','P1V3','P2V3','P3V3'] |
+| `skuLogicAppsStageProd` | `"WS1"` | No | <a id="skuLogicAppsStageProd"></a>Logic Apps plan SKU Stage/Prod |
+| `skuOpenAIDev` | `"S0"` | No | <a id="skuOpenAIDev"></a>Azure OpenAI SKU Dev |
+| `skuOpenAIStageProd` | `"S0"` | No | <a id="skuOpenAIStageProd"></a>Azure OpenAI SKU Stage/Prod |
+| `skuPostgreSQLDev` | `"Standard_B1ms"` | No | <a id="skuPostgreSQLDev"></a>PostgreSQL compute SKU Dev |
+| `skuPostgreSQLStageProd` | `"Standard_B1ms"` | No | <a id="skuPostgreSQLStageProd"></a>PostgreSQL compute SKU Stage/Prod |
+| `skuRedisDev` | `"Standard"` | No | <a id="skuRedisDev"></a>Redis SKU Dev ['Basic','Standard','Premium'] |
+| `skuRedisManagedDev` | `"Balanced_B1"` | No | <a id="skuRedisManagedDev"></a>Balanced_B0&#124;Balanced_B1&#124;Balanced_B5&#124;Balanced_B10 |
+| `skuRedisManagedStageProd` | `"Balanced_B5"` | No | <a id="skuRedisManagedStageProd"></a>Selects the Azure Managed Redis SKU for Stage and Prod: Balanced_B0, Balanced_B1, Balanced_B5 or Balanced_B10. Used only when enableRedisManaged is true. |
+| `skuRedisStageProd` | `"Standard"` | No | <a id="skuRedisStageProd"></a>Redis SKU Stage/Prod |
+| `skuSQLDatabaseDev` | `"S0"` | No | <a id="skuSQLDatabaseDev"></a>Azure SQL DB (DTU model) SKU Dev |
+| `skuSQLDatabaseStageProd` | `"S0"` | No | <a id="skuSQLDatabaseStageProd"></a>Azure SQL DB (DTU model) SKU Stage/Prod |
+| `skuSpeechDev` | `"S0"` | No | <a id="skuSpeechDev"></a>Azure AI Speech SKU Dev |
+| `skuSpeechStageProd` | `"S0"` | No | <a id="skuSpeechStageProd"></a>Azure AI Speech SKU Stage/Prod |
+| `skuStorageAccountDev` | `"Standard_LRS"` | No | <a id="skuStorageAccountDev"></a>Project Storage Account SKU Dev ['Standard_LRS','Standard_GRS','Standard_RAGRS','Standard_ZRS','Premium_LRS','Premium_ZRS','Standard_GZRS','Standard_RAGZRS'] |
+| `skuStorageAccountStageProd` | `"Standard_LRS"` | No | <a id="skuStorageAccountStageProd"></a>Project Storage Account SKU Stage/Prod |
+| `skuTierAksDev` | `"Standard"` | No | <a id="skuTierAksDev"></a>AKS SKU tier Dev |
+| `skuTierAksStageProd` | `"Standard"` | No | <a id="skuTierAksStageProd"></a>AKS SKU tier Stage/Prod |
+| `skuTierAzureMLDev` | `"basic"` | No | <a id="skuTierAzureMLDev"></a>Azure ML workspace tier Dev |
+| `skuTierAzureMLStageProd` | `"basic"` | No | <a id="skuTierAzureMLStageProd"></a>Azure ML workspace tier Stage/Prod |
+| `skuTierFunctionDev` | `"ElasticPremium"` | No | <a id="skuTierFunctionDev"></a>Function plan tier Dev |
+| `skuTierFunctionStageProd` | `"ElasticPremium"` | No | <a id="skuTierFunctionStageProd"></a>Function plan tier Stage/Prod |
+| `skuTierPostgreSQLDev` | `"Burstable"` | No | <a id="skuTierPostgreSQLDev"></a>PostgreSQL tier Dev ['Burstable','GeneralPurpose','MemoryOptimized'] |
+| `skuTierPostgreSQLStageProd` | `"Burstable"` | No | <a id="skuTierPostgreSQLStageProd"></a>PostgreSQL tier Stage/Prod |
+| `skuTierSQLDatabaseDev` | `"Standard"` | No | <a id="skuTierSQLDatabaseDev"></a>Azure SQL DB tier Dev ['Basic','Standard','Premium'] |
+| `skuTierSQLDatabaseStageProd` | `"Standard"` | No | <a id="skuTierSQLDatabaseStageProd"></a>Azure SQL DB tier Stage/Prod |
+| `skuTierWebAppDev` | `"PremiumV3"` | No | <a id="skuTierWebAppDev"></a>Web App plan tier Dev |
+| `skuTierWebAppStageProd` | `"PremiumV3"` | No | <a id="skuTierWebAppStageProd"></a>Web App plan tier Stage/Prod |
+| `skuVisionDev` | `"S1"` | No | <a id="skuVisionDev"></a>Azure AI Vision SKU Dev |
+| `skuVisionStageProd` | `"S1"` | No | <a id="skuVisionStageProd"></a>Azure AI Vision SKU Stage/Prod |
+| `skuWebAppDev` | `"P1v3"` | No | <a id="skuWebAppDev"></a>Web App plan SKU Dev |
+| `skuWebAppStageProd` | `"P1v3"` | No | <a id="skuWebAppStageProd"></a>Web App plan SKU Stage/Prod |
 
 ## Identity, access and encryption
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `aiSearchDisableLocalAuth` | `true` | No | Entra ID only on AI Search (no API keys). false re-enables keys for a key-based client. |
-| `apimGatewayManagedIdentityPrincipalId` | `""` | Depends | APIM system-assigned managed identity object ID. Required when assigning the OpenAI user role to the APIM managed identity. |
-| `azureDevOpsTenantId` | `"<todo>_AzureDevOpsTenantId"` | Yes | Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. mandatory: Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. |
-| `azure_machinelearning_sp_oid` | `"<todo>_ObjectID"` | Depends | Azure ML service principal OID mandatory: Azure ML service principal OID ensure: find in Entra ID as "Azure Machine Learning" app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). otherwise: optional if enableAIFoundry:'false'. |
-| `cmk` | `"false"` | No | Customer Managed Key encryption otherwise: true, enable CMK for Key Vault, Storage accounts, etc. |
-| `cmkDisableForAISearch` | `"true"` | No | Disable CMK for AI Search otherwise: true, disables CMK encryption for Azure AI Search even when cmk:'true'. Reason: Foundry runtime creates indexes without providing CMK info, causing failures. |
-| `cmkDisableForFoundry` | `"true"` | No | Disable CMK for AI Foundry otherwise: true, disables CMK encryption for AI Foundry account even when cmk:'true'. Reason: Foundry does not respect AI Search CMK contract at runtime. |
-| `cmkKeyName` | `"<todo>_aifactory-cmk-key"` | Depends | CMK key name in seeding KV mandatory: if cmk:'true' ensure: key name in your Seeding Keyvault to use for CMK encryption. |
-| `cmkKeyVersion` | `""` | No | CMK key version otherwise: pin to a specific GUID version string. |
-| `commonServicePrincipleOIDKey` | `"<optional>esml-common-sp-oid"` | Depends | Seeding KV secret name for common SP OID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `debug_disable_100_rbac_security` | `"false"` | No | Skip RBAC and security step otherwise: true, skip RBAC and security step for all services (steps 61-99). |
-| `dev_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Yes | ADO service connection for DEV seeding KV mandatory: ADO service connection for DEV seeding KV ensure: name matches your service connection for the DEV seeding KV subscription. otherwise: can be same as dev_service_connection. |
-| `dev_service_connection` | `"<todo>_ado_service_connection"` | Yes | ADO service connection for DEV mandatory: ADO service connection for DEV ensure: name matches your Azure DevOps service connection for the DEV subscription. |
-| `disableContributorAccessForUsers` | `"false"` | No | Disable Contributor for project users recommended: false, enables users to create artifacts (managed online endpoints etc). otherwise: true, restrict Contributor access. |
-| `disableLocalAuth` | `"true"` | No | Disable local API key ("admin account") auth on Cognitive/AI Services & Foundry, AAD-only recommended: true, disables key auth (many orgs forbid keys). otherwise: false, allow local API keys. |
-| `disableRBACAdminOnRGForUsers` | `"true"` | No | Disable RBAC Admin on RG for project users recommended: true, restricts users from assigning RBAC at resource group scope. |
-| `groups_coreteam_members` | `"<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>"` | Depends | Core team AD group ObjectIDs mandatory: if use_ad_groups:'true' |
-| `groups_project_members_esml` | `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | Depends | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_esml. Used when use_ad_groups is true and admin_projectType is esml, an older project type. |
-| `groups_project_members_genai_1` | `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | Depends | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_genai_1. Used when use_ad_groups is true. |
-| `inputCommonSPIDKey` | `"<optional>esml-common-sp-id"` | Depends | Seeding KV secret name for common SP App ID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `inputCommonSPSecretKey` | `"<optional>esml-common-sp-secret"` | Depends | Seeding KV secret name for common SP secret ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `personas_core_team` | `"p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops"` | No | Core team personas keep-as-is: Mapped to group_coreteam_members. |
-| `personas_project_esml` | `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | No | Persona names of the project team, in the order of the groups in groups_project_members_esml. Keep as is. Used when admin_projectType is esml. |
-| `personas_project_genai_1` | `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | No | Persona names of the project team, in the order of the groups in groups_project_members_genai_1. Keep as is. |
-| `prod_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Depends | ADO service connection for PROD seeding KV mandatory: ADO service connection for PROD seeding KV ensure: name matches your service connection for the PROD seeding KV subscription. otherwise: can be same as prod_service_connection. Required when deploying that environment. |
-| `prod_service_connection` | `"<todo>_ado_service_connection"` | Depends | ADO service connection for PROD mandatory: ADO service connection for PROD ensure: name matches your Azure DevOps service connection for the PROD subscription. Required when deploying that environment. |
-| `project_service_principal_AppID_seeding_kv_name` | `"<optional>esml-project001-sp-id"` | Depends | Project SP App ID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `project_service_principal_OID_seeding_kv_name` | `"<optional>esml-project001-sp-oid"` | Depends | Project SP OID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `project_service_principal_Secret_seeding_kv_name` | `"<optional>esml-project001-sp-secret"` | Depends | Project SP secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
-| `technical_admins_ad_object_id` | `"<todo>_EntraID_ObjectID"` | Yes | Project team Entra ID object ID(s) mandatory: Project team Entra ID object ID(s) ensure: comma-separated ObjectIDs of users or AD groups for the project team. |
-| `technical_admins_email` | `"<todo>_email_or_securitygroup_name"` | No | Project team contact email or group name recommended: set for better project tracking. |
-| `tenantId` | `"<todo>_TenantId"` | Yes | Azure tenant ID mandatory: Azure tenant ID ensure: find in Azure Portal &gt; Entra ID &gt; Overview (Directory ID). |
-| `test_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Depends | ADO service connection for STAGE seeding KV mandatory: ADO service connection for STAGE seeding KV ensure: name matches your service connection for the STAGE seeding KV subscription. otherwise: can be same as test_service_connection. Required when deploying that environment. |
-| `test_service_connection` | `"<todo>_ado_service_connection"` | Depends | ADO service connection for STAGE mandatory: ADO service connection for STAGE ensure: name matches your Azure DevOps service connection for the STAGE subscription. Required when deploying that environment. |
-| `updateKeyvaultRbac` | `"false"` | No | Update Key Vault RBAC otherwise: true, re-run to update RBAC properties. |
-| `updateRbac` | `false` | No | Set true to skip the role assignments for users, groups and service principals on the project storage accounts and resource group in the RBAC step. The default, false, makes those assignments. |
-| `use_ad_groups` | `"true"` | No | Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas. |
+| `aiSearchDisableLocalAuth` | `true` | No | <a id="aiSearchDisableLocalAuth"></a>Entra ID only on AI Search (no API keys). false re-enables keys for a key-based client. |
+| `apimGatewayManagedIdentityPrincipalId` | `""` | Depends | <a id="apimGatewayManagedIdentityPrincipalId"></a>APIM system-assigned managed identity object ID. Required when assigning the OpenAI user role to the APIM managed identity. |
+| `azureDevOpsTenantId` | `"<todo>_AzureDevOpsTenantId"` | Yes | <a id="azureDevOpsTenantId"></a>Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. mandatory: Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments. |
+| `azure_machinelearning_sp_oid` | `"<todo>_ObjectID"` | Depends | <a id="azure_machinelearning_sp_oid"></a>Azure ML service principal OID mandatory: Azure ML service principal OID ensure: find in Entra ID as "Azure Machine Learning" app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). otherwise: optional if enableAIFoundry:'false'. |
+| `cmk` | `"false"` | No | <a id="cmk"></a>Customer Managed Key encryption otherwise: true, enable CMK for Key Vault, Storage accounts, etc. |
+| `cmkDisableForAISearch` | `"true"` | No | <a id="cmkDisableForAISearch"></a>Disable CMK for AI Search otherwise: true, disables CMK encryption for Azure AI Search even when cmk:'true'. Reason: Foundry runtime creates indexes without providing CMK info, causing failures. |
+| `cmkDisableForFoundry` | `"true"` | No | <a id="cmkDisableForFoundry"></a>Disable CMK for AI Foundry otherwise: true, disables CMK encryption for AI Foundry account even when cmk:'true'. Reason: Foundry does not respect AI Search CMK contract at runtime. |
+| `cmkKeyName` | `"<todo>_aifactory-cmk-key"` | Depends | <a id="cmkKeyName"></a>CMK key name in seeding KV mandatory: if cmk:'true' ensure: key name in your Seeding Keyvault to use for CMK encryption. |
+| `cmkKeyVersion` | `""` | No | <a id="cmkKeyVersion"></a>CMK key version otherwise: pin to a specific GUID version string. |
+| `commonServicePrincipleOIDKey` | `"<optional>esml-common-sp-oid"` | Depends | <a id="commonServicePrincipleOIDKey"></a>Seeding KV secret name for common SP OID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `debug_disable_100_rbac_security` | `"false"` | No | <a id="debug_disable_100_rbac_security"></a>Skip RBAC and security step otherwise: true, skip RBAC and security step for all services (steps 61-99). |
+| `dev_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Yes | <a id="dev_seeding_kv_service_connection"></a>ADO service connection for DEV seeding KV mandatory: ADO service connection for DEV seeding KV ensure: name matches your service connection for the DEV seeding KV subscription. otherwise: can be same as dev_service_connection. |
+| `dev_service_connection` | `"<todo>_ado_service_connection"` | Yes | <a id="dev_service_connection"></a>ADO service connection for DEV mandatory: ADO service connection for DEV ensure: name matches your Azure DevOps service connection for the DEV subscription. |
+| `disableContributorAccessForUsers` | `"false"` | No | <a id="disableContributorAccessForUsers"></a>Disable Contributor for project users recommended: false, enables users to create artifacts (managed online endpoints etc). otherwise: true, restrict Contributor access. |
+| `disableLocalAuth` | `"true"` | No | <a id="disableLocalAuth"></a>Disable local API key ("admin account") auth on Cognitive/AI Services & Foundry, AAD-only recommended: true, disables key auth (many orgs forbid keys). otherwise: false, allow local API keys. |
+| `disableRBACAdminOnRGForUsers` | `"true"` | No | <a id="disableRBACAdminOnRGForUsers"></a>Disable RBAC Admin on RG for project users recommended: true, restricts users from assigning RBAC at resource group scope. |
+| `groups_coreteam_members` | `"<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>"` | Depends | <a id="groups_coreteam_members"></a>Core team AD group ObjectIDs mandatory: if use_ad_groups:'true' |
+| `groups_project_members_esml` | `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | Depends | <a id="groups_project_members_esml"></a>Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_esml. Used when use_ad_groups is true and admin_projectType is esml, an older project type. |
+| `groups_project_members_genai_1` | `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | Depends | <a id="groups_project_members_genai_1"></a>Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_genai_1. Used when use_ad_groups is true. |
+| `inputCommonSPIDKey` | `"<optional>esml-common-sp-id"` | Depends | <a id="inputCommonSPIDKey"></a>Seeding KV secret name for common SP App ID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `inputCommonSPSecretKey` | `"<optional>esml-common-sp-secret"` | Depends | <a id="inputCommonSPSecretKey"></a>Seeding KV secret name for common SP secret ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `personas_core_team` | `"p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops"` | No | <a id="personas_core_team"></a>Core team personas keep-as-is: Mapped to group_coreteam_members. |
+| `personas_project_esml` | `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | No | <a id="personas_project_esml"></a>Persona names of the project team, in the order of the groups in groups_project_members_esml. Keep as is. Used when admin_projectType is esml. |
+| `personas_project_genai_1` | `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | No | <a id="personas_project_genai_1"></a>Persona names of the project team, in the order of the groups in groups_project_members_genai_1. Keep as is. |
+| `prod_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Depends | <a id="prod_seeding_kv_service_connection"></a>ADO service connection for PROD seeding KV mandatory: ADO service connection for PROD seeding KV ensure: name matches your service connection for the PROD seeding KV subscription. otherwise: can be same as prod_service_connection. Required when deploying that environment. |
+| `prod_service_connection` | `"<todo>_ado_service_connection"` | Depends | <a id="prod_service_connection"></a>ADO service connection for PROD mandatory: ADO service connection for PROD ensure: name matches your Azure DevOps service connection for the PROD subscription. Required when deploying that environment. |
+| `project_service_principal_AppID_seeding_kv_name` | `"<optional>esml-project001-sp-id"` | Depends | <a id="project_service_principal_AppID_seeding_kv_name"></a>Project SP App ID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `project_service_principal_OID_seeding_kv_name` | `"<optional>esml-project001-sp-oid"` | Depends | <a id="project_service_principal_OID_seeding_kv_name"></a>Project SP OID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `project_service_principal_Secret_seeding_kv_name` | `"<optional>esml-project001-sp-secret"` | Depends | <a id="project_service_principal_Secret_seeding_kv_name"></a>Project SP secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
+| `technical_admins_ad_object_id` | `"<todo>_EntraID_ObjectID"` | Yes | <a id="technical_admins_ad_object_id"></a>Project team Entra ID object ID(s) mandatory: Project team Entra ID object ID(s) ensure: comma-separated ObjectIDs of users or AD groups for the project team. |
+| `technical_admins_email` | `"<todo>_email_or_securitygroup_name"` | No | <a id="technical_admins_email"></a>Project team contact email or group name recommended: set for better project tracking. |
+| `tenantId` | `"<todo>_TenantId"` | Yes | <a id="tenantId"></a>Azure tenant ID mandatory: Azure tenant ID ensure: find in Azure Portal &gt; Entra ID &gt; Overview (Directory ID). |
+| `test_seeding_kv_service_connection` | `"<todo>_ado_service_connection"` | Depends | <a id="test_seeding_kv_service_connection"></a>ADO service connection for STAGE seeding KV mandatory: ADO service connection for STAGE seeding KV ensure: name matches your service connection for the STAGE seeding KV subscription. otherwise: can be same as test_service_connection. Required when deploying that environment. |
+| `test_service_connection` | `"<todo>_ado_service_connection"` | Depends | <a id="test_service_connection"></a>ADO service connection for STAGE mandatory: ADO service connection for STAGE ensure: name matches your Azure DevOps service connection for the STAGE subscription. Required when deploying that environment. |
+| `updateKeyvaultRbac` | `"false"` | No | <a id="updateKeyvaultRbac"></a>Update Key Vault RBAC otherwise: true, re-run to update RBAC properties. |
+| `updateRbac` | `false` | No | <a id="updateRbac"></a>Set true to skip the role assignments for users, groups and service principals on the project storage accounts and resource group in the RBAC step. The default, false, makes those assignments. |
+| `use_ad_groups` | `"true"` | No | <a id="use_ad_groups"></a>Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas. |
 
 ## Models and deployments
 
 | Variable | Default | Required | What it does |
 |---|---|---|---|
-| `aifactoryAgentModelDeployment` | `""` | No | Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'. |
-| `default_embedding_capacity` | `25` | No | Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute. |
-| `default_gpt_4o_version` | `"2024-11-20"` | No | gpt-4o version otherwise: "2024-08-06". |
-| `default_gpt_54_mini_version` | `"2026-03-17"` | No | Version for the separately named GPT-5.4-mini deployment toggle. |
-| `default_gpt_capacity` | `40` | No | GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute. |
-| `default_model_sku` | `"DataZoneStandard"` | No | Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
-| `deployModel_gpt_4o` | `"false"` | No | Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios. |
-| `deployModel_gpt_54_mini` | `"false"` | No | Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X. |
-| `deployModel_gpt_X` | `"true"` | No | Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName. |
-| `deployModel_text_embedding_3_large` | `"true"` | No | Deploy text-embedding-3-large recommended: for production RAG scenarios. |
-| `deployModel_text_embedding_3_small` | `"false"` | No | Deploy text-embedding-3-small recommended: for cost-optimized scenarios. |
-| `deployModel_text_embedding_ada_002` | `"false"` | No | Deploy text-embedding-ada-002 |
-| `modelGPTXCapacity` | `30` | No | GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute. |
-| `modelGPTXName` | `"gpt-5.4-mini"` | No | GPT-X model name ensure: model is available in your Azure region with sufficient quota. |
-| `modelGPTXSku` | `"DataZoneStandard"` | No | GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
-| `modelGPTXVersion` | `"2026-03-17"` | No | GPT-X model version ensure: update the version when selecting a different model. |
+| `aifactoryAgentModelDeployment` | `""` | No | <a id="aifactoryAgentModelDeployment"></a>Foundry model deployment used by the AI Factory Agent (Foundry Agent and chat app) keep-as-is: Empty uses modelGPTXName. Set it when the agent should keep its own model, independent of the project's model. Must be an existing, succeeded deployment in the project Foundry account. Read when enableFactoryChatAgent:'true' or enableAIFactoryAgentLiveVoice:'true'. |
+| `default_embedding_capacity` | `25` | No | <a id="default_embedding_capacity"></a>Embedding model TPM capacity (K) keep-as-is: 25 = 25K tokens per minute. |
+| `default_gpt_4o_version` | `"2024-11-20"` | No | <a id="default_gpt_4o_version"></a>gpt-4o version otherwise: "2024-08-06". |
+| `default_gpt_54_mini_version` | `"2026-03-17"` | No | <a id="default_gpt_54_mini_version"></a>Version for the separately named GPT-5.4-mini deployment toggle. |
+| `default_gpt_capacity` | `40` | No | <a id="default_gpt_capacity"></a>GPT model TPM capacity (K) keep-as-is: 40 = 40K tokens per minute. |
+| `default_model_sku` | `"DataZoneStandard"` | No | <a id="default_model_sku"></a>Default model deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
+| `deployModel_gpt_4o` | `"false"` | No | <a id="deployModel_gpt_4o"></a>Deploy gpt-4o recommended: for general-purpose AI Foundry scenarios. |
+| `deployModel_gpt_54_mini` | `"false"` | No | <a id="deployModel_gpt_54_mini"></a>Enable the separately named GPT-5.4-mini deployment toggle; inspect its workflow binding alongside deployModel_gpt_X. |
+| `deployModel_gpt_X` | `"true"` | No | <a id="deployModel_gpt_X"></a>Deploy custom GPT-X model otherwise: true, deploy the model defined in modelGPTXName. |
+| `deployModel_text_embedding_3_large` | `"true"` | No | <a id="deployModel_text_embedding_3_large"></a>Deploy text-embedding-3-large recommended: for production RAG scenarios. |
+| `deployModel_text_embedding_3_small` | `"false"` | No | <a id="deployModel_text_embedding_3_small"></a>Deploy text-embedding-3-small recommended: for cost-optimized scenarios. |
+| `deployModel_text_embedding_ada_002` | `"false"` | No | <a id="deployModel_text_embedding_ada_002"></a>Deploy text-embedding-ada-002 |
+| `modelGPTXCapacity` | `30` | No | <a id="modelGPTXCapacity"></a>GPT-X TPM capacity (K) keep-as-is: 30 = 30K tokens per minute. |
+| `modelGPTXName` | `"gpt-5.4-mini"` | No | <a id="modelGPTXName"></a>GPT-X model name ensure: model is available in your Azure region with sufficient quota. |
+| `modelGPTXSku` | `"DataZoneStandard"` | No | <a id="modelGPTXSku"></a>GPT-X deployment SKU keep-as-is: Keep inference within the selected data zone; confirm model/SKU availability and quota. |
+| `modelGPTXVersion` | `"2026-03-17"` | No | <a id="modelGPTXVersion"></a>GPT-X model version ensure: update the version when selecting a different model. |

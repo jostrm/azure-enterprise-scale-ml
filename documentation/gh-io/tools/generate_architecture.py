@@ -18,6 +18,7 @@ from xml.sax.saxutils import escape
 
 SITE = Path(__file__).resolve().parents[1]
 DATA = SITE / "data" / "code_templates.json"
+RESOURCES = SITE / "data" / "azure_resources.json"
 ICONS = Path(__file__).resolve().parent / "architecture_icons"
 OUTPUT = SITE / "docs" / "assets" / "architecture"
 WIDTH, HEIGHT = 1600, 1010
@@ -80,9 +81,15 @@ def symbol(name):
     return f'<symbol id="icon-{name}" viewBox="{box}">{body.strip()}</symbol>'
 
 
+def names():
+    """The label of each resource on the images, from the Azure resource library: one name in both places."""
+    resources = json.loads(RESOURCES.read_text(encoding="utf-8"))["resources"]
+    return {resource["id"]: resource["label"] for resource in resources if "label" in resource}
+
+
 class Drawing:
     def __init__(self):
-        self.parts, self.icons, self.at = [], [], {}
+        self.parts, self.icons, self.at, self.names = [], [], {}, names()
 
     def add(self, text):
         self.parts.append(text)
@@ -108,8 +115,12 @@ class Drawing:
             self.text(x + w - 12, y + 18, note, size=11, color="muted", anchor="end")
 
     def icon(self, key, name, cx, top, label, size=30):
-        """An icon with its label underneath. `key` names the spot for circles and arrows."""
+        """An icon with its label underneath. `key` names the spot for circles and arrows.
+
+        A label line that starts with @ is the id of a resource: it becomes the name of that resource.
+        """
         self.at[key] = (cx, top)
+        label = [line for item in label for line in (self.names[item[1:]] if item.startswith("@") else [item])]
         if (ICONS / f"{name}.svg").is_file():
             if name not in self.icons:
                 self.icons.append(name)
@@ -151,9 +162,9 @@ def hub(drawing, mode):
                           note="you own it")
         drawing.icon("hub-vpn", "vpn-gateway", 86, 612, ["VPN or ExpressRoute", "gateway"])
         drawing.icon("hub-firewall", "firewall", 236, 612, ["Azure Firewall"])
-        drawing.icon("hub-resolver", "dns-resolver", 86, 716, ["DNS Private", "Resolver"])
-        drawing.icon("hub-dns", "dns-zones", 236, 716, ["Private DNS zones", "(central)"])
-        drawing.icon("hub-bastion", "bastion", 86, 820, ["Azure Bastion"])
+        drawing.icon("hub-resolver", "dns-resolver", 86, 716, ["@dns-resolver"])
+        drawing.icon("hub-dns", "dns-zones", 236, 716, ["@dns-zones", "(central)"])
+        drawing.icon("hub-bastion", "bastion", 86, 820, ["@bastion"])
         drawing.icon("hub-vnet", "vnet", 236, 820, ["Hub virtual", "network"])
         drawing.lines(166, 926, ["One hub can serve several AI Factories.",
                                  "Settings: centralDnsZoneByPolicyInHub = true,",
@@ -164,9 +175,9 @@ def hub(drawing, mode):
         drawing.icon("people", "users", 76, 492, ["Your people"])
         drawing.icon("onprem", "vpn-gateway", 226, 492, ["Azure VPN client", "(point-to-site)"])
         drawing.container(16, 566, 300, 424, "Own hub · created by ESAF", "purple", note="Dev network")
-        drawing.icon("hub-vpn", "vpn-gateway", 86, 612, ["VPN gateway"])
-        drawing.icon("hub-resolver", "dns-resolver", 236, 612, ["DNS Private", "Resolver"])
-        drawing.icon("hub-bastion", "bastion", 86, 716, ["Azure Bastion"])
+        drawing.icon("hub-vpn", "vpn-gateway", 86, 612, ["@vpn-gateway"])
+        drawing.icon("hub-resolver", "dns-resolver", 236, 612, ["@dns-resolver"])
+        drawing.icon("hub-bastion", "bastion", 86, 716, ["@bastion"])
         drawing.icon("hub-vnet", "vnet", 236, 716, ["Hub virtual", "network"])
         drawing.lines(166, 826, ["The Factory needs no other hub.",
                                  "Each Factory pays for its own VPN gateway.",
@@ -235,46 +246,46 @@ def render(mode, data=None):
     for key, name, column, row, label in (
         ("hosted", "foundry", 0, 0, ["Hosted agents"]),
         ("prompt", "foundry", 1, 0, ["Prompt agents"]),
-        ("chat-agent", "foundry", 2, 0, ["ESAF Agent Chat", "agent"]),
+        ("chat-agent", "foundry", 2, 0, ["@agent-chat"]),
         ("models", "azure-openai", 3, 0, ["Models"]),
         ("foundry-iq", "foundry-iq", 0, 1, ["Foundry IQ", "knowledge base"]),
         ("tools", "mcp", 1, 1, ["Tools:", "MCP servers"]),
         ("agent-service", "cognitive-services", 2, 1, ["Agent service"]),
         ("evaluations", "evaluations", 3, 1, ["Evaluations"]),
         ("fabric-tool", "fabric-data-agent", 0, 2, ["Fabric data agent", "tool"]),
-        ("voice", "speech", 1, 2, ["Voice Live"]),
-        ("content-safety", "content-safety", 2, 2, ["Content Safety"]),
-        ("doc-intelligence", "document-intelligence", 3, 2, ["Document", "Intelligence"]),
+        ("voice", "speech", 1, 2, ["@agent-chat-voice"]),
+        ("content-safety", "content-safety", 2, 2, ["@content-safety"]),
+        ("doc-intelligence", "document-intelligence", 3, 2, ["@document-intelligence"]),
     ):
         d.icon(key, name, 424 + column * 120, 232 + row * 102, label)
 
     d.container(864, 186, 240, 174, "Agent service keeps its data here", "blue")
-    d.icon("search", "ai-search", 924, 220, ["Azure AI Search"])
-    d.icon("cosmos", "cosmos-db", 1044, 220, ["Cosmos DB"])
+    d.icon("search", "ai-search", 924, 220, ["@ai-search"])
+    d.icon("cosmos", "cosmos-db", 1044, 220, ["@cosmos-db"])
     d.icon("storage", "storage", 924, 290, ["Storage"])
-    d.icon("keyvault", "key-vault", 1044, 290, ["Key Vault"])
+    d.icon("keyvault", "key-vault", 1044, 290, ["@key-vault"])
 
     d.container(864, 372, 240, 174, "Azure Machine Learning and data", "blue")
-    d.icon("aml", "machine-learning", 924, 406, ["ML workspace"])
-    d.icon("eventhubs", "event-hubs", 1044, 406, ["Event Hubs"])
-    d.icon("adf", "data-factory", 924, 476, ["Data Factory"])
-    d.icon("databricks", "databricks", 1044, 476, ["Databricks"])
+    d.icon("aml", "machine-learning", 924, 402, ["@azure-ml"])
+    d.icon("eventhubs", "event-hubs", 1044, 402, ["@event-hubs"])
+    d.icon("adf", "data-factory", 924, 486, ["@data-factory"])
+    d.icon("databricks", "databricks", 1044, 486, ["@databricks"])
 
     d.container(1118, 186, 438, 174, "Applications · full stack", "blue")
     for key, name, column, row, label in (
-        ("containerapps", "container-apps", 0, 0, ["Container Apps"]),
-        ("functions", "functions", 1, 0, ["Functions"]),
-        ("webapp", "app-service", 2, 0, ["Web App"]),
-        ("bot", "bot-service", 3, 0, ["Bot Service"]),
-        ("aks", "aks", 0, 1, ["AKS"]),
-        ("sql", "sql-database", 1, 1, ["SQL Database"]),
-        ("postgres", "postgresql", 2, 1, ["PostgreSQL"]),
-        ("redis", "redis", 3, 1, ["Redis"]),
+        ("containerapps", "container-apps", 0, 0, ["@container-apps"]),
+        ("functions", "functions", 1, 0, ["@function-app"]),
+        ("webapp", "app-service", 2, 0, ["@web-app"]),
+        ("bot", "bot-service", 3, 0, ["@bot-service"]),
+        ("aks", "aks", 0, 1, ["@aks"]),
+        ("sql", "sql-database", 1, 1, ["@sql"]),
+        ("postgres", "postgresql", 2, 1, ["@postgresql"]),
+        ("redis", "redis", 3, 1, ["@redis-cache"]),
     ):
         d.icon(key, name, 1178 + column * 108, 220 + row * 70, label)
 
     d.container(1118, 372, 438, 174, "Project subnets · in the common virtual network", "blue")
-    d.icon("pe", "private-endpoint", 1178, 410, ["Private", "endpoints"])
+    d.icon("pe", "private-endpoint", 1178, 410, ["@private-endpoints"])
     d.icon("agent-subnet", "subnet", 1286, 410, ["Agent subnet"])
     d.icon("aca-subnet", "subnet", 1394, 410, ["Container Apps", "subnet"])
     d.icon("identity", "managed-identity", 1502, 410, ["Managed", "identities"])
@@ -286,8 +297,8 @@ def render(mode, data=None):
     d.icon("pp-subnet", "subnet", 424, 648, ["Power Platform", "subnet (delegated)"])
     d.icon("common-subnet", "private-endpoint", 544, 648, ["Common subnet:", "private endpoints"])
     d.icon("scoring-subnet", "subnet", 664, 648, ["Scoring subnet"])
-    d.icon("bastion-subnet", "bastion", 784, 648, ["Azure Bastion", "(optional)"])
-    d.icon("admin-vm", "virtual-machine", 904, 648, ["Admin VM", "(optional)"])
+    d.icon("bastion-subnet", "bastion", 784, 648, ["@bastion", "(optional)"])
+    d.icon("admin-vm", "virtual-machine", 904, 648, ["@admin-vm", "(optional)"])
     dns = {"external-hub": "Private DNS zones are in your hub. Peering connects this network to it.",
            "own-hub": "Private DNS zones are in this resource group. Peering connects this network to the own hub.",
            "standalone": "Private DNS zones are in this resource group. There is no peering."}[mode]
@@ -296,27 +307,27 @@ def render(mode, data=None):
 
     d.container(360, 812, 600, 150, "Common services", "blue")
     d.icon("datalake", "storage", 424, 848, ["Data lake", "(ADLS Gen2)"])
-    d.icon("common-kv", "key-vault", 544, 848, ["Key Vault"])
+    d.icon("common-kv", "key-vault", 544, 848, ["@key-vault"])
     d.icon("acr", "container-registry", 664, 848, ["Container", "registry"])
     d.icon("log-analytics", "log-analytics", 784, 848, ["Log Analytics"])
     if mode == "external-hub":
         d.icon("dashboards", "dashboard", 904, 848, ["Dashboards"])
     else:
-        d.icon("common-dns", "dns-zones", 904, 848, ["Private DNS", "zones"])
+        d.icon("common-dns", "dns-zones", 904, 848, ["@dns-zones"])
 
     d.container(974, 608, 582, 190, "AI gateway · its own pipeline", "blue")
-    d.icon("apim", "api-management", 1050, 648, ["API Management", "as the AI gateway"])
+    d.icon("apim", "api-management", 1050, 648, ["@apim"])
     d.text(1150, 668, "or", size=12, color="muted", anchor="middle")
-    d.icon("kong", "kong", 1250, 648, ["Kong", "(the alternative)"])
-    d.icon("factory-mcp", "container-apps", 1450, 648, ["Factory MCP server", "(published on the gateway)"])
+    d.icon("kong", "kong", 1250, 648, ["@kong"])
+    d.icon("factory-mcp", "container-apps", 1450, 648, ["@factory-mcp", "(published on the gateway)"])
     d.lines(1265, 760, ["One endpoint in front of a pool of model deployments, with retries.",
                         "Settings: ENABLE_APIM or ENABLE_KONG, addAIFactoryMCP2APIM."], size=10.5, color="muted")
 
     d.container(974, 812, 582, 150, "Run and watch the Factory", "blue")
     d.icon("pipelines", "pipelines", 1050, 848, ["Azure DevOps or", "GitHub Actions"])
     d.icon("monitor", "monitor", 1184, 848, ["Azure Monitor", "health model"])
-    d.icon("appinsights", "application-insights", 1318, 848, ["Application", "Insights"])
-    d.icon("dashboards2", "dashboard", 1452, 848, ["Usage and cost", "dashboards"])
+    d.icon("appinsights", "application-insights", 1318, 848, ["@app-insights"])
+    d.icon("dashboards2", "dashboard", 1452, 848, ["@dashboards"])
 
     # ---- how it connects
     d.arrow([(1508, 88), (1508, 216)])
