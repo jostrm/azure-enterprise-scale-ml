@@ -5,8 +5,8 @@
     python documentation/gh-io/tools/generate_architecture.py --png      # also write the PNG stills (Playwright)
 
 The numbered blue circles come from documentation/gh-io/data/code_templates.json: a template with a "number" gets
-a circle at its "place". The service icons are the official Azure icons in architecture_icons/. A product that
-has no icon file there is drawn as a lettered dark tile; add its SVG to that folder to replace the tile.
+a circle at its "place". The icons are the official Microsoft icons in architecture_icons/ (see its README).
+A product in TILES has no official icon in those sets and is drawn as a lettered dark tile.
 """
 
 import argparse
@@ -57,12 +57,8 @@ PLACES = {
     "ingestion": "adf", "chat": "chat-agent", "model-factory": "aml", "functions": "functions",
     "functions-storage": "storage", "starter-rag": "models", "starter-fabric": "fabric-agent",
 }
-# Products without an icon file: the letters and the border color of their tile.
-TILES = {
-    "teams": ("T", "blue"), "m365-copilot": ("M365", "blue"), "copilot-studio": ("CS", "blue"),
-    "power-automate": ("PA", "blue"), "sharepoint": ("SP", "blue"), "fabric": ("F", "blue"),
-    "fabric-data-agent": ("FA", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue"),
-}
+# Products without an official icon in the Microsoft icon sets: the letters and the border color of their tile.
+TILES = {"sharepoint": ("SP", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue")}
 
 
 def load():
@@ -72,13 +68,19 @@ def load():
 def symbol(name):
     """One icon file as an SVG symbol. Its ids get a prefix, so that two icons never share a gradient."""
     text = (ICONS / f"{name}.svg").read_text(encoding="utf-8")
-    box = re.search(r'viewBox="([^"]+)"', text)[1]
-    body = text[text.index(">", text.index("<svg")) + 1:text.rindex("</svg>")]
+    opening = re.search(r"<svg\b[^>]*>", text)[0]
+    box = re.search(r'viewBox="([^"]+)"', opening)
+    # The Fabric icons have a width and a height instead of a viewBox, and set the fill on the root element.
+    box = box[1] if box else "0 0 {} {}".format(*(re.search(rf'\b{side}="([\d.]+)', opening)[1]
+                                                  for side in ("width", "height")))
+    fill = re.search(r'\bfill="([^"]+)"', opening)
+    inherited = f' fill="{fill[1]}"' if fill else ""
+    body = text[text.index(opening) + len(opening):text.rindex("</svg>")]
     body = re.sub(r"<(title|desc)>.*?</\1>", "", body, flags=re.S)
     body = re.sub(r'\bid="([^"]+)"', lambda match: f'id="{name}-{match[1]}"', body)
     body = re.sub(r"url\(#([^)]+)\)", lambda match: f"url(#{name}-{match[1]})", body)
     body = re.sub(r'href="#([^"]+)"', lambda match: f'href="#{name}-{match[1]}"', body)
-    return f'<symbol id="icon-{name}" viewBox="{box}">{body.strip()}</symbol>'
+    return f'<symbol id="icon-{name}" viewBox="{box}"{inherited}>{body.strip()}</symbol>'
 
 
 def names():
@@ -231,8 +233,9 @@ def render(mode, data=None):
     d.arrow([(108, 149), (214, 149)])
 
     d.container(16, 240, 300, 202, "Knowledge and data outside the Factory", "blue")
-    d.icon("sharepoint", "sharepoint", 86, 318, ["SharePoint", "sites and files"])
-    d.icon("fabric", "fabric", 236, 276, ["Microsoft Fabric", "OneLake"])
+    d.icon("sharepoint", "sharepoint", 86, 276, ["SharePoint", "sites and files"])
+    d.icon("onelake", "onelake", 86, 362, ["OneLake"])
+    d.icon("fabric", "fabric", 236, 276, ["Microsoft Fabric"])
     d.icon("fabric-agent", "fabric-data-agent", 236, 362, ["Fabric data agent", "(Fabric IQ)"])
 
     hub(d, mode)

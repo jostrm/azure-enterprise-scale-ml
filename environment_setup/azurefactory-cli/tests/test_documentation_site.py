@@ -375,6 +375,15 @@ def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site)
         colors = {color.upper() for color in re.findall(r"#[0-9A-Fa-f]{6}\b", drawn)}
         assert colors <= {color.upper() for color in drawing.PALETTE.values()}, "No red or orange: see the style guide."
         assert text.count("<symbol ") >= 30, "The services are drawn with the official Azure icons."
+        # Microsoft 365, Power Platform and Fabric are drawn with the official icons of their own icon sets.
+        for name in ("teams", "m365-copilot", "copilot-studio", "power-automate", "fabric", "fabric-data-agent",
+                     "onelake"):
+            assert (SITE / "tools" / "architecture_icons" / f"{name}.svg").is_file(), name
+            assert f'<symbol id="icon-{name}" viewBox="' in text and f'href="#icon-{name}"' in text, f"{mode}: {name}"
+        # A product without an official icon in those sets stays a lettered tile, and the README says which.
+        readme = (SITE / "tools" / "architecture_icons" / "README.md").read_text(encoding="utf-8")
+        for name in drawing.TILES:
+            assert not (SITE / "tools" / "architecture_icons" / f"{name}.svg").exists() and f"`{name}.svg`" in readme
     on_image = [resource for resource in library.load_resources()["resources"] if resource.get("label")]
     assert len(on_image) >= 20, "The services on the images take their names from the resource library."
     for resource in on_image:
