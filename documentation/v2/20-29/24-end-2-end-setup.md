@@ -70,7 +70,8 @@ you select it. It lists the permissions, the regions and the checklist for after
 
 **Next:** [Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md)
 
-Related: [Docs hub](../README.md) · [Folder structure](../reference/folder-structure.md) ·
+Related: [Docs hub](../README.md) ·
+[Guide 17: the six scenarios, tool by tool](../10-19/17-cli-and-api-and-usage.md) · [Folder structure](../reference/folder-structure.md) ·
 [Settings](../reference/settings.md) ·
 [ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md), the guided lab app (private preview: ask
 [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a preview code) ·
