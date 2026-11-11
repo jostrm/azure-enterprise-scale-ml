@@ -73,6 +73,10 @@
          <lastmod>2026-11-11</lastmod>
     </url>
     <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/parameters/variables/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
          <loc>https://jostrm.github.io/azure-enterprise-scale-ml/factory-tools/18-cli-and-api-and-usage/</loc>
          <lastmod>2026-11-11</lastmod>
     </url>
@@ -94,6 +98,70 @@
     </url>
     <url>
          <loc>https://jostrm.github.io/azure-enterprise-scale-ml/project-team/ml-model-factory/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/01-install-esaf/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/02-create-factory/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/add-scale-set/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/03-add-project/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/04-first-agent-chat/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/setup/05-clean-up/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/usage/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/usage/prerequisites/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/usage/01-first-agent/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/usage/02-first-ml-model/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/usage/dashboards/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/reference/scenarios/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/reference/hub-and-network-modes/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/reference/folder-structure/</loc>
+         <lastmod>2026-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://jostrm.github.io/azure-enterprise-scale-ml/reference/settings/</loc>
          <lastmod>2026-11-11</lastmod>
     </url>
 </urlset>
