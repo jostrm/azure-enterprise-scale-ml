@@ -1,0 +1,108 @@
+FOUNDRY VOICE SALES FROM FABRIC — ARCHITECTURE
+
+Baseline and trust boundary
+--------------------------
+The local browser uses a Python backend-for-frontend (BFF), bound only to
+127.0.0.1. The BFF calls a persisted, versioned Foundry PromptAgentDefinition.
+Foundry runs that prompt agent. The agent exposes exactly one app-owned
+function, query_sales_data(question), whose implementation stays in the local
+BFF. This is not a custom container-hosted agent, an Azure deployment of this
+backend, or an application that merely calls a model without a persisted agent.
+
+The local function connects to the REAL Microsoft-hosted Fabric Data Agent MCP:
+  https://api.fabric.microsoft.com/v1/mcp/workspaces/{workspace-guid}/dataagents/{data-agent-guid}/agent
+or an exact, approved workspace-private endpoint. It initializes MCP, lists tools,
+validates/discovers the sole question tool's name and schema, then calls that
+actual tool. Optional MCP_TOOL_NAME/MCP_QUESTION_ARGUMENT constrain a reviewed
+discovery result; they do not invent a Fabric tool contract. Fabric queries only
+the agent's configured, permitted data sources. The app does not provide arbitrary
+SQL, resource mutation, role-assignment, or infrastructure tools.
+
+Flow:
+  Local browser text / native live microphone
+    -> BFF (same-origin and per-browser-session checks)
+    -> Foundry persisted prompt agent name + version
+    -> function request: query_sales_data(question)
+    -> BFF's local Fabric MCP client, signed-in user's token
+    -> Microsoft-hosted Fabric Data Agent
+    -> configured read-only sources under actual source permissions
+    -> tool result submitted to Foundry
+    -> grounded answer displayed, optionally spoken
+
+Each OS user must use their own Azure CLI sign-in and local instance. A shared
+team web server, shared service-account identity, and application-credential OBO
+are NOT implemented. Loopback is not authentication of another OS user: this
+design trusts the single user's OS/browser session, not a shared/untrusted host.
+A session cookie and same-origin checks reduce browser request abuse; they do
+not turn the local application into a multi-user authentication boundary.
+
+Publication versus operation
+----------------------------
+Publish is the only explicit agent-version write. It requires -AllowAzure,
+publisher permissions, and an existing model deployment. It does not provision
+Foundry, capacity, networking, data sources, or the BFF. The publisher copies the
+returned exact version into configuration. Regular callers use that existing
+name/version. Setup installs locked dependencies locally; Start only starts the
+BFF. No automatic publication, role assignments, or infrastructure actions occur.
+
+The domain configuration is replaceable: business vocabulary, sample questions,
+and approved sources must match the consumer's published Data Agent. Do not
+promise stock/inventory, proprietary measures, or schemas absent from those
+sources. Sales is the example domain, not a hardcoded customer connection.
+
+Native live voice, optional
+---------------------------
+VOICE_ENABLED=false is the default; all text startup/grounding remains usable.
+Native Voice Live is a WebSocket speech-to-speech flow, not upload -> transcribe
+-> text-to-speech. The pinned API contract is 2026-07-15. Native audio is pcm16,
+mono, 24,000 Hz. The browser streams microphone audio to the local BFF and receives
+audio.delta playback data. The voice backend requires a native function call
+through the Foundry-grounded answer path before the spoken round; function_call_output
+feeds the result back to the speech session.
+
+On user interruption, cancel active output and truncate the native conversation
+at audio actually played, not total audio received/queued. Clear queued browser
+audio. Native spoken text is provisional: the authoritative Foundry/Fabric answer
+must remain visible separately. A model can mispronounce/rephrase, so spoken
+output is not independent evidence of exact business figures.
+
+The operator must select a verified available compatible native realtime model.
+Do not guess a deployment name. Region and processing scope are different:
+the official Sweden Central availability table distinguishes globally processed
+gpt-realtime from gpt-realtime-datazone processing within a data zone. Other
+listed models, such as gpt-4.1, can have regional processing but are not a reason
+to assume compatibility with this native-realtime baseline. Confirm current
+availability and organizational data-residency policy before enabling voice.
+
+Fabric IQ: deferred, NOT IMPLEMENTED
+----------------------------------
+Fabric IQ / ontology extensions are not included, not prerequisites, and not
+secretly substituted for the Fabric Data Agent MCP tool. The notebook's optional
+IQ section is deliberately informational with no runnable fake integration.
+The retiring MicrosoftFabricPreviewTool is not used. The official Foundry
+integration page announces its retirement on 2026-11-06; direct Fabric MCP is the
+baseline here.
+
+Verification boundaries
+-----------------------
+Offline unit tests use fake local executables/modules and mocked services.
+They verify argument safety, opt-in gates, startup health/ownership/shutdown,
+notebook defaults, backend contracts and browser behavior. No local test proves
+Azure identity, Fabric permissions, private support, real data correctness,
+Voice Live availability, microphone redirection, or end-to-end audio.
+All Azure/customer/live-voice validation is NOT RUN in the template.
+
+Official references (reviewed 2026-11-04; documentation is not live proof)
+----------------------------------------------------------------------
+Foundry agent types:
+https://learn.microsoft.com/en-us/azure/foundry/agents/overview#agent-types
+Function calling and application-owned execution:
+https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/tools/function-calling
+Fabric's published remote MCP tool:
+https://learn.microsoft.com/en-us/fabric/data-science/data-agent-mcp-server
+Retiring legacy integration:
+https://learn.microsoft.com/en-us/fabric/data-science/data-agent-foundry
+Native voice API:
+https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-api-reference-2026-07-15
+Model availability and processing scope:
+https://learn.microsoft.com/en-us/azure/ai-services/speech-service/regions?tabs=voice-live#llm-availability-and-processing-scope

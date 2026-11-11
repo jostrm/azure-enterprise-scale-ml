@@ -1,0 +1,2 @@
+# Keep the committed template and consumer checkout byte-identical across Git clients.
+* text=auto eol=lf
