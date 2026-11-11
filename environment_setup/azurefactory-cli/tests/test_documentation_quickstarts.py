@@ -459,7 +459,7 @@ def test_every_python_call_shown_matches_the_real_esaf_signature(page):
             continue
         try:
             inspect.signature(getattr(esaf, node.func.attr)).bind(
-                *node.args, **{keyword.arg: 0 for keyword in node.keywords})
+                *node.args, **{keyword.arg: 0 for keyword in node.keywords if keyword.arg})  # **mapping names no keyword
         except (AttributeError, TypeError) as error:
             problems.append(f"esaf.{node.func.attr}: {error}")
     assert not problems, f"{name(page)} shows calls the SDK refuses: {problems}"
