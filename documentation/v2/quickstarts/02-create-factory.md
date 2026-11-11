@@ -31,6 +31,7 @@ flowchart LR
 ## Prerequisites
 
 - The tools from [Quickstart: Install the ESAF tools](01-install-esaf.md), with the Factory API running.
+  The one-file examples on this page need the app package v0.47.101 or later.
 - An Azure subscription for Dev, where you can create resource groups and assign roles.
 - A signed-in Azure CLI: run `az login --tenant <your tenant ID>`.
 - For GitHub Actions: [GitHub CLI](https://cli.github.com/), signed in, and access to your consumer repository.
@@ -53,65 +54,72 @@ part of how the Factory is built.
 
 ## Describe your Factory
 
-The Factory API needs to know what to build. Choose one of four ways: three use files, for the CLI, the Python
-SDK and REST, and one uses the app. None of them creates anything in Azure.
+The Factory API needs to know what to build. Choose one of four ways: three use one file, for the CLI, the
+Python SDK and REST, and one uses the app. None of them creates anything in Azure.
 
-A description in files has up to three small files. Each file goes with one scenario:
+In a file, you describe the whole Factory once. Save it as `create-factory.json` in the root of your consumer
+repository. It has up to three parts:
 
-| File | What it describes | The scenario that takes it |
-|---|---|---|
-| `creation-request.json` | The Factory, its first scale set and project 001 | 1, on this page |
-| `scale-set-settings.json` | Your own VNet or subnets for a scale set | 2, in [Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets) |
-| `project-settings.json` | The services of a project, such as the Factory MCP and Agent Chat | 3, in [Add a project](03-add-project.md#change-a-setting) |
+| Part | What it describes |
+|---|---|
+| `creation_request` | The Factory, its first scale set and project 001 |
+| `scale_set_settings` | Your own VNet or subnets for the first scale set. Leave it out and ESAF builds the network. |
+| `project_settings` | The services of project 001, such as API Management, the Factory MCP and Agent Chat |
 
-The creation request takes only the settings shown below and refuses other names. That's why the service
-switches and the network settings live in the two other files.
+The API saves the two settings parts before anything deploys, so the first run already uses them.
 
 <details open>
 <summary>In a file: automated networking</summary>
 
 ESAF builds the VNet and its subnets from `dev_vnet_cidr`. This example is the fastest first test: standalone,
-public networking and GitHub Actions. It's the same request that the ESAF Tutorial Guide writes for you.
-
-Save this as `creation-request.json` in the root of your consumer repository:
+public networking and GitHub Actions.
 
 ```json
 {
-  "contract_version": 1,
-  "mode": "full-bootstrap",
-  "action": "create-factory",
-  "folder": "<absolute path of your azurefactory folder>",
-  "orchestrator": "gha",
-  "factory_key": "acme-ai",
-  "region_short_name": "sdc",
-  "config": {
-    "subscription_id": "<your Dev subscription ID>",
-    "tenant_id": "<your tenant ID>",
-    "location": "swedencentral",
-    "factory_prefix": "acme-",
-    "aifactory_version": "1.25",
-    "scale_set_number": "001",
-    "project_number": "001",
-    "repo_root": "<absolute path of your consumer repository>",
-    "github_repository": "<owner>/<your consumer repository>",
-    "github_visibility": "private",
-    "dev_vnet_cidr": "10.140.0.0/16",
-    "cost_center": "123456",
-    "coordination_mode": "single-writer",
-    "identity_mode": "create",
-    "runner_mode": "self-hosted",
-    "team_member_email": "<your sign-in email>",
-    "team_group_name": "acme-ai-team",
-    "access_hub_mode": "integrated",
-    "setup_hub_access": false,
-    "network_mode": "public"
+  "creation_request": {
+    "contract_version": 1,
+    "mode": "full-bootstrap",
+    "action": "create-factory",
+    "folder": "<absolute path of your azurefactory folder>",
+    "orchestrator": "gha",
+    "factory_key": "acme-ai",
+    "region_short_name": "sdc",
+    "config": {
+      "subscription_id": "<your Dev subscription ID>",
+      "tenant_id": "<your tenant ID>",
+      "location": "swedencentral",
+      "factory_prefix": "acme-",
+      "aifactory_version": "1.25",
+      "scale_set_number": "001",
+      "project_number": "001",
+      "repo_root": "<absolute path of your consumer repository>",
+      "github_repository": "<owner>/<your consumer repository>",
+      "github_visibility": "private",
+      "dev_vnet_cidr": "10.140.0.0/16",
+      "cost_center": "123456",
+      "coordination_mode": "single-writer",
+      "identity_mode": "create",
+      "runner_mode": "self-hosted",
+      "team_member_email": "<your sign-in email>",
+      "team_group_name": "acme-ai-team",
+      "access_hub_mode": "integrated",
+      "setup_hub_access": false,
+      "network_mode": "public"
+    }
+  },
+  "project_settings": {
+    "ENABLE_KONG": "false",
+    "ENABLE_APIM": "true",
+    "enableAIFactoryMCP": "true",
+    "addAIFactoryMCP2APIM": "true",
+    "enableFactoryChatAgent": "true"
   }
 }
 ```
 
 On Windows, write each backslash in a path twice, for example `C:\\work\\team-factory\\azurefactory`.
 
-Change these values before you use it:
+Change these values in `creation_request` before you use the file:
 
 | Setting | What it does |
 |---|---|
@@ -125,115 +133,132 @@ Change these values before you use it:
 | `github_repository` | Names the consumer repository that runs the pipelines. |
 | `access_hub_mode`, `setup_hub_access`, `network_mode` | Set the topology. See [the values for each hub mode](../concepts/hub-and-network-modes.md#settings-behind-the-choices). |
 
-Keep `creation-request.json` out of Git if you treat your subscription IDs as private.
-
-Then save the service switches as `project-settings.json`:
-
-```json
-{
-  "enableAIFactoryMCP": "true",
-  "addAIFactoryMCP2APIM": "true",
-  "enableFactoryChatAgent": "true"
-}
-```
-
-`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
-for project 001 in Dev only. Agent Chat has its own prerequisites: see
+The `project_settings` in this example turn on API Management, the Factory MCP and its publication in API
+Management, and the Factory chat agent. `addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns
+on both. Agent Chat has its own prerequisites: see
 [Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
 
-The API Management and Kong switches are not project settings, and the Factory API refuses them in this
-file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
-the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
-
-```yaml
-ENABLE_KONG: "false"
-ENABLE_APIM: "true"
-```
+Keep `create-factory.json` out of Git if you treat your subscription IDs as private.
 
 </details>
 
 <details>
 <summary>In a file: BYO VNet</summary>
 
-You bring the VNet, and ESAF creates the subnets in it. Scenario 1 always builds the network of the first scale
-set itself, so your VNet goes to the scale set that you add next.
-
-1. Save `creation-request.json` as shown under "In a file: automated networking".
-2. Save the network settings as `scale-set-settings.json`:
-
-   ```json
-   {
-     "vnetResourceGroup_param": "<resource group of your VNet>",
-     "vnetNameFull_param": "<name of your VNet>"
-   }
-   ```
-
-3. Save the service switches as `project-settings.json`:
+You bring the VNet, and ESAF creates the subnets in it. `scale_set_settings` names your VNet.
+`byoVnetResourcegroupName` and `byoVnetName` are the friendly names of the variables `vnetResourceGroup_param`
+and `vnetNameFull_param`.
 
 ```json
 {
-  "enableAIFactoryMCP": "true",
-  "addAIFactoryMCP2APIM": "true",
-  "enableFactoryChatAgent": "true"
+  "creation_request": {
+    "contract_version": 1,
+    "mode": "full-bootstrap",
+    "action": "create-factory",
+    "folder": "<absolute path of your azurefactory folder>",
+    "orchestrator": "gha",
+    "factory_key": "acme-ai",
+    "region_short_name": "sdc",
+    "config": {
+      "subscription_id": "<your Dev subscription ID>",
+      "tenant_id": "<your tenant ID>",
+      "location": "swedencentral",
+      "factory_prefix": "acme-",
+      "aifactory_version": "1.25",
+      "scale_set_number": "001",
+      "project_number": "001",
+      "repo_root": "<absolute path of your consumer repository>",
+      "github_repository": "<owner>/<your consumer repository>",
+      "github_visibility": "private",
+      "dev_vnet_cidr": "10.140.0.0/16",
+      "cost_center": "123456",
+      "coordination_mode": "single-writer",
+      "identity_mode": "create",
+      "runner_mode": "self-hosted",
+      "team_member_email": "<your sign-in email>",
+      "team_group_name": "acme-ai-team",
+      "access_hub_mode": "integrated",
+      "setup_hub_access": false,
+      "network_mode": "public"
+    }
+  },
+  "scale_set_settings": {
+    "byoVnetResourcegroupName": "<resource group of your VNet>",
+    "byoVnetName": "<name of your VNet>"
+  },
+  "project_settings": {
+    "ENABLE_KONG": "false",
+    "ENABLE_APIM": "true",
+    "enableAIFactoryMCP": "true",
+    "addAIFactoryMCP2APIM": "true",
+    "enableFactoryChatAgent": "true"
+  }
 }
 ```
 
-`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
-for project 001 in Dev only. Agent Chat has its own prerequisites: see
-[Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
-
-The API Management and Kong switches are not project settings, and the Factory API refuses them in this
-file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
-the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
-
-```yaml
-ENABLE_KONG: "false"
-ENABLE_APIM: "true"
-```
+Change the values in `creation_request` as described under "In a file: automated networking".
 
 </details>
 
 <details>
 <summary>In a file: BYO subnets</summary>
 
-You bring the VNet and its subnets, and ESAF creates no network at all. As with a BYO VNet, your network goes
-to the scale set that you add after scenario 1.
-
-1. Save `creation-request.json` as shown under "In a file: automated networking".
-2. Save the network settings as `scale-set-settings.json`:
-
-   ```json
-   {
-     "BYO_subnets": "true",
-     "vnetResourceGroup_param": "<resource group of your VNet>",
-     "vnetNameFull_param": "<name of your VNet>"
-   }
-   ```
-
-   Your subnets must exist before the run. See [networking and private DNS](../10-19/14-networking-privateDNS.md)
-   for the subnets that a scale set and its projects need.
-3. Save the service switches as `project-settings.json`:
+You bring the VNet and its subnets, and ESAF creates no network. `enableByoSubnets` is the friendly name of the
+variable `BYO_subnets`. The file has no `dev_vnet_cidr`, because there is no network for ESAF to plan: the API
+refuses a request that has both.
 
 ```json
 {
-  "enableAIFactoryMCP": "true",
-  "addAIFactoryMCP2APIM": "true",
-  "enableFactoryChatAgent": "true"
+  "creation_request": {
+    "contract_version": 1,
+    "mode": "full-bootstrap",
+    "action": "create-factory",
+    "folder": "<absolute path of your azurefactory folder>",
+    "orchestrator": "gha",
+    "factory_key": "acme-ai",
+    "region_short_name": "sdc",
+    "config": {
+      "subscription_id": "<your Dev subscription ID>",
+      "tenant_id": "<your tenant ID>",
+      "location": "swedencentral",
+      "factory_prefix": "acme-",
+      "aifactory_version": "1.25",
+      "scale_set_number": "001",
+      "project_number": "001",
+      "repo_root": "<absolute path of your consumer repository>",
+      "github_repository": "<owner>/<your consumer repository>",
+      "github_visibility": "private",
+      "cost_center": "123456",
+      "coordination_mode": "single-writer",
+      "identity_mode": "create",
+      "runner_mode": "self-hosted",
+      "team_member_email": "<your sign-in email>",
+      "team_group_name": "acme-ai-team",
+      "access_hub_mode": "integrated",
+      "setup_hub_access": false,
+      "network_mode": "public"
+    }
+  },
+  "scale_set_settings": {
+    "byoVnetResourcegroupName": "<resource group of your VNet>",
+    "byoVnetName": "<name of your VNet>",
+    "enableByoSubnets": true,
+    "subnetCommon": "snet-dev-esml-cmn-001",
+    "subnetProjGenAI": "snt-dev-prj001-genai"
+  },
+  "project_settings": {
+    "ENABLE_KONG": "false",
+    "ENABLE_APIM": "true",
+    "enableAIFactoryMCP": "true",
+    "addAIFactoryMCP2APIM": "true",
+    "enableFactoryChatAgent": "true"
+  }
 }
 ```
 
-`addAIFactoryMCP2APIM` needs `enableAIFactoryMCP`, so the file turns on both. The MCP settings work
-for project 001 in Dev only. Agent Chat has its own prerequisites: see
-[Quickstart: Create your first agent by enabling ESAF Agent Chat](04-first-agent-chat.md).
-
-The API Management and Kong switches are not project settings, and the Factory API refuses them in this
-file. The separate AI gateway pipeline reads them from the pipeline variables of your consumer repository:
-the GitHub variables, or the variables file of the Azure DevOps pipelines. Set them there:
-
-```yaml
-ENABLE_KONG: "false"
-ENABLE_APIM: "true"
-```
+Your subnets must exist before the run. Name each one you bring with its `subnet…` variable: the list is under
+[networking in the variable reference](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/variables/#networking-dns-and-existing-resources).
+Change the values in `creation_request` as described under "In a file: automated networking".
 
 </details>
 
@@ -277,12 +302,12 @@ For the smallest form, select **Use Simple Mode** instead: GitHub Actions, Dev a
 <summary>CLI (PowerShell)</summary>
 
 ```powershell
-azurefactory esaf init-factory --creation-request-json .\creation-request.json --wait
+azurefactory esaf init-factory --request-json .\create-factory.json --wait
 ```
 
 `--wait` follows the job to its end. Without it, the command prints a job ID that you follow with
 `azurefactory esaf job <job ID> --wait`. Did you save a draft in the app instead? Then leave out
-`--creation-request-json`.
+`--request-json`.
 
 </details>
 <!-- /factory-tool -->
@@ -291,12 +316,12 @@ azurefactory esaf init-factory --creation-request-json .\creation-request.json -
 <summary>CLI (bash)</summary>
 
 ```bash
-azurefactory esaf init-factory --creation-request-json ./creation-request.json --wait
+azurefactory esaf init-factory --request-json ./create-factory.json --wait
 ```
 
 `--wait` follows the job to its end. Without it, the command prints a job ID that you follow with
 `azurefactory esaf job <job ID> --wait`. Did you save a draft in the app instead? Then leave out
-`--creation-request-json`.
+`--request-json`.
 
 </details>
 <!-- /factory-tool -->
@@ -309,8 +334,8 @@ import json
 
 from azurefactory import esaf
 
-creation = json.load(open("creation-request.json", encoding="utf-8-sig"))
-job = esaf.init_factory(creation_request=creation)
+request = json.load(open("create-factory.json", encoding="utf-8-sig"))
+job = esaf.init_factory(**request)
 print("Job", job.id)
 state = job.wait()
 print(state["status"], "-", state["message"])
@@ -331,8 +356,8 @@ API_URL='http://127.0.0.1:8765'
 read -r -s -p 'API key: ' API_KEY
 FOLDER="$(cygpath -w "$PWD/azurefactory")"   # on Linux or macOS: FOLDER="$PWD/azurefactory"
 
-jq -n --arg folder "$FOLDER" --slurpfile request creation-request.json \
-  '{folder: $folder, approved: true, creation_request: $request[0]}' |
+jq -n --arg folder "$FOLDER" --slurpfile request create-factory.json \
+  '{folder: $folder, approved: true} + $request[0]' |
   curl --silent --show-error --fail-with-body -X POST "$API_URL/api/v1/esaf/init-factory" \
     --header "X-API-Key: $API_KEY" --header 'Content-Type: application/json' --data @-
 ```
@@ -350,16 +375,9 @@ curl --silent --show-error --get "$API_URL/api/v1/esaf/jobs/<job ID>" \
 The run takes about one hour, and up to 90 minutes in the recorded runs. You can stop waiting at any time;
 the job keeps running while the app stays open.
 
-When the job has succeeded, apply your other files. Each one is one more call:
-
-| File | Call |
-|---|---|
-| `scale-set-settings.json` | `azurefactory esaf add-scale-set 002 dev --cidr <range of your VNet> --settings-json ./scale-set-settings.json --wait` |
-| `project-settings.json` | `azurefactory esaf upsert-project 001 dev --scale-set 001 --settings-json ./project-settings.json --wait` |
-
-In Python, pass the content of the file as `settings=`. Over REST, send it as `settings`. See
-[Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets) and
-[Add a project](03-add-project.md#change-a-setting).
+To change the project's settings later, send them with scenario 3: see
+[Add a project](03-add-project.md#change-a-setting). To add a scale set on another network, see
+[Add a scale set](add-scale-set.md#use-your-own-vnet-or-subnets).
 
 ## Verify the result
 

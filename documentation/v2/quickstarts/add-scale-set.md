@@ -126,10 +126,12 @@ pass scale-set settings with the same call.
 
 | You bring | Settings |
 |---|---|
-| The VNet. ESAF creates the subnets in it. | `vnetResourceGroup_param` and `vnetNameFull_param` |
-| The VNet and its subnets | The same two, and `BYO_subnets` set to `"true"` |
+| The VNet. ESAF creates the subnets in it. | `byoVnetResourcegroupName` and `byoVnetName` |
+| The VNet and its subnets | The same two, `enableByoSubnets` set to `true`, and the names of your subnets |
 
-Save the settings as `scale-set-settings.json`, as shown in
+These are the friendly names of `vnetResourceGroup_param`, `vnetNameFull_param` and `BYO_subnets`. They need
+the app package v0.47.101 or later; the older names work in every version. Save the settings as
+`scale-set-settings.json`: they are the `scale_set_settings` part of the examples in
 [Quickstart: Create your AI Factory](02-create-factory.md#describe-your-factory). Then add them to the call:
 
 | Tool | Call |

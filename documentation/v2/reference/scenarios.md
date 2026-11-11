@@ -46,6 +46,7 @@ The CLI commands are the same in PowerShell and in Bash. Every REST body carries
 | `display_name` | Scenario 3 | Gives a new project a display name. |
 | `include_project_subnets` | Scenario 4 | Also deletes the project's subnets. The default is `False`. |
 | `include_keyvault_and_resource_group` | Scenario 4 | `False` deletes only the project's services. The default is `True`. |
+| `scale_set_settings`, `project_settings` | Scenario 1, with `creation_request` | Save settings for the first scale set (your own VNet or subnets) and for project 001 (its services) before anything deploys. The CLI takes one file with all three parts: `--request-json`. Needs the app package v0.47.101 or later. |
 | `creation_request` | Scenario 1 | Saves a new Factory and starts it in one call. Leave it out to run the draft you saved in the app. The CLI option is `--creation-request-json`. See [the example](../quickstarts/02-create-factory.md#describe-your-factory). |
 | `retries` | All | Sets how often the API runs the scenario again after a failed run: 0 to 5, default 2. |
 | `version_ref` | All | Deploys an explicit ESAF version instead of the Factory's own. |
