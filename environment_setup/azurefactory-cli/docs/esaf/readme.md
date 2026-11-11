@@ -143,7 +143,7 @@ Every method also accepts these keyword arguments:
 ### 1. `esaf.init_factory()`: Init the AI Factory
 
 ```python
-esaf.init_factory(*, creation_request=None)
+esaf.init_factory(*, creation_request=None, scale_set_settings=None, project_settings=None)
 ```
 
 | Parameter | Meaning |
@@ -151,7 +151,33 @@ esaf.init_factory(*, creation_request=None)
 | (none) | Submits the folder's **saved factory draft** (for example saved in the Config Wizard) as one approved workflow. |
 | `creation_request` | Saves a new factory and starts it in the same call. The body is the creation API's full-bootstrap request: `{"contract_version": 1, "mode": "full-bootstrap", "action": "create-factory", "folder": ..., "orchestrator": "gha", "config": {...}, "factory_key": ..., "region_short_name": ...}`. `config` needs at least `factory_prefix`, `location` and `scale_set_number`. |
 
+| `scale_set_settings` | With `creation_request`: flat wizard settings of the new factory's **first Dev scale set**, saved before it deploys. A BYO VNet is `vnetResourceGroup_param` and `vnetNameFull_param`; BYO subnets add `"BYO_subnets": "true"` (then leave `dev_vnet_cidr` out of `config`). |
+| `project_settings` | With `creation_request`: flat wizard settings of the **initial project**, saved before its first deploy, for example `enableAIFactoryMCP`, `addAIFactoryMCP2APIM` and `enableFactoryChatAgent`. |
+
 It deploys the common Dev resource group, its network and the initial project001. About one hour.
+
+One call and one file can describe the whole factory. The file's fields are the keyword arguments:
+
+```python
+import json
+with open("create-factory.json", encoding="utf-8") as file:
+    esaf.init_factory(**json.load(file), wait=True)
+```
+
+```json
+{
+  "creation_request": {"contract_version": 1, "mode": "full-bootstrap", "folder": "...", "config": {"...": "..."}},
+  "scale_set_settings": {"BYO_subnets": "true", "vnetResourceGroup_param": "rg-network",
+                         "vnetNameFull_param": "vnet-ai-dev"},
+  "project_settings": {"enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true",
+                       "enableFactoryChatAgent": "true"}
+}
+```
+
+The Factory API saves both settings after it has created the factory in the catalog and before anything deploys,
+and checks them first: a key the catalog does not accept is refused by name before the factory is created (the
+accepted keys are the `field_keys` of `GET /api/v1/factory-catalog/settings`). Sending the same call again resumes
+the factory and does not save the same settings twice.
 
 ### 2. `esaf.add_scale_set(scale_set, environment)`: Add a scale set
 
@@ -322,6 +348,7 @@ final job:
 
 ```powershell
 azurefactory esaf init-factory --wait
+azurefactory esaf init-factory --request-json .\create-factory.json --wait
 azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16 --wait
 azurefactory esaf upsert-project 002 dev --scale-set 001 --wait
 azurefactory esaf delete-project 002 dev --wait
@@ -329,6 +356,10 @@ azurefactory esaf delete-scale-set 002 dev --wait
 azurefactory esaf delete-factory --wait
 azurefactory esaf job 0b7d6c84-3a52-4f05-9a27-52a1c3f8e0d1 --wait
 ```
+
+`init-factory` reads a new factory from files: `--request-json FILE` holds `creation_request` and, optionally,
+`scale_set_settings` and `project_settings` in one file; or pass them as separate files with
+`--creation-request-json`, `--scale-set-settings-json` and `--project-settings-json`.
 
 `--folder` overrides `ESAF_FOLDER`, `--factory` selects a factory, and `--retries` and `--version-ref` work as in
 Python. The exit code is `0` when the job succeeded or is still running, `3` when it was blocked and `5` when it failed.
