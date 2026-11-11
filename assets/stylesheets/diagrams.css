@@ -1,0 +1,8 @@
+/* Diagrams use dark gray boxes with colored borders (see documentation/v2/images/concepts/README.md).
+   The theme draws diagram text in its own color, so set light text for the boxes and their edge labels. */
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-mermaid-label-fg-color: #ECF6FF;
+  --md-mermaid-label-bg-color: #191919;
+}
