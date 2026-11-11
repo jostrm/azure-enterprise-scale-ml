@@ -945,8 +945,18 @@ def add_esaf_commands(sub) -> None:
         command.add_argument("--wait", action="store_true", help="Read the job every second until it ends.")
         return command
 
-    scenario("init-factory", "Scenario 1: submit the folder's saved factory draft.").add_argument(
+    created = scenario("init-factory", "Scenario 1: submit the folder's saved factory draft.")
+    created.add_argument(
         "--creation-request-json", help="Optional full-bootstrap creation body JSON file instead of the saved draft.")
+    created.add_argument("--scale-set-settings-json",
+                         help="With --creation-request-json: JSON file of the first scale set's settings (BYO VNet, "
+                              "BYO subnets), saved before it deploys.")
+    created.add_argument("--project-settings-json",
+                         help="With --creation-request-json: JSON file of the initial project's settings (service "
+                              "switches), saved before its first deploy.")
+    created.add_argument("--request-json",
+                         help="One JSON file with creation_request and, optionally, scale_set_settings and "
+                              "project_settings; instead of the three separate files.")
     added = scenario("add-scale-set", "Scenario 2: add (or resume) a scale set and deploy its common.", scale_set=True)
     added.add_argument("--cidr", help="The new scale set's VNet range; the pipeline computes the subnets.")
     added.add_argument("--max-projects", type=int)
@@ -975,6 +985,36 @@ def _esaf_session(args):
     return esaf.Session(args.folder, client(args, default_timeout=POLL_TIMEOUT_SECONDS), getattr(args, "factory", None))
 
 
+_ESAF_INIT_FILES = {"creation_request": "--creation-request-json", "scale_set_settings": "--scale-set-settings-json",
+                    "project_settings": "--project-settings-json"}
+
+
+def _esaf_init_request(args) -> dict:
+    """init-factory's body fields from its JSON files: one file per field, or --request-json holding all of them."""
+    def read(path, flag):
+        value = read_json_file(path)
+        if not isinstance(value, dict):
+            raise ConfigError(flag + " requires a JSON object.")
+        return value
+
+    separate = {field: getattr(args, flag[2:].replace("-", "_")) for field, flag in _ESAF_INIT_FILES.items()}
+    if not args.request_json:
+        return {field: read(path, _ESAF_INIT_FILES[field]) if path else None for field, path in separate.items()}
+    if any(separate.values()):
+        raise ConfigError("--request-json holds the whole request; do not combine it with "
+                          + ", ".join(_ESAF_INIT_FILES.values()) + ".")
+    request = read(args.request_json, "--request-json")
+    unknown = sorted(set(request) - set(_ESAF_INIT_FILES))
+    if unknown or not isinstance(request.get("creation_request"), dict):
+        raise ConfigError("--request-json requires an object with creation_request and, optionally, "
+                          "scale_set_settings and project_settings"
+                          + ("; unknown: " + ", ".join(unknown) if unknown else "") + ".")
+    for field in ("scale_set_settings", "project_settings"):
+        if request.get(field) is not None and not isinstance(request[field], dict):
+            raise ConfigError("--request-json: " + field + " must be a JSON object.")
+    return {field: request.get(field) for field in _ESAF_INIT_FILES}
+
+
 def _esaf_finished(job) -> int:
     state = job.result if job.result is not None else job.status()
     status = state.get("status")
@@ -992,8 +1032,7 @@ def cmd_esaf(args):
     common = {"version_ref": args.version_ref, "retries": args.retries, "wait": args.wait, "session": session}
     route = args.esaf_route
     if route == "init-factory":
-        creation = read_json_file(args.creation_request_json) if args.creation_request_json else None
-        job = esaf.init_factory(creation_request=creation, retries=args.retries, wait=args.wait, session=session)
+        job = esaf.init_factory(**_esaf_init_request(args), retries=args.retries, wait=args.wait, session=session)
     elif route == "add-scale-set":
         settings = read_json_file(args.settings_json) if args.settings_json else None
         job = esaf.add_scale_set(args.scale_set, args.environment, cidr=args.cidr, max_projects=args.max_projects,
