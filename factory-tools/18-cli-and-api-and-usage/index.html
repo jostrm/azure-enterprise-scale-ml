@@ -2221,48 +2221,7 @@
 <a href="https://jostrm.github.io/azure-enterprise-scale-ml/factory-tools/18-cli-and-api-and-usage/">documentation site</a>.</p>
 <p><strong>6 common scenarios all tools support</strong></p>
 <p>The Configuration Wizard, CLI, REST API and Python SDK cover the same six
-common scenarios. Each SDK call below is a client of the same Config Wizard API.</p>
-<table>
-<thead>
-<tr>
-<th>Scenario</th>
-<th>SDK call</th>
-<th>Outcome</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Init AI Factory</td>
-<td><code>factory_create_prepare</code> / <code>bootstrap_*</code></td>
-<td>Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones.</td>
-</tr>
-<tr>
-<td>2. Add scaleset</td>
-<td><code>scaleset_add_prepare</code></td>
-<td>Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group.</td>
-</tr>
-<tr>
-<td>3. Add or update project</td>
-<td><code>project_add_prepare</code> + <code>project_deployment_*</code></td>
-<td>Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists.</td>
-</tr>
-<tr>
-<td>4. Delete project</td>
-<td><code>project_delete_prepare</code></td>
-<td>The project resource group is deleted.</td>
-</tr>
-<tr>
-<td>5. Delete scaleset</td>
-<td><code>scaleset_delete_prepare</code></td>
-<td>The project and common resource groups are deleted, leaving an empty Azure subscription.</td>
-</tr>
-<tr>
-<td>6. Delete AI Factory</td>
-<td><code>delete_aifactory_prepare</code> / <code>_confirm</code></td>
-<td>All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept.</td>
-</tr>
-</tbody>
-</table>
+common scenarios, one call each. See <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/reference/scenarios.md">the six ESAF scenarios</a>.</p>
 <p><strong>Note:</strong> It uses the new registered Azure Factory approach (v1.25 and higher).
 You need the prepared API and accelerator source folders from your platform team.</p>
 <h2 id="choose-your-tool">Choose your tool<a class="headerlink" href="#choose-your-tool" title="Permanent link">&para;</a></h2>

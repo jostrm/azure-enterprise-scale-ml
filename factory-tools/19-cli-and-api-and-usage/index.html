@@ -2637,13 +2637,14 @@ and <code>PROD/001</code> are different targets; <code>001</code> is not a UUID.
 <p>Each scenario is <strong>one <code>azurefactory esaf</code> command</strong>. The Config Wizard API runs it as
 one job: it prepares, checks and confirms every review, waits for a busy
 configuration lock and retries a failed run. <strong>Running a command is the approval</strong>:
-it changes Azure. Start the API first (<code>.\start-api.ps1</code> in the API checkout;
-see the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/docs/esaf/readme.md">ESAF usage guide</a>).</p>
-<p>Connect <strong>once</strong> in this window: the API address and key, and <code>ESAF_FOLDER</code>, the
-absolute <code>azurefactory</code> folder on the API host. Then install the CLI from your
-approved accelerator checkout:</p>
+it changes Azure. Start the API first, from the app: see
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/quickstarts/01-install-esaf.md">Quickstart: Install the ESAF tools</a>. You
+don't need the API's source code.</p>
+<p>Connect <strong>once</strong> in this window: the API address and the key you entered in the
+app, and <code>ESAF_FOLDER</code>, the absolute <code>azurefactory</code> folder on the API host. Then
+install the CLI from your approved accelerator checkout:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">$env:AIFACTORY_API_URL</span> <span class="p">=</span> <span class="s1">'http://127.0.0.1:8765'</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">$env:AIFACTORY_API_KEY</span> <span class="p">=</span> <span class="p">(</span><span class="nb">Get-Content</span> <span class="n">-Raw</span> <span class="p">(</span><span class="nb">Join-Path</span> <span class="nv">$env:USERPROFILE</span> <span class="s1">'.aifactory\api.key'</span><span class="p">)).</span><span class="n">Trim</span><span class="p">()</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">$env:AIFACTORY_API_KEY</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s1">'API key you entered in the app'</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nv">$env:ESAF_FOLDER</span> <span class="p">=</span> <span class="p">(</span><span class="nb">Resolve-Path</span> <span class="p">(</span><span class="nb">Read-Host</span> <span class="s1">'Absolute azurefactory folder on the API host'</span><span class="p">)).</span><span class="n">Path</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nv">$AcceleratorRoot</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s1">'Absolute path to your approved accelerator checkout'</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">-e</span> <span class="p">(</span><span class="nb">Join-Path</span> <span class="nv">$AcceleratorRoot</span> <span class="s1">'environment_setup\azurefactory-cli'</span><span class="p">)</span>
@@ -3121,35 +3122,38 @@ See the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/e
 <p>Each scenario is <strong>one method</strong> of <code>from azurefactory import esaf</code>. The Config Wizard
 API runs it as one job: it prepares, checks and confirms every review, waits for a
 busy configuration lock and retries a failed run. <strong>Calling a method is the
-approval</strong>: it changes Azure. Start the API first and install the SDK; see the
+approval</strong>: it changes Azure. Start the API from the app and install the SDK
+first: see <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/quickstarts/01-install-esaf.md">Quickstart: Install the ESAF tools</a>.
+Every parameter is in the
 <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/docs/esaf/readme.md">ESAF usage guide</a>.</p>
 <p>Save this as <strong><code>esaf_scenarios_1_3.py</code></strong> and run it. It connects <strong>once</strong>: the
-<code>azurefactory</code> folder on the API host, the API address and the key from the key
-file <code>start-api.ps1</code> writes. Every later call names only what it changes:</p>
+<code>azurefactory</code> folder on the API host, the API address and the key you entered
+in the app. Every later call names only what it changes:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="n">folder</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"Absolute azurefactory folder on the API host: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">".aifactory"</span> <span class="o">/</span> <span class="s2">"api.key"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="n">esaf</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">folder</span><span class="o">=</span><span class="n">folder</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="s2">"http://127.0.0.1:8765"</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">getpass</span><span class="w"> </span><span class="kn">import</span> <span class="n">getpass</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="n">folder</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"Absolute azurefactory folder on the API host: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="n">key</span> <span class="o">=</span> <span class="n">getpass</span><span class="p">(</span><span class="s2">"API key you entered in the app: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="n">esaf</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">folder</span><span class="o">=</span><span class="n">folder</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="s2">"http://127.0.0.1:8765"</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
 <a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">job</span><span class="p">):</span>
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="s2">"ESAF job"</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">state</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>  <span class="c1"># reads the job every second until it ends</span>
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"status"</span><span class="p">],</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"message"</span><span class="p">])</span>
-<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"succeeded"</span><span class="p">:</span>
-<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> stopped: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'blockers'</span><span class="p">)</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'problem'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">job</span><span class="p">):</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="s2">"ESAF job"</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">state</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>  <span class="c1"># reads the job every second until it ends</span>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"status"</span><span class="p">],</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"message"</span><span class="p">])</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>    <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"succeeded"</span><span class="p">:</span>
+<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> stopped: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'blockers'</span><span class="p">)</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'problem'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a>
-<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="n">creation</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Creation request JSON file: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8-sig"</span><span class="p">))</span>
-<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 1"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">init_factory</span><span class="p">(</span><span class="n">creation_request</span><span class="o">=</span><span class="n">creation</span><span class="p">))</span>
-<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 2"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">add_scale_set</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">cidr</span><span class="o">=</span><span class="s2">"10.141.0.0/16"</span><span class="p">))</span>
-<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 3"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">))</span>
-<a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 3 update"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span>
-<a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a>                                             <span class="n">settings</span><span class="o">=</span><span class="p">{</span><span class="s2">"tag_costcenter"</span><span class="p">:</span> <span class="s2">"lab"</span><span class="p">}))</span>
+<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a>
+<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="n">creation</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Creation request JSON file: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8-sig"</span><span class="p">))</span>
+<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 1"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">init_factory</span><span class="p">(</span><span class="n">creation_request</span><span class="o">=</span><span class="n">creation</span><span class="p">))</span>
+<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 2"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">add_scale_set</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">cidr</span><span class="o">=</span><span class="s2">"10.141.0.0/16"</span><span class="p">))</span>
+<a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 3"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">))</span>
+<a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a><span class="n">run</span><span class="p">(</span><span class="s2">"Scenario 3 update"</span><span class="p">,</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"002"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span>
+<a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a>                                             <span class="n">settings</span><span class="o">=</span><span class="p">{</span><span class="s2">"tag_costcenter"</span><span class="p">:</span> <span class="s2">"lab"</span><span class="p">}))</span>
 </code></pre></div>
 <table>
 <thead>
@@ -3752,9 +3756,11 @@ confirms every review, waits for a busy configuration lock and retries a failed
 run. <strong>Sending the request is the approval</strong>: it changes Azure, and the body must
 say <code>"approved": true</code>. Errors are <code>application/problem+json</code> with a <code>code</code>
 (<code>config</code>, <code>blocked</code>, <code>conflict</code>, <code>auth</code>, <code>failure</code>) and the server's <code>blockers</code>.</p>
-<p>Connect once in Bash / Git Bash, then define a POST and a wait helper:</p>
+<p>Start the API from the app first: see
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/quickstarts/01-install-esaf.md">Quickstart: Install the ESAF tools</a>. Then
+connect once in Bash / Git Bash, and define a POST and a wait helper:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="nv">API_URL</span><span class="o">=</span><span class="s1">'http://127.0.0.1:8765'</span>
-<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="nv">API_KEY</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">'\r\n'</span><span class="w"> </span>&lt;<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.aifactory/api.key"</span><span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-s<span class="w"> </span>-p<span class="w"> </span><span class="s1">'API key you entered in the app: '</span><span class="w"> </span>API_KEY<span class="p">;</span><span class="w"> </span><span class="nb">echo</span>
 <a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-p<span class="w"> </span><span class="s2">"Absolute azurefactory folder on the API host: "</span><span class="w"> </span>FOLDER
 <a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>
 <a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>esaf_post<span class="o">()</span><span class="w"> </span><span class="o">{</span><span class="w">  </span><span class="c1"># esaf_post ROUTE JSON_FIELDS -&gt; prints the job id</span>
@@ -4512,33 +4518,15 @@ blocked/unimplemented. Accepting an input does not implement its deployment.</p>
 <h2 id="agent-factory-chat-and-live-voice">Agent Factory chat and live voice<a class="headerlink" href="#agent-factory-chat-and-live-voice" title="Permanent link">&para;</a></h2>
 <p><strong>Conditional/blocked:</strong> two optional project-pipeline steps run in the foundry phase. <code>enableFactoryChatAgent</code>
 creates or updates the owned Foundry prompt agent. With <code>enableAIFactoryAgentLiveVoice</code> <strong>also</strong> set, a second step
-deploys the private chat web application with Azure Voice Live for <strong>project001 Dev</strong>, given an Entra registration,
+deploys the private chat web application with Azure Voice Live for <strong>any project number in Dev</strong>, given an Entra registration,
 reader object IDs, an internal Container Apps environment and a succeeded model deployment. Saving flags changes
 configuration only. An approved pipeline run is separate; <code>false</code> skips a step, <strong>not resource deletion</strong>.</p>
 <details>
 <summary>More info</summary>
-<table>
-<thead>
-<tr>
-<th>JSON/YAML setting (default disabled)</th>
-<th>GHA environment name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>enableFactoryChatAgent</code></td>
-<td><code>ENABLE_FACTORY_CHAT_AGENT</code></td>
-</tr>
-<tr>
-<td><code>enableAIFactoryAgentLiveVoice</code></td>
-<td><code>ENABLE_AI_FACTORY_AGENT_LIVE_VOICE</code></td>
-</tr>
-</tbody>
-</table>
-<p>Inputs (default empty): <code>aifactoryAgentEntraAppId</code>, <code>aifactoryAgentReaderObjectIds</code>,
-<code>aifactoryAgentContainerAppsEnvironment</code>, <code>aifactoryAgentVoiceName</code>, <code>aifactoryAgentVoiceLanguages</code>
-(GHA <code>AIFACTORY_AGENT_ENTRA_APP_ID</code>, <code>AIFACTORY_AGENT_READER_OBJECT_IDS</code>,
-<code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code>, <code>AIFACTORY_AGENT_VOICE_NAME</code>, <code>AIFACTORY_AGENT_VOICE_LANGUAGES</code>).
+<p>The settings, their prerequisites and the one call that deploys them are in
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/quickstarts/04-first-agent-chat.md">Quickstart: Create your first agent by enabling ESAF Agent Chat</a>.
+Each setting also has a GitHub Actions variable in upper snake case, for example
+<code>ENABLE_FACTORY_CHAT_AGENT</code> and <code>AIFACTORY_AGENT_ENTRA_APP_ID</code>.
 Voice without the chat flag fails loudly. The step never replaces an app deployed by hand; use the operator flow
 for that. See <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md">chapter 21 — Agent Factory chat and live voice</a> and the
 <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-project001-dev">options reference</a>.
