@@ -118,7 +118,7 @@ ESML** with sources instead of from memory.
 Set these in `variables.json` / ADO `variables.yaml` / GitHub variables (or in the Config Wizard, Simple Mode
 card, or the CLI), then run the project pipeline.
 
-The four switches, the five optional settings and the one call that deploys them are in
+The four required settings, the five optional settings and the one call that deploys them are in
 [Quickstart: Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md#turn-on-the-four-settings).
 Each setting also has a GitHub Actions variable in upper snake case, for example
 `ENABLE_FACTORY_CHAT_AGENT`, `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` and `AIFACTORY_AGENT_ENTRA_APP_ID`.
@@ -131,16 +131,19 @@ Run it in one of three ways, all for one project in Dev:
 | GitHub Actions Run workflow UI | `infra-project.yml` with environment `dev`. |
 | Terminal, no pipeline | `./ADO-azurefactory.sh add-aifactory-agent-chat --to-project 001` plans; add `--apply` to deploy (`GHA-azurefactory.sh` takes the same options). It reads the project's own variables file and runs steps 70 and 72 with your Azure CLI sign-in. |
 
-Command line:
+Command line, v1.25 `azurefactory` folder: put the settings in a JSON file, as the quickstart shows. One call
+saves them and starts the run:
 
 ```powershell
-azurefactory config review --folder C:\factory --project-number 001 `
-  --enable-factory-chat-agent true --enable-aifactory-agent-live-voice true `
-  --aifactory-agent-entra-app-id <client-id> --aifactory-agent-reader-object-ids <object-id>
+azurefactory esaf upsert-project 001 dev --settings-json .\agent-chat.json --wait
 ```
 
+Legacy `aifactory` folder only: `azurefactory config review` and `config save` take the same settings
+as options. They save but never deploy, and they do not work on a v1.25 `azurefactory` folder. See the
+[CLI options](../../../environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-any-project-dev).
+
 Where the settings live in the wizards (Simple Mode and the exported `variables.json`, `variables.yaml` and `.env`
-carry the same seven settings side by side):
+carry the same nine settings side by side):
 
 - **ESAIF ConfigWizard (MAUI app):** step 6, **AI Factory Agent chat & live voice**, right after *MCP & AI Gateway*,
   and the same section in the Simple Mode card. A flag without its prerequisites stops the review with a plain reason;

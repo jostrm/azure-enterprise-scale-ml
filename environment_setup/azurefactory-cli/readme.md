@@ -592,9 +592,10 @@ azurefactory --timeout 180 preflight --request-json .\preflight-request.json --s
 azurefactory --timeout 180 bootstrap workflow prepare --preflight --request-json .\workflow-request.json
 ```
 
-Cloud checks can exceed 60 seconds, so both preflight forms default to a
-360-second request timeout; health, doctor and all other commands retain their
-60-second default. An explicit global `--timeout` **before the command**, even
+Cloud checks can exceed 90 seconds, so both preflight forms default to a
+540-second request timeout. Cost reports default to a 900-second and `esaf`
+scenario commands to an 1800-second request timeout; health, doctor and all other
+commands keep their 90-second default. An explicit global `--timeout` **before the command**, even
 `--timeout 30`, always takes precedence. Preflight never automatically retries.
 Timeout or Ctrl+C exits
 nonzero without implying readiness and does not create/approve a workflow.
@@ -749,7 +750,8 @@ azurefactory gateway show apim-spider-sdc-dev-001 # last refreshed menu and inve
 The SDK equivalents are `gateway_instances()`, `gateway_snapshot(id)` and
 `gateway_refresh(id)`.
 
-### AI Factory Agent live voice options (project001 Dev)
+<a id="ai-factory-agent-live-voice-options-project001-dev"></a>
+### AI Factory Agent live voice options (any project, Dev)
 
 `config review` and `config save` also accept dedicated options for the opt-in live
 voice of the AI Factory Agent chat (Azure Voice Live speech with the pulsing voice
@@ -777,7 +779,8 @@ azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
 
 The fields must exist in the selected draft/schema (a wizard API version that
 includes the live voice settings). Saving never deploys: the project pipeline's late
-foundry-phase step `72-aifactory-agent-live-voice` acts on them for project001 Dev only. See
+foundry-phase step `72-aifactory-agent-live-voice` acts on them for any project in Dev
+(project numbers 001-999; Stage and Prod runs skip the step). See
 [47-aifactory-agent-live-voice](../../usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md).
 
 ## Preview then confirm

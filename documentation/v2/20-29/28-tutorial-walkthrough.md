@@ -710,7 +710,7 @@ coordinated writer model for each physical target.
 
 - [End-to-end setup](24-end-2-end-setup.md)
 - [Update an AI Factory](26-update-AIFactory.md)
-- [FinOps monitoring tutorial](tutorial-fiops.md)
+- [FinOps monitoring tutorial](tutorial-finops.md)
 - [SDK/CLI documentation](../../../environment_setup/azurefactory-cli/readme.md)
 - [API usage examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md)
 - [CLI implementation](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),

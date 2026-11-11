@@ -157,7 +157,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-url", default=os.getenv(API_URL_ENV), help=f"API base URL (env {API_URL_ENV}, default loopback:8765).")
     parser.add_argument("--api-key", default=os.getenv(API_KEY_ENV), help=f"API key value (env {API_KEY_ENV}); never logged or stored.")
     parser.add_argument("--timeout", type=positive_float,
-                        help="Per-request timeout seconds (default 360 for preflight, 600 for costs, 60 otherwise).")
+                        help=f"Per-request timeout seconds (default {PREFLIGHT_REQUEST_TIMEOUT_SECONDS:g} for preflight, "
+                             f"{COST_REQUEST_TIMEOUT_SECONDS:g} for costs, {POLL_TIMEOUT_SECONDS:g} for esaf scenarios, "
+                             f"{DEFAULT_REQUEST_TIMEOUT_SECONDS:g} otherwise).")
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
