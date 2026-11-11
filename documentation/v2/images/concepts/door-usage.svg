@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-labelledby="t">
+  <title id="t">Usage docs: a project box with a chat agent and a model chart</title>
+  <rect width="120" height="120" rx="20" fill="#eef6ff"/>
+  <path d="M60 30l34 16v36L60 98 26 82V46z" fill="#7c3aed"/>
+  <path d="M60 30l34 16-34 16-34-16z" fill="#a78bfa"/>
+  <path d="M60 62v36L26 82V46z" fill="#6d28d9"/>
+  <rect x="64" y="12" width="40" height="26" rx="8" fill="#3b82f6"/><path d="M74 38l-4 9 12-9z" fill="#3b82f6"/>
+  <circle cx="76" cy="25" r="3" fill="#fff"/><circle cx="84" cy="25" r="3" fill="#fff"/><circle cx="92" cy="25" r="3" fill="#fff"/>
+  <g fill="#22c55e"><rect x="68" y="78" width="6" height="10" rx="1.5"/><rect x="77" y="72" width="6" height="14" rx="1.5" transform="translate(0 -1)"/><rect x="86" y="64" width="6" height="18" rx="1.5" transform="translate(0 -3)"/></g>
+</svg>

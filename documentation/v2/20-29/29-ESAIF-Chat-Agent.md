@@ -41,12 +41,11 @@ flowchart TB
 
 ## Turn it on
 
-| Variable | Effect |
-|---|---|
-| `enableFactoryChatAgent` | Step `70-factory-chat-agent` creates or updates the owned Foundry prompt agent `enterprise-scale-ai-factory`. |
-| `enableAIFactoryAgentLiveVoice` | Step `72-aifactory-agent-live-voice` deploys the private chat app with Azure Voice Live (project001 Dev). Requires `enableFactoryChatAgent`. |
-| `aifactoryAgentEntraAppId`, `aifactoryAgentReaderObjectIds` | The web sign-in app registration and the people who may use the chat. |
-| `enableAIFactoryMCP` (optional) | The MCP for agents; see [29. AI Factory MCP](./29-factory-MCP.md). |
+Two switches turn it on for any project number in Dev: `enableFactoryChatAgent` creates the Foundry prompt
+agent, and `enableAIFactoryAgentLiveVoice` deploys the private chat app with live voice. Follow
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md)
+for the settings table and the one call that deploys them. `enableAIFactoryMCP` is optional: it adds the MCP
+for agents; see [29. AI Factory MCP](./29-factory-MCP.md).
 
 Full guide (prerequisites, operator flow, security, troubleshooting):
 [21. Agent Factory chat and live voice](../10-19/21-agent-factory-chat.md).

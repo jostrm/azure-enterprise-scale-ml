@@ -13,20 +13,21 @@ implementations of Azure provisioning logic.
 ## 6 common scenarios all tools support
 
 The Configuration Wizard, CLI, REST API and Python SDK cover the same six
-common scenarios. The simplest way is **one call per scenario**: the ESAF methods
+common scenarios, and each scenario is **one call**: the ESAF methods
 (`from azurefactory import esaf`), the `azurefactory esaf` CLI commands and the
-`/api/v1/esaf/*` routes are the same contract, and the Config Wizard API runs each
-call as one job. The step-by-step calls remain for when you review every change
-yourself before it is applied.
+`/api/v1/esaf/*` routes are the same contract. The table of scenarios, calls and
+outcomes is in [the six ESAF scenarios](../reference/scenarios.md).
 
-| Scenario | Python SDK (one call) | Step-by-step SDK calls | Outcome |
-|---|---|---|---|
-| 1. Init AI Factory | `esaf.init_factory()` | `factory_create_prepare` / `bootstrap_*` | Starting from an empty subscription, creates the common part of the AI Factory, such as connectivity and private DNS zones. |
-| 2. Add scaleset | `esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16")` | `scaleset_add_prepare` | Prepares a new, empty Azure subscription by enabling resource providers, and creates a new project with Azure resources, some of which are in a common resource group. |
-| 3. Add or update project | `esaf.upsert_project("002", "dev")` | `project_add_prepare` + `project_deployment_*` | Creates the project-specific resource group and assigns team access. Adds or removes resources, changes settings (SKU, performance, etc.), or creates a new project if none exists. |
-| 4. Delete project | `esaf.delete_project("002", "dev")` | `project_delete_prepare` | The project resource group is deleted. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`); `esaf.delete_project` grants it for you. |
-| 5. Delete scaleset | `esaf.delete_scale_set("002", "dev")` | `scaleset_delete_prepare` | The project and common resource groups are deleted, leaving an empty Azure subscription. Prerequisite under single-writer coordination: the enrollment permits deletion, granted by a reviewed `authorize-deletion` (`authorize_deletion_prepare` / `_confirm`, mode `allow`); `esaf.delete_scale_set` grants it for you. |
-| 6. Delete AI Factory | `esaf.delete_factory()` | `delete_aifactory_prepare` / `_confirm` | All project and common resource groups in every environment are deleted, and the factory's local configuration is removed. Connectivity hub resource groups, Entra groups and Git repositories are kept. Under single-writer coordination it needs the `authorize-deletion` permission, which `esaf.delete_factory` grants; whole-factory deletion ran end to end on aif-138 (2026-11-02). |
+### Deletion prerequisites
+
+| Scenario | Prerequisite |
+|---|---|
+| 4. Delete project | Prerequisite under single-writer coordination: the Factory's deletion permission (`authorize-deletion`). `esaf.delete_project` grants it for you. |
+| 5. Delete scaleset | Prerequisite under single-writer coordination: the Factory's deletion permission (`authorize-deletion`). `esaf.delete_scale_set` grants it for you. |
+| 6. Delete AI Factory | Prerequisite under single-writer coordination: the Factory's deletion permission (`authorize-deletion`). `esaf.delete_factory` grants it for you. |
+
+To review a change yourself before the API applies it, use the step-by-step
+commands in guides [19](19-cli-and-api-and-usage.md) and [20](20-cli-and-api-and-usage.md).
 
 ## The one-call methods (ESAF) and their parameters
 

@@ -53,6 +53,33 @@ TOOL_SECTION = re.compile(
     r'^</details>\r?\n<!-- /factory-tool -->',
     re.M | re.S,
 )
+ALERT = re.compile(r"> ?\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*")
+ADMONITIONS = {"NOTE": "note", "TIP": "tip", "IMPORTANT": 'info "Important"', "WARNING": "warning",
+               "CAUTION": 'danger "Caution"'}
+
+
+def site_alerts(text):
+    """Render GitHub alerts (`> [!NOTE]`) as Material admonitions: the site has no alert extension."""
+    result, fence, alert = [], None, False
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        ending = line[len(body):]
+        marker = FENCE.match(line)
+        if marker and fence is None:
+            fence = marker[1]
+        elif marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence):
+            fence = None
+        kind = None if fence or marker else ALERT.fullmatch(body)
+        if kind:
+            alert = True
+            result.append(f"!!! {ADMONITIONS[kind[1]]}{ending}{ending}")
+        elif alert and not marker and body.startswith(">"):
+            content = body[1:].removeprefix(" ")
+            result.append(("    " + content if content else "") + ending)
+        else:
+            alert = False
+            result.append(line)
+    return "".join(result)
 
 
 def linked_tabs(text):
@@ -130,7 +157,7 @@ def on_files(files, config):
         uri = "factory-tools/" + name
         text = path.read_text(encoding="utf-8")
         # A combined TOC would expose headings from the two inactive tool views.
-        content = "---\nhide:\n  - toc\n---\n\n" + site_markdown(linked_tabs(text), path)
+        content = "---\nhide:\n  - toc\n---\n\n" + site_markdown(linked_tabs(site_alerts(text)), path)
         append(uri, content)
     append("project-team/index.md", PROJECT_HOME)
     for uri, path in PROJECT_GUIDES.items():

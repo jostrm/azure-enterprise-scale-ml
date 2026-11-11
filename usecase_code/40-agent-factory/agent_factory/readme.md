@@ -197,7 +197,7 @@ identity permissions and cost budget. `discover` and `preflight` read Azure;
 they are not offline tests. Ingestion, knowledge configuration and deployment
 are distinct mutations requiring `--apply`; invocation can incur model costs.
 
-Follow the maintained [operator commands](../readme.md#operator-commands-powershell)
+Follow the maintained [operator commands](../readme.md#how-to-run-the-code)
 and [ingestion/knowledge/deployment sequence](../readme.md#data-and-foundry-iq)
 for **one explicit `--target`**. Do not silently enable public access, approve
 private links, lift a policy gate or guess a resource name.

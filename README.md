@@ -49,7 +49,7 @@ Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources
 <a href="./documentation/v2/10-19/22-lifecycle-azure-function.md"><b>Lifecycle API</b></a> &nbsp;·&nbsp;
 <a href="./usecase_code/40-agent-factory/readme.md"><b>Agent Factory</b></a> &nbsp;·&nbsp;
 <a href="./usecase_code/50-ml-factory/readme.md"><b>ML Factory</b></a> &nbsp;·&nbsp;
-<a href="./documentation/readme.md"><b>Documentation</b></a><br>
+<a href="./documentation/v2/README.md"><b>Documentation</b></a><br>
 <sub>MLOps and GenAIOps from the AI Factory you get from the Agent Factory and ML Factory</sub>
 </p>
 

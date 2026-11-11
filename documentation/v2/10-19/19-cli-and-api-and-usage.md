@@ -67,16 +67,17 @@ and `PROD/001` are different targets; `001` is not a UUID. API environments are
 Each scenario is **one `azurefactory esaf` command**. The Config Wizard API runs it as
 one job: it prepares, checks and confirms every review, waits for a busy
 configuration lock and retries a failed run. **Running a command is the approval**:
-it changes Azure. Start the API first (`.\start-api.ps1` in the API checkout;
-see the [ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md)).
+it changes Azure. Start the API first, from the app: see
+[Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md). You
+don't need the API's source code.
 
-Connect **once** in this window: the API address and key, and `ESAF_FOLDER`, the
-absolute `azurefactory` folder on the API host. Then install the CLI from your
-approved accelerator checkout:
+Connect **once** in this window: the API address and the key you entered in the
+app, and `ESAF_FOLDER`, the absolute `azurefactory` folder on the API host. Then
+install the CLI from your approved accelerator checkout:
 
 ```powershell
 $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
-$env:AIFACTORY_API_KEY = (Get-Content -Raw (Join-Path $env:USERPROFILE '.aifactory\api.key')).Trim()
+$env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the app'
 $env:ESAF_FOLDER = (Resolve-Path (Read-Host 'Absolute azurefactory folder on the API host')).Path
 $AcceleratorRoot = Read-Host 'Absolute path to your approved accelerator checkout'
 python -m pip install -e (Join-Path $AcceleratorRoot 'environment_setup\azurefactory-cli')
@@ -619,21 +620,24 @@ See the [canonical CLI reference](../../../environment_setup/azurefactory-cli/re
 Each scenario is **one method** of `from azurefactory import esaf`. The Config Wizard
 API runs it as one job: it prepares, checks and confirms every review, waits for a
 busy configuration lock and retries a failed run. **Calling a method is the
-approval**: it changes Azure. Start the API first and install the SDK; see the
+approval**: it changes Azure. Start the API from the app and install the SDK
+first: see [Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md).
+Every parameter is in the
 [ESAF usage guide](../../../environment_setup/azurefactory-cli/docs/esaf/readme.md).
 
 Save this as **`esaf_scenarios_1_3.py`** and run it. It connects **once**: the
-`azurefactory` folder on the API host, the API address and the key from the key
-file `start-api.ps1` writes. Every later call names only what it changes:
+`azurefactory` folder on the API host, the API address and the key you entered
+in the app. Every later call names only what it changes:
 
 ```python
 import json
+from getpass import getpass
 from pathlib import Path
 
 from azurefactory import esaf
 
 folder = input("Absolute azurefactory folder on the API host: ").strip()
-key = (Path.home() / ".aifactory" / "api.key").read_text(encoding="utf-8").strip()
+key = getpass("API key you entered in the app: ").strip()
 esaf.connect(folder=folder, url="http://127.0.0.1:8765", api_key=key)
 
 
@@ -1326,11 +1330,13 @@ run. **Sending the request is the approval**: it changes Azure, and the body mus
 say `"approved": true`. Errors are `application/problem+json` with a `code`
 (`config`, `blocked`, `conflict`, `auth`, `failure`) and the server's `blockers`.
 
-Connect once in Bash / Git Bash, then define a POST and a wait helper:
+Start the API from the app first: see
+[Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md). Then
+connect once in Bash / Git Bash, and define a POST and a wait helper:
 
 ```bash
 API_URL='http://127.0.0.1:8765'
-API_KEY="$(tr -d '\r\n' < "$HOME/.aifactory/api.key")"
+read -r -s -p 'API key you entered in the app: ' API_KEY; echo
 read -r -p "Absolute azurefactory folder on the API host: " FOLDER
 
 esaf_post() {  # esaf_post ROUTE JSON_FIELDS -> prints the job id
@@ -2141,22 +2147,17 @@ blocked/unimplemented. Accepting an input does not implement its deployment.
 
 **Conditional/blocked:** two optional project-pipeline steps run in the foundry phase. `enableFactoryChatAgent`
 creates or updates the owned Foundry prompt agent. With `enableAIFactoryAgentLiveVoice` **also** set, a second step
-deploys the private chat web application with Azure Voice Live for **project001 Dev**, given an Entra registration,
+deploys the private chat web application with Azure Voice Live for **any project number in Dev**, given an Entra registration,
 reader object IDs, an internal Container Apps environment and a succeeded model deployment. Saving flags changes
 configuration only. An approved pipeline run is separate; `false` skips a step, **not resource deletion**.
 
 <details markdown="1">
 <summary>More info</summary>
 
-| JSON/YAML setting (default disabled) | GHA environment name |
-|---|---|
-| `enableFactoryChatAgent` | `ENABLE_FACTORY_CHAT_AGENT` |
-| `enableAIFactoryAgentLiveVoice` | `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` |
-
-Inputs (default empty): `aifactoryAgentEntraAppId`, `aifactoryAgentReaderObjectIds`,
-`aifactoryAgentContainerAppsEnvironment`, `aifactoryAgentVoiceName`, `aifactoryAgentVoiceLanguages`
-(GHA `AIFACTORY_AGENT_ENTRA_APP_ID`, `AIFACTORY_AGENT_READER_OBJECT_IDS`,
-`AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT`, `AIFACTORY_AGENT_VOICE_NAME`, `AIFACTORY_AGENT_VOICE_LANGUAGES`).
+The settings, their prerequisites and the one call that deploys them are in
+[Quickstart: Create your first agent by enabling ESAF Agent Chat](../quickstarts/04-first-agent-chat.md).
+Each setting also has a GitHub Actions variable in upper snake case, for example
+`ENABLE_FACTORY_CHAT_AGENT` and `AIFACTORY_AGENT_ENTRA_APP_ID`.
 Voice without the chat flag fails loudly. The step never replaces an app deployed by hand; use the operator flow
 for that. See [chapter 21 — Agent Factory chat and live voice](21-agent-factory-chat.md) and the
 [options reference](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-project001-dev).
