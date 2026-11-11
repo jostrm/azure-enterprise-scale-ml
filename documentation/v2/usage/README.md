@@ -41,9 +41,8 @@ tools.
 </table>
 
 > [!NOTE]
-> Availability is not deployment certification. The templates in
-> [`usecase_code`](../../../usecase_code/readme.md) are checked-in implementations, not proof of a successful
-> Azure run. Each template states its own prerequisites and test status.
+> Each template in [`usecase_code`](../../../usecase_code/readme.md) states what it needs and whether it is
+> tested in Azure. Read that before you plan a delivery on it.
 
 ## Build your first agent
 

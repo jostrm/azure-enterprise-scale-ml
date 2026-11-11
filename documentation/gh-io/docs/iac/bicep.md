@@ -1,66 +1,60 @@
 # Bicep infrastructure
 
-Bicep describes the Azure resources that the infrastructure pipelines deploy.
-AI Factory combines shared Bicep modules with configuration, planning, approval
-and operation tracking.
+Bicep describes the Azure resources that the pipelines deploy. You change settings. ESAF runs the Bicep
+modules for you.
 
-## Recommended workflow
+## How a change reaches Azure
 
-1. Choose your registered factory, scale set and project.
-2. Review the supported [Parameters](../parameters/index.md).
-3. Save approved configuration.
-4. Prepare and separately approve deployment.
-5. Follow the exact run and its resulting Azure resources.
+1. Choose the Factory, the scale set and the project.
+2. Change the [settings](../parameters/index.md), for example switch on a service.
+3. Run the change with the app, the CLI, the Python SDK or REST.
+4. Follow the run until it ends, then look at the resources in Azure.
 
-Use the [CLI, Python SDK or REST walkthrough](../factory-tools/19-cli-and-api-and-usage.md).
-You do not need to edit shared Bicep for every configuration change.
+[Add and update](../factory-tools/19-cli-and-api-and-usage.md) walks through it for each tool. You only edit
+Bicep when you add a service that ESAF doesn't have yet.
 
 ## Source organization
 
 | Location under `environment_setup\aifactory\bicep` | Purpose |
 | --- | --- |
-| `esml-common` | Common infrastructure |
-| `esml-project` | Machine-learning project infrastructure |
-| `esml-genai-1` | Phased generative-AI project infrastructure |
-| `modules` | Reusable resource and access-control modules |
-| `copy_to_local_settings` | Provider templates copied into consumer repositories |
-| `scripts` | Validation, configuration translation and supporting operations |
+| `esml-common` | The common part of a scale set |
+| `esml-genai-1` | The project, deployed in phases |
+| `modules` | One reusable module for each Azure service and for access |
+| `copy_to_local_settings` | The Azure DevOps and GitHub Actions pipelines that are copied to your repository |
+| `scripts` | Checks, settings conversion and helper steps of the pipelines |
 
-The shared `variables.json` template currently has a `dev` section. A
-backend-generated registered project has `dev` and `stage_prod`; these are
-different formats. See [the parameter reference](../parameters/advanced.md#scope-and-authoritative-sources).
+The folder names keep their history. There is one project template today.
 
-## Existing resources and incremental updates
+The `variables.json` of a project has two sections: `dev`, and `stage_prod` for Stage and Prod. See
+[Every variable in variables.json](../parameters/variables.md).
 
-A Bicep deployment can update existing resources, but "incremental" does not mean
-"nothing else can change." Inspect the plan, naming, dependencies and existing
-state. Some properties cannot be changed in place.
+## Updating what exists
 
-!!! warning "Deletion is separate"
-    Disabling a flag is not a general deletion approval. Use the
-    [reviewed removal workflow](../factory-tools/20-cli-and-api-and-usage.md).
+Running the pipeline again updates the resources that exist and adds the services you switched on. Azure
+can't change some properties in place. Such a change fails, and the log of the run gives the reason.
+
+!!! warning "Switching a service off"
+    A switched-off service that exists stays in Azure while `enableDeleteForDisabledResources` is `"false"`,
+    the default. With `"true"`, the next project pipeline run deletes it. See
+    [what happens when you switch a service off](../index.md#what-happens-when-you-switch-a-service-off).
 
 ## Encryption and private networking
 
-Customer-managed encryption keys, private endpoints, DNS and role assignments
-are service-specific. Provide the supported key references and permissions and
-check compatibility for each enabled service. Do not assume a single switch
-enables every security feature everywhere.
+Each service has its own settings for customer-managed keys, private endpoints, DNS and roles. Give the key
+and the permissions that each switched-on service needs. See the
+[Parameters reference](../parameters/advanced.md).
 
 <details markdown="1">
 <summary>More info</summary>
 
-Actual source modules include `aiSearch.bicep`, `keyVault.bicep`,
-`storageAccount.bicep` and `aksCluster.bicep`. Use the
-[module directory](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/modules)
-for the current names rather than guessed filenames.
+The modules include `aiSearch.bicep`, `keyVault.bicep`, `storageAccount.bicep` and `aksCluster.bicep`. See the
+[module folder](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/modules)
+for all of them.
 
-Published change `940b1b48` passes an existing AKS load-balancer subnet when
-attaching that cluster to Azure ML. It does not turn every AKS cluster into
-a supported/private inference target without its other prerequisites.
+When you attach an AKS cluster to Azure Machine Learning, the template passes the load-balancer subnet of
+that cluster.
 
-Bootstrap also has reviewed supporting operations outside Bicep. Neither a
-successful compilation nor an accepted deployment request proves that all
-resources, permissions and private connectivity are working.
+After a run succeeds, test that your users and the pipeline runner reach the services over the private
+network.
 
 </details>

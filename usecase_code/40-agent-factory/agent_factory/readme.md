@@ -112,7 +112,7 @@ single-target operator commands. This is different from the core team's
 ### 1. Prepare your project copy
 
 From the repository root, or use the equivalent copied directory
-`aifactory-usecase-code\40-agent-factory` in your orange project:
+`aifactory-usecase-code\40-agent-factory` in the repository of your project:
 
 ```powershell
 Set-Location .\usecase_code\40-agent-factory
@@ -149,8 +149,8 @@ print(json.dumps([
 ```
 
 The default catalog contains knowledge/reviewer/documentation prompt agents,
-hosted framework examples and a multi-agent helpdesk team. An entry is a
-definition, not proof that its framework, model or knowledge source is deployed.
+hosted framework examples and a multi-agent helpdesk team. An entry defines an
+agent. It says nothing yet about what is deployed in your project.
 Read the real [catalog](catalog.py),
 [prompt agents](../41-single-agent/prompt-agent/readme.md),
 [hosted examples](../41-single-agent/hosted-agent/readme.md) and
@@ -160,8 +160,8 @@ Read the real [catalog](catalog.py),
 
 Save this separate program as `plan_agents.py` in the same directory. Supply
 the absolute path to your reviewed project configuration and its exact target
-key when prompted. `plan` validates local configuration; it does not
-authenticate, discover Azure resources or prove connectivity.
+key when prompted. `plan` validates your local configuration only. It doesn't
+sign in to Azure, look up resources or test the connection.
 
 ```python
 import json
@@ -199,8 +199,9 @@ are distinct mutations requiring `--apply`; invocation can incur model costs.
 
 Follow the maintained [operator commands](../readme.md#how-to-run-the-code)
 and [ingestion/knowledge/deployment sequence](../readme.md#data-and-foundry-iq)
-for **one explicit `--target`**. Do not silently enable public access, approve
-private links, lift a policy gate or guess a resource name.
+for **one explicit `--target`**. Ask your platform team before you enable public
+access, approve a private link or change a policy, and use the resource names of
+your project.
 Python integrations use the actual [selection and command entry points](cli.py),
 [OAuth-backed `project_client` and prompt lifecycle](prompt.py) and
 [hosted deployment implementation](hosted.py); the operator CLI preserves the

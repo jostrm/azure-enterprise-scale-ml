@@ -1,0 +1,218 @@
+/* Code templates library, Azure resource library and the architecture images.
+   Colors carry meaning: blue is neutral, purple is the AI Factory, pink is a project or an agent. */
+
+.esaf-library {
+  --esaf-blue: #5AA9FF;
+  --esaf-purple: #B07CFF;
+  --esaf-pink: #FF6FD8;
+  --esaf-box: #191919;
+  --esaf-text: #ECF6FF;
+  margin: 1em 0 2em;
+}
+
+.esaf-library__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.esaf-library__search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--md-default-fg-color);
+  background: var(--md-default-bg-color);
+  border: 2px solid var(--esaf-blue);
+  border-radius: 0.6rem;
+}
+
+.esaf-library__search:focus-visible {
+  outline: 3px solid var(--esaf-purple);
+  outline-offset: 1px;
+}
+
+.esaf-library__count {
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.esaf-library__clear {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color);
+  background: transparent;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 1rem;
+  cursor: pointer;
+}
+
+.esaf-library__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.45rem 0;
+}
+
+.esaf-library__label {
+  flex: 0 0 6.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--md-default-fg-color--light);
+}
+
+.esaf-chip {
+  padding: 0.2rem 0.65rem;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color);
+  background: transparent;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 1rem;
+  cursor: pointer;
+}
+
+.esaf-chip:hover,
+.esaf-chip:focus-visible {
+  border-color: var(--esaf-blue);
+}
+
+.esaf-chip[aria-pressed="true"] {
+  color: var(--esaf-text);
+  background: var(--esaf-box);
+  border-color: var(--esaf-blue);
+  box-shadow: 0 0 0 1px var(--esaf-blue);
+}
+
+.esaf-chip__count {
+  opacity: 0.65;
+}
+
+.esaf-library__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.esaf-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 1rem;
+  color: var(--esaf-text);
+  background: var(--esaf-box);
+  border: 2px solid var(--esaf-blue);
+  border-radius: 0.8rem;
+  scroll-margin-top: 6rem;
+}
+
+.esaf-card[hidden] {
+  display: none;
+}
+
+.esaf-card[data-factory="Agent Factory"],
+.esaf-card[data-category="AI and agents"] {
+  border-color: var(--esaf-pink);
+}
+
+.esaf-card[data-factory="Model Factory"],
+.esaf-card[data-category="Machine learning"] {
+  border-color: var(--esaf-purple);
+}
+
+.esaf-card:target {
+  box-shadow: 0 0 0 4px var(--esaf-blue);
+}
+
+.md-typeset .esaf-card__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--esaf-text);
+}
+
+.esaf-card__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--esaf-box);
+  background: var(--esaf-blue);
+  border-radius: 50%;
+}
+
+.md-typeset .esaf-card p {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.esaf-card__summary {
+  flex: 1 0 auto;
+}
+
+.esaf-tag {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 0 0.45rem;
+  font-size: 0.62rem;
+  line-height: 1.7;
+  border: 1px solid var(--esaf-blue);
+  border-radius: 0.6rem;
+}
+
+.esaf-tag--factory {
+  border-color: var(--esaf-purple);
+}
+
+.esaf-tag--tag {
+  border-color: #6B7785;
+}
+
+.md-typeset .esaf-card__path code {
+  font-size: 0.62rem;
+  color: var(--esaf-text);
+  background: #2A2A2A;
+  word-break: break-all;
+}
+
+.md-typeset .esaf-card__links {
+  margin-bottom: 0;
+}
+
+.md-typeset .esaf-card__links a {
+  margin-right: 0.8rem;
+  color: var(--esaf-blue);
+  text-decoration: underline;
+}
+
+.esaf-library__empty {
+  padding: 1rem;
+  border: 1px dashed var(--md-default-fg-color--lighter);
+  border-radius: 0.6rem;
+}
+
+/* Architecture images: the page has no side columns, so the image gets the full width. */
+.esaf-architecture {
+  margin: 0.8rem 0 0.4rem;
+  background: #FFFFFF;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.esaf-architecture object,
+.esaf-architecture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1600 / 1010;
+}

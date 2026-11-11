@@ -43,27 +43,28 @@ SITE_SOURCES = {
 }
 PROJECT_HOME = """# Get started - Agent & ML Factory SDK: Project team
 
-Build workload code in your project without changing the shared factory engines.
-For factory configuration and administration, use the
+Build the code of your workload in your project. The shared engines of the factories stay as they are.
+To configure and administer the Factory itself, use the
 [core-team CLI, Python SDK and REST tutorials](../factory-tools/18-cli-and-api-and-usage.md).
 
-| Your workload | Start here | First safe result |
+| Your workload | Start here | Your first result |
 | --- | --- | --- |
-| Agent, RAG or multi-agent application | [Agent Factory SDK](agent-factory.md#project-team-quickstart) | Inspect the catalog, then make an offline single-target plan. |
-| Machine-learning model | [ML Model Factory SDK](ml-model-factory.md#project-team-quickstart) | Validate a scenario and inspect its route; optionally train on a reviewed local CSV. |
+| Agent, RAG or multi-agent application | [Agent Factory SDK](agent-factory.md#project-team-quickstart) | List the catalog, then make a plan for one target without calling Azure. |
+| Machine-learning model | [ML Model Factory SDK](ml-model-factory.md#project-team-quickstart) | Validate a scenario and see its route. You can also train on a local CSV file. |
 
-## Work locally before choosing a cloud target
+Looking for a template to start from? Search the [code templates library](../code-templates/index.md).
 
-1. Use a project-owned copy of the purple examples; keep configuration in the orange project.
-2. Choose the documented component environment and dependencies, not a global package upgrade.
-3. Keep tenant settings, resource selections, credentials and generated artifacts out of public Git.
-4. Run the offline examples first. Local files, rendered jobs and catalog entries are **not deployment evidence**.
-5. Optional live steps require an operator-reviewed target, approved identity/private connectivity,
-   dataset terms, cost budget and passing quality gates. Cloud routes can fail on missing prerequisites;
-   do not bypass gates or assume every template is live-validated.
+## Work on your machine first
 
-These pages reuse marked sections of the maintained source guides. The full guides,
-source code and notebook examples remain linked from each tutorial.
+1. Copy the examples into the repository of your project, and keep your configuration there.
+2. Install the packages into the Python environment of the component, rather than upgrading them globally.
+3. Keep tenant settings, credentials and generated files out of a public repository.
+4. Run the offline examples first. They need no Azure sign-in and create nothing in Azure.
+5. Before a live step, check the target with your platform team: the identity, the private network, the terms
+   of the dataset and the budget. A live step stops when the project lacks something it needs. Fix that
+   first, then run it again.
+
+Each tutorial links to its full guide, the source code and the notebooks.
 """
 LINK = re.compile(r"(!?\[[^\]\n]*\]\()([^\s)]+)(\))")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")

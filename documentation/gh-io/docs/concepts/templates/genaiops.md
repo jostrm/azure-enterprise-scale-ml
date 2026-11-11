@@ -1,15 +1,13 @@
 # Agent Factory and GenAIOps
 
-Agent Factory supplies reusable workload examples for persistent prompt agents,
-hosted agents, multi-agent patterns, ingestion and RAG. It is not a promise that
-one setup command deploys every agent framework or application.
+The Agent Factory is a set of code templates for prompt agents, hosted agents, multi-agent teams, data
+ingestion and RAG. Find them all, with filters, in the [code templates library](../../code-templates/index.md).
 
 ## Watch RAG step by step
 
-Follow approved documents through chunking and indexing, then an authorized
-question through retrieval to a grounded answer. RAG supplies context at
-question time; it does not train the answer model on your documents.
-This configuration-wizard lesson does not read files or call a model.
+Follow approved documents through chunking and indexing, then a question through retrieval to a grounded
+answer. RAG gives the model your documents as context when a question is asked. The model itself isn't
+trained on them.
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/rag.png">
@@ -32,41 +30,39 @@ See also [DataOps + RAG and fine-tuning](dataops.md#watch-the-data-flow).
 | `44-azure-mcp` | A narrow, private read-only Azure tool example. |
 | `45-rag-agent` | Explicit source-bound RAG with separate Search and Foundry IQ paths. |
 
-[Open the Agent Factory quickstart](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md).
-Keep project configuration outside generated use-case copies, and select an
-exact existing target rather than guessing a resource from its name.
+[Open the Agent Factory quickstart](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md),
+or follow [Run your first agent](../../usage/01-first-agent.md).
 
-## Configure infrastructure and workload separately
+## The project gives you the services, the template gives you the agent
 
-The GenAI infrastructure route can provide Foundry, storage, Key Vault, Search,
-Cosmos DB, monitoring and hosting components according to the selected design.
-For standard private agents, review capability-host dependencies together.
-Creating infrastructure does not automatically ingest data or deploy an agent.
+The project pipeline deploys Foundry, Storage, Key Vault, AI Search, Cosmos DB, monitoring and the hosting
+services you switched on. Private Foundry agents need AI Search, Cosmos DB and Storage together. You then run
+a template to ingest your data and deploy an agent.
 
-Current model names, versions, SKU and capacity are in
-[Parameters](../../parameters/advanced.md). Do not assume the old GPT-4o table
-still describes the selected template. Simple presets can also differ from raw
-shared-template defaults.
+The model names, versions, SKUs and capacity of a project are settings. See
+[Every variable in variables.json](../../parameters/variables.md).
 
 ## RAG and shared data
 
-Select the intended source, version and audience, then configure ingestion and
-grounding. The RAG example preserves source bindings and isolated retrieval
-copies. It does not imply arbitrary binary extraction or automatic per-user
-document permissions.
+Choose the source, its version and who may read the answers. Then run the ingestion and connect the index or
+the Foundry IQ knowledge base to the agent. To keep the access rights of each document, start from the
+template with access control lists in the [library](../../code-templates/index.md).
 
-Changing `use_common_datalake_storage` does not move data or repoint deployed
-agents automatically. Reconfigure and verify the affected workload.
+When you change `use_common_datalake_storage`, copy the data yourself and deploy the agent again.
 
-## Gateways and management interfaces
+## Gateways
 
-Regular APIM pools, optional Kong edge, dedicated AI Gateway integration and
-network Application Gateway have different jobs and prerequisites.
-See [gateway parameters](../../parameters/advanced.md#mcp-and-ai-gateway-parameters).
+| Gateway | What it does |
+| --- | --- |
+| API Management as the AI gateway | Puts one endpoint in front of several model deployments, with load balancing, retries and token limits. |
+| Kong | The alternative AI gateway, when your organization runs Kong. |
+| Application Gateway | Brings web traffic from your network to an application in a project. |
 
-Factory Agent Chat and Factory MCP are management interfaces, not the same as
-your workload agent or the narrow private Azure MCP example. Their allowed
-actions depend on configured identity, scope and approval.
+See the [gateway settings](../../parameters/advanced.md#mcp-and-ai-gateway-parameters) and the
+[architecture](../../architectures.md).
+
+Agent Chat and the Factory MCP server are for operating the Factory itself. The agents you build for your
+workload are separate, and each runs with its own identity and permissions.
 
 <details markdown="1">
 <summary>More info</summary>
@@ -75,10 +71,7 @@ actions depend on configured identity, scope and approval.
 [Private Azure MCP](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md) |
 [Monitor and operate](../../intelligence.md)
 
-The private Azure MCP example initially permits a narrow resource-read tool
-surface, not arbitrary shell commands or mutations. Framework/model support,
-private network reachability and tool permissions must be checked for the chosen
-deployment. Cloud inference and ingestion are explicit operations with their own
-costs and permissions.
+The private Azure MCP template gives an agent read-only tools for Azure resources. It can't change them.
+Model calls and ingestion cost money, so check the quota and the budget of the project before a large run.
 
 </details>

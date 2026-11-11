@@ -142,3 +142,4 @@ aa_ref_code/
 ignore.md
 # Claude Code worktrees: never commit them (an undeclared gitlink breaks recursive submodule checkouts)
 .claude/worktrees/
+documentation/gh-io/site/
