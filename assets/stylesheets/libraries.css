@@ -65,6 +65,9 @@
 }
 
 .esaf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   padding: 0.2rem 0.65rem;
   font-size: 0.68rem;
   line-height: 1.5;
@@ -75,12 +78,20 @@
   cursor: pointer;
 }
 
+.esaf-chip input {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin: 0;
+  accent-color: var(--esaf-blue);
+  cursor: pointer;
+}
+
 .esaf-chip:hover,
-.esaf-chip:focus-visible {
+.esaf-chip:focus-within {
   border-color: var(--esaf-blue);
 }
 
-.esaf-chip[aria-pressed="true"] {
+.esaf-chip:has(input:checked) {
   color: var(--esaf-text);
   background: var(--esaf-box);
   border-color: var(--esaf-blue);
@@ -182,6 +193,17 @@
   color: var(--esaf-text);
   background: #2A2A2A;
   word-break: break-all;
+}
+
+.md-typeset .esaf-card__path a code {
+  color: var(--esaf-blue);
+  text-decoration: underline;
+}
+
+.esaf-card__state {
+  margin-left: 0.3rem;
+  font-size: 0.66rem;
+  opacity: 0.85;
 }
 
 .md-typeset .esaf-card__links {

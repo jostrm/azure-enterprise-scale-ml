@@ -1,11 +1,11 @@
-// Search box and filter chips of the code templates library and the Azure resource library.
+// Search box and filter checkboxes of the code templates library and the Azure resource library.
 // Without JavaScript every card stays visible, so the pages still work.
 (function () {
   "use strict";
 
   function setUp(library) {
     var search = library.querySelector(".esaf-library__search");
-    var chips = Array.prototype.slice.call(library.querySelectorAll(".esaf-chip"));
+    var boxes = Array.prototype.slice.call(library.querySelectorAll("input[type=checkbox][data-filter]"));
     var cards = Array.prototype.slice.call(library.querySelectorAll(".esaf-card"));
     var count = library.querySelector("[data-count]");
     var empty = library.querySelector(".esaf-library__empty");
@@ -13,15 +13,15 @@
 
     function selected() {
       var groups = {};
-      chips.forEach(function (chip) {
-        if (chip.getAttribute("aria-pressed") === "true") {
-          (groups[chip.dataset.filter] = groups[chip.dataset.filter] || []).push(chip.dataset.value);
+      boxes.forEach(function (box) {
+        if (box.checked) {
+          (groups[box.dataset.filter] = groups[box.dataset.filter] || []).push(box.dataset.value);
         }
       });
       return groups;
     }
 
-    // A card shows when it has one of the chosen values in every group that has a choice, and every search word.
+    // A card shows when it has one of the checked values in every row that has a check, and every search word.
     function apply() {
       var groups = selected();
       var words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
@@ -39,26 +39,19 @@
       clear.hidden = !words.length && !Object.keys(groups).length;
     }
 
-    chips.forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true");
-        apply();
-      });
-    });
+    boxes.forEach(function (box) { box.addEventListener("change", apply); });
     search.addEventListener("input", apply);
     clear.addEventListener("click", function () {
-      chips.forEach(function (chip) { chip.setAttribute("aria-pressed", "false"); });
+      boxes.forEach(function (box) { box.checked = false; });
       search.value = "";
       apply();
       search.focus();
     });
 
-    // A link can open the library with filters already chosen: ?service=Fabric&tag=rag&q=voice
+    // A link can open the library with filters already checked: ?service=Fabric&tag=rag&q=voice
     var query = new URLSearchParams(window.location.search);
-    chips.forEach(function (chip) {
-      if (query.getAll(chip.dataset.filter).indexOf(chip.dataset.value) !== -1) {
-        chip.setAttribute("aria-pressed", "true");
-      }
+    boxes.forEach(function (box) {
+      box.checked = query.getAll(box.dataset.filter).indexOf(box.dataset.value) !== -1;
     });
     search.value = query.get("q") || "";
     apply();

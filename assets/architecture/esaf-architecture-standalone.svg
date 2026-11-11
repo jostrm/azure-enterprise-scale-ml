@@ -100,21 +100,21 @@
 <rect x="864" y="372" width="240" height="174" rx="8" fill="#F4F9FF" stroke="#5AA9FF" stroke-width="1.5"/>
 <path d="M865 398 V380 a7 7 0 0 1 7 -7 H1096 a7 7 0 0 1 7 7 V398 Z" fill="#DFEDFF"/>
 <text x="876" y="390" font-size="12.5" font-weight="700" fill="#1B2A3A" text-anchor="start">Azure Machine Learning and data</text>
-<use href="#icon-machine-learning" x="909" y="406" width="30" height="30"/>
-<text x="924" y="450" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="924" dy="0">ML workspace</tspan></text>
-<use href="#icon-event-hubs" x="1029" y="406" width="30" height="30"/>
-<text x="1044" y="450" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1044" dy="0">Event Hubs</tspan></text>
-<use href="#icon-data-factory" x="909" y="476" width="30" height="30"/>
-<text x="924" y="520" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="924" dy="0">Data Factory</tspan></text>
-<use href="#icon-databricks" x="1029" y="476" width="30" height="30"/>
-<text x="1044" y="520" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1044" dy="0">Databricks</tspan></text>
+<use href="#icon-machine-learning" x="909" y="402" width="30" height="30"/>
+<text x="924" y="446" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="924" dy="0">Azure Machine</tspan><tspan x="924" dy="13">Learning</tspan></text>
+<use href="#icon-event-hubs" x="1029" y="402" width="30" height="30"/>
+<text x="1044" y="446" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1044" dy="0">Event Hubs</tspan></text>
+<use href="#icon-data-factory" x="909" y="486" width="30" height="30"/>
+<text x="924" y="530" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="924" dy="0">Data Factory</tspan></text>
+<use href="#icon-databricks" x="1029" y="486" width="30" height="30"/>
+<text x="1044" y="530" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1044" dy="0">Azure Databricks</tspan></text>
 <rect x="1118" y="186" width="438" height="174" rx="8" fill="#F4F9FF" stroke="#5AA9FF" stroke-width="1.5"/>
 <path d="M1119 212 V194 a7 7 0 0 1 7 -7 H1548 a7 7 0 0 1 7 7 V212 Z" fill="#DFEDFF"/>
 <text x="1130" y="204" font-size="12.5" font-weight="700" fill="#1B2A3A" text-anchor="start">Applications · full stack</text>
 <use href="#icon-container-apps" x="1163" y="220" width="30" height="30"/>
 <text x="1178" y="264" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1178" dy="0">Container Apps</tspan></text>
 <use href="#icon-functions" x="1271" y="220" width="30" height="30"/>
-<text x="1286" y="264" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1286" dy="0">Functions</tspan></text>
+<text x="1286" y="264" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1286" dy="0">Function App</tspan></text>
 <use href="#icon-app-service" x="1379" y="220" width="30" height="30"/>
 <text x="1394" y="264" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1394" dy="0">Web App</tspan></text>
 <use href="#icon-bot-service" x="1487" y="220" width="30" height="30"/>
@@ -126,7 +126,7 @@
 <use href="#icon-postgresql" x="1379" y="290" width="30" height="30"/>
 <text x="1394" y="334" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1394" dy="0">PostgreSQL</tspan></text>
 <use href="#icon-redis" x="1487" y="290" width="30" height="30"/>
-<text x="1502" y="334" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1502" dy="0">Redis</tspan></text>
+<text x="1502" y="334" font-size="11" font-weight="400" fill="#1B2A3A" text-anchor="middle"><tspan x="1502" dy="0">Cache for Redis</tspan></text>
 <rect x="1118" y="372" width="438" height="174" rx="8" fill="#F4F9FF" stroke="#5AA9FF" stroke-width="1.5"/>
 <path d="M1119 398 V380 a7 7 0 0 1 7 -7 H1548 a7 7 0 0 1 7 7 V398 Z" fill="#DFEDFF"/>
 <text x="1130" y="390" font-size="12.5" font-weight="700" fill="#1B2A3A" text-anchor="start">Project subnets · in the common virtual network</text>
@@ -214,13 +214,13 @@
 <a href="../../code-templates/#rag-split-tables-acl" target="_top"><g class="template-number" data-template="rag-split-tables-acl"><title>5. RAG that keeps each reader's permissions</title><circle cx="110" cy="320" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="110" y="324" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">5</text></g></a>
 <a href="../../code-templates/#azure-mcp-inventory" target="_top"><g class="template-number" data-template="azure-mcp-inventory"><title>6. Private Azure MCP server for your agents</title><circle cx="568" cy="336" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="568" y="340" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">6</text></g></a>
 <a href="../../code-templates/#aifactory-mcp-gateway" target="_top"><g class="template-number" data-template="aifactory-mcp-gateway"><title>7. Factory MCP server on the AI gateway</title><circle cx="1074" cy="650" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="1074" y="654" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">7</text></g></a>
-<a href="../../code-templates/#agent-training-ml-churn" target="_top"><g class="template-number" data-template="agent-training-ml-churn"><title>8. Agent that trains and scores ML models</title><circle cx="948" cy="408" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="412" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">8</text></g></a>
+<a href="../../code-templates/#agent-training-ml-churn" target="_top"><g class="template-number" data-template="agent-training-ml-churn"><title>8. Agent that trains and scores ML models</title><circle cx="948" cy="404" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="408" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">8</text></g></a>
 <a href="../../code-templates/#single-agent" target="_top"><g class="template-number" data-template="single-agent"><title>9. Single agent: prompt agent or hosted agent</title><circle cx="568" cy="234" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="568" y="238" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">9</text></g></a>
 <a href="../../code-templates/#multi-agent-helpdesk" target="_top"><g class="template-number" data-template="multi-agent-helpdesk"><title>10. Multi-agent helpdesk: retrieve, review, answer</title><circle cx="448" cy="234" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="448" y="238" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">10</text></g></a>
 <a href="../../code-templates/#rag-agent-shared-lake" target="_top"><g class="template-number" data-template="rag-agent-shared-lake"><title>11. RAG from the shared data lake or project storage</title><circle cx="948" cy="222" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="226" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">11</text></g></a>
-<a href="../../code-templates/#data-helpdesk-corpus" target="_top"><g class="template-number" data-template="data-helpdesk-corpus"><title>12. Prepare a helpdesk corpus for RAG</title><circle cx="948" cy="478" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="482" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">12</text></g></a>
+<a href="../../code-templates/#data-helpdesk-corpus" target="_top"><g class="template-number" data-template="data-helpdesk-corpus"><title>12. Prepare a helpdesk corpus for RAG</title><circle cx="948" cy="488" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="492" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">12</text></g></a>
 <a href="../../code-templates/#factory-chat-agent" target="_top"><g class="template-number" data-template="factory-chat-agent"><title>13. ESAF Agent Chat: the agent behind it</title><circle cx="688" cy="234" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="688" y="238" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">13</text></g></a>
-<a href="../../code-templates/#ml-model-factory" target="_top"><g class="template-number" data-template="ml-model-factory"><title>14. ML Model Factory</title><circle cx="971" cy="408" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="971" y="412" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">14</text></g></a>
+<a href="../../code-templates/#ml-model-factory" target="_top"><g class="template-number" data-template="ml-model-factory"><title>14. ML Model Factory</title><circle cx="971" cy="404" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="971" y="408" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">14</text></g></a>
 <a href="../../code-templates/#func-aifactory-lifecycle" target="_top"><g class="template-number" data-template="func-aifactory-lifecycle"><title>15. Factory lifecycle as an Azure Function</title><circle cx="1310" cy="222" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="1310" y="226" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">15</text></g></a>
 <a href="../../code-templates/#func-read-from-storage" target="_top"><g class="template-number" data-template="func-read-from-storage"><title>16. Azure Function that reads from storage</title><circle cx="948" cy="292" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="948" y="296" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">16</text></g></a>
 <a href="../../code-templates/#foundry-prompt-rag-responses-api" target="_top"><g class="template-number" data-template="foundry-prompt-rag-responses-api"><title>17. Starter: prompt agent with RAG in one file</title><circle cx="808" cy="234" r="10.5" fill="#5AA9FF" stroke="#FFFFFF" stroke-width="2"/><text x="808" y="238" font-size="11.5" font-weight="700" fill="#191919" text-anchor="middle">17</text></g></a>
