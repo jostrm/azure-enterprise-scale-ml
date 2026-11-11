@@ -151,7 +151,7 @@ esaf.init_factory(*, creation_request=None, scale_set_settings=None, project_set
 | (none) | Submits the folder's **saved factory draft** (for example saved in the Config Wizard) as one approved workflow. |
 | `creation_request` | Saves a new factory and starts it in the same call. The body is the creation API's full-bootstrap request: `{"contract_version": 1, "mode": "full-bootstrap", "action": "create-factory", "folder": ..., "orchestrator": "gha", "config": {...}, "factory_key": ..., "region_short_name": ...}`. `config` needs at least `factory_prefix`, `location` and `scale_set_number`. |
 
-| `scale_set_settings` | With `creation_request`: flat wizard settings of the new factory's **first Dev scale set**, saved before it deploys. A BYO VNet is `vnetResourceGroup_param` and `vnetNameFull_param`; BYO subnets add `"BYO_subnets": "true"` (then leave `dev_vnet_cidr` out of `config`). |
+| `scale_set_settings` | With `creation_request`: flat wizard settings of the new factory's **first Dev scale set**, saved before it deploys. A BYO VNet is `byoVnetResourcegroupName` and `byoVnetName`; BYO subnets add `"enableByoSubnets": true` and the subnet names (then leave `dev_vnet_cidr` out of `config`). See the three examples below. |
 | `project_settings` | With `creation_request`: flat wizard settings of the **initial project**, saved before its first deploy, for example `enableAIFactoryMCP`, `addAIFactoryMCP2APIM` and `enableFactoryChatAgent`. |
 
 It deploys the common Dev resource group, its network and the initial project001. About one hour.
@@ -167,12 +167,48 @@ with open("create-factory.json", encoding="utf-8") as file:
 ```json
 {
   "creation_request": {"contract_version": 1, "mode": "full-bootstrap", "folder": "...", "config": {"...": "..."}},
-  "scale_set_settings": {"BYO_subnets": "true", "vnetResourceGroup_param": "rg-network",
-                         "vnetNameFull_param": "vnet-ai-dev"},
+  "scale_set_settings": {"byoVnetResourcegroupName": "rg-network", "byoVnetName": "vnet-ai-dev"},
   "project_settings": {"enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true",
                        "enableFactoryChatAgent": "true"}
 }
 ```
+
+`scale_set_settings` in the three network examples:
+
+| Example | `scale_set_settings` |
+|---|---|
+| Automated networking | Leave it out. ESAF creates the VNet and its subnets from `dev_vnet_cidr`. |
+| BYO VNet | `{"byoVnetResourcegroupName": "rg-network", "byoVnetName": "vnet-ai-dev"}`. ESAF creates the subnets in your VNet. |
+| BYO subnets | The two BYO VNet settings, `"enableByoSubnets": true` and your subnet names. ESAF creates no network. |
+
+```json
+"scale_set_settings": {
+  "byoVnetResourcegroupName": "rg-network",
+  "byoVnetName": "vnet-ai-dev",
+  "enableByoSubnets": true,
+  "subnetCommon": "snet-dev-esml-cmn-001",
+  "subnetCommonScoring": "snet-dev-esml-cmn-001-scoring",
+  "subnetCommonPowerbiGw": "snet-esml-cmn-pbi-001",
+  "subnetProjGenAI": "snt-dev-prj001-genai",
+  "subnetProjAKS": "snt-prj001-aks",
+  "subnetProjAKS2": "snt-dev-prj001-aks2",
+  "subnetProjACA": "snt-prj001-aca",
+  "subnetProjACA2": "snt-prj001-aca-002",
+  "subnetProjWebapp": "snt-prj001-webapp",
+  "subnetProjLogicapp": "",
+  "subnetProjDatabricksPublic": "snt-prj001-dbxpub",
+  "subnetProjDatabricksPrivate": "snt-prj001-dbxpriv"
+}
+```
+
+The three friendly names are mapped by the Factory API, in every `settings` object of scenarios 1 to 3; the
+wizard's own keys still work, and the subnet names are the wizard's:
+
+| Friendly name | Wizard key |
+|---|---|
+| `byoVnetResourcegroupName` | `vnetResourceGroup_param` |
+| `byoVnetName` | `vnetNameFull_param` |
+| `enableByoSubnets` | `BYO_subnets` |
 
 The Factory API saves both settings after it has created the factory in the catalog and before anything deploys,
 and checks them first: a key the catalog does not accept is refused by name before the factory is created (the
@@ -193,7 +229,7 @@ esaf.add_scale_set(scale_set, environment, *, cidr=None, max_projects=None, subs
 | `cidr` | The new scale set's **VNet range**, for example `"10.141.0.0/16"`. Required for a new scale set; the deployment pipeline computes its subnets (with BYOSubnet they already exist). It must not overlap the hub or any peered VNet. |
 | `max_projects` | Project capacity; default `7`. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Default to the environment's existing scale set; `orchestrator` is `"gha"` or `"ado"`. |
-| `settings` | Optional flat wizard settings saved at scale-set scope before deployment, such as `BYO_subnets`, `vnetResourceGroup_param`, `vnetNameFull_param`, `byoASEv3` or `byoAseFullResourceId`. |
+| `settings` | Optional flat wizard settings saved at scale-set scope before deployment, such as `byoVnetResourcegroupName`, `byoVnetName`, `enableByoSubnets` and the subnet names (see scenario 1), `byoASEv3` or `byoAseFullResourceId`. |
 
 It registers the scale set (if new), extends the factory's single writer to it and deploys its common part. Calling
 it again for an existing scale set resumes: registration is skipped. About 15-30 minutes.
