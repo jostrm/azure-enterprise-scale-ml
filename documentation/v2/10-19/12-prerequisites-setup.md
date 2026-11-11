@@ -27,7 +27,7 @@ The values from prerequisites, will be used to set the PARAMETERS in the AI Fact
     - **What:** 
         - **3 service principles** (ObjectID, AppId, Secret)
             - **Why**: MI is not supported from all Azure Services. Project-specific service principle is needed to:
-                - Projects: Enable Authentication on WebApp (only possible via SP), see [config-webapp-post-deplpoyment-of-webapp](../20-29/24-end-2-end-setup.md#config-webapp-post-deplpoyment-of-webapp)
+                - Projects: Enable Authentication on WebApp (only possible via SP), see [config-webapp-post-deplpoyment-of-webapp](../20-29/24-legacy-v124-setup.md#config-webapp-post-deployment-of-webapp)
                 - Projects: Enable unattended CI/CD with unattended Evaluation.
                 - Projects: ACL on Datalake for project folders, to run pipelines that reads/writes data.
                 - Core team: Connect from Azure Data factory to certain services.

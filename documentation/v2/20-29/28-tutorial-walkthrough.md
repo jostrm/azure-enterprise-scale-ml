@@ -285,7 +285,7 @@ Use an explicitly reviewed external-hub or no-hub configuration only with source
 API, and app versions that support that topology. No-hub mode (`integrated` with
 `setup_hub_access=false`) skips shared hub-lock storage; it does not mean an
 external hub exists or that other execution prerequisites are satisfied. Follow
-the [setup guide's topology requirements](24-end-2-end-setup.md#current-integrated-hub-limitation)
+[hub and network modes](../concepts/hub-and-network-modes.md)
 and resolve the actual preview's blockers. Saving configuration does not establish
 that a default configure-to-deploy chain will succeed.
 

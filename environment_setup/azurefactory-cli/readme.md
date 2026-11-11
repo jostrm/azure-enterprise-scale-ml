@@ -442,7 +442,7 @@ Registered sources are 125+ or `main`; 124 is not a registered fallback.
 Omitting the version delegates to the current API's registered default; pass
 `--aifactory-version 125` or `--aifactory-version main` to select explicitly.
 Deployment remains a separate reviewed runtime operation. See the
-[end-to-end shell workflow](../../documentation/v2/20-29/24-end-2-end-setup.md#shell-first-new-registered-consumer-v125--main).
+[end-to-end shell workflow](../../documentation/v2/reference/maintainers/automation-and-review-flow.md#shell-first-setup-in-full).
 
 The modern raw Simple/Full creation launchers map `AIF_SETUP_HUB_ACCESS` into
 `config.setup_hub_access` for `/api/v1/creation/prepare`. With

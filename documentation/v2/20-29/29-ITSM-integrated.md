@@ -54,11 +54,9 @@ endpoints through the Factory API or `azurefactory request`. Resolve version
 incompatibilities before continuing; do not bypass them by switching to a legacy
 deployment route.
 
-Choose the network topology using the
-[setup guide](24-end-2-end-setup.md#choose-the-setup-path), including its
-[integrated-hub limitation](24-end-2-end-setup.md#current-integrated-hub-limitation).
-`access_hub_mode:"integrated"` with `setup_hub_access:true` describes an owned
-hub, but support depends on the selected release and workflow.
+Choose the network topology using
+[hub and network modes](../concepts/hub-and-network-modes.md).
+`access_hub_mode:"integrated"` with `setup_hub_access:true` describes an owned hub.
 `setup_hub_access:false` means **no owned hub**. Review non-overlapping factory,
 hub and VPN-client address ranges, and resolve all coordination and network
 blockers in the stage preview before execution.

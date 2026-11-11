@@ -65,9 +65,9 @@ and [separate runtime deployment](../10-19/19-cli-and-api-and-usage.md#separate-
 for full connection, scope, receipt and observation handling. Installed UI labels
 may vary; do not infer a backend capability from a button or source version alone.
 
-This update path does not repair an unfinished bootstrap. The
-[default integrated-hub limitation](24-end-2-end-setup.md#current-integrated-hub-limitation)
-still applies; do not recreate the factory or switch to legacy scripts to bypass it.
+This update path does not repair an unfinished bootstrap; do not recreate the
+factory or switch to legacy scripts to bypass a blocker. For the topology choices, see
+[hub and network modes](../concepts/hub-and-network-modes.md).
 Selecting `main` does not migrate the consumer layout, update every project
 snapshot or authorize a source-pin change during an active workflow.
 
@@ -167,7 +167,7 @@ hash and scheduling settings from the reviewed launcher/API, even if the checkbo
 is unchecked. Do not guess those fields or use `dev` as a shortcut for manual
 Dev-only execution.
 
-See [setup: manual ADO parameters](24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml).
+See [setup: manual ADO parameters](24-legacy-v124-setup.md#manual-azure-devops-run-pipeline-variablesyaml).
 
 ## Manual GitHub Actions workflow
 
@@ -186,7 +186,7 @@ assembly-loading problem.
 Update the submodule and re-copy **both** `infra-project.yml` and
 `infra-project-phase.yml` into `.github/workflows`; updating only the submodule
 does not refresh existing consumer workflow copies.
-See [GitHub manual setup](24-end-2-end-setup.md#manual-github-actions-project-run)
+See [GitHub manual setup](24-legacy-v124-setup.md#manual-github-actions-project-run)
 and the [workflow input guide](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md#manual-inputs-and-subnet-authentication).
 
 ## Quick Feature-update & run
