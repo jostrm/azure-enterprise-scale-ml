@@ -254,6 +254,14 @@ def test_code_templates_library_lists_only_templates_that_exist():
         assert (ROOT / name).is_dir() and name not in listed, name
 
 
+def test_code_templates_cards_use_compact_architecture_links():
+    library = tool("code_templates")
+    data = library.load()
+    page = library.render(library.LIBRARY, data)
+    labels = re.findall(r'<a href="\.\./architectures/#the-numbers-on-the-images">([^<]*)</a>', page)
+    assert labels == ["architecture"] * sum("number" in template for template in data["templates"])
+
+
 def test_code_templates_page_shows_every_template_with_filters(site):
     _, config, _ = site
     library = tool("code_templates")

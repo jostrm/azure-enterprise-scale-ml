@@ -99,7 +99,7 @@ def library(data):
         links = [f'<a href="{GITHUB_TREE}{quote(template["path"])}">Open the template</a>',
                  f'<a href="{GITHUB_BLOB}{quote(template["readme"])}">Read the guide</a>']
         if "number" in template:
-            links.append('<a href="../architectures/#the-numbers-on-the-images">See it on the architecture</a>')
+            links.append('<a href="../architectures/#the-numbers-on-the-images">architecture</a>')
         cards.append(
             f'<article class="esaf-card" id="{template["id"]}" data-factory="{escape(template["factory"])}" '
             f'data-service="{escape("|".join(template["services"]))}" data-tag="{escape("|".join(template["tags"]))}" '
