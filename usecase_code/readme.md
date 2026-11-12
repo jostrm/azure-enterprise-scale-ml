@@ -1,6 +1,9 @@
 # Welcome to the use case code templates
 
-Choose from **147 non-legacy implementation templates** for DataOps, MLOps and GenAIOps on the AI Factory infrastructure. Browse agents, machine-learning patterns and full stack examples, then follow the selected template's own prerequisites and setup instructions.
+Choose from **147 non-legacy implementation templates** for DataOps, MLOps and GenAIOps on the AI Factory infrastructure. Browse agents, machine-learning patterns and full stack examples, then follow the selected template's own prerequisites and setup instructions.<br>
+- <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a> - with <b>search and filter</b> template by type<br>
+- <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a> - to see what Azure Resources you can use plug-and-play, in categories.<br>
+- <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> Azure Resources connected with <b>Teams, Copilot, Fabric, Sharepoint</b> and which <b>Code template</b> to use.
 
 | Category | Non-legacy templates | What is counted |
 | --- | ---: | --- |
