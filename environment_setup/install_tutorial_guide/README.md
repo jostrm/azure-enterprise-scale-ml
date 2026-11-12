@@ -62,22 +62,41 @@ Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 - [SHA256SUMS.txt](SHA256SUMS.txt)
 - [Build receipt](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi.json)
 
+Paste the **whole block** into PowerShell, then press **Enter** after the final `}`.
+The `>>` prompt means PowerShell is still collecting a multiline command; if it remains after the
+closing `}`, press Enter on the empty line to submit it. No downloads run inside the block until
+it is submitted. The script uses Windows' built-in `curl.exe` to show a live progress bar for each
+download, followed by a separate checksum-verification message. It does not install or open the MSI.
+
 ```powershell
-$ProgressPreference = 'SilentlyContinue'
-$Base = 'https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_tutorial_guide'
-$Folder = Join-Path $HOME 'Downloads\ESAF-Tutorials'
-New-Item -ItemType Directory -Force -Path $Folder | Out-Null
-Invoke-WebRequest -Uri "$Base/SHA256SUMS.txt" -OutFile (Join-Path $Folder 'SHA256SUMS.txt')
-Get-Content (Join-Path $Folder 'SHA256SUMS.txt') | Where-Object { $_.Trim() } | ForEach-Object {
-    $Expected, $File = $_.Trim() -split '\s+', 2
-    if ($File -notmatch '^ESAF-Tutorials-[0-9.]+-win-x64-local-preview-(signed|unsigned)(-[0-9]+\.cab|\.msi)$') {
-        throw 'Unexpected download filename.'
+& {
+    $ErrorActionPreference = 'Stop'
+    $Base = 'https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_tutorial_guide'
+    $Folder = Join-Path $HOME 'Downloads\ESAF-Tutorials'
+    New-Item -ItemType Directory -Force -Path $Folder | Out-Null
+    Write-Host "Downloading checksums to $Folder"
+    curl.exe --fail --location --progress-bar --output (Join-Path $Folder 'SHA256SUMS.txt') "$Base/SHA256SUMS.txt"
+    if ($LASTEXITCODE -ne 0) { throw "Checksum download failed (curl exit code $LASTEXITCODE)." }
+    $Entries = @(Get-Content (Join-Path $Folder 'SHA256SUMS.txt') | Where-Object { $_.Trim() })
+    if ($Entries.Count -eq 0) { throw 'The checksum file is empty.' }
+    $Index = 0
+    foreach ($Entry in $Entries) {
+        $Expected, $File = $Entry.Trim() -split '\s+', 2
+        if ($File -notmatch '^ESAF-Tutorials-[0-9.]+-win-x64-local-preview-(signed|unsigned)(-[0-9]+\.cab|\.msi)$') {
+            throw 'Unexpected download filename.'
+        }
+        $Index++
+        $Destination = Join-Path $Folder $File
+        Write-Host "[$Index/$($Entries.Count)] Downloading $File"
+        curl.exe --fail --location --progress-bar --output $Destination "$Base/$File"
+        if ($LASTEXITCODE -ne 0) { throw "Download failed: $File (curl exit code $LASTEXITCODE)." }
+        Write-Host "Verifying SHA256: $File"
+        if ((Get-FileHash $Destination -Algorithm SHA256).Hash -ne $Expected) {
+            throw "Hash mismatch: $File"
+        }
+        Write-Host "OK  $File"
     }
-    Invoke-WebRequest -Uri "$Base/$File" -OutFile (Join-Path $Folder $File)
-    if ((Get-FileHash (Join-Path $Folder $File) -Algorithm SHA256).Hash -ne $Expected) {
-        throw "Hash mismatch: $File"
-    }
-    "OK  $File"
+    Write-Host "Verified downloads are ready in $Folder. Run only the MSI."
 }
 ```
 
@@ -152,6 +171,8 @@ Options without a recording are turned off. Which videos you see depends on your
 
 | Problem | Fix |
 |---|---|
+| PowerShell shows only `>>`, with no download messages | Finish pasting the whole block and press Enter after the final `}`. If it still waits, press Enter on an empty line. To abandon an incomplete paste, press Ctrl+C and paste the whole block again. |
+| Edge says the MSI "isn't commonly downloaded" | This is Edge's download-reputation warning, not a prompt the PowerShell downloader waits for. Windows or organizational security controls may still block downloading or running the unsigned MSI. Verify the checksums and follow your organization's approval process; do not disable security controls. |
 | The installer says a file is missing | Put all 4 `.cab` parts beside the `.msi`, with their original file names. |
 | "Private preview is not configured" | Ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a configured installer. |
 | "The code or session is invalid, expired or revoked" | Ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a new code. |
