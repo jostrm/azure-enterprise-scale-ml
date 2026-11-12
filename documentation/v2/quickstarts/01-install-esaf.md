@@ -40,6 +40,19 @@ Every tool is an L1 client of the same Factory API, so the result is the same wh
 
 ## Start the Factory API
 
+<details>
+<summary><b>Option A) Windows - Start via ESAF Tutorial Guide (Windows app only)</b></summary>
+ 
+1. Download the [ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md)
+2. From within the app, click "Start API"
+
+![ESAF Tutorial Guide](../20-29/images/esaf-tutorial-app-start-api.png)
+
+</details>
+
+<details> 
+<summary><b>Option B) Mac & Linux - Start via ESAF Wizard App (Windows, Mac OS, Linux)</b></summary>
+
 The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for Windows, Linux and macOS.
 
 1. Download the [AIFactory Config Wizard](../../../environment_setup/install_config_wizard/readme.md#download)
@@ -50,7 +63,8 @@ The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for 
    [Linux](../../../environment_setup/install_config_wizard/readme.md#linux).
 4. In the left menu, select **Quick setup**, then **Start API host**. Do this before you open any other
    window in the app, so that you choose the key.
-5. In the **API Host Authentication** dialog, enter a private API key. You choose it; remember it for the
+   ![ESAF Tutorial Guide](../20-29/images/esaf-wizard-tkinter-start-api.png)
+5. In the **API Host Authentication** dialog, enter a private API key. You choose it. remember it for the
    next steps.
 6. Copy the API address from the **API Host Started** dialog. The default is `http://127.0.0.1:8765`. The
    status bar shows it too.

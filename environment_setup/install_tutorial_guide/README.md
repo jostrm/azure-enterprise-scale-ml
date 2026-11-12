@@ -10,6 +10,14 @@ ESAF ConfigWizard app.
 
 ## What you can do with it
 
+### You can Start the ESAF API
+
+From within this app, click "Start API"
+
+![ESAF Tutorial Guide](../../documentation/v2/20-29/images/esaf-tutorial-app-start-api.png)
+
+### Get guided how to use the API, SDK, to SETUP an AI Factory | Use Code templates
+
 | Tutorial | You learn to |
 |---|---|
 | **ESAF Python SDK - scenarios 1-6** | Create, extend and delete an AI Factory with one `esaf.*` call per scenario. Start here. |
