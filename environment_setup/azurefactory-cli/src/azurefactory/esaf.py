@@ -17,9 +17,12 @@ is needed only when the folder holds more than one.
 Environment (dev, stage or prod) is required on scale-set and project scenarios: the same suffix or project number
 can exist in several environments, and a delete must never reach another one.
 
-Each call is one POST to the Factory API's /api/v1/esaf/<scenario> route, which runs the scenario as a resilient
+Each lifecycle call is one POST to the Factory API's /api/v1/esaf/<scenario> route, which runs the scenario as a resilient
 server-side job and answers 202 with a job id. Calling the method is the approval, so call it only for what you mean
 to change. apply_project remains an alias of upsert_project.
+
+export_allowed_projects(factory, project_numbers) is instead a read-only API export returning an EsafExportPackage.
+It uses the same connection, never starts a job, and writes nothing until package.save(destination) is called.
 """
 
 from __future__ import annotations
@@ -31,9 +34,10 @@ from typing import Any
 
 from .client import AzureFactoryClient
 from .errors import APIError, ConfigError
+from .export_package import EsafExportPackage
 
 __all__ = ["connect", "init_factory", "add_scale_set", "upsert_project", "apply_project", "delete_project",
-           "delete_scale_set", "delete_factory", "EsafJob", "Session"]
+           "delete_scale_set", "delete_factory", "export_allowed_projects", "EsafExportPackage", "EsafJob", "Session"]
 
 ENVIRONMENTS = ("dev", "stage", "prod")
 ACTIVE = {"queued", "running", "pending", "accepted", "preparing", "confirming", "retrying"}
@@ -44,6 +48,10 @@ class Session:
     folder: str
     client: Any
     factory: str | None = None  # factory key or id; default: the folder's only factory
+
+    def export_allowed_projects(self, factory: str, project_numbers: list[str] | tuple[str, ...]) -> EsafExportPackage:
+        """Export through this connection, using the explicitly selected factory."""
+        return self.client.esaf_export_allowed_projects(self.folder, factory, project_numbers)
 
 
 _default: Session | None = None
@@ -111,6 +119,17 @@ class EsafJob:
 
 def _session(session: Session | None) -> Session:
     return session or _default or connect()
+
+
+def export_allowed_projects(factory: str, project_numbers: list[str] | tuple[str, ...], *,
+                            session: Session | None = None) -> EsafExportPackage:
+    """Return a server-built ZIP for selected projects; save(destination) writes it explicitly.
+
+    Uses the connected API folder, URL and credentials. Select a canonical factory key or UUID and 1 to 200 unique
+    existing project numbers from '000' to '999'; registration is checked by the API, not inferred locally.
+    The package's project-lock is a local selection restriction, not an Azure permission grant.
+    """
+    return _session(session).export_allowed_projects(factory, project_numbers)
 
 
 def _environment(environment: str) -> str:

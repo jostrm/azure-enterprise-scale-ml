@@ -1,4 +1,4 @@
-site_name: Enterprise Scale AI Factory
+site_name: Enterprise Scale Azure Factory
 site_url: https://jostrm.github.io/azure-enterprise-scale-ml/
 site_description: Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.
 site_author: Microsoft
@@ -63,9 +63,14 @@ plugins:
 
 hooks:
   - tools/factory_guides.py
+  - tools/code_templates.py
 
 extra_css:
   - assets/stylesheets/diagrams.css
+  - assets/stylesheets/libraries.css
+
+extra_javascript:
+  - assets/javascripts/libraries.js
 
 nav:
   - Overview: index.md
@@ -83,6 +88,8 @@ nav:
       - Run your first agent: usage/01-first-agent.md
       - Train your first model: usage/02-first-ml-model.md
       - Project dashboards: usage/dashboards.md
+  - "Code templates library: Project team": code-templates/index.md
+  - Architecture: architectures.md
   - "Get started - CLI, SDK, API: Core team":
       - Get started: factory-tools/18-cli-and-api-and-usage.md
       - Add and update: factory-tools/19-cli-and-api-and-usage.md
@@ -96,6 +103,7 @@ nav:
       - Hub and network modes: reference/hub-and-network-modes.md
       - Folder structure: reference/folder-structure.md
       - Settings: reference/settings.md
+  - Azure resource library: resources/index.md
   - Parameters:
       - Configure your factory: parameters/index.md
       - Every variable in variables.json: parameters/variables.md
@@ -110,7 +118,6 @@ nav:
           - DataOps: concepts/templates/dataops.md
           - MLOps: concepts/templates/mlops.md
           - GenAIOps: concepts/templates/genaiops.md
-  - Automated Architectures: architectures.md
   - IaC:
       - BICEP: iac/bicep.md
       - BYO Terraform: iac/terraform.md

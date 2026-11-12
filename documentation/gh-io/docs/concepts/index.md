@@ -1,30 +1,29 @@
 # AI Factory concepts
 
-An AI Factory separates reusable platform services from the projects that use
-them. You choose what to configure, where to deploy it and who may operate it.
+An AI Factory keeps the shared platform services apart from the projects that use them. The platform team
+owns the Factory and its scale sets. Each project team owns its project.
 
 ## Factory, scale set and project
 
 | Term | Meaning |
 | --- | --- |
-| **Factory** | The registered identity and settings for a governed AI platform, including its region and naming. |
-| **Scale set** | An environment/subscription/networking grouping inside a factory. **Not Azure Virtual Machine Scale Sets (VMSS).** |
-| **Project** | A logical workload/team with its own number, settings and explicitly selected deployment locations. |
-| **Placement** | The scale set used by that project in Dev, Stage or Prod. Adding a placement saves a target; it does not deploy it. |
-| **Common services** | Shared resources such as networking or storage that projects may depend on. |
+| **Factory** | One governed AI platform: its name, its region and its settings. |
+| **Scale set** | A group of projects that share one network, in one environment and subscription. It has nothing to do with Azure Virtual Machine Scale Sets. |
+| **Project** | One team's workload, with a three-digit number such as `001`, its own resource group and its own settings. |
+| **Environment** | Dev, Stage or Prod. A project is deployed to each environment that you ask for. |
+| **Common services** | The network, data lake, Key Vault and monitoring that the projects of a scale set share. |
 
-The registered format uses stable UUIDs for these objects. Human-readable names
-and three-digit numbers help navigation but are not interchangeable with UUIDs.
-See [scale and environment choices](enterprise-scale.md).
+You name a Factory, a scale set and a project by their key or number in every call, for example
+`esaf.upsert_project("002", "dev", scale_set="001")`. See [scale and environment choices](enterprise-scale.md)
+and [the six scenarios](../reference/scenarios.md).
 
 ## Watch the concepts
 
-These original animations come from the configuration wizard's **View > Concept
-animations** lessons. They explain an illustrative setup, not your deployed
-resources. Reduced-motion preferences show a still image instead; use the links
-below each animation to open it at full size or read the still.
+These animations are the lessons under **View > Concept animations** in the configuration wizard. They show
+an example setup. If your device asks for reduced motion, you get a still image. Use the links below each
+animation to open it at full size.
 
-The SVGs include their own fonts for consistent rendering:
+The animations carry their own font:
 [Open Sans font notices and license](../assets/animations/font-license.txt).
 
 ### Factories, scale sets and projects
@@ -40,8 +39,8 @@ The SVGs include their own fonts for consistent rendering:
 
 ### Configuration map
 
-Follow ingestion, DataOps, training, inference and an agent in a small example.
-The sample region labels do not prescribe moving data between regions.
+Follow ingestion, DataOps, training, inference and an agent in a small example. The region labels are
+examples.
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/map.png">
@@ -66,30 +65,19 @@ The sample region labels do not prescribe moving data between regions.
 
 ## Three rules to keep in mind
 
-1. **Configuration is not deployment.** Save reviewed settings, then separately
-   approve the operation that applies them.
-2. **A flag is not a cleanup plan.** Removing settings and deleting resources are
-   different tasks with different safeguards.
-3. **Shared source is not live state.** A template, graph or screenshot does not
-   prove a resource was deployed successfully in your environment.
+1. **A call does the whole scenario.** `esaf.init_factory()` or `esaf.upsert_project(...)` saves the settings
+   and runs the pipeline that deploys them. Follow the run it returns until it ends.
+2. **Switching a service off deletes it only when you ask for that.** A switched-off service that already
+   exists stays in Azure unless `enableDeleteForDisabledResources` is `"true"`. See
+   [what happens when you switch a service off](../index.md#what-happens-when-you-switch-a-service-off).
+3. **Azure is the truth.** A template or a diagram shows what a deployment creates. The run status and the
+   Azure portal show what exists.
 
-Both GitHub Actions and Azure DevOps are supported provider choices, with
-different authentication and execution setup. Their availability does not imply
-that every operation behaves identically through every version.
+You choose GitHub Actions or Azure DevOps as the pipeline provider when you create the Factory. Both run the
+same Bicep templates. See [GitHub Actions](../orchestrators/gh.md) and [Azure DevOps](../orchestrators/ado.md).
 
-<details markdown="1">
-<summary>More info</summary>
+## Where your Factory is stored
 
-The default registered layout is `azurefactory/register.json` with
-API-written project settings. Older `aifactory` JSON/YAML/`.env` workflows remain
-separate routes. A source-version change does not migrate one layout into another.
-
-The CLI and Python SDK use the shared Factory API for supported operations.
-Advanced enrollment is a separate local CLI implementation. A desktop host,
-Agent Chat or MCP adapter does not create a second independent deployment engine
-or bypass approval.
-
-Conceptual labels such as foundation, automation and guided experience describe
-levels of assistance, not Azure product SKUs.
-
-</details>
+The Factory API keeps your factories in a folder named `azurefactory`, with `register.json` as its index and
+one `variables.json` for each project. See [Folder structure](../reference/folder-structure.md). Change the
+settings with a tool rather than by editing the files, so that the API checks them.

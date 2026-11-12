@@ -8,6 +8,8 @@ sources:
   - environment_setup/azurefactory-cli/src/azurefactory/operation_results.py
   - environment_setup/azurefactory-cli/src/azurefactory/preflight.py
   - environment_setup/azurefactory-cli/src/azurefactory/workflow_events.py
+  - environment_setup/azurefactory-cli/src/azurefactory/esaf.py
+  - environment_setup/azurefactory-cli/src/azurefactory/export_package.py
   - environment_setup/azurefactory-cli/readme.md
   - environment_setup/install_config_wizard/readme.md
   - environment_setup/install_config_wizard/api-usage-examples/readme.md
@@ -20,6 +22,7 @@ tests:
   - environment_setup/azurefactory-cli/tests/test_preflight.py
   - environment_setup/azurefactory-cli/tests/test_quickstart_examples.py
   - environment_setup/azurefactory-cli/tests/test_workflow_events.py
+  - environment_setup/azurefactory-cli/tests/test_esaf_export.py
 graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/client.py::class:AzureFactoryClient
 reviewed_source: '288d6f6a + d03bc189 teardown review; observed 2026-10-19'
@@ -38,6 +41,17 @@ Transport validation permits plaintext HTTP only on loopback, rejects URL creden
 
 ## Modes and observations
 
+- Local SDK source, observed 2026-11-11: `esaf.export_allowed_projects(factory, project_numbers, *, session=None)`
+  and `Session.export_allowed_projects` reuse the configured API connection/folder and call only
+  `POST /api/v1/esaf/export-allowed-projects`, without `approved`, jobs or polling. The API owns source validation,
+  privacy filtering and ZIP construction. Selectors are canonical catalog keys or UUIDs, at most 128 characters,
+  not display names; output names the catalog key. Export accepts 1–200 unique existing project numbers `000`–`999`,
+  including registered `000`; it does not change or reuse new-project creation restrictions.
+  `EsafExportPackage` validates the v1 envelope, canonical base64,
+  safe filenames/entries, archive integrity, selected projects, exact project-lock metadata, and compressed/expanded
+  bounds; `save(destination)` is explicit and refuses overwrites. Project-lock is a local selection restriction,
+  not an Azure permission grant. Unsupported hosts fail without local packaging or deployment fallback.
+  Isolated fake-HTTP tests establish the client contract only, not installed-host support.
 - Catalog/configuration confirmation can return a saved catalog with no runtime job.
 - Scoped settings have thin convenience entry points:
   `AzureFactoryClient.catalog_settings_prepare` and CLI

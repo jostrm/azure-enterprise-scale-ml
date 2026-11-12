@@ -18,6 +18,8 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 
 from .errors import APIError, AuthError, BlockedError, ConfigError, FailureError, RedirectError, RequestTimeout
 from . import catalog_requests
+from . import export_package
+from .export_package import EsafExportPackage
 from .monitoring_saved import SavedMonitoringClient
 from .operation_results import legacy_execution_result
 from .workflow_events import WorkflowRunEvent
@@ -149,6 +151,7 @@ class AzureFactoryClient(SavedMonitoringClient):
         query: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         require_key: bool | None = None,
+        max_response_bytes: int | None = None,
     ) -> Any:
         method = method.upper()
         safe_endpoint = validate_endpoint(endpoint)
@@ -179,7 +182,9 @@ class AzureFactoryClient(SavedMonitoringClient):
         opener = build_opener(ProxyHandler({}), _NoRedirect)
         try:
             with opener.open(req, timeout=float(self.timeout)) as response:
-                payload = response.read()
+                payload = response.read() if max_response_bytes is None else response.read(max_response_bytes + 1)
+                if max_response_bytes is not None and len(payload) > max_response_bytes:
+                    raise APIError("API response exceeds the permitted size.")
                 if path == "/api/v1/monitoring/export" and method == "POST":
                     if response.headers.get_content_type() != "text/csv":
                         raise APIError("Monitoring export did not return text/csv.")
@@ -189,7 +194,9 @@ class AzureFactoryClient(SavedMonitoringClient):
                         raise APIError("Monitoring export did not return UTF-8 CSV.") from None
                 return _decode_response(payload, response.headers.get_content_type(), method)
         except HTTPError as exc:
-            payload = exc.read()
+            payload = exc.read() if max_response_bytes is None else exc.read(max_response_bytes + 1)
+            if max_response_bytes is not None and len(payload) > max_response_bytes:
+                raise APIError("API error response exceeds the permitted size.", status=exc.code) from None
             details = redact_secrets(_decode_error(payload), self.api_key)
             if 300 <= exc.code < 400:
                 raise RedirectError("Refusing to follow API redirect.", status=exc.code, details=details) from None
@@ -271,6 +278,25 @@ class AzureFactoryClient(SavedMonitoringClient):
     def esaf_job(self, folder: str, job_id: str) -> dict[str, Any]:
         """Read an ESAF job (GET /api/v1/esaf/jobs/<id>)."""
         return self._esaf_request("GET", "/api/v1/esaf/jobs/" + quote(str(job_id), safe=""), query={"folder": folder})
+
+    def esaf_export_allowed_projects(self, folder: str, factory: str,
+                                     project_numbers: list[str] | tuple[str, ...]) -> EsafExportPackage:
+        """Read a server-built export, without approval, job submission or local packaging."""
+        projects = export_package.validate_selection(factory, project_numbers)
+        if not isinstance(folder, str) or not folder.strip() or _has_control(folder):
+            raise ConfigError("Export requires the configured azurefactory folder on the API host.")
+        try:
+            response = self._esaf_request(
+                "POST", "/api/v1/esaf/export-allowed-projects",
+                body={"folder": folder, "factory": factory, "project_numbers": projects},
+                max_response_bytes=export_package.MAX_RESPONSE_BYTES)
+        except ConfigError as error:
+            if error.message != ESAF_TOO_OLD:
+                raise
+            raise ConfigError("The Factory API does not support /api/v1/esaf/export-allowed-projects; "
+                              "use an API host with export support. No other route was tried.",
+                              status=error.status, details=error.details) from None
+        return export_package.parse_export(response, projects)
 
     def _esaf_request(self, method: str, path: str, **kwargs) -> dict[str, Any]:
         try:

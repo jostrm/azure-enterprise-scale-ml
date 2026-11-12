@@ -55,6 +55,41 @@ scenarios, so a delete never reaches another environment. The factory is needed 
 than one (`esaf.connect(factory=...)`). Pass an explicit `esaf.Session(folder, client, factory)` in concurrent
 consumers. `apply_project` remains an alias of `upsert_project`.
 
+### Export selected projects (read-only)
+
+```python
+from azurefactory import esaf
+
+# Reuse the connection above; no local configuration discovery or new credentials.
+package = esaf.export_allowed_projects("spider-001", ["001", "003"])
+package.save(package.file_name)  # explicit file path; refuses to overwrite an existing file
+
+# An explicit connection supports the same call without relying on the module default:
+# session = esaf.connect(folder=..., url=..., api_key=...)
+# package = session.export_allowed_projects("spider-001", ["001", "003"])
+```
+
+`export_allowed_projects(factory, project_numbers, *, session=None) -> EsafExportPackage`
+uses the preconfigured `azurefactory` folder on the API host. The factory is an explicit canonical catalog key
+or UUID, at most 128 characters, not a display name. Catalog keys match `[a-z][a-z0-9-]{1,79}`;
+the response always names the resolved catalog key. Select 1 to 200 unique three-digit ASCII strings from
+`"000"` to `"999"`; the API verifies that each project is already registered. Export does not apply
+new-project creation rules to existing projects. The immutable package exposes `file_name`, `zip_bytes`,
+`allowed_azurefactory_names`, `allowed_project_numbers` (tuples), and `contract_version`.
+`save(destination)` returns the saved `pathlib.Path`; the parent directory must already exist.
+Alternatively consume `zip_bytes` without writing a file.
+
+This makes one authenticated `POST /api/v1/esaf/export-allowed-projects` with
+`{"folder": ..., "factory": ..., "project_numbers": ["001", "003"]}`. Unlike lifecycle
+calls, there is **no approval, job, polling, deployment or local ZIP construction**. The API owns
+source validation, privacy filtering and packaging; unsupported APIs fail without a fallback.
+The SDK validates contract version 1, canonical base64, safe filenames/archive paths, matching
+project selection, archive integrity and limits (16 MiB ZIP, 64 MiB expanded; 24 MiB HTTP response).
+The returned archive must contain `azurefactory/register.json` and `azurefactory/project-lock.json`;
+the latter must exactly match `{"allowed-azurefactory-names": ["spider-001"],
+"allowed-project-numbers": ["001", "003"]}` for this example. This lock restricts local selection;
+it **does not grant Azure permissions**. The SDK neither extracts the archive nor reads local factory configs.
+
 Refusals raise the SDK errors with the server's problem details: `ConfigError` (unknown, ambiguous or invalid target),
 `BlockedError` (the server's review refused it, or another ESAF job holds the factory), `AuthError` and `FailureError`.
 An API without the ESAF routes raises `ConfigError`; no other route is tried.

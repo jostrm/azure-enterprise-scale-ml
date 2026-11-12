@@ -180,7 +180,7 @@ def requirement(key, comment):
     lower = key.lower()
     if key in {"enableAIFoundry", "enableAFoundryCaphost", "enableAISearch", "enableCosmosDB",
                "ENABLE_AI_FOUNDRY", "ENABLE_FOUNDRY_CAPHOST", "ENABLE_AI_SEARCH", "ENABLE_COSMOS_DB"}:
-        return "C", "Required together for the standard private-agent capability-host architecture; not universal across all deployment paths."
+        return "C", "Required together for private Foundry agents that keep their data in your own resources."
     if key in {"APIM_GATEWAY_RESOURCE_GROUP", "APIM_GATEWAY_SERVICE_NAME", "APIM_GATEWAY_AGGREGATE_TPM", "APIM_GATEWAY_BACKENDS_JSON",
                "apimGatewayResourceGroup", "apimGatewayServiceName", "apimGatewayAggregateTpm", "apimGatewayBackendsJson"}:
         return "C", "Required by the separate AI gateway workflow when APIM is enabled."
@@ -213,9 +213,9 @@ DESCRIPTIONS = {
 
 for names, text in (
     (("enableAIFoundry", "ENABLE_AI_FOUNDRY"),
-     "Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim."),
+     "Deploys the Microsoft Foundry account and project. Private agents also need enableAFoundryCaphost, AI Search, Cosmos DB and Storage. Check that your region offers the models you want."),
     (("enableAFoundryCaphost", "ENABLE_FOUNDRY_CAPHOST"),
-     "Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements."),
+     "Lets private Foundry agents keep their threads, files and vectors in your own Storage, AI Search and Cosmos DB. Needs those three services and enableAIFoundry."),
     (("enableAIFactoryMCP", "ENABLE_AI_FACTORY_MCP"),
      "Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources."),
     (("enableFactoryChatAgent", "ENABLE_FACTORY_CHAT_AGENT"),
@@ -233,17 +233,17 @@ for names, text in (
     (("enableAIFactoryAgentLiveVoice", "ENABLE_AI_FACTORY_AGENT_LIVE_VOICE"),
      "Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles."),
     (("enableDeleteForDisabledResources", "ENABLE_DELETE_FOR_DISABLED_RESOURCES"),
-     "Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval."),
+     "Decides what happens to a service that is switched off but exists in Azure. false, the default: the pipeline leaves it alone. true: the next run of the project pipeline deletes, in the project resource group, the resources that have the AI Factory name of a switched-off service, before it deploys the rest. It keeps Key Vault, storage accounts, Application Insights, dashboards and managed identities, and never touches the common resource group. Databases go with their data, and it purges deleted Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources, which cannot be undone. Review the switched-off services before you set it to true."),
     (("deleteAllServicesForProject", "DELETE_ALL_SERVICES_FOR_PROJECT"),
-     "Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution."),
+     "true deletes all services in the project resource group in the next project pipeline run, then ends the run. Key Vault stays unless deleteKeyvaultAlso is true. Review the project and the environment first."),
     (("deleteKeyvaultAlso", "DELETE_KEYVAULT_ALSO"),
-     "Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply."),
+     "With deleteAllServicesForProject, true also deletes the Key Vault of the project. Review the secrets and keys it holds first. The soft delete of Azure Key Vault still applies."),
     (("deleteAllForProject", "DELETE_ALL_FOR_PROJECT"),
-     "Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion."),
+     "true deletes everything in the project resource group, the resource group itself, and the subnets and network security groups of the project in the common resource group. Review the project and the environment first."),
     (("apimGatewaySku", "APIM_GATEWAY_SKU"),
      "SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers."),
     (("apimGatewaySkuCapacity", "APIM_GATEWAY_SKU_CAPACITY"),
-     "Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation."),
+     "Number of units of the API Management SKU. Check the limits of the SKU and size it from the load you measure."),
 ):
     DESCRIPTIONS.update(dict.fromkeys(names, text))
 
@@ -253,6 +253,25 @@ GATEWAY_SOURCE = (" The AI gateway pipeline reads it from variables.yaml or the 
                   "not from variables.json.")
 SKIP_DIAGNOSTICS = ("Skips the {service} diagnostic setting, because an Azure Policy usually manages it. Set false to "
                     "create it from Bicep; applies when {switch} is true.")
+TEAM_GROUPS = ("Entra ID group object IDs of the project team, comma-separated, in the order of the personas in "
+               "{personas}. Used when use_ad_groups is true{condition}.")
+TEAM_PERSONAS = "Persona names of the project team, in the order of the groups in {groups}. Keep as is{condition}."
+OLDER_TYPE = " and admin_projectType is esml, an older project type"
+for names, text in (
+    (("groups_project_members_esml", "GROUPS_PROJECT_MEMBERS_ESML"),
+     TEAM_GROUPS.format(personas="personas_project_esml", condition=OLDER_TYPE)),
+    (("groups_project_members_genai_1", "GROUPS_PROJECT_MEMBERS_GENAI_1"),
+     TEAM_GROUPS.format(personas="personas_project_genai_1", condition="")),
+    (("personas_project_esml", "PERSONAS_PROJECT_ESML"),
+     TEAM_PERSONAS.format(groups="groups_project_members_esml", condition=". Used when admin_projectType is esml")),
+    (("personas_project_genai_1", "PERSONAS_PROJECT_GENAI_1"),
+     TEAM_PERSONAS.format(groups="groups_project_members_genai_1", condition="")),
+    (("subnetProjGenAI", "SUBNET_PROJ_GENAI"),
+     "Name of the existing subnet of the project for its AI services. Required when BYO_subnets is true; the subnet "
+     "must exist."),
+):
+    DESCRIPTIONS.update(dict.fromkeys(names, text))
+
 DESCRIPTIONS.update({
     "admin_projectType": "Selects the project type that sizes the project subnets: all (every subnet), genai-1 or "
                          "esml. Any other value fails the networking step. Keep all.",
@@ -564,7 +583,7 @@ def generate():
         for key, entry in entries.items():
             if len(entry["lines"]) > 1:
                 lines.append(f"- Source duplicate: {code(source + ':' + key)}, lines {', '.join(map(str, entry['lines']))}; one reference row.")
-    lines += ["", "## YAML and variables.json reference", "", "Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** = YAML assignment; **J.section** = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.", ""]
+    lines += ["", "## YAML and variables.json reference", "", "Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** = YAML assignment; **J.section** = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings, fallbacks and reviewed template counterparts. A GHA name can be a fallback rather than an equal of the YAML key, so read the workflow before you swap one for the other.", ""]
 
     def marker(source, key):
         return f"<!-- parameter {source}:{key} -->"
@@ -593,7 +612,7 @@ def generate():
             bindings = ", ".join(code(value) + (" (not in .env template)" if value not in env else "") for value in sorted(mapping[key])) or "No verified binding"
             lines.append(f"| {''.join(marks)}{code(key)} | {bindings} | {status} | {'<br>'.join(defaults)} | {description(key, entry)} |")
         lines.append("")
-    lines += ["## GitHub Actions .env reference", "", "Every unique assignment is included, including orchestrator-only and compatibility names. Values are decoded literals, not expansions; these are template values, not necessarily the workflow's effective fallback. **No verified counterpart** means no mapping was found in the inspected shared bindings, not proof that a setting is unused.", ""]
+    lines += ["## GitHub Actions .env reference", "", "Every unique assignment is included, including orchestrator-only and compatibility names. Values are decoded literals, not expansions; these are template values, not necessarily the workflow's effective fallback. **No verified counterpart** means that no mapping was found in the shared bindings. The setting can still be read somewhere else.", ""]
     groups = defaultdict(list)
     for key in sorted(env):
         groups[category(key)].append(key)
@@ -701,7 +720,9 @@ def variables_markdown():
         for row in members:
             defaults = [literal(value) if len(document) == 1 else f"{section}: {literal(value)}"
                         for section, value in row["defaults"].items()]
-            lines.append(f"| {code(row['key'])} | {'<br>'.join(defaults)} | {words[row['status']]} | {row['text']} |")
+            # The anchor lets the Azure resource library link to the row of a setting.
+            lines.append(f"| {code(row['key'])} | {'<br>'.join(defaults)} | {words[row['status']]} "
+                         f"| <a id=\"{row['key']}\"></a>{row['text']} |")
     return "\n".join(lines) + "\n"
 
 

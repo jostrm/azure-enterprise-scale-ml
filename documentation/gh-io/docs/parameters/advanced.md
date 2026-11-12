@@ -1,13 +1,11 @@
 # Parameters - complete reference
 
-Use [Standard parameters](standard.md) for the initial checklist. This reference
-covers the **public configuration surface**, not every Bash local or internal
-Bicep/ARM module parameter.
+Start with the [required inputs](standard.md). This reference lists every setting you can change, with its
+default and its name in each format. For one explained list, see
+[Every variable in variables.json](variables.md).
 
-This page follows the shared templates on **published development `main`**.
-It calls the settings "Parameters"; their exact JSON/YAML/environment names stay
-unchanged. Start with the [tool-specific guide](../factory-tools/18-cli-and-api-and-usage.md)
-for a registered factory, rather than manually editing generated files.
+The page is built from the templates on the `main` branch. To change a setting, use a
+[tool](../factory-tools/18-cli-and-api-and-usage.md) rather than editing the files.
 
 Jump to [current feature choices](#mcp-and-ai-gateway-parameters),
 [all JSON/YAML parameters](#yaml-and-variablesjson-reference), or
@@ -15,8 +13,8 @@ Jump to [current feature choices](#mcp-and-ai-gateway-parameters),
 
 ## MCP and AI Gateway parameters
 
-These are opt-in **project001 Dev** features in matching ADO/GHA project
-pipelines, not a universal gateway selection switch.
+These settings switch on optional steps of the **project001 Dev** pipeline, in Azure DevOps and in GitHub
+Actions.
 
 | JSON/YAML | GitHub name | Effect / requirements |
 | --- | --- | --- |
@@ -24,7 +22,8 @@ pipelines, not a universal gateway selection switch.
 | `enableAIGatewaySKU` | `ENABLE_AI_GATEWAY_SKU` | Create or adopt the dedicated AI Gateway with the selected Foundry account. |
 | `addAIFactoryMCP2AIGatewaySKU` | `ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` | Register the MCP tool server; both components and suitable private outbound networking are required. |
 
-All three default to false. **False skips the step; it does not delete resources.**
+All three default to false. **False skips the step; it does not delete resources.** To delete a switched-off
+service that exists, see `enableDeleteForDisabledResources` in [the variables list](variables.md).
 `aifactoryMcpImage`, `aifactoryMcpApiImage` and `aifactoryMcpEntraAppId` are required
 for MCP hosting. `aiGatewaySkuResourceId` selects an existing gateway to adopt;
 `aiGatewaySkuOutboundSubnetId` provides the new gateway's outbound subnet when
@@ -34,17 +33,16 @@ call the MCP; the APIMs are only read and an administrator assigns `AiFactory.Mc
 to each identity. The exact environment names and defaults are in the
 generated tables below.
 
-Regular APIM pools (`ENABLE_APIM`), the optional Kong edge (`ENABLE_KONG`) and
-network Application Gateway are **different routes**. A configuration field
-does not make every route available in an installed API.
+The AI gateway for model calls has its own pipeline and settings: API Management with a pool of model
+backends (`ENABLE_APIM`), or Kong as the alternative (`ENABLE_KONG`). Application Gateway is for web traffic
+and has its own settings.
 See [component prerequisites](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
 ## Safe editing
 
-Use [registered settings/parameter preparation](index.md) for API-managed
-configuration. Inspect defaults and dependencies; change only intended values.
-Deleting an override is not resource deletion. Secret-name references are not
-places to store secret values.
+Change settings with a [tool](index.md). Read the default of a setting and what it depends on, and change
+only the values you mean to. Removing a value you set returns the setting to its default; it deletes nothing
+in Azure. A setting that ends in a secret name holds the name of a Key Vault secret, never the secret itself.
 
 <details markdown="1">
 <summary>More info</summary>
@@ -64,9 +62,8 @@ helper's CLI options, from `bootstrap/lib/create-new-aifactory-scaleset.sh`,
 `bootstrap/lib/aifactory_scaleset_config.py`. Public Bash command switches are
 documented below. Internal resume flags, generated state, shell implementation
 locals, external service API schemas, and module-internal ARM inputs are excluded.
-There is no separate checked-in bootstrap `.env` template in these sources:
-bootstrap reads process environment inputs, then writes the selected route's files.
-Do not confuse that input environment with the generated GitHub `.env`.
+The launcher scripts read their inputs from environment variables and then write the files of the chosen
+orchestrator. Those inputs are a different list from the GitHub `.env` file that the scripts write.
 
 !!! note "Two distinct JSON contracts"
     The raw checked-in consumer template `environment_setup/aifactory/variables.json`
@@ -86,13 +83,13 @@ Do not confuse that input environment with the generated GitHub `.env`.
 ### Reading defaults and requirements
 
 - **M — mandatory in the source template's deployment context.** A supplied
-  default can satisfy the input; it does not mean you must edit every M row.
+  default can satisfy the input, so you only edit the M rows whose default doesn't fit.
 - **C — conditionally required.** Applies only to the selected environment,
   identity route, service or networking mode. For example, Stage service
   connections are not prerequisites for a Dev-only run.
-- **O — optional override or feature switch.** O does not mean safe to enable
-  without its dependencies. Optional switches remain O even if a preset fixes
-  them on; the required private-agent service bundle is C for that architecture.
+- **O — optional override or feature switch.** A switch can still need other services: read its
+  description. A switch stays O when a preset turns it on. The services that private Foundry agents need
+  together are marked C.
 - Values are **actual assignments**, not the sometimes stale `<default>` text
   in comments. Empty strings and `<todo>` / `<optional>` placeholders are shown
   literally and are not usable credentials or resource IDs.
@@ -112,8 +109,8 @@ The shared template default is `shared-subscriptions` with
 `common_vnet_cidr=172.16.XX.0/18` and network-aligned Dev/Stage/Prod selectors
 **`0` / `64` / `128`**. Own-subscription `/20` planning uses **`0` / `16` / `32`**.
 `XX` replaces the third octet in the VNet and subnet templates. Environments,
-VPN client pools and existing networks must not overlap. Address intent does
-not create peering or resize existing networks.
+VPN client pools and existing networks must not overlap. ESAF plans inside the range you give. It doesn't
+resize a network that already exists.
 
 | `centralDnsZoneByPolicyInHub` | `enableAIFactoryHub` | Meaning |
 |---|---|---|
@@ -121,18 +118,16 @@ not create peering or resize existing networks.
 | `false` | `true` | Own AI Factory hub intent |
 | `true` | Either | External central-DNS hub takes precedence; supply its subscription/resource group |
 
-The hub flag alone is configuration intent, not a deployment operation. JSON
-stores these flags as booleans while YAML/GHA templates use string values.
-The three public-access flags govern service access, not repository visibility
-and not every telemetry endpoint. `enableAMPLS=false` does not provide
-private-only Application Insights/Log Analytics ingestion.
+JSON stores these flags as booleans, while the YAML and GitHub templates use strings.
+The three public-access flags control access to the Azure services. Monitoring has its own switch: set
+`enableAMPLS` to `true` for private-only ingestion to Application Insights and Log Analytics.
 
 ### Models, SKUs and aliases
 
 `modelGPTXSku` / `MODEL_GPTX_SKU` and
 `default_model_sku` / `DEFAULT_MODEL_SKU` default to **`DataZoneStandard`**.
-Model availability, version support, capacity and quota must be checked for
-the selected region/subscription; a template value is not a capacity reservation.
+Check that the region of your Factory offers the model and version, and that your subscription has the
+quota for the capacity you ask for.
 Dev and Stage/Prod service SKUs remain separate fields.
 
 AI Search has a particularly important fallback:
@@ -161,8 +156,8 @@ Successful attempts export the effective SKU (and PostgreSQL tier) for later ste
 The existing JSON-array names `skuAISearchDevArray` and
 `skuAISearchStageProdArray` remain supported alongside the comma-separated
 `skuArrayAISearchDev` / `skuArrayAISearchStageProd` names. A customized spelling
-takes precedence over the unchanged default; differing custom values fail
-validation rather than silently discarding either configuration.
+takes precedence over the unchanged default. When both spellings have different custom values, validation
+fails and names them.
 Container Apps detected before the run retain their existing application images
 and configuration. Retry reconciliation uses the original existence flags, so
 only resources absent at the start are reapplied unless explicitly opted in.
@@ -192,9 +187,8 @@ first with selected-first SKUs, then each fallback in list order. Up to five
 fallbacks plus the primary and three SKUs allow **18 creation attempts**, with the
 unchanged **240-second delay** before each retry. Explicit `[]` or blank disables
 regional fallback; missing runtime fields and undefined GHA variables retain `[]`
-for historical inputs. Denmark East is intentionally retained because the portal
-allows it despite its omission from Microsoft's AI Search region list; Germany
-remains last with its known capacity warning. Availability is not guaranteed.
+for historical inputs. Denmark East is in the list because the portal allows it, although it is missing from
+Microsoft's AI Search region list. Germany is last because of its known capacity shortage.
 
 This is **provisioning-only recovery**, not runtime failover, replication or index
 migration. Existing Search keeps its actual region and requested SKU changes;
@@ -207,8 +201,8 @@ and cost before provisioning with these defaults.
 Attempts honor the infra phase, deletion and service/debug switches, retaining
 the cognitive/database capability-host debug override used by ADO. AI Search
 also runs when private Foundry requires it (`enableAIFoundry=true` and
-`enablePublicGenAIAccess!=true`), even if `enableAISearch=false`. Preflight quota
-headroom checks are **not a capacity guarantee**. Container Apps fallback from
+`enablePublicGenAIAccess!=true`), even if `enableAISearch=false`. The preflight step checks your quota. A
+region can still be out of capacity when the deployment runs, which is what the retries are for. Container Apps fallback from
 `Consumption` to `D4` or `D8` changes to **dedicated workload-profile pricing**;
 review costs before enabling these candidates.
 
@@ -226,10 +220,9 @@ service-principal secret-name fields empty. A seeding-vault shell may still be
 required. Existing-SP and PAT routes require secrets only when selected; keep
 them out of committed files, logs and command history.
 
-Deletion and debug switches are public template inputs and therefore included.
-Their presence is not a recommendation to enable them. Review the exact target,
-backups, policy/RBAC permissions, network reachability and the deployment plan.
-A complete configuration reference is not a guarantee of deployment success.
+The delete and debug switches are listed with the other settings. Leave them `false` for normal runs. Before
+you set a delete switch to `true`, read which project and environment the run targets and back up what you
+need.
 
 </details>
 
@@ -258,20 +251,17 @@ They use the existing deployment engine and route configuration.
 
 Legacy create defaults to `124`. Update inherits the saved version unless an
 explicit version selector is provided. Choose `main` explicitly for development;
-project-only is not an upgrade operation. Current create validation
+`--project-only` keeps the templates as they are. Current create validation
 accepts `AIF_NETWORK_MODE=priv` (default), `h` (hybrid) or `pub` (public). Private
 networking needs a hub (external, or the own hub with `AIF_SETUP_HUB_ACCESS=true`)
 unless `AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false`; a Standalone AI Factory without a
 hub uses `h` or `pub`. Its general region prompt defaults to **`swedencentral`**, whereas
 the shared configuration templates default to **`eastus2`**.
-Initial legacy bootstrap deploys Dev only and seeds Stage/Prod subscription
-values from Dev; that is not a reviewed multi-environment network plan.
+The first run of a launcher deploys Dev only and copies the Dev subscription to the Stage and Prod settings.
+Change those before you deploy Stage or Prod.
 
-Register-managed targets are a distinct contract: these legacy launchers do
-not initialize or modify `azurefactory/register.json`. Use the corresponding
-lifecycle CLI/API with an explicit, reviewed target manifest instead.
-Legacy create explicitly rejects `AIF_CREATE_PROJECTS` and `AIF_PROJECT_MODE`;
-they are not supported substitutes for a scoped lifecycle manifest.
+The launcher scripts don't read or write `azurefactory/register.json`. For a Factory that the Factory API
+manages, use the CLI, the SDK or REST. The create script rejects `AIF_CREATE_PROJECTS` and `AIF_PROJECT_MODE`.
 
 ## Simple-mode technical contract
 
@@ -304,8 +294,8 @@ all three dependencies; its capability host cannot be selected without Foundry.
 The UI clears those three when Foundry is unchecked, after which Search and Cosmos DB
 can be selected independently. Explicit `AIF_SIMPLE_PROJECT_RESOURCES_JSON=[]`
 deploys only the baseline project foundation. Omitting the selection preserves the
-default Foundry bundle. Explicit incomplete dependencies are rejected before Azure
-mutations, not silently re-enabled; valid selections are ordered by the catalog.
+default Foundry bundle. A selection that lacks a required service is rejected before anything changes in
+Azure. Valid selections are ordered by the catalog.
 
 Additional optional IDs are `azure-machine-learning`, `aks-for-azure-ml`, `aks`,
 `databricks`, `datafactory`, `event-hubs`, `postgresql` and `container-apps`.
@@ -325,7 +315,7 @@ and ML phases still run.
 The additive literal `projectResourceSelection` manifest contract has version 1
 and strict dependency validation. Publish the matching source before using it.
 All model deployment toggles remain off and model SKU defaults stay
-`DataZoneStandard`. This is not a preloaded-model or runnable-agent guarantee.
+`DataZoneStandard`. Switch on a model deployment before you run an agent.
 
 Deploying a **new Application Gateway is optional**, not a prerequisite for private
 Foundry agents. New UI selections default off. Set
@@ -340,8 +330,8 @@ When false, gateway hostname/backend/certificate inputs may be blank and all
 gateway-specific feature/certificate checks, subnet reservation, NSG, identity,
 certificate role grant/private endpoint, frontend DNS, deployment and backend
 health checks are skipped. VPN, DNS Private Resolver, required private DNS zones
-and the selected project workloads remain enabled. No environment, including Prod,
-universally requires a new Application Gateway.
+and the selected project workloads remain enabled. A new Application Gateway is optional in every
+environment, Prod included.
 
 This is an additive v2 capability (`AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT=1`), not
 a replacement for v2. The manifest's literal `appGatewayDeployment` advertises
@@ -375,9 +365,8 @@ automatic paid-SKU fallback, and does not create an admin VM.
 `GITHUB_REPOSITORY_VISIBILITY=private|public` defaults to **private** for this
 contract, unlike the generic `.env.template` repository default. An existing
 repository must be empty and match the requested visibility. Review generated
-code and non-secret metadata before publication. Ignore rules for `.env`,
-populated configuration, certificates and VPN files are not a general-purpose
-secret sanitizer.
+code and non-secret metadata before publication. The ignore rules cover `.env`, filled-in settings,
+certificates and VPN files. Check for other secrets yourself before you publish a repository.
 
 ## Maintaining the reference
 
@@ -391,8 +380,8 @@ python documentation/gh-io/tools/generate_parameters.py --check
 
 The check compares the exact source-qualified union with generated row markers,
 rejects duplicate JSON keys/reference rows and detects stale defaults,
-descriptions, aliases and inventory counts. Repeated source assignments are
-reported, not silently represented as multiple settings.
+descriptions, aliases and inventory counts. A setting that is assigned twice in a template is reported once,
+with both lines.
 
 Targeted regression tests:
 
@@ -423,7 +412,7 @@ Counts are source-qualified: a spelling present in YAML and JSON is covered in e
 
 ## YAML and variables.json reference
 
-Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** = YAML assignment; **J.section** = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.
+Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** = YAML assignment; **J.section** = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings, fallbacks and reviewed template counterparts. A GHA name can be a fallback rather than an equal of the YAML key, so read the workflow before you swap one for the other.
 
 ### Services and feature switches
 
@@ -455,7 +444,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:apimGatewayRetryCount --><!-- parameter json.dev:apimGatewayRetryCount -->`apimGatewayRetryCount` | `APIM_GATEWAY_RETRY_COUNT` | O | Y: `"2"`<br>J.dev: `"2"` | Sets how many times APIM retries after a backend answers 429 (throttled), from 1 to 50. Used only when ENABLE_APIM is true. The AI gateway pipeline reads it from variables.yaml or the GitHub variables, not from variables.json. |
 | <!-- parameter yaml:apimGatewayServiceName --><!-- parameter json.dev:apimGatewayServiceName -->`apimGatewayServiceName` | `APIM_GATEWAY_SERVICE_NAME` | C | Y: `""`<br>J.dev: `""` | Existing APIM service with system-assigned managed identity enabled. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter yaml:apimGatewaySku --><!-- parameter json.dev:apimGatewaySku -->`apimGatewaySku` | `APIM_GATEWAY_SKU` | O | Y: `"StandardV2"`<br>J.dev: `"StandardV2"` | SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers. |
-| <!-- parameter yaml:apimGatewaySkuCapacity --><!-- parameter json.dev:apimGatewaySkuCapacity -->`apimGatewaySkuCapacity` | `APIM_GATEWAY_SKU_CAPACITY` | O | Y: `1`<br>J.dev: `1` | Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation. |
+| <!-- parameter yaml:apimGatewaySkuCapacity --><!-- parameter json.dev:apimGatewaySkuCapacity -->`apimGatewaySkuCapacity` | `APIM_GATEWAY_SKU_CAPACITY` | O | Y: `1`<br>J.dev: `1` | Number of units of the API Management SKU. Check the limits of the SKU and size it from the load you measure. |
 | <!-- parameter yaml:apimGatewaySubscriptionId --><!-- parameter json.dev:apimGatewaySubscriptionId -->`apimGatewaySubscriptionId` | `APIM_GATEWAY_SUBSCRIPTION_ID` | O | Y: `""`<br>J.dev: `""` | Subscription containing APIM. Empty uses the environment subscription. |
 | <!-- parameter yaml:cleanFoundryCaphost --><!-- parameter json.dev:cleanFoundryCaphost -->`cleanFoundryCaphost` | `CLEAN_FOUNDRY_CAPHOST` | O | Y: `"false"`<br>J.dev: `"false"` | Clean up capability host on deletion otherwise: false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project. |
 | <!-- parameter yaml:databricksOID --><!-- parameter json.dev:databricksOID -->`databricksOID` | `DATABRICKS_OID` | C | Y: `"<optional>_ObjectID"`<br>J.dev: `"<optional>_ObjectID"` | Databricks object ID mandatory: if enableDatabricks:'true' ensure: find Databricks object ID in Entra ID. |
@@ -468,16 +457,16 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:elasticLastName --><!-- parameter json.dev:elasticLastName -->`elasticLastName` | `ELASTIC_LAST_NAME` | C | Y: `"Factory"`<br>J.dev: `"Factory"` | Elastic Cloud contact last name mandatory: if enableElasticsearch:'true' |
 | <!-- parameter yaml:elasticSku --><!-- parameter json.dev:elasticSku -->`elasticSku` | `ELASTIC_SKU` | O | Y: `"ess-consumption-2024_Monthly"`<br>J.dev: `"ess-consumption-2024_Monthly"` | Elastic Cloud SKU |
 | <!-- parameter yaml:elasticType --><!-- parameter json.dev:elasticType -->`elasticType` | `ELASTIC_TYPE` | O | Y: `"ElasticCloud"`<br>J.dev: `"ElasticCloud"` | Elasticsearch deployment type otherwise: "SelfManagedOnAKS" (future support). |
-| <!-- parameter yaml:enableAFoundryCaphost --><!-- parameter json.dev:enableAFoundryCaphost -->`enableAFoundryCaphost` | `ENABLE_FOUNDRY_CAPHOST` | C | Y: `"true"`<br>J.dev: `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
+| <!-- parameter yaml:enableAFoundryCaphost --><!-- parameter json.dev:enableAFoundryCaphost -->`enableAFoundryCaphost` | `ENABLE_FOUNDRY_CAPHOST` | C | Y: `"true"`<br>J.dev: `"true"` | Lets private Foundry agents keep their threads, files and vectors in your own Storage, AI Search and Cosmos DB. Needs those three services and enableAIFoundry. |
 | <!-- parameter yaml:enableAIDocIntelligence --><!-- parameter json.dev:enableAIDocIntelligence -->`enableAIDocIntelligence` | `ENABLE_AI_DOC_INTELLIGENCE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Document Intelligence |
 | <!-- parameter yaml:enableAIFactoryAgentLiveVoice --><!-- parameter json.dev:enableAIFactoryAgentLiveVoice -->`enableAIFactoryAgentLiveVoice` | `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
 | <!-- parameter yaml:enableAIFactoryCreatedDefaultProjectForAIFv2 --><!-- parameter json.dev:enableAIFactoryCreatedDefaultProjectForAIFv2 -->`enableAIFactoryCreatedDefaultProjectForAIFv2` | `ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2` | O | Y: `"true"`<br>J.dev: `"true"` | AI Factory default project for AIFv2 otherwise: false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections. |
 | <!-- parameter yaml:enableAIFactoryHub --><!-- parameter json.dev:enableAIFactoryHub -->`enableAIFactoryHub` | `ENABLE_AI_FACTORY_HUB` | O | Y: `"false"`<br>J.dev: `false` | Own AI Factory Hub intent |
 | <!-- parameter yaml:enableAIFactoryMCP --><!-- parameter json.dev:enableAIFactoryMCP -->`enableAIFactoryMCP` | `ENABLE_AI_FACTORY_MCP` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
-| <!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry -->`enableAIFoundry` | `ENABLE_AI_FOUNDRY` | C | Y: `"true"`<br>J.dev: `"true"` | Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim. |
+| <!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry -->`enableAIFoundry` | `ENABLE_AI_FOUNDRY` | C | Y: `"true"`<br>J.dev: `"true"` | Deploys the Microsoft Foundry account and project. Private agents also need enableAFoundryCaphost, AI Search, Cosmos DB and Storage. Check that your region offers the models you want. |
 | <!-- parameter yaml:enableAIFoundryHub --><!-- parameter json.dev:enableAIFoundryHub -->`enableAIFoundryHub` | `ENABLE_AI_FOUNDRY_HUB` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. |
 | <!-- parameter yaml:enableAIGatewaySKU --><!-- parameter json.dev:enableAIGatewaySKU -->`enableAIGatewaySKU` | `ENABLE_AI_GATEWAY_SKU` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources. |
-| <!-- parameter yaml:enableAISearch --><!-- parameter json.dev:enableAISearch -->`enableAISearch` | `ENABLE_AI_SEARCH` | C | Y: `"true"`<br>J.dev: `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
+| <!-- parameter yaml:enableAISearch --><!-- parameter json.dev:enableAISearch -->`enableAISearch` | `ENABLE_AI_SEARCH` | C | Y: `"true"`<br>J.dev: `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
 | <!-- parameter yaml:enableAISearchSharedPrivateLink --><!-- parameter json.dev:enableAISearchSharedPrivateLink -->`enableAISearchSharedPrivateLink` | `ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK` | O | Y: `"true"`<br>J.dev: `"true"` | AI Search shared private link otherwise: false, creates a private endpoint in the project vNet. |
 | <!-- parameter yaml:enableAIServices --><!-- parameter json.dev:enableAIServices -->`enableAIServices` | `ENABLE_AI_SERVICES` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. |
 | <!-- parameter yaml:enableAKS --><!-- parameter json.dev:enableAKS -->`enableAKS` | `ENABLE_AKS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy standalone AKS cluster in project RG |
@@ -496,13 +485,13 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableBotService --><!-- parameter json.dev:enableBotService -->`enableBotService` | `ENABLE_BOT_SERVICE` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy Azure Bot Service keep-as-is: Required for Microsoft Foundry agent scenarios. |
 | <!-- parameter yaml:enableContainerApps --><!-- parameter json.dev:enableContainerApps -->`enableContainerApps` | `ENABLE_CONTAINER_APPS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Container Apps |
 | <!-- parameter yaml:enableContentSafety --><!-- parameter json.dev:enableContentSafety -->`enableContentSafety` | `ENABLE_CONTENT_SAFETY` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Content Safety |
-| <!-- parameter yaml:enableCosmosDB --><!-- parameter json.dev:enableCosmosDB -->`enableCosmosDB` | `ENABLE_COSMOS_DB` | C | Y: `"true"`<br>J.dev: `"true"` | Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
+| <!-- parameter yaml:enableCosmosDB --><!-- parameter json.dev:enableCosmosDB -->`enableCosmosDB` | `ENABLE_COSMOS_DB` | C | Y: `"true"`<br>J.dev: `"true"` | Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
 | <!-- parameter yaml:enableDatabricks --><!-- parameter json.dev:enableDatabricks -->`enableDatabricks` | `ENABLE_DATABRICKS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Databricks workspace |
 | <!-- parameter yaml:enableDatafactory --><!-- parameter json.dev:enableDatafactory -->`enableDatafactory` | `ENABLE_DATAFACTORY` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Data Factory in project RG |
 | <!-- parameter yaml:enableDatafactoryCommon --><!-- parameter json.dev:enableDatafactoryCommon -->`enableDatafactoryCommon` | `ENABLE_DATAFACTORY_COMMON` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Data Factory in common RG |
 | <!-- parameter yaml:enableDefenderforAIResourceLevel --><!-- parameter json.dev:enableDefenderforAIResourceLevel -->`enableDefenderforAIResourceLevel` | `ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL` | O | Y: `"false"`<br>J.dev: `"false"` | Defender for AI at resource level otherwise: true, enable Microsoft Defender for AI at per-resource level. |
 | <!-- parameter yaml:enableDefenderforAISubLevel --><!-- parameter json.dev:enableDefenderforAISubLevel -->`enableDefenderforAISubLevel` | `ENABLE_DEFENDER_FOR_AI_SUB_LEVEL` | O | Y: `"false"`<br>J.dev: `"false"` | Defender for AI at subscription level otherwise: true, enable Microsoft Defender for AI at subscription level. |
-| <!-- parameter yaml:enableDeleteForDisabledResources --><!-- parameter json.dev:enableDeleteForDisabledResources -->`enableDeleteForDisabledResources` | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
+| <!-- parameter yaml:enableDeleteForDisabledResources --><!-- parameter json.dev:enableDeleteForDisabledResources -->`enableDeleteForDisabledResources` | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | O | Y: `"false"`<br>J.dev: `"false"` | Decides what happens to a service that is switched off but exists in Azure. false, the default: the pipeline leaves it alone. true: the next run of the project pipeline deletes, in the project resource group, the resources that have the AI Factory name of a switched-off service, before it deploys the rest. It keeps Key Vault, storage accounts, Application Insights, dashboards and managed identities, and never touches the common resource group. Databases go with their data, and it purges deleted Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources, which cannot be undone. Review the switched-off services before you set it to true. |
 | <!-- parameter yaml:enableElasticsearch --><!-- parameter json.dev:enableElasticsearch -->`enableElasticsearch` | `ENABLE_ELASTICSEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
 | <!-- parameter yaml:enableEncryptionAtHost --><!-- parameter json.dev:enableEncryptionAtHost -->`enableEncryptionAtHost` | `ENABLE_ENCRYPTION_AT_HOST` | O | Y: `"true"`<br>J.dev: `"true"` | Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
 | <!-- parameter yaml:enableEventHubs --><!-- parameter json.dev:enableEventHubs -->`enableEventHubs` | `ENABLE_EVENT_HUBS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Event Hubs |
@@ -688,7 +677,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:subnetProjAKS2 --><!-- parameter json.dev:subnetProjAKS2 -->`subnetProjAKS2` | `SUBNET_PROJ_AKS2` | C | Y: `"snt-<network_env>prj<xxx>-aks2"`<br>J.dev: `"snt-<network_env>prj<xxx>-aks2"` | BYO project secondary AKS subnet mandatory: if BYO_subnets:'true' ensure: subnet exists. |
 | <!-- parameter yaml:subnetProjDatabricksPrivate --><!-- parameter json.dev:subnetProjDatabricksPrivate -->`subnetProjDatabricksPrivate` | `SUBNET_PROJ_DATABRICKS_PRIVATE`, `SUBNET_PROJ_DBX_PRIVATE` (not in .env template) | C | Y: `"snt-prj<xxx>-dbxpriv"`<br>J.dev: `"snt-prj<xxx>-dbxpriv"` | BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
 | <!-- parameter yaml:subnetProjDatabricksPublic --><!-- parameter json.dev:subnetProjDatabricksPublic -->`subnetProjDatabricksPublic` | `SUBNET_PROJ_DATABRICKS_PUBLIC`, `SUBNET_PROJ_DBX_PUBLIC` (not in .env template) | C | Y: `"snt-prj001-dbxpub"`<br>J.dev: `"snt-prj001-dbxpub"` | BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
-| <!-- parameter yaml:subnetProjGenAI --><!-- parameter json.dev:subnetProjGenAI -->`subnetProjGenAI` | `SUBNET_PROJ_GENAI` | C | Y: `"snt-dev-prj<xxx>-genai"`<br>J.dev: `"snt-dev-prj<xxx>-genai"` | BYO project GenAI subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| <!-- parameter yaml:subnetProjGenAI --><!-- parameter json.dev:subnetProjGenAI -->`subnetProjGenAI` | `SUBNET_PROJ_GENAI` | C | Y: `"snt-dev-prj<xxx>-genai"`<br>J.dev: `"snt-dev-prj<xxx>-genai"` | Name of the existing subnet of the project for its AI services. Required when BYO_subnets is true; the subnet must exist. |
 | <!-- parameter yaml:subnetProjLogicapp --><!-- parameter json.dev:subnetProjLogicapp -->`subnetProjLogicapp` | `SUBNET_PROJ_LOGICAPP` | C | Y: `""`<br>J.dev: `""` | BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: if BYO_subnets:'true', enableLogicApps:'true', logicAppType:'Standard', byoASEv3:'false' and enablePublicAccessWithPerimeter:'false'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
 | <!-- parameter yaml:subnetProjWebapp --><!-- parameter json.dev:subnetProjWebapp -->`subnetProjWebapp` | `SUBNET_PROJ_WEBAPP` | C | Y: `"snt-prj<xxx>-webapp"`<br>J.dev: `"snt-prj<xxx>-webapp"` | App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists. |
 | <!-- parameter yaml:test_cidr_range --><!-- parameter json.dev:test_cidr_range -->`test_cidr_range` | `STAGE_CIDR_RANGE` | M | Y: `"64"`<br>J.dev: `"64"` | STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18. |
@@ -716,9 +705,9 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:debug_disable_68_integration --><!-- parameter json.dev:debug_disable_68_integration -->`debug_disable_68_integration` | `DEBUG_DISABLE_68_INTEGRATION` | O | Y: `"false"`<br>J.dev: `"false"` | Skip integration step otherwise: true, skip: Logic Apps, Event Hubs. |
 | <!-- parameter yaml:debug_disable_69_aifoundry_2025 --><!-- parameter json.dev:debug_disable_69_aifoundry_2025 -->`debug_disable_69_aifoundry_2025` | `DEBUG_DISABLE_69_AIFOUNDRY_2025` | O | Y: `"false"`<br>J.dev: `"false"` | Skip AI Foundry V2 step otherwise: true, skip: AI Foundry V2 including RBAC and default project. |
 | <!-- parameter yaml:debug_disable_validation_tasks --><!-- parameter json.dev:debug_disable_validation_tasks -->`debug_disable_validation_tasks` | `DEBUG_DISABLE_VALIDATION_TASKS` | O | Y: `"false"`<br>J.dev: `"false"` | Disable validation tasks otherwise: true, skip subnet validation, submodule check, DNS zones check to speed up re-runs. |
-| <!-- parameter yaml:deleteAllForProject --><!-- parameter json.dev:deleteAllForProject -->`deleteAllForProject` | `DELETE_ALL_FOR_PROJECT` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion. |
-| <!-- parameter yaml:deleteAllServicesForProject --><!-- parameter json.dev:deleteAllServicesForProject -->`deleteAllServicesForProject` | `DELETE_ALL_SERVICES_FOR_PROJECT` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution. |
-| <!-- parameter yaml:deleteKeyvaultAlso --><!-- parameter json.dev:deleteKeyvaultAlso -->`deleteKeyvaultAlso` | `DELETE_KEYVAULT_ALSO` | O | Y: `"false"`<br>J.dev: `"false"` | Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply. |
+| <!-- parameter yaml:deleteAllForProject --><!-- parameter json.dev:deleteAllForProject -->`deleteAllForProject` | `DELETE_ALL_FOR_PROJECT` | O | Y: `"false"`<br>J.dev: `"false"` | true deletes everything in the project resource group, the resource group itself, and the subnets and network security groups of the project in the common resource group. Review the project and the environment first. |
+| <!-- parameter yaml:deleteAllServicesForProject --><!-- parameter json.dev:deleteAllServicesForProject -->`deleteAllServicesForProject` | `DELETE_ALL_SERVICES_FOR_PROJECT` | O | Y: `"false"`<br>J.dev: `"false"` | true deletes all services in the project resource group in the next project pipeline run, then ends the run. Key Vault stays unless deleteKeyvaultAlso is true. Review the project and the environment first. |
+| <!-- parameter yaml:deleteKeyvaultAlso --><!-- parameter json.dev:deleteKeyvaultAlso -->`deleteKeyvaultAlso` | `DELETE_KEYVAULT_ALSO` | O | Y: `"false"`<br>J.dev: `"false"` | With deleteAllServicesForProject, true also deletes the Key Vault of the project. Review the secrets and keys it holds first. The soft delete of Azure Key Vault still applies. |
 | <!-- parameter yaml:diagnosticSettingLevel --><!-- parameter json.dev:diagnosticSettingLevel -->`diagnosticSettingLevel` | `DIAGNOSTIC_SETTING_LEVEL` | O | Y: `"gold"`<br>J.dev: `"gold"` | Diagnostics level otherwise: silver or bronze for less verbose (lower cost) logging. |
 | <!-- parameter yaml:maxRetryAttempts --><!-- parameter json.dev:maxRetryAttempts -->`maxRetryAttempts` | `MAX_RETRY_ATTEMPTS` | O | Y: `"2"`<br>J.dev: `"2"` | Max total retry attempts keep-as-is: Total attempts (1 original + N retries). Valid values: 1, 2, or 3. |
 | <!-- parameter yaml:policyExemptionAssignmentIds --><!-- parameter json.dev:policyExemptionAssignmentIds -->`policyExemptionAssignmentIds` | `POLICY_EXEMPTION_ASSIGNMENT_IDS` | O | Y: `"[]"`<br>J.dev: `"[]"` | JSON array of policy assignment IDs (deployIfNotExists or auditIfNotExists) to exempt on the VNet RG otherwise: e.g. '["/subscriptions/ |
@@ -838,13 +827,13 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:disableLocalAuth --><!-- parameter json.dev:disableLocalAuth -->`disableLocalAuth` | `DISABLE_LOCAL_AUTH` | O | Y: `"true"`<br>J.dev: `"true"` | Disable local API key ("admin account") auth on Cognitive/AI Services & Foundry, AAD-only recommended: true, disables key auth (many orgs forbid keys). otherwise: false, allow local API keys. |
 | <!-- parameter yaml:disableRBACAdminOnRGForUsers --><!-- parameter json.dev:disableRBACAdminOnRGForUsers -->`disableRBACAdminOnRGForUsers` | `DISABLE_RBAC_ADMIN_ON_RG_FORUSERS`, `DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS` (not in .env template) | O | Y: `"true"`<br>J.dev: `"true"` | Disable RBAC Admin on RG for project users recommended: true, restricts users from assigning RBAC at resource group scope. |
 | <!-- parameter yaml:groups_coreteam_members --><!-- parameter json.dev:groups_coreteam_members -->`groups_coreteam_members` | `GROUPS_CORETEAM_MEMBERS` | C | Y: `"<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>"`<br>J.dev: `"<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>"` | Core team AD group ObjectIDs mandatory: if use_ad_groups:'true' |
-| <!-- parameter yaml:groups_project_members_esml --><!-- parameter json.dev:groups_project_members_esml -->`groups_project_members_esml` | `GROUPS_PROJECT_MEMBERS_ESML` | C | Y: `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"`<br>J.dev: `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | ESML project team AD group ObjectIDs mandatory: if use_ad_groups:'true' |
-| <!-- parameter yaml:groups_project_members_genai_1 --><!-- parameter json.dev:groups_project_members_genai_1 -->`groups_project_members_genai_1` | `GROUPS_PROJECT_MEMBERS_GENAI_1` | C | Y: `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"`<br>J.dev: `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | GenAI-1 project team AD group ObjectIDs mandatory: if use_ad_groups:'true' |
+| <!-- parameter yaml:groups_project_members_esml --><!-- parameter json.dev:groups_project_members_esml -->`groups_project_members_esml` | `GROUPS_PROJECT_MEMBERS_ESML` | C | Y: `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"`<br>J.dev: `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_esml. Used when use_ad_groups is true and admin_projectType is esml, an older project type. |
+| <!-- parameter yaml:groups_project_members_genai_1 --><!-- parameter json.dev:groups_project_members_genai_1 -->`groups_project_members_genai_1` | `GROUPS_PROJECT_MEMBERS_GENAI_1` | C | Y: `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"`<br>J.dev: `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_genai_1. Used when use_ad_groups is true. |
 | <!-- parameter yaml:inputCommonSPIDKey --><!-- parameter json.dev:inputCommonSPIDKey -->`inputCommonSPIDKey` | `INPUT_COMMON_SPID_KEY` | C | Y: `"<optional>esml-common-sp-id"`<br>J.dev: `"<optional>esml-common-sp-id"` | Seeding KV secret name for common SP App ID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter yaml:inputCommonSPSecretKey --><!-- parameter json.dev:inputCommonSPSecretKey -->`inputCommonSPSecretKey` | `INPUT_COMMON_SP_SECRET_KEY` | C | Y: `"<optional>esml-common-sp-secret"`<br>J.dev: `"<optional>esml-common-sp-secret"` | Seeding KV secret name for common SP secret ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter yaml:personas_core_team --><!-- parameter json.dev:personas_core_team -->`personas_core_team` | `PERSONAS_CORE_TEAM` | O | Y: `"p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops"`<br>J.dev: `"p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops"` | Core team personas keep-as-is: Mapped to group_coreteam_members. |
-| <!-- parameter yaml:personas_project_esml --><!-- parameter json.dev:personas_project_esml -->`personas_project_esml` | `PERSONAS_PROJECT_ESML` | O | Y: `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"`<br>J.dev: `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | ESML project personas keep-as-is: Mapped to groups_project_members_esml and PROJECT_TYPE=esml. |
-| <!-- parameter yaml:personas_project_genai_1 --><!-- parameter json.dev:personas_project_genai_1 -->`personas_project_genai_1` | `PERSONAS_PROJECT_GENAI_1` | O | Y: `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"`<br>J.dev: `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | GenAI-1 project personas keep-as-is: Mapped to groups_project_members_genai_1 and PROJECT_TYPE=genai-1. |
+| <!-- parameter yaml:personas_project_esml --><!-- parameter json.dev:personas_project_esml -->`personas_project_esml` | `PERSONAS_PROJECT_ESML` | O | Y: `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"`<br>J.dev: `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | Persona names of the project team, in the order of the groups in groups_project_members_esml. Keep as is. Used when admin_projectType is esml. |
+| <!-- parameter yaml:personas_project_genai_1 --><!-- parameter json.dev:personas_project_genai_1 -->`personas_project_genai_1` | `PERSONAS_PROJECT_GENAI_1` | O | Y: `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"`<br>J.dev: `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | Persona names of the project team, in the order of the groups in groups_project_members_genai_1. Keep as is. |
 | <!-- parameter yaml:prod_seeding_kv_service_connection --><!-- parameter json.dev:prod_seeding_kv_service_connection -->`prod_seeding_kv_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for PROD seeding KV mandatory: ADO service connection for PROD seeding KV ensure: name matches your service connection for the PROD seeding KV subscription. otherwise: can be same as prod_service_connection. Required when deploying that environment. |
 | <!-- parameter yaml:prod_service_connection --><!-- parameter json.dev:prod_service_connection -->`prod_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for PROD mandatory: ADO service connection for PROD ensure: name matches your Azure DevOps service connection for the PROD subscription. Required when deploying that environment. |
 | <!-- parameter yaml:project_service_principal_AppID_seeding_kv_name --><!-- parameter json.dev:project_service_principal_AppID_seeding_kv_name -->`project_service_principal_AppID_seeding_kv_name` | `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID` | C | Y: `"<optional>esml-project001-sp-id"`<br>J.dev: `"<optional>esml-project001-sp-id"` | Project SP App ID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
@@ -882,7 +871,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 
 ## GitHub Actions .env reference
 
-Every unique assignment is included, including orchestrator-only and compatibility names. Values are decoded literals, not expansions; these are template values, not necessarily the workflow's effective fallback. **No verified counterpart** means no mapping was found in the inspected shared bindings, not proof that a setting is unused.
+Every unique assignment is included, including orchestrator-only and compatibility names. Values are decoded literals, not expansions; these are template values, not necessarily the workflow's effective fallback. **No verified counterpart** means that no mapping was found in the shared bindings. The setting can still be read somewhere else.
 
 ### GHA: Factory, project, naming and orchestration
 
@@ -1018,7 +1007,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:APIM_GATEWAY_RETRY_COUNT -->`APIM_GATEWAY_RETRY_COUNT` | `apimGatewayRetryCount` | O | `"2"` | Apim gateway retry count. |
 | <!-- parameter env:APIM_GATEWAY_SERVICE_NAME -->`APIM_GATEWAY_SERVICE_NAME` | `apimGatewayServiceName` | C | `""` | Apim gateway service name. Required by the separate AI gateway workflow when APIM is enabled. |
 | <!-- parameter env:APIM_GATEWAY_SKU -->`APIM_GATEWAY_SKU` | `apimGatewaySku` | O | `"StandardV2"` | SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers. |
-| <!-- parameter env:APIM_GATEWAY_SKU_CAPACITY -->`APIM_GATEWAY_SKU_CAPACITY` | `apimGatewaySkuCapacity` | O | `"1"` | Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation. |
+| <!-- parameter env:APIM_GATEWAY_SKU_CAPACITY -->`APIM_GATEWAY_SKU_CAPACITY` | `apimGatewaySkuCapacity` | O | `"1"` | Number of units of the API Management SKU. Check the limits of the SKU and size it from the load you measure. |
 | <!-- parameter env:APIM_GATEWAY_SUBSCRIPTION_ID -->`APIM_GATEWAY_SUBSCRIPTION_ID` | `apimGatewaySubscriptionId` | O | `""` | Empty uses the GitHub Environment AZURE_SUBSCRIPTION_ID. |
 | <!-- parameter env:CLEAN_FOUNDRY_CAPHOST -->`CLEAN_FOUNDRY_CAPHOST` | `cleanFoundryCaphost` | O | `"true"` | Clean Foundry capability hosts before redeployment otherwise: true, deletes capability hosts before redeployment (useful when switching caphost configuration). |
 | <!-- parameter env:DATABRICKS_OID -->`DATABRICKS_OID` | `databricksOID` | C | `"<todo>"` | Databricks object ID mandatory: if ENABLE_DATABRICKS:'true' ensure: find Databricks object ID in Entra ID. |
@@ -1037,10 +1026,10 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_AI_FACTORY_AGENT_LIVE_VOICE -->`ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` | `enableAIFactoryAgentLiveVoice` | O | `"false"` | Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
 | <!-- parameter env:ENABLE_AI_FACTORY_HUB -->`ENABLE_AI_FACTORY_HUB` | `enableAIFactoryHub` | O | `"false"` | Own AI Factory Hub intent |
 | <!-- parameter env:ENABLE_AI_FACTORY_MCP -->`ENABLE_AI_FACTORY_MCP` | `enableAIFactoryMCP` | O | `"false"` | Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
-| <!-- parameter env:ENABLE_AI_FOUNDRY -->`ENABLE_AI_FOUNDRY` | `enableAIFoundry` | C | `"true"` | Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim. |
+| <!-- parameter env:ENABLE_AI_FOUNDRY -->`ENABLE_AI_FOUNDRY` | `enableAIFoundry` | C | `"true"` | Deploys the Microsoft Foundry account and project. Private agents also need enableAFoundryCaphost, AI Search, Cosmos DB and Storage. Check that your region offers the models you want. |
 | <!-- parameter env:ENABLE_AI_FOUNDRY_HUB -->`ENABLE_AI_FOUNDRY_HUB` | `enableAIFoundryHub` | O | `"false"` | DEPRECATED: Legacy AI Foundry Hub v1 keep-as-is: Legacy Hub (v1). Use ENABLE_AI_FOUNDRY instead. |
 | <!-- parameter env:ENABLE_AI_GATEWAY_SKU -->`ENABLE_AI_GATEWAY_SKU` | `enableAIGatewaySKU` | O | `"false"` | Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources. |
-| <!-- parameter env:ENABLE_AI_SEARCH -->`ENABLE_AI_SEARCH` | `enableAISearch` | C | `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
+| <!-- parameter env:ENABLE_AI_SEARCH -->`ENABLE_AI_SEARCH` | `enableAISearch` | C | `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
 | <!-- parameter env:ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK -->`ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK` | `enableAISearchSharedPrivateLink` | O | `"true"` | Enable AI Search shared private link |
 | <!-- parameter env:ENABLE_AI_SERVICES -->`ENABLE_AI_SERVICES` | `enableAIServices` | O | `"false"` | DEPRECATED: Standalone AI Services account keep-as-is: Replaced by ENABLE_AI_FOUNDRY. Requires ENABLE_AI_SERVICES:'true' for legacy Hub v1. |
 | <!-- parameter env:ENABLE_AKS -->`ENABLE_AKS` | `enableAKS` | O | `"false"` | Deploy standalone AKS cluster keep-as-is: Independent of Azure ML, for general container workloads. |
@@ -1058,18 +1047,18 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_BOT_SERVICE -->`ENABLE_BOT_SERVICE` | `enableBotService` | O | `"true"` | Enable Azure Bot Service |
 | <!-- parameter env:ENABLE_CONTAINER_APPS -->`ENABLE_CONTAINER_APPS` | `enableContainerApps` | O | `"false"` | Enable Azure Container Apps |
 | <!-- parameter env:ENABLE_CONTENT_SAFETY -->`ENABLE_CONTENT_SAFETY` | `enableContentSafety` | O | `"false"` | Enable Azure AI Content Safety |
-| <!-- parameter env:ENABLE_COSMOS_DB -->`ENABLE_COSMOS_DB` | `enableCosmosDB` | C | `"true"` | Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
+| <!-- parameter env:ENABLE_COSMOS_DB -->`ENABLE_COSMOS_DB` | `enableCosmosDB` | C | `"true"` | Required capability-host thread and agent-history store for private Foundry standard agents. mandatory: Required capability-host thread and agent-history store for private Foundry standard agents. Required together for private Foundry agents that keep their data in your own resources. |
 | <!-- parameter env:ENABLE_DATABRICKS -->`ENABLE_DATABRICKS` | `enableDatabricks` | O | `"false"` | Enable Azure Databricks |
 | <!-- parameter env:ENABLE_DATAFACTORY -->`ENABLE_DATAFACTORY` | `enableDatafactory` | O | `"false"` | Enable Azure Data Factory |
 | <!-- parameter env:ENABLE_DATAFACTORY_COMMON -->`ENABLE_DATAFACTORY_COMMON` | `enableDatafactoryCommon` | O | `"false"` | Enable Data Factory in common RG |
 | <!-- parameter env:ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL -->`ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL` | `enableDefenderforAIResourceLevel` | O | `"false"` | Defender for AI at resource level keep-as-is: Per-resource Microsoft Defender for AI protection. |
 | <!-- parameter env:ENABLE_DEFENDER_FOR_AI_SUB_LEVEL -->`ENABLE_DEFENDER_FOR_AI_SUB_LEVEL` | `enableDefenderforAISubLevel` | O | `"false"` | Defender for AI at subscription level keep-as-is: Subscription-level Microsoft Defender for AI protection. |
-| <!-- parameter env:ENABLE_DELETE_FOR_DISABLED_RESOURCES -->`ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `enableDeleteForDisabledResources` | O | `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
+| <!-- parameter env:ENABLE_DELETE_FOR_DISABLED_RESOURCES -->`ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `enableDeleteForDisabledResources` | O | `"false"` | Decides what happens to a service that is switched off but exists in Azure. false, the default: the pipeline leaves it alone. true: the next run of the project pipeline deletes, in the project resource group, the resources that have the AI Factory name of a switched-off service, before it deploys the rest. It keeps Key Vault, storage accounts, Application Insights, dashboards and managed identities, and never touches the common resource group. Databases go with their data, and it purges deleted Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources, which cannot be undone. Review the switched-off services before you set it to true. |
 | <!-- parameter env:ENABLE_ELASTICSEARCH -->`ENABLE_ELASTICSEARCH` | `enableElasticsearch` | O | `"false"` | Enable Elasticsearch (Elastic Cloud) |
 | <!-- parameter env:ENABLE_ENCRYPTION_AT_HOST -->`ENABLE_ENCRYPTION_AT_HOST` | `enableEncryptionAtHost` | O | `"true"` | Defender for Cloud encryption at host on new VMs and AKS node pools keep-as-is: Needs the subscription feature Microsoft.Compute/EncryptionAtHost (the bootstrap registers it). Existing VMs are never changed; false opts out. |
 | <!-- parameter env:ENABLE_EVENT_HUBS -->`ENABLE_EVENT_HUBS` | `enableEventHubs` | O | `"false"` | Enable Azure Event Hubs |
 | <!-- parameter env:ENABLE_FACTORY_CHAT_AGENT -->`ENABLE_FACTORY_CHAT_AGENT` | `enableFactoryChatAgent` | O | `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
-| <!-- parameter env:ENABLE_FOUNDRY_CAPHOST -->`ENABLE_FOUNDRY_CAPHOST` | `enableAFoundryCaphost` | C | `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
+| <!-- parameter env:ENABLE_FOUNDRY_CAPHOST -->`ENABLE_FOUNDRY_CAPHOST` | `enableAFoundryCaphost` | C | `"true"` | Lets private Foundry agents keep their threads, files and vectors in your own Storage, AI Search and Cosmos DB. Needs those three services and enableAIFoundry. |
 | <!-- parameter env:ENABLE_FUNCTION -->`ENABLE_FUNCTION` | `enableFunction` | O | `"false"` | Enable Azure Functions |
 | <!-- parameter env:ENABLE_KONG -->`ENABLE_KONG` | `ENABLE_KONG` | O | `"false"` | Enable kong. |
 | <!-- parameter env:ENABLE_LOGIC_APPS -->`ENABLE_LOGIC_APPS` | `enableLogicApps` | O | `"false"` | Enable Azure Logic Apps |
@@ -1144,7 +1133,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:SUBNET_PROJ_AKS2 -->`SUBNET_PROJ_AKS2` | `subnetProjAKS2` | O | `""` | BYO AKS secondary project subnet name |
 | <!-- parameter env:SUBNET_PROJ_DATABRICKS_PRIVATE -->`SUBNET_PROJ_DATABRICKS_PRIVATE` | `subnetProjDatabricksPrivate` | C | `""` | BYO Databricks private subnet name mandatory: if ENABLE_DATABRICKS:'true' and BYO_SUBNETS:'true' |
 | <!-- parameter env:SUBNET_PROJ_DATABRICKS_PUBLIC -->`SUBNET_PROJ_DATABRICKS_PUBLIC` | `subnetProjDatabricksPublic` | C | `""` | BYO Databricks public subnet name mandatory: if ENABLE_DATABRICKS:'true' and BYO_SUBNETS:'true' |
-| <!-- parameter env:SUBNET_PROJ_GENAI -->`SUBNET_PROJ_GENAI` | `subnetProjGenAI` | C | `""` | BYO GenAI project subnet name mandatory: if BYO_SUBNETS:'true' |
+| <!-- parameter env:SUBNET_PROJ_GENAI -->`SUBNET_PROJ_GENAI` | `subnetProjGenAI` | C | `""` | Name of the existing subnet of the project for its AI services. Required when BYO_subnets is true; the subnet must exist. |
 | <!-- parameter env:SUBNET_PROJ_LOGICAPP -->`SUBNET_PROJ_LOGICAPP` | `subnetProjLogicapp` | C | `""` | BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: for enabled private Standard without BYO ASE when BYO_SUBNETS:'true'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
 | <!-- parameter env:SUBNET_PROJ_WEBAPP -->`SUBNET_PROJ_WEBAPP` | `subnetProjWebapp` | C | `""` | BYO App Service/Function VNet-integration project subnet name mandatory: if (ENABLE_WEB_APP:'true' OR ENABLE_FUNCTION:'true') and BYO_SUBNETS:'true' |
 | <!-- parameter env:VNET_NAME_BASE -->`VNET_NAME_BASE` | `vnetNameBase` | O | `"vnt-esmlcmn"` | Common vNet base name keep-as-is: Base name of the common virtual network. |
@@ -1283,13 +1272,13 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:DISABLE_LOCAL_AUTH -->`DISABLE_LOCAL_AUTH` | `disableLocalAuth` | O | `"true"` | Disable local API key ("admin account") auth on Cognitive/AI Services & Foundry, AAD-only recommended: true, disables key auth (many orgs forbid keys). otherwise: false, allow local API keys. |
 | <!-- parameter env:DISABLE_RBAC_ADMIN_ON_RG_FORUSERS -->`DISABLE_RBAC_ADMIN_ON_RG_FORUSERS` | `disableRBACAdminOnRGForUsers` | O | `"false"` | Disable RBAC Admin on RG for project users recommended: true, restrict RBAC Admin on resource group for better governance. |
 | <!-- parameter env:GROUPS_CORETEAM_MEMBERS -->`GROUPS_CORETEAM_MEMBERS` | `groups_coreteam_members` | M | `"<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>"` | Core team Entra ID group OIDs mandatory: Core team Entra ID group OIDs ensure: 3 comma-separated AD group ObjectIDs matching personas in PERSONAS_CORE_TEAM. |
-| <!-- parameter env:GROUPS_PROJECT_MEMBERS_ESML -->`GROUPS_PROJECT_MEMBERS_ESML` | `groups_project_members_esml` | M | `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | ESML project team Entra ID group OIDs mandatory: ESML project team Entra ID group OIDs ensure: 3 comma-separated AD group ObjectIDs matching personas in PERSONAS_PROJECT_ESML. |
-| <!-- parameter env:GROUPS_PROJECT_MEMBERS_GENAI_1 -->`GROUPS_PROJECT_MEMBERS_GENAI_1` | `groups_project_members_genai_1` | M | `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | GenAI-1 project team Entra ID group OIDs mandatory: GenAI-1 project team Entra ID group OIDs ensure: 5 comma-separated AD group ObjectIDs matching personas in PERSONAS_PROJECT_GENAI_1. |
+| <!-- parameter env:GROUPS_PROJECT_MEMBERS_ESML -->`GROUPS_PROJECT_MEMBERS_ESML` | `groups_project_members_esml` | M | `"<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>"` | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_esml. Used when use_ad_groups is true and admin_projectType is esml, an older project type. |
+| <!-- parameter env:GROUPS_PROJECT_MEMBERS_GENAI_1 -->`GROUPS_PROJECT_MEMBERS_GENAI_1` | `groups_project_members_genai_1` | M | `"<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>"` | Entra ID group object IDs of the project team, comma-separated, in the order of the personas in personas_project_genai_1. Used when use_ad_groups is true. |
 | <!-- parameter env:INPUT_COMMON_SPID_KEY -->`INPUT_COMMON_SPID_KEY` | `inputCommonSPIDKey` | C | `"<todo>esml-common-sp-id"` | Seeding KV secret name for common SP App ID mandatory: Seeding KV secret name for common SP App ID ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter env:INPUT_COMMON_SP_SECRET_KEY -->`INPUT_COMMON_SP_SECRET_KEY` | `inputCommonSPSecretKey` | C | `"<todo>esml-common-sp-secret"` | Seeding KV secret name for common SP secret mandatory: Seeding KV secret name for common SP secret ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter env:PERSONAS_CORE_TEAM -->`PERSONAS_CORE_TEAM` | `personas_core_team` | O | `"p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops"` | Core team persona list keep-as-is: 4 personas (3 user, 1 SP). Mapped to GROUPS_CORETEAM_MEMBERS. |
-| <!-- parameter env:PERSONAS_PROJECT_ESML -->`PERSONAS_PROJECT_ESML` | `personas_project_esml` | O | `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | ESML project persona list keep-as-is: 4 personas (3 user, 1 SP). Mapped to GROUPS_PROJECT_MEMBERS_ESML. |
-| <!-- parameter env:PERSONAS_PROJECT_GENAI_1 -->`PERSONAS_PROJECT_GENAI_1` | `personas_project_genai_1` | O | `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | GenAI-1 project persona list keep-as-is: 6 personas (5 user, 1 SP). Mapped to GROUPS_PROJECT_MEMBERS_GENAI_1. |
+| <!-- parameter env:PERSONAS_PROJECT_ESML -->`PERSONAS_PROJECT_ESML` | `personas_project_esml` | O | `"p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops"` | Persona names of the project team, in the order of the groups in groups_project_members_esml. Keep as is. Used when admin_projectType is esml. |
+| <!-- parameter env:PERSONAS_PROJECT_GENAI_1 -->`PERSONAS_PROJECT_GENAI_1` | `personas_project_genai_1` | O | `"p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops"` | Persona names of the project team, in the order of the groups in groups_project_members_genai_1. Keep as is. |
 | <!-- parameter env:PROJECT_MEMBERS -->`PROJECT_MEMBERS` | `technical_admins_ad_object_id` | M | `"<todo>_object_id"` | Project team Entra ID object ID(s) mandatory: Project team Entra ID object ID(s) ensure: comma-separated ObjectIDs of users or AD groups (when USE_AD_GROUPS:'true'). |
 | <!-- parameter env:PROJECT_MEMBERS_EMAILS -->`PROJECT_MEMBERS_EMAILS` | `technical_admins_email` | O | `"<todo>_EntraID-Security-Group-Name"` | Project team contact email or group name recommended: set for better project tracking. |
 | <!-- parameter env:PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID -->`PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID` | `project_service_principal_AppID_seeding_kv_name` | C | `"<optional>esml-project001-sp-id"` | Project SP App ID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
@@ -1318,9 +1307,9 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:DEBUG_DISABLE_69_AIFOUNDRY_2025 -->`DEBUG_DISABLE_69_AIFOUNDRY_2025` | `debug_disable_69_aifoundry_2025` | O | `"false"` | Disable step 69: AI Foundry V2 keep-as-is: AI Foundry V2 including RBAC and default project (CosmosDB, Storage). |
 | <!-- parameter env:DEBUG_DISABLE_VALIDATION_TASKS -->`DEBUG_DISABLE_VALIDATION_TASKS` | `debug_disable_validation_tasks` | O | `"false"` | Disable validation tasks otherwise: true, skip subnet, submodule, and DNS checks. |
 | <!-- parameter env:DEBUG_ENABLE_CLEANING -->`DEBUG_ENABLE_CLEANING` | `debugEnableCleaning` | O | `"false"` | Enable error cleanup tasks otherwise: true, enables cleanup tasks (71-73) that delete resources on deployment failures. |
-| <!-- parameter env:DELETE_ALL_FOR_PROJECT -->`DELETE_ALL_FOR_PROJECT` | `deleteAllForProject` | O | `"false"` | Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion. |
-| <!-- parameter env:DELETE_ALL_SERVICES_FOR_PROJECT -->`DELETE_ALL_SERVICES_FOR_PROJECT` | `deleteAllServicesForProject` | O | `"false"` | Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution. |
-| <!-- parameter env:DELETE_KEYVAULT_ALSO -->`DELETE_KEYVAULT_ALSO` | `deleteKeyvaultAlso` | O | `"false"` | Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply. |
+| <!-- parameter env:DELETE_ALL_FOR_PROJECT -->`DELETE_ALL_FOR_PROJECT` | `deleteAllForProject` | O | `"false"` | true deletes everything in the project resource group, the resource group itself, and the subnets and network security groups of the project in the common resource group. Review the project and the environment first. |
+| <!-- parameter env:DELETE_ALL_SERVICES_FOR_PROJECT -->`DELETE_ALL_SERVICES_FOR_PROJECT` | `deleteAllServicesForProject` | O | `"false"` | true deletes all services in the project resource group in the next project pipeline run, then ends the run. Key Vault stays unless deleteKeyvaultAlso is true. Review the project and the environment first. |
+| <!-- parameter env:DELETE_KEYVAULT_ALSO -->`DELETE_KEYVAULT_ALSO` | `deleteKeyvaultAlso` | O | `"false"` | With deleteAllServicesForProject, true also deletes the Key Vault of the project. Review the secrets and keys it holds first. The soft delete of Azure Key Vault still applies. |
 | <!-- parameter env:DIAGNOSTIC_SETTING_LEVEL -->`DIAGNOSTIC_SETTING_LEVEL` | `diagnosticSettingLevel` | O | `"gold"` | Diagnostics level otherwise: silver or bronze for less verbose (lower cost) logging. |
 | <!-- parameter env:POLICY_EXEMPTION_ASSIGNMENT_IDS -->`POLICY_EXEMPTION_ASSIGNMENT_IDS` | `policyExemptionAssignmentIds` | O | `"[]"` | JSON array of policy assignment IDs (deployIfNotExists or auditIfNotExists) scoped to the VNet RG keep-as-is: Prevents DINE remediation race conditions during AI Foundry Standard Agent network injection. Leave as '[]' in greenfield/non-ALZ. otherwise: e.g. '["/subscriptions/ |
 | <!-- parameter env:POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS -->`POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS` | `policyExemptionDefinitionReferenceIds` | O | `"[]"` | JSON array of policyDefinitionReferenceIds to narrow exemption to specific DINE members within an initiative keep-as-is: Leave as '[]' to exempt the full assignment. |

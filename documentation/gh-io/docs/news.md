@@ -1,47 +1,44 @@
 # News and releases
 
-**`main` is the shared development branch. Release branches are stable adoption
-points.** This site describes published `main`, with limits called out where a
-feature needs a particular API or runtime version.
+This site describes the `main` branch, where development happens. A release branch is a stable version that
+you choose when you create a Factory.
 
-## Recent published development
+## New on main
 
-| Area | What is available | Where to read |
+| Area | What is new | Where to read |
 | --- | --- | --- |
-| CLI, Python SDK and REST tutorials | One whole-page tool selector, real Python examples and matching add/update/remove walkthroughs. | [Get started](factory-tools/18-cli-and-api-and-usage.md) |
-| Reviewed client shortcuts | Named configuration, settings, project/scale-set deletion preparation and local draft-removal helpers. Confirmation remains separate. | [Add and update](factory-tools/19-cli-and-api-and-usage.md), [remove and recover](factory-tools/20-cli-and-api-and-usage.md) |
-| MCP and AI Gateway integration | Opt-in project001 Dev component pipeline steps, with image, identity and network prerequisites. This is not a universal APIM-versus-Kong switch. | [Parameters](parameters/advanced.md#mcp-and-ai-gateway-parameters) |
-| Factory Agent Chat live voice | Optional Azure Voice Live speech for the chat: a pulsing voice orb, the same governed answers, `enableAIFactoryAgentLiveVoice` next to `enableFactoryChatAgent`. Opt-in, project001 Dev, off by default. | [Chapter 21](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md) |
-| AKS attached to Azure ML | The published template supplies the existing cluster's load-balancer subnet. | [IaC](iac/bicep.md) |
-| Usage, cost and monitoring | Native workbooks, sample/saved report interfaces and explicit Azure billing reads; missing data is not zero cost. | [Monitor and operate](intelligence.md) |
+| Architecture images | One image for each hub mode. It shows how ESAF connects to Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway, with a number for each code template. | [Architecture](architectures.md) |
+| Code templates library | Every code template of the Agent Factory, the Model Factory and the other folders, with a search box and filters. | [Code templates library](code-templates/index.md) |
+| Azure resource library | Every Azure service a project can switch on, by category, with its setting. | [Azure resource library](resources/index.md) |
+| Setup and usage docs | Five quickstarts for the platform team and the first steps for a project team. Each scenario is one call. | [Setup docs](setup/index.md), [Usage docs](usage/index.md) |
+| Every variable explained | All variables of `variables.json`, with the default value and what each one does. | [Every variable in variables.json](parameters/variables.md) |
+| CLI, Python SDK and REST tutorials | One tab for each tool, with examples you can run, for adding, updating and removing. | [Get started](factory-tools/18-cli-and-api-and-usage.md) |
+| MCP and AI gateway | Optional steps of the project 001 Dev pipeline: the Factory MCP server, and its publication on API Management. | [Settings](parameters/advanced.md#mcp-and-ai-gateway-parameters) |
+| Agent Chat live voice | Talk to ESAF Agent Chat with Azure Voice Live. Switch it on with `enableAIFactoryAgentLiveVoice` next to `enableFactoryChatAgent`. | [Agent Chat and live voice](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md) |
+| AKS for Azure Machine Learning | Attaching an existing AKS cluster passes the load-balancer subnet of that cluster. | [Bicep](iac/bicep.md) |
+| Usage, cost and monitoring | Workbooks in the Azure portal, sample and saved reports, and live cost reads. | [Monitor and operate](intelligence.md) |
 
-!!! note "Source, installation and release are different"
-    A push to `main` makes source available. It does not upgrade an installed
-    desktop/API, change a deployment's selected version, or provision Azure.
-    Use the current host's capabilities and review before execution.
+!!! note "A change on main reaches you when you update"
+    New code on `main` changes nothing in a Factory that exists. You get it when you update the tools you
+    installed and run the pipelines of your Factory again with that version.
 
-## v1.25 release notes
+## v1.25
 
-The [v1.25 notes](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/RELEASE_125.md)
-review the **23 September 2026** source snapshot on `release/v1.25`.
-They cover registered configuration/bootstrap, CLI/SDK/API examples, Agent
-Factory, ML Model Factory, versioned data, monitoring and gateway policies.
-The snapshot is not a new GA announcement.
+The [v1.25 release notes](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/RELEASE_125.md) describe
+the `release/v1.25` branch as of 23 September 2026: the Factory API with its CLI and SDK, the Agent Factory,
+the ML Model Factory, versioned data, monitoring and the gateway policies.
 
-Later development on `main` is not automatically part of that snapshot.
-Read the [roadmap](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/ROADMAP_MAIN.md)
-as a dated assessment, not a promise that every planned feature is released.
+The [roadmap](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/ROADMAP_MAIN.md) lists what is
+planned after that.
 
-## Still limited or in progress
+## Not available yet
 
-| Capability | Current boundary |
+| Capability | Status |
 | --- | --- |
-| Captured Dev-to-Stage-to-Prod promotion | Not a completed executable workflow. Registering a target and deploying current settings is different. |
-| Full bootstrap and deletion | Conditional on compatible source, identity, networking, ownership and retention checks. Unsupported combinations remain blocked. |
-| Keeping selected resources inside groups chosen for whole-group deletion | Not supported by that execution path. Do not remove the safeguard. |
-| New nine-persona access policy and shared dual-graph enhancements | Local development/addendum material must not be read as proof of inclusion in a published release or installed host. |
-| Health-model integration everywhere | Optional component tooling is separate; do not assume a complete Factory CLI/desktop/API health-model workflow. |
-| General report-email delivery | A report or an alert is not proof that report attachments were emailed. |
+| Promotion from Dev to Stage to Prod as one workflow | Not available. You deploy each environment with its own settings. |
+| Keeping selected resources when a whole resource group is deleted | Not available. A whole-group delete removes everything in the group. |
+| A health model command in the CLI and the app | Not available. Deploy the health model with its own pipeline. |
+| Sending reports by email | Not available. |
 
 ## Earlier releases
 
@@ -52,21 +49,11 @@ as a dated assessment, not a promise that every planned feature is released.
 <details markdown="1">
 <summary>More info</summary>
 
-Recent source references include `413c48d0` (native tool tutorials), `0da0d85b`
-and `2ae10aa9` (reviewed wrappers and environment-order handling), `cf8437af`
-(MCP/AI Gateway pipeline integration), and `940b1b48` (AML/AKS subnet binding).
-These identify source changes, not successful customer deployments.
+Version `125` means the `release/v1.25` branch. The launcher scripts of a repository that was set up with
+v1.24 still create with version `124` unless you name another, and an update keeps the version that was
+saved.
 
-The original v1.25 note identifies snapshot
-`1bd9020e009036427763a0f66b2b2449ca38f288`. The supported version selector maps
-`125` to `release/v1.25`; similarly named branches are not automatically
-equivalent. Some legacy creation defaults still select 124 and update flows can
-inherit the saved version. Development's use of `main` does not silently change
-those deployment defaults.
-
-Choose compatible launcher, helpers, provider templates, CLI/API and workload
-versions together. Each approved run records the exact source it will use even
-while `main` continues to advance. Review removed or renamed parameters and
-service/region prerequisites before an upgrade.
+Use the tools, the templates and the workload code of the same version together. Each run records the commit
+it used. Before you upgrade, read the release notes for settings that were renamed or removed.
 
 </details>
