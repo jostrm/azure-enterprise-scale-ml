@@ -34,7 +34,7 @@ Access to the private API source repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.102, complete executable and `_internal` folder |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.103, complete executable and `_internal` folder |
 | Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.36, self-contained executable |
 | macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.36, self-contained executable |
 
@@ -163,6 +163,10 @@ same call, for example your own VNet or subnets and the service switches: one fi
 From v0.47.102, the wizard's **ON/OFF: App & Integration** page has an **AI Gateway** group for the APIM and
 Kong gateway variables (`ENABLE_APIM`, `ENABLE_KONG`, `apimGateway*`, `kongGateway*`). The packaged API accepts
 the same variables as settings.
+
+From v0.47.103, the packaged API has the project-team routes: use cases, My project and
+`POST /api/v1/esaf/export-allowed-projects`, which returns a validated read-only configuration bundle for a
+project team. The wizard explains what is relevant or blocked and why, and shows example text in empty fields.
 
 Every parameter, jobs, errors and the CLI equivalents (`azurefactory esaf ...`) are in the
 [ESAF usage guide](../azurefactory-cli/docs/esaf/readme.md).
