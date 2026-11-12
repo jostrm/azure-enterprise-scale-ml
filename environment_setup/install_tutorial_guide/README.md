@@ -45,49 +45,43 @@ The six scenarios are: 1 Init AI Factory, 2 Add scale set, 3 Add or update proje
 
 ## Download and verify
 
-The installer is one `.msi` file plus four `.cab` parts. **You need all five files in the same folder.**
-The parts hold the compressed app; they're split so that no file is larger than GitHub allows.
+This is the **local-preview** installer, version **0.2.3**. Its invitation is
+checked locally and its guides are bundled. This convenience gate is not a content
+security boundary. The code is requested on every launch; there is no remembered login.
 
-| File | What it is |
-|---|---|
-| [ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi) | The installer. Run only this file. |
-| [...-1.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-1.cab), [...-2.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-2.cab), [...-3.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-3.cab), [...-4.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-4.cab) | The app's compressed parts, read by the installer. |
-| [SHA256SUMS.txt](SHA256SUMS.txt) | The SHA-256 hash of every file. |
+Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-To download all of them and check their hashes, run this in PowerShell:
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab)
+- [SHA256SUMS.txt](SHA256SUMS.txt)
+- [Build receipt](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi.json)
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'
-$Version = '0.2.2'
 $Base = 'https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_tutorial_guide'
 $Folder = Join-Path $HOME 'Downloads\ESAF-Tutorials'
-$Name = "ESAF-Tutorials-$Version-win-x64-protected-unsigned"
 New-Item -ItemType Directory -Force -Path $Folder | Out-Null
-$Files = @("$Name.msi") + (1..4 | ForEach-Object { "$Name-$_.cab" }) + 'SHA256SUMS.txt'
-foreach ($File in $Files) {
-    Invoke-WebRequest -Uri "$Base/$File" -OutFile (Join-Path $Folder $File)
-}
+Invoke-WebRequest -Uri "$Base/SHA256SUMS.txt" -OutFile (Join-Path $Folder 'SHA256SUMS.txt')
 Get-Content (Join-Path $Folder 'SHA256SUMS.txt') | Where-Object { $_.Trim() } | ForEach-Object {
     $Expected, $File = $_.Trim() -split '\s+', 2
-    $Actual = (Get-FileHash (Join-Path $Folder $File) -Algorithm SHA256).Hash
-    if ($Actual -ne $Expected) { throw "Hash mismatch: $File" }
+    if ($File -notmatch '^ESAF-Tutorials-[0-9.]+-win-x64-local-preview-(signed|unsigned)(-[0-9]+\.cab|\.msi)$') {
+        throw 'Unexpected download filename.'
+    }
+    Invoke-WebRequest -Uri "$Base/$File" -OutFile (Join-Path $Folder $File)
+    if ((Get-FileHash (Join-Path $Folder $File) -Algorithm SHA256).Hash -ne $Expected) {
+        throw "Hash mismatch: $File"
+    }
     "OK  $File"
 }
 ```
 
-**Expected output:**
-
-```text
-OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi
-OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-1.cab
-OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-2.cab
-OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-3.cab
-OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-4.cab
-```
-
-The hashes catch a broken or incomplete download. They come from this same folder, so they don't replace your
-organization's own check of where the software comes from.
-
+Close the app before upgrading. Same-version reinstallations are supported.
+To deliberately install an older version, first uninstall the newer app in
+**Windows Settings > Apps > Installed apps**, then run the older MSI. Settings
+and progress are retained. The installer never silently removes a newer version.
 ## Install
 
 1. Open the download folder: `explorer "$HOME\Downloads\ESAF-Tutorials"`.
@@ -101,8 +95,7 @@ controls to get past the warning.
 
 ## Start your first tutorial
 
-1. Enter your private-preview code and select **Unlock private preview**. Select **Remember this device** to
-   skip this next time.
+1. Enter your private-preview code and select **Unlock private preview**.
 2. Open **Settings (⚙)**. Fill in your tenant, subscription, repository, factory prefix, region and networks,
    then select **Save**. Settings are saved only on this computer.
 3. Under **Tutorial to open at start**, choose **ESAF Python SDK - scenarios 1-6**, save, and restart the app.
@@ -156,7 +149,7 @@ Options without a recording are turned off. Which videos you see depends on your
 
 | Problem | Fix |
 |---|---|
-| The installer says a file is missing | Put all four `.cab` parts beside the `.msi`, with their original file names. |
+| The installer says a file is missing | Put all 4 `.cab` parts beside the `.msi`, with their original file names. |
 | "Private preview is not configured" | Ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a configured installer. |
 | "The code or session is invalid, expired or revoked" | Ask [Joakim Åström on LinkedIn](https://www.linkedin.com/in/joakimastrom/) for a new code. |
 | **Start API** shows **Failed** | Read the reason on the pill. Check that `az` and `git` are installed and signed in, then select **Restart API**. |

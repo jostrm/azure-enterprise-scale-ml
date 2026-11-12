@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "applicationVersion": "0.2.3",
+  "platform": "windows",
+  "runtime": "win-x64",
+  "mode": "local-preview",
+  "localCodeEnabled": true,
+  "titleRecoveryEnabled": true,
+  "accessConfigurationValidated": true,
+  "binaryAccessModeValidated": true,
+  "files": [
+    {
+      "name": "ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi",
+      "bytes": 995581,
+      "sha256": "AAACB4614E261DC2A03E2332501FAE305BDE8188EF5E438FE84CFDD4633CD5E7"
+    },
+    {
+      "name": "ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab",
+      "bytes": 32003127,
+      "sha256": "17BE51BD24C9630D106FB4D6E4A3CCE926DFDBD24504DEA0FF7A8EEA294B67D3"
+    },
+    {
+      "name": "ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab",
+      "bytes": 24237373,
+      "sha256": "D354B9F9152F781F3288A32B468F34DD76494B718DE0F7B339DEAFAA9E27024F"
+    },
+    {
+      "name": "ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab",
+      "bytes": 30348057,
+      "sha256": "A7DBDE430AB6EB2B34B7860CD56259275BF9AF38AF973ED8C20B31679426A819"
+    },
+    {
+      "name": "ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab",
+      "bytes": 34791645,
+      "sha256": "FAEC01E87E74154740401FE52D874CD2569F38BFA5F0A3EEAB7B1BB44866EBCD"
+    }
+  ],
+  "signed": false,
+  "signingCertificate": null,
+  "sourceCommit": "7cae7e0797d5b644e4a56b210608cbfaf65a6ff6",
+  "builtAtUtc": "2026-11-12T11:43:42.3059029Z",
+  "sha256": "AAACB4614E261DC2A03E2332501FAE305BDE8188EF5E438FE84CFDD4633CD5E7"
+}
