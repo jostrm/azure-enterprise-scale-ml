@@ -47,6 +47,8 @@ Every tool is an L1 client of the same Factory API, so the result is the same wh
 2. From within the app, click "Start API"
 
 ![ESAF Tutorial Guide](../20-29/images/esaf-tutorial-app-start-api.png)
+3. Copy the API key that is auto-generated, for later use. 
+- If you forgot to save key, it is saved at environment variable AIFACTORY_API_KEY
 
 </details>
 
@@ -117,6 +119,7 @@ Factory API, so you can skip "Start the Factory API" above.
 <summary>CLI (PowerShell)</summary>
 
 Open PowerShell in the root of your consumer repository:
+- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
 
 ```powershell
 python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
@@ -133,7 +136,8 @@ azurefactory health
 <summary>CLI (bash)</summary>
 
 Open Bash in the root of your consumer repository:
-
+- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
+  
 ```bash
 python3 -m pip install ./azure-enterprise-scale-ml/environment_setup/azurefactory-cli
 export AIFACTORY_API_URL='http://127.0.0.1:8765'
@@ -153,6 +157,7 @@ In Git Bash on Windows, the API needs a Windows path:
 
 Install the SDK and set the connection once. This is PowerShell; on Linux or macOS, use the three `export`
 lines from the CLI (bash) tab instead:
+- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
 
 ```powershell
 python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
