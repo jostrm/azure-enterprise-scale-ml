@@ -34,7 +34,7 @@ Access to the private API source repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.104, complete executable and `_internal` folder |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.105, complete executable and `_internal` folder |
 | Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.36, self-contained executable |
 | macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.36, self-contained executable |
 
@@ -172,6 +172,10 @@ From v0.47.104, creating a Factory no longer stops on a hash or pin difference: 
 helper, the submodule pin or the `release/v1.25` branch head differs from the one the app was reviewed against,
 the wizard and the API log a warning and run the published code. v0.47.101 to v0.47.103 refused to create a
 Factory from the `release/v1.25` head; use v0.47.104 or later.
+
+From v0.47.105, the wizard's own API host no longer fails when its port is taken (for example 8765 held by
+another wizard or API host): a **Choose other port** dialog takes another port, `0` for any free port, or Cancel.
+The packaged Factory API is the same as in v0.47.104.
 
 Every parameter, jobs, errors and the CLI equivalents (`azurefactory esaf ...`) are in the
 [ESAF usage guide](../azurefactory-cli/docs/esaf/readme.md).
