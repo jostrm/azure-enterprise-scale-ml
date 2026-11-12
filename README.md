@@ -2,7 +2,7 @@
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 > [!NOTE]
-> **Deploy to Azure: meant for a quick test:** For a governed factory use the app, CLI or the Factory API.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>See Full set up</b></a>
+> **Deploy to Azure: for a quick test:** For a governed factory use the app, CLI or the Factory API.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b> Full set up</b></a>
 
 ![Header](documentation/v2/10-19/images/header.png)
 See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below.
@@ -10,7 +10,7 @@ See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" 
 
 <p align="center">
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
-Governed Microsoft Foundry, Azure Machine Learning and up to +54 Azure resources for full-stack development, isolated across Dev, Stage and Prod environments. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a><br>
+Governed Microsoft Foundry, Azure Machine Learning and up to <b>+54</b> Azure resources for full-stack development, isolated across Dev, Stage and Prod environments. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a><br>
 <a href="usecase_code/readme.md">147 reusable usecase templates</a> via "agent-factory" and "ml-factory", compatible with the automated setup of the landing zones by the Azure factory. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a>
 <br>A template way of working &amp; Project way of working - <b>plug and play</b>.
 </p>
@@ -111,6 +111,11 @@ Besides above, optionally, automation exists for
 - Factory UX: Configuration Wizard, Governance, Observability
 - Azure AI gateway (new SKU) integration
 
+<p align="center">
+- Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a> - with <b>search and filter</b> template by type<br>
+- Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a> - to see what Azure Resources you can use plug-and-play, in categories.<br>
+- Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> Azure Resources connected with <b>Teams, Copilot, Fabric, Sharepoint</b> and which <b>Code template</b> to use.
+</p>
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up Factory</b></a> &nbsp;·&nbsp;
