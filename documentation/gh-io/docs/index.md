@@ -1,6 +1,6 @@
 # Enterprise Scale Azure Factory (ESAF)
 
-![Enterprise Scale AI Factory](assets/images/header.png)
+![Enterprise Scale Azure Factory](assets/images/header.png)
 
 Go from an empty Azure subscription to a governed AI Factory, then build agents and ML models in it.
 

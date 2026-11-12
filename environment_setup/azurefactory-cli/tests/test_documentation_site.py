@@ -133,6 +133,14 @@ def test_site_ships_the_images_the_pages_show(site):
     assert "assets/" in page(site, "setup/index.md") and "raw.githubusercontent.com" not in page(site, "setup/index.md")
 
 
+def test_site_header_carries_the_product_name(site):
+    _, config, _ = site
+    assert config.site_name == "Enterprise Scale Azure Factory"
+    home = (SITE / "docs" / "index.md").read_text(encoding="utf-8")
+    assert "![Enterprise Scale Azure Factory](assets/images/header.png)" in home
+    assert "Enterprise Scale AI Factory" not in home
+
+
 def test_site_renders_mermaid_diagrams(site):
     _, config, _ = site
     fences = config.mdx_configs.get("pymdownx.superfences", {}).get("custom_fences", [])
