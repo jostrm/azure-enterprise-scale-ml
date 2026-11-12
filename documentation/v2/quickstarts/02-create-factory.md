@@ -44,7 +44,7 @@ Pick one hub mode and one networking mode. Every tool supports the same combinat
 
 | You want | Hub mode | Networking mode | Keep in mind |
 |---|---|---|---|
-| The fastest first test | Standalone, no hub | Public | You can't run [Agent Chat](04-first-agent-chat.md) on it. |
+| The fastest first test | Standalone, no hub | Public | You can't run [ESAFT Agent Chat](04-first-agent-chat.md) on it (since private), but many other Agent Chat templates exists. |
 | The full path, with Agent Chat | Own hub | Private | The Factory creates a VPN gateway, which takes longer and costs more. |
 | To join your landing zone | External hub | Private or hybrid | Your hub must exist first. |
 
