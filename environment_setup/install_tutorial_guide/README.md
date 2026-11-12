@@ -14,7 +14,10 @@ ESAF ConfigWizard app.
 
 From within this app, click "Start API"
 
-![ESAF Tutorial Guide](../../documentation/v2/20-29/images/esaf-tutorial-app-start-api.png)
+![ESAF Tutorial Guide](../../documentation/v2/20-29/images/esaf-tutorial-app-start-api.png)<br>
+
+When Started, it will popup a dialog with the auto-generated API key, with a copy button. You can also read it via ENV. <br>
+![ESAF Tutorial Guide](../../documentation/v2/20-29/images/esaf-tutorial-app-started-api.png)
 
 ### Get guided how to use the API, SDK, to SETUP an AI Factory | Use Code templates
 
