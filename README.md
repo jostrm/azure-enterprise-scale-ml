@@ -12,7 +12,7 @@ See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" 
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
 Governed Microsoft Foundry, Azure Machine Learning and up to +54 Azure resources for full-stack development, isolated across Dev, Stage and Prod environments. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a><br>
 <a href="usecase_code/readme.md">147 reusable usecase templates</a> via "agent-factory" and "ml-factory", compatible with the automated setup of the landing zones by the Azure factory. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a>
-<br>A template way of working &amp; Project way of working - <b>plug and play<b>.
+<br>A template way of working &amp; Project way of working - <b>plug and play</b>.
 </p>
 
 <table>
