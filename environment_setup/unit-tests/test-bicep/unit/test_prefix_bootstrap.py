@@ -643,3 +643,50 @@ def test_github_environment_policy_drift_blocks_without_mutation():
     native.environment = lambda name: {"name": name, "protection_rules": []}
     with pytest.raises(repository.enrollment.EnrollmentError, match="reviewed-github-environment-changed"):
         native.ensure_environment(expected["name"], expected)
+
+
+# Joakim (2026-11-12, video 10): release/v1.25 may move between the review and the run (a fix or a feature is pushed).
+# That is a logged warning, never repository-discovery-changed:source: the run checks out the reviewed commit.
+def test_repository_execution_after_the_published_branch_moved_runs_the_reviewed_commit(workspace, capsys):
+    consumer, _, state = workspace
+    document = json.loads((consumer / "azurefactory" / "register.json").read_bytes())
+    scope = {"factory_id": document["factories"][0]["id"], "scale_set_id": document["factories"][0]["scale_sets"][0]["id"]}
+    refs, remote, tip = {}, {}, {"sha": "b" * 40}
+    assets = {"bootstrap/templates/factory-lifecycle-gha.yml": b"reviewed: workflow\n",
+              "bootstrap/templates/hub_private_probe.py": b"reviewed = True\n"}
+
+    def git(root, *args, **kwargs):
+        if args[0] == "ls-remote":
+            value = tip["sha"] if args[1] == repository.SHARED_URL else refs.get(args[2])
+            return value + "\t" + args[2] if value else ""
+        if args[0] == "init":
+            (root / ".git").mkdir()
+        elif args[0] == "clone":
+            templates = Path(args[-1]) / "bootstrap" / "templates"
+            templates.mkdir(parents=True)
+            (templates / "factory-lifecycle-gha.yml").write_bytes(b"reviewed: workflow\n")
+            (templates / "hub_private_probe.py").write_bytes(b"reviewed = True\n")
+        elif args[0] == "rev-parse":
+            return "b" * 40
+        elif args[0] == "cat-file":
+            return assets[args[2].split(":", 1)[1]]
+        elif args[0] in ("hash-object", "write-tree"):
+            return "c" * 40
+        elif args[0] == "commit-tree":
+            return ("e" if "-p" in args else "d") * 40
+        elif args[0] == "push":
+            sha, ref = args[-1].split(":", 1)
+            refs[ref] = sha
+        return ""
+    runtime = SimpleNamespace(discover=lambda: remote or None, source_assets=lambda sha: {
+        name: hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        for name, data in assets.items()}, git=git,
+                              create=lambda: remote.update(id=7), set_initial_default_branch=lambda: None,
+                              ensure_environment=lambda name, expected: {"name": name})
+    plan = repository.prepare(consumer_root=consumer, scope=scope, expected_revision="reviewed",
+                              bootstrap_config={"github_repository": "example/factory"}, runtime=runtime)
+    tip["sha"] = "f" * 40          # a fix lands on release/v1.25 after the review
+    result = repository.execute(plan, state_dir=state, runtime=runtime)
+    assert result["status"] == "succeeded", result
+    assert result["outputs"]["bindings"]["published_source"]["sha"] == "b" * 40
+    assert "published accelerator moved" in capsys.readouterr().err

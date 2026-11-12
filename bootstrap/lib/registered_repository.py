@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -74,10 +75,14 @@ class Repository:
             required = {"bootstrap/" + relative for relative in helpers} | {
                 "bootstrap/templates/factory-lifecycle-single-writer-" + self.provider + ".yml"}
         require(required <= files.keys(), "selected-published-source-lacks-prefix-bootstrap")
+        # Joakim (2026-11-12): a hash mismatch never blocks. Code on release/v1.25 changes (fixes, features) after an
+        # application release; the published helpers run and the difference is a logged warning.
+        self.source_warnings = []
         for relative in helpers:
             content = (Path(__file__).parent.parent / relative).read_bytes()
             expected = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
-            require(files["bootstrap/" + relative]["sha"] == expected, "published-prefix-bootstrap-helper-mismatch:" + relative)
+            if files["bootstrap/" + relative]["sha"] != expected:
+                self.source_warnings.append("published-prefix-bootstrap-helper-differs:" + relative)
         return {name: files[name]["sha"] for name in sorted(required)}
 
     def discover(self):
@@ -258,21 +263,29 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
     source_tip = runtime.git(root, "ls-remote", SHARED_URL, "refs/heads/" + source_ref)
     require(re.fullmatch(r"[a-f0-9]{40}\s+refs/heads/" + re.escape(source_ref), source_tip),
             "published-source-ref-required")
-    sha = source_tip.split()[0]
+    tip = source_tip.split()[0]
+    shared = prerequisites.ordinary(root / SHARED_PATH)
+    shared_sha = runtime.git(shared, "rev-parse", "HEAD", missing=True) if shared.is_dir() else None
+    sha = shared_sha if shared_sha and re.fullmatch(r"[a-f0-9]{40}", shared_sha) else tip
     source_assets = runtime.source_assets(sha)
+    source_warnings = []
+    if sha != tip:
+        source_warnings.append("The consumer's submodule pins " + sha[:8] + " while " + source_ref + " is at " + tip[:8] +
+                               "; the submodule's published commit runs (warning only).")
+    for code in getattr(runtime, "source_warnings", None) or []:
+        source_warnings.append("The published accelerator's bootstrap/" + code.split(":", 1)[1] + " at " + sha[:8] +
+                               " differs from the helper this application reviewed; the published code runs (warning only).")
     remote_tip = runtime.git(root, "ls-remote", url, "refs/heads/main") if remote else ""
     require(not remote or not runtime.git(root, "ls-remote", url, LOCK_REF),
             "existing-initializer-lock-requires-reconciliation")
     remote_sha = remote_tip.split()[0] if remote_tip else None
     require(not remote_sha or remote_sha == head, "existing-remote-main-must-match-local-head")
-    shared = prerequisites.ordinary(root / SHARED_PATH)
     modules_path = prerequisites.ordinary(root / ".gitmodules")
     modules_hash = hashlib.sha256(modules_path.read_bytes()).hexdigest() if modules_path.is_file() else None
     if head:
         require(not runtime.git(root, "diff", "--name-only", "HEAD", "--", ".gitmodules"),
                 "dirty-gitmodules-needs-reconciliation")
-    shared_sha = runtime.git(shared, "rev-parse", "HEAD", missing=True) if shared.is_dir() else None
-    require(not shared.exists() or shared_sha == sha, "existing-shared-source-pin-conflict")
+    require(not shared.exists() or shared_sha == sha, "existing-shared-source-is-not-a-git-commit")
     plan = {"contract_version": 1, "stage": "repository-initialization", "plan_id": str(uuid4()),
             "expires_at": time.time() + REVIEW_SECONDS, "consumer_root": str(root), "scope": scope,
             "target": target, "config": config, "provider": provider, "repository": url,
@@ -298,6 +311,10 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
         plan["warnings"] = [enrollment._single_writer_module().WARNING, enrollment._single_writer_module().HUB_WARNING,
                             "Single-writer coordination requires a private repository; repository visibility is never changed automatically."]
         plan["effects"][2] = "Pin the published accelerator, repository-state helpers and single-writer scoped workflow; no Blob coordination/private probe."
+    if source_warnings:
+        plan["source_warnings"] = source_warnings
+        for warning in source_warnings:
+            print("WARNING: " + warning, file=sys.stderr)
     plan["plan_hash"] = enrollment.digest(plan)
     return plan
 
@@ -309,10 +326,13 @@ def execute(plan, *, state_dir, runtime=None):
     runtime = runtime or Repository(plan["target"], plan["provider"], plan["config"])
     fresh = prepare(consumer_root=plan["consumer_root"], scope=plan["scope"],
                     bootstrap_config=plan["config"], expected_revision=plan["expected_revision"], runtime=runtime)
-    for key in ("register_hash", "existing_git", "head", "origin", "remote_id", "remote_sha", "source",
-                "application_helper_sha256", "gitmodules_sha256", "pipeline", "auth_namespace", "environment",
-                "environments"):
+    for key in ("register_hash", "existing_git", "head", "origin", "remote_id", "remote_sha",
+                "gitmodules_sha256", "pipeline", "auth_namespace", "environment", "environments"):
         require(fresh[key] == plan[key], "repository-discovery-changed:" + key)
+    for key in ("source", "application_helper_sha256"):
+        if fresh[key] != plan[key]:
+            print("WARNING: the published accelerator moved since the review (" + key + "); the reviewed commit " +
+                  plan["source"]["sha"][:8] + " runs (warning only).", file=sys.stderr)
     if plan["config"].get("coordination_mode") == "single-writer":
         require(fresh.get("private_project") == plan.get("private_project"), "repository-private-project-changed")
     root, folder = Path(plan["consumer_root"]), prerequisites.ordinary(state_dir)

@@ -224,3 +224,68 @@ def test_new_default_case_conflict_is_not_a_rename(workspace):
     with pytest.raises(repository.enrollment.EnrollmentError,
                        match="github-environment-case-differs-from-reviewed-binding"):
         environment_plan(workspace, "single-writer", inventory={"Dev": {"id": 7, "name": "dev"}})
+
+
+# Joakim (2026-11-12, video 10): a hash mismatch never blocks. When the published release/v1.25 changes a helper after
+# an application release (aif-159: published-prefix-bootstrap-helper-mismatch:lib/factory_enrollment.py made every
+# released app refuse a new Factory), the published code runs and the difference is a logged warning.
+@pytest.mark.parametrize("provider", ["gha", "ado"])
+def test_a_published_helper_that_differs_warns_and_never_blocks(monkeypatch, provider):
+    runtime = object.__new__(repository.Repository)
+    runtime.provider, runtime.config = provider, {"coordination_mode": "single-writer"}
+    root = Path(repository.__file__).parent.parent
+    relatives = ["lib/common_network_preservation.py", "lib/provider_repository_state.py",
+                 "lib/factory_enrollment.py", "lib/factory_lifecycle.py",
+                 "templates/factory-lifecycle-single-writer-" + provider + ".yml"]
+    files = []
+    for relative in relatives:
+        data = (root / relative).read_bytes()
+        if relative == "lib/factory_enrollment.py":
+            data += b"\n# published after this application was released\n"
+        files.append({"path": "bootstrap/" + relative, "type": "blob",
+                      "sha": hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()})
+    monkeypatch.setattr(repository, "urlopen", lambda request, timeout:
+                        io.BytesIO(repository.enrollment.canonical({"sha": "a" * 40, "truncated": False, "tree": files})))
+    assets = runtime.source_assets("a" * 40)
+    assert set(assets) == {"bootstrap/" + name for name in relatives}
+    assert runtime.source_warnings == ["published-prefix-bootstrap-helper-differs:lib/factory_enrollment.py"]
+
+
+def test_prepare_carries_the_helper_warning_and_stays_executable(workspace):
+    consumer = workspace[0]
+    scope = scope_of(consumer)
+    runtime = SimpleNamespace(discover=lambda: {"id": 7, "private": True}, environment=lambda name: None,
+                              git=lambda root, *args, **kwargs:
+                              "b" * 40 + "\trefs/heads/main" if args[:2] == ("ls-remote", repository.SHARED_URL) else "",
+                              source_warnings=["published-prefix-bootstrap-helper-differs:lib/factory_enrollment.py"])
+    runtime.source_assets = lambda sha: {}
+    plan = repository.prepare(consumer_root=consumer, scope=scope, expected_revision="reviewed",
+                              bootstrap_config={"github_repository": "example/factory", "coordination_mode": "single-writer"},
+                              runtime=runtime)
+    assert plan["can_execute"] is True and plan["blockers"] == []
+    assert len(plan["source_warnings"]) == 1
+    assert "lib/factory_enrollment.py" in plan["source_warnings"][0] and "warning only" in plan["source_warnings"][0]
+
+
+# A reader adds the submodule (docs step 1) and release/v1.25 moves before the Init: the submodule's published commit
+# runs, with a logged warning, instead of existing-shared-source-pin-conflict.
+def test_an_existing_submodule_behind_the_published_branch_runs_its_own_commit_with_a_warning(workspace):
+    consumer = workspace[0]
+    scope = scope_of(consumer)
+    (consumer / repository.SHARED_PATH).mkdir()
+    seen = []
+
+    def git(root, *args, **kwargs):
+        if args[:2] == ("ls-remote", repository.SHARED_URL):
+            return "b" * 40 + "\t" + args[2]
+        if args[:2] == ("rev-parse", "HEAD") and Path(root).name == repository.SHARED_PATH:
+            return "a" * 40
+        return ""
+    runtime = SimpleNamespace(discover=lambda: {"id": 7, "private": True}, environment=lambda name: None, git=git,
+                              source_assets=lambda sha: seen.append(sha) or {})
+    plan = repository.prepare(consumer_root=consumer, scope=scope, expected_revision="reviewed",
+                              bootstrap_config={"github_repository": "example/factory", "coordination_mode": "single-writer"},
+                              runtime=runtime)
+    assert plan["can_execute"] is True
+    assert plan["source"]["sha"] == "a" * 40 and seen == ["a" * 40]
+    assert any("aaaaaaaa" in text and "bbbbbbbb" in text for text in plan["source_warnings"])
