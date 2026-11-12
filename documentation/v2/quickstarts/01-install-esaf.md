@@ -50,7 +50,7 @@ Every tool is an L1 client of the same Factory API, so the result is the same wh
 
 </details>
 
-<details> 
+<details>
 <summary><b>Option B) Mac & Linux - Start via ESAF Wizard App (Windows, Mac OS, Linux)</b></summary>
 
 The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for Windows, Linux and macOS.
@@ -70,6 +70,8 @@ The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for 
    status bar shows it too.
 
 Keep the app open. The API stops when you close it.
+
+</details>
 
 ## Create your Factory folder
 
