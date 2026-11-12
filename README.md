@@ -2,22 +2,18 @@
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 > [!NOTE]
-> **Deploy to Azure - meant for a quick test:** Private networking, dedicated hub, Dev, project 001. It doesn't expose all of the roughly 35 Azure resources you can choose from, or all SKU settings. Use it if you want to quickly build an agent with Foundry and AI Search, train an ML model with Azure Machine Learning or Databricks, build a front end with Container Apps, or run DataOps with Data Factory, it's a simple way to get that running with private networking. Read <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md">portal/README.md</a> before you press it</sub>
->
-> But, it doesn't create dashboards automatically, and it leaves out other features. For a governed factory, use the app, the CLI or the Factory API described below.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Full set up</b></a>
+> **Deploy to Azure - meant for a quick test:** For a governed factory, use the app, the CLI or the Factory API described below.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Full set up</b></a>
 
 ![Header](documentation/v2/10-19/images/header.png)
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as above<br>
 
 <p align="center">
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
-Governed Microsoft Foundry, Azure Machine Learning and +35 other Azure resources for full-stack development for every team, isolated across Dev, Stage and Prod environments.
-<a href="usecase_code/readme.md">147 reusable usecase templates</a> via "agent-factory" and "ml-factory", compatible with the automated setup of the landing zones by the Azure factory.
-<br>A template way of working &amp; Project way of working - <b>plug and play<b>. <br>
-    See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a><br>
-    See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a><br>
-    See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a><br>
+Governed Microsoft Foundry, Azure Machine Learning and up to +54 Azure resources for full-stack development, isolated across Dev, Stage and Prod environments. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Resources Library</b></a><br>
+<a href="usecase_code/readme.md">147 reusable usecase templates</a> via "agent-factory" and "ml-factory", compatible with the automated setup of the landing zones by the Azure factory. See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a>
+<br>A template way of working &amp; Project way of working - <b>plug and play<b>.
 </p>
 
 <table>
@@ -94,8 +90,8 @@ The deployed features follow [Microsoft's Well-Architected Framework WAF](https:
 The *Factory project* can have 1 or many resources *ENABLED=True* to get a *GenAI* with *Machine Learning* baseline architecture automated in ~40min with resources: **Microsoft Foundry, AI Search, Azure Machine Learning, Databricks** + 2 Storage accounts, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access. <br>
 Via *Factory feature flags* you can add optional resources, re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
-# + 35 Azure resources (on top of all platform related) for project teams
-The +35 resources a team can add via "enable" config, such as **ARCHITECTURES** seen in the image below: 
+# + 54 Azure resources (on top of all platform related) for project teams
+The +54 resources a team can add via "enable" config, such as **ARCHITECTURES** seen in the image below: 
 - **AI related**: Microsoft Foundry, Azure OpenAI (standalone), Azure Machine Learning, Azure Databricks Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS (fully private, and Azure Arc enabled)
 - **Data & Databases**: Azure Cosmos DB, Elastic search, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis, Azure Managed Redis (AMR)
@@ -130,7 +126,7 @@ Besides above, optionally, automation exists for
 </p>
 
 ![ESAF architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
-*Figure*: Each team in the AI Factory, have their own *floor* with 1-35 resources, optinally to get above architectures. Each team can own multiple floors. You may *turn ON/OFF* Azure resources to remove cost. Easy to turn on again.
+*Figure*: Each team in the AI Factory, have their own *floor* with 1-55 resources, optinally to get above architectures. Each team can own multiple floors. You may *turn ON/OFF* Azure resources to remove cost. Easy to turn on again.
 
 > [!TIP]
 > **Tip**: Use the [github.com/azure/enterprise-scale-aifactory](https://github.com/azure/enterprise-scale-aifactory) for stable releases of this accelerator - to get a bootstrapped repo (as a mirror repo, or "bring your own repo"). [ESAF on github.com/azure](https://github.com/azure/enterprise-scale-aifactory). This bootstraps a repo for you - using this as a submodule repo.
