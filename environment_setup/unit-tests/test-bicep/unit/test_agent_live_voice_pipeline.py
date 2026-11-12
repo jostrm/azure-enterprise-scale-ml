@@ -7,6 +7,9 @@ import importlib.util
 import pytest
 
 from base.config import REPO_ROOT, yaml_defaults
+from domain.optional_addons import (
+    PROJECT001_DEV, assert_pipeline_apply_warns_and_skips, assert_strict_outside_the_pipeline_apply, load_launcher,
+)
 from domain.pipeline_contracts import ADO_ROOT, ADO_SERVICES, GHA_PHASE, evaluate, load_pipeline, objects
 
 CHAT_FLAG = "enableFactoryChatAgent"
@@ -89,7 +92,7 @@ def ado_condition():
     ("foundry", ("false", "false"), "false", False),
     ("foundry", ("true", "false"), "false", False),  # chat alone only needs the Foundry Agent step (70-factory-chat-agent)
     ("foundry", ("true", "true"), "false", True),
-    ("foundry", ("false", "true"), "false", True),  # reaches the launcher, which rejects voice without chat loudly
+    ("foundry", ("false", "true"), "false", True),  # reaches the launcher, which warns and skips voice without chat
     ("infra", ("true", "true"), "false", False),
     ("foundry", ("true", "true"), "true", False),
 ])
@@ -119,3 +122,24 @@ def test_launcher_is_importable_without_azure_access_and_skips_offline():
     off = {name: "false" for name in FLAGS}
     result = module.run(type("Args", (), {"command": "apply", "apply": True})(), off, lambda *_: pytest.fail("Azure contacted"))
     assert result["mode"] == "skipped" and result["mutations"] is False
+
+
+# Live voice turned on before its Entra app registration and reader list exist.
+WITHOUT_APP_REGISTRATION = {**PROJECT001_DEV, CHAT_FLAG: "true", VOICE_FLAG: "true", "enableAIFoundry": "true",
+                            "enableAISearch": "true", "enableContainerApps": "true", "modelGPTXName": "gpt-4o"}
+
+
+def test_pipeline_apply_warns_and_skips_an_incomplete_configuration_without_azure(capsys):
+    module = load_launcher(LAUNCHER, "agent_live_voice_launcher_incomplete")
+    assert_pipeline_apply_warns_and_skips(module, WITHOUT_APP_REGISTRATION, "aifactoryAgentEntraAppId", capsys)
+
+
+def test_validate_plan_and_direct_callers_stay_strict_on_an_incomplete_configuration(capsys):
+    module = load_launcher(LAUNCHER, "agent_live_voice_launcher_incomplete_strict")
+    assert_strict_outside_the_pipeline_apply(module, WITHOUT_APP_REGISTRATION, capsys)
+
+
+def test_the_launcher_docstring_says_apply_warns_and_validate_fails():
+    doc = load_launcher(LAUNCHER, "agent_live_voice_launcher_docstring").__doc__
+    assert "fail instead of being ignored" not in doc
+    assert "apply warns and skips" in doc and "validate" in doc
