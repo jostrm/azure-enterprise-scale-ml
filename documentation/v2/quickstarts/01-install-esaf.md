@@ -44,11 +44,15 @@ Every tool is an L1 client of the same Factory API, so the result is the same wh
 <summary><b>Option A) Windows - Start via ESAF Tutorial Guide (Windows app only)</b></summary>
  
 1. Download the [ESAF Tutorial Guide](../../../environment_setup/install_tutorial_guide/README.md)
-2. From within the app, click "Start API"
+2. From within the app, click "Start API". Wait until the pill shows **Running** with a port number.
 
 ![ESAF Tutorial Guide](../20-29/images/esaf-tutorial-app-start-api.png)
-3. Copy the API key that is auto-generated, for later use. 
-- If you forgot to save key, it is saved at environment variable AIFACTORY_API_KEY
+3. The **API started** dialog shows the auto-generated API key. Select **Copy key** if you need it in another
+   tool, then **Close**.
+
+The guide's API uses a new port every time it starts, so you don't type the address or the key yourself: under
+[Connect your tool](#connect-your-tool), the guide's **Type connection** button types both into PowerShell for you, in one line.
+Keep the guide open. The API stops when you close it.
 
 </details>
 
@@ -118,16 +122,31 @@ Factory API, so you can skip "Start the Factory API" above.
 <details markdown="1" data-factory-tool="CLI (PowerShell)">
 <summary>CLI (PowerShell)</summary>
 
-Open PowerShell in the root of your consumer repository:
-- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
+Open PowerShell in the root of your consumer repository.
 
-```powershell
-python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
-$env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
-$env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the app'
-$env:ESAF_FOLDER = (Resolve-Path .\azurefactory).Path
-azurefactory health
-```
+1. Install the CLI:
+
+   ```powershell
+   python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
+   ```
+
+2. Connect to the Factory API:
+   - **Option A, ESAF Tutorial Guide:** in the guide, select **Type connection**, then click this PowerShell
+     window within 3 seconds. The guide types one line that sets `$env:AIFACTORY_API_URL` and
+     `$env:AIFACTORY_API_KEY` for its API. Press **Enter**. The line includes the key, so don't share a screenshot of it.
+   - **Option B, AIFactory Config Wizard:**
+
+     ```powershell
+     $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
+     $env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the app'
+     ```
+
+3. Point the CLI at your folder and check the connection:
+
+   ```powershell
+   $env:ESAF_FOLDER = (Resolve-Path .\azurefactory).Path
+   azurefactory health
+   ```
 
 </details>
 <!-- /factory-tool -->
@@ -135,8 +154,8 @@ azurefactory health
 <details markdown="1" data-factory-tool="CLI (bash)">
 <summary>CLI (bash)</summary>
 
-Open Bash in the root of your consumer repository:
-- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
+Open Bash in the root of your consumer repository. With the ESAF Tutorial Guide (option A), use the port that its
+pill shows (**Running ... on port N**) instead of `8765`, and paste the key from its **Copy key** button.
   
 ```bash
 python3 -m pip install ./azure-enterprise-scale-ml/environment_setup/azurefactory-cli
@@ -156,8 +175,8 @@ In Git Bash on Windows, the API needs a Windows path:
 <summary>Python SDK</summary>
 
 Install the SDK and set the connection once. This is PowerShell; on Linux or macOS, use the three `export`
-lines from the CLI (bash) tab instead:
-- If you forgot to save key, and used ESAF Lab Guide to start API locally, then the key is already saved at environment variable AIFACTORY_API_KEY
+lines from the CLI (bash) tab instead. With the ESAF Tutorial Guide (option A), select **Type connection** in the
+guide and click this PowerShell window instead of the `Read-Host` line: it also sets the API address.
 
 ```powershell
 python -m pip install .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
