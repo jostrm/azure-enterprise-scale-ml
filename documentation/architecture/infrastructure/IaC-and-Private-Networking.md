@@ -110,7 +110,6 @@ store availability or a successful end-user conversation. Native registration
 feature availability, M365 approval and tenant app policy remain service/admin
 boundaries. Tokens are obtained through the existing explicit-subscription
 OAuth transport and are never saved in the project profile or receipt.
-
 Azure Managed Redis (main `789beb55` plus working tree, 2026-11-07):
 `enableRedisManaged` is an independent default-false flag, carried from JSON
 overrides and public GHA/ADO defaults through validation to `64-databases`.

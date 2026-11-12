@@ -402,3 +402,57 @@ The component links in this addendum intentionally describe the current checkout
 [tutorial]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/documentation/v2/20-29/28-tutorial-walkthrough.md
 [showback]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/RUNBOOK.md
 [email-script]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/environment_setup/aifactory/bicep/scripts/ado/124_send_email_notifications.sh
+
+## Post-v1.25 backport — 5 November 2026: networking mode for Scenario 1
+
+Backported from `main` (`f115b66c`). The legacy create launcher accepts
+`AIF_NETWORK_MODE=priv|h|pub` (private default, hybrid, public). Private networking needs a
+hub (external, or the factory's own hub with `AIF_SETUP_HUB_ACCESS=true`), so a Standalone
+AI Factory without a hub uses `h` or `pub`; the API host lifts the rule with
+`AIFACTORY_PRIVATE_NETWORK_REQUIRES_HUB=false`. The registered launcher passes the
+full-bootstrap choice to the Factory API as `config.network_mode`; Simple Mode stays private.
+The Factory API (pink `31fd1189` or later) owns the rule and detects this source by its
+`"priv" "priv h pub"` choice list (feature `public-hybrid-network`).
+
+## Post-v1.25 backport — 5 November 2026: network read-back and COMMON pipeline contract
+
+Backported from `main` (`2b51f962`, `080ab776`). Network-foundation finalization logs a property Azure sets by itself on
+a created subnet, NSG or VNet as `read_back_warnings` evidence and continues; differences in written or core network
+properties (address ranges, NSG and rules, route table, NAT gateway, service endpoints, network policies, delegations,
+peerings, DNS, DDoS) still stop the stage. `infra-common.yml` carries the reviewed COMMON deployment contract
+(`AIFACTORY_COMMON_DEPLOYMENT_CONTRACT=1`) that the Factory API's opt-in `common=API-2-Pipelines` route uses.
+
+## Post-v1.25 backport — 6 November 2026: opt-in SecurityControl=Ignore tag for test factories
+
+Backported from `main` (`547048a9`). The bootstrap key `security_control_ignore_tag` (off by default) gives the
+common and project resource groups the prerequisites create the tag `SecurityControl=Ignore` at their first write,
+the exemption the MCAPS Modify policies check. For test factories only; production factories keep governance.
+
+## Post-v1.25 backport — 6 November 2026: JSON override reaches the workflow's own env names
+
+Backported from `main` (`aca8d18d`). `apply-json-config-overrides.py` also writes a configuration key to every GitHub
+Actions env name bound to the matching variable, whatever the case (`use_ad_groups` sets `useAdGroups`, bound to
+`vars.USE_AD_GROUPS`), so infra-common.yml's resource-group RBAC assigns the team group as a Group.
+
+## Post-v1.25 backport — 6 November 2026: a Graph read retries once after a 401
+
+Backported from `main` (`3aced095`). The privileged prerequisites' Graph client drops its cached token after a 401 on a
+read and sends the read once more, only when the CLI returns a different (renewed) token. A second 401, other failures
+and every write still stop the stage (aif-150: the preflight stopped on `graph-request-failed-401`).
+
+## Post-v1.25 backport — 6 November 2026: a Graph CAE challenge says "sign in again"
+
+Backported from `main` (`906f25b8`). A Graph 401 that names a continuous access evaluation challenge
+(InteractionRequired, or insufficient_claims in WWW-Authenticate) stops the privileged prerequisites with
+`graph-cae-sign-in-required` instead of `graph-request-failed-401`: the Azure CLI keeps its revoked token, so only an
+interactive `az login` helps.
+
+## Post-v1.25 backport — 6 November 2026: the seeding Key Vault DNS check runs on Linux runners
+
+Backported from `main` (`e2e72b48`). `prepareSeedingKeyVaultPrivateDns.ps1` waits for the vault's private DNS through
+its cross-platform helper on both DNS paths; the zone-group path called the Windows-only `Clear-DnsClientCache` and
+`Resolve-DnsName`, so infra-project stopped on a Linux self-hosted runner after creating the zone group (aif-151).
+
+Also backported from `main` (`4f7c1b1d`): the Azure DevOps services job's inline seeding Key Vault DNS
+wait (`job-2-genai-services.yaml`, step `02b_az_prepare_seeding_keyvault_private_dns`) resolves through
+`System.Net.Dns` too, so it runs on Linux agents.

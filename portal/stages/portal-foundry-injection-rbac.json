@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "17806780616651532523"
+    }
+  },
+  "parameters": {
+    "accountResourceId": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "agentSubnetId": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "networkContributor": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')]",
+    "accountParts": "[split(parameters('accountResourceId'), '/')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Network/virtualNetworks/{0}', parameters('vnetName'))]",
+      "name": "[guid(resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')), parameters('accountResourceId'), variables('networkContributor'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('networkContributor')]",
+        "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('accountParts')[2], variables('accountParts')[4]), 'Microsoft.CognitiveServices/accounts', last(variables('accountParts'))), '2025-06-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Network/virtualNetworks/{0}/subnets/{1}', parameters('vnetName'), last(split(parameters('agentSubnetId'), '/')))]",
+      "name": "[guid(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), last(split(parameters('agentSubnetId'), '/'))), parameters('accountResourceId'), variables('networkContributor'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('networkContributor')]",
+        "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('accountParts')[2], variables('accountParts')[4]), 'Microsoft.CognitiveServices/accounts', last(variables('accountParts'))), '2025-06-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ]
+}

@@ -296,9 +296,9 @@ class ApiVersionNotServed(Blocked):
 
     During an api-version rollout an ARM front end can advertise a provider version (in the provider schema)
     before the resource's region serves it (aif-128 COMMON, 2026-10-26: 2026-07-01 for ~83 Microsoft.Network
-    types, while swedencentral answered it with this 400). It keeps the caller's fail-closed code, so every
-    caller that does not handle it fails exactly as before; only the closure walk retries a schema-derived
-    version at an older one.
+    types, while swedencentral answered it with this 400; aif-138 project deletion, 2026-10-31, the same for
+    privateEndpoints and networkInterfaces). It keeps the caller's fail-closed code, so every caller that does not
+    handle it fails exactly as before; only the closure walk retries a schema-derived version at an older one.
     """
 
 
@@ -326,6 +326,11 @@ def http_error_api_version_not_served(error, url):
                 and api_version_not_served(json.loads(raw), versions[0]))
     except Exception:  # an unreadable answer is a plain failure
         return False
+
+
+# Azure AI Search: ARM's registered type is searchServices; "services" is kept for callers that used that name.
+SEARCH_SERVICE_KINDS = frozenset({"microsoft.search/searchservices", "microsoft.search/services"})
+SEARCH_SHARED_LINK_KINDS = frozenset(kind + "/sharedprivatelinkresources" for kind in SEARCH_SERVICE_KINDS)
 
 
 def arm_error_code(raw):
@@ -1844,6 +1849,9 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         except Blocked:
             return "unclassified"
 
+    derived = set()  # resources whose api-version came from the provider schema, not a pin
+    referenced = set()  # resources only another body names; they may already be deleted (dangling reference)
+
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
@@ -1885,7 +1893,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         """The walk's child-inventory steps for one resource, planned lazily in serial order."""
         namespace, relative = kind.split("/", 1)
         key = resource_id.lower()
-        if kind == "microsoft.search/services":
+        if kind in SEARCH_SERVICE_KINDS:
             # This documented ARM child must be inventoried even when omitted
             # from provider discovery; a failed list never means an empty list.
             yield "collection", resource_id + "/sharedPrivateLinkResources", "2025-05-01", None, None
@@ -1894,7 +1902,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             if not child.startswith(relative + "/") or "/" in tail:
                 continue
             full_type = namespace + "/" + child
-            if full_type == "microsoft.search/services/sharedprivatelinkresources":
+            if full_type in SEARCH_SHARED_LINK_KINDS:
                 continue
             if full_type in inline:
                 yield "inline", key + "/" + tail, None, None, None
@@ -1952,7 +1960,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             if kind in LISTED_ONLY_CHILDREN:
                 return
             reader.prefetch(resource_read(resource_id, versions[resource_id.lower()]))
-            if kind not in terminal_extensions and kind != "microsoft.search/searchservices":
+            if kind not in terminal_extensions:
                 read_children_ahead(resource_id, kind)
                 read_extensions_ahead(resource_id)
 
@@ -1979,7 +1987,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             # aif-135: ACR registries/privateEndpointConnectionProxies answers 404 at every api-version.
             # Documented pinned children (Search sharedPrivateLinkResources) stay strict: a failed list there
             # never means an empty list.
-            pinned = collection_resource_type(path) == "microsoft.search/services/sharedprivatelinkresources"
+            pinned = collection_resource_type(path) in SEARCH_SHARED_LINK_KINDS
             try:
                 api, (rows, unsupported) = served(
                     lambda value: reader.get(collection_read(path, value, extension)), api, kind)
@@ -2126,9 +2134,6 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             enqueue(reference)
         if kind in terminal_extensions:
             continue
-        if kind == "microsoft.search/searchservices":
-            # Search's ARM resource type is services, never searchServices.
-            raise Blocked("invalid-search-service-arm-resource-type")
         for step, path, value, single, child_kind in child_steps(resource_id, kind):
             read_children_ahead(resource_id, kind)
             if step == "inline":
@@ -3170,8 +3175,7 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
     # Only independently proven entries in the immutable manifest are eligible.
     # Leave private endpoint connections to the reviewed RG cascade: deleting
     # them individually changes embedded parent bodies before the next guard.
-    links = [item for item in resources if resource_type_from_id(item["id"]) ==
-             "microsoft.search/services/sharedprivatelinkresources"]
+    links = [item for item in resources if resource_type_from_id(item["id"]) in SEARCH_SHARED_LINK_KINDS]
     for item in deletion_order(links):
         locks.authorize(document)
         locks.assert_held()

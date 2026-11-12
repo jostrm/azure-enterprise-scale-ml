@@ -27,6 +27,7 @@ Open this directory as an Obsidian vault, or read the Markdown directly. No plug
 ## Platform and operation
 
 - [[Bootstrap-and-Layouts]], [[IaC-and-Private-Networking]], [[Identity-and-Personas]], [[Health-Models]].
+- [[Deploy-to-Azure-Portal]]: proposed "Deploy to Azure" button for the Simple Mode bootstrap. It builds a dedicated hub, and portal-deployed factories cannot be registered with the Factory API.
 - [[Compute-Security-Baseline]] — Defender for Cloud baseline for every VM, runner VM and AKS cluster: Gen2 + Trusted Launch, encryption at host, Guest Configuration/Attestation, update assessment, opt-in backup.
 - [[AI-Gateway-APIM-Provisioning]] — opt-in reviewed APIM runner and managed StandardV2 provisioning beside the classic AI gateway step.
 - [[Orchestration-and-Updates]], [[Lifecycle-and-Recovery]].

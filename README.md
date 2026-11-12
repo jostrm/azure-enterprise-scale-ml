@@ -90,7 +90,7 @@ The *Factory project* can have 1 or many resources *ENABLED=True* to get a *GenA
 Via *Factory feature flags* you can add optional resources, re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
 # + 54 Azure resources (on top of all platform related) for project teams
-The +54 resources a team can add via "enable" config, such as **ARCHITECTURES** seen in the image below: 
+The +54 resources a team can add via "enable" config, such as **ARCHITECTURES** seen in the image below:
 - **AI related**: Microsoft Foundry, Azure OpenAI (standalone), Azure Machine Learning, Azure Databricks Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS (fully private, and Azure Arc enabled)
 - **Data & Databases**: Azure Cosmos DB, Elastic search, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis, Azure Managed Redis (AMR)

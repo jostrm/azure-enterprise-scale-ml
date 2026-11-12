@@ -1,0 +1,128 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "10138553338159901004"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "gatewaySubnetCidr": {
+      "type": "string"
+    },
+    "vnetCidr": {
+      "type": "string"
+    },
+    "vpnClientCidr": {
+      "type": "string"
+    },
+    "locationShort": {
+      "type": "string"
+    },
+    "scalesetNumber": {
+      "type": "string"
+    },
+    "costCenter": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "gatewayName": "[format('vpngw-aifactory-access-{0}-{1}', parameters('locationShort'), parameters('scalesetNumber'))]",
+    "tags": {
+      "CostCenter": "[parameters('costCenter')]",
+      "Purpose": "AIFactoryConnectivity"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', parameters('vnetName'), 'GatewaySubnet')]",
+      "properties": {
+        "addressPrefix": "[parameters('gatewaySubnetCidr')]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-pip', variables('gatewayName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "zones": [
+        "1",
+        "2",
+        "3"
+      ],
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "publicIPAddressVersion": "IPv4"
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworkGateways",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('gatewayName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "gatewayType": "Vpn",
+        "vpnType": "RouteBased",
+        "vpnGatewayGeneration": "Generation1",
+        "sku": {
+          "name": "VpnGw1AZ",
+          "tier": "VpnGw1AZ"
+        },
+        "ipConfigurations": [
+          {
+            "name": "default",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'GatewaySubnet')]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', variables('gatewayName')))]"
+              }
+            }
+          }
+        ],
+        "vpnClientConfiguration": {
+          "vpnClientAddressPool": {
+            "addressPrefixes": [
+              "[parameters('vpnClientCidr')]"
+            ]
+          },
+          "vpnClientProtocols": [
+            "OpenVPN"
+          ],
+          "vpnAuthenticationTypes": [
+            "AAD"
+          ],
+          "aadTenant": "[format('{0}{1}', environment().authentication.loginEndpoint, tenant().tenantId)]",
+          "aadAudience": "c632b3df-fb67-4d84-bdcf-b95ad541b5c8",
+          "aadIssuer": "[format('https://sts.windows.net/{0}/', tenant().tenantId)]"
+        },
+        "customRoutes": {
+          "addressPrefixes": [
+            "[parameters('vnetCidr')]"
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'GatewaySubnet')]",
+        "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', variables('gatewayName')))]"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "5773744238821433744"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string"
+    },
+    "keyVaultId": {
+      "type": "string"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "subnetName": {
+      "type": "string",
+      "defaultValue": "snet-esml-cmn-001"
+    }
+  },
+  "variables": {
+    "keyVaultName": "[last(split(parameters('keyVaultId'), '/'))]",
+    "endpointName": "[format('pend-{0}-to-{1}', variables('keyVaultName'), parameters('vnetName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('endpointName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "[format('{0}-connection', variables('endpointName'))]",
+            "properties": {
+              "privateLinkServiceId": "[parameters('keyVaultId')]",
+              "groupIds": [
+                "vault"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', variables('endpointName'), 'aifactory-seeding-keyvault')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "vaultcore",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', variables('endpointName'))]"
+      ]
+    }
+  ]
+}
