@@ -173,12 +173,11 @@ correct workflow owner before changing the submodule.
 
 ### Source compatibility and stopped bootstrap runs
 
-Use compatible, published backend and accelerator revisions. The runtime checks
-helper contents as well as source references.
-For example,
-`published-prefix-bootstrap-helper-mismatch:lib/common_network_preservation.py`
-means the API's reviewed helper differs from the requested published accelerator.
-Install compatible published versions through your normal update process.
+Use compatible, published backend and accelerator revisions. The runtime compares
+helper contents and source references, and a difference is a warning, never a stop:
+the published code runs. For example, the warning that `bootstrap/lib/factory_enrollment.py`
+differs from the helper the application reviewed means the accelerator was published after
+your app. Install the current app through your normal update process to remove the warning.
 Preserve local changes and the active workflow's source pin. Do not modify
 expected hashes, substitute unpublished helpers or disable verification.
 
