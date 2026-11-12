@@ -8,6 +8,9 @@ import json
 import pytest
 
 from base.config import REPO_ROOT, env_defaults, yaml_defaults
+from domain.optional_addons import (
+    PROJECT001_DEV, assert_pipeline_apply_warns_and_skips, assert_strict_outside_the_pipeline_apply, load_launcher,
+)
 from domain.pipeline_contracts import (
     ADO_GATEWAY, ADO_ROOT, ADO_SERVICES, CONFIG_ONLY_EXCEPTIONS, EXTRA_FEATURES, FEATURES, GHA_GATEWAY, GHA_PHASE,
     evaluate, load_pipeline, objects,
@@ -214,3 +217,25 @@ def test_github_reads_the_mcp_app_id_from_the_seeding_keyvault_before_the_step()
     download = job["steps"][names.index("03_Download_Secrets_From_Seeding_KeyVault")]["run"]
     assert f'"${{{{ env.aifactory_mcp_AppID_seeding_kv_name }}}}" "{SEEDED}"' in download
     assert names.index("03_Download_Secrets_From_Seeding_KeyVault") < names.index(STEP)
+
+
+# The create-factory quickstart (documentation/v2/quickstarts/02-create-factory.md) turns these on before the MCP images
+# and its app registration exist; byor-159 run 43192891708 then failed the whole project pipeline in its last step.
+DOCS_QUICKSTART = {**PROJECT001_DEV, "enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true",
+                   "enableFactoryChatAgent": "true", "enableAIFoundry": "true", "enableContainerApps": "true"}
+
+
+def test_pipeline_apply_warns_and_skips_the_docs_quickstart_configuration_without_azure(capsys):
+    module = load_launcher(LAUNCHER, "mcp_gateway_launcher_docs_flow")
+    assert_pipeline_apply_warns_and_skips(module, DOCS_QUICKSTART, "aifactoryMcpImage", capsys)
+
+
+def test_validate_plan_and_direct_callers_stay_strict_on_the_docs_quickstart_configuration(capsys):
+    module = load_launcher(LAUNCHER, "mcp_gateway_launcher_docs_flow_strict")
+    assert_strict_outside_the_pipeline_apply(module, DOCS_QUICKSTART, capsys)
+
+
+def test_the_launcher_docstring_says_apply_warns_and_validate_fails():
+    doc = load_launcher(LAUNCHER, "mcp_gateway_launcher_docstring").__doc__
+    assert "fail instead of being ignored" not in doc
+    assert "apply warns and skips" in doc and "validate" in doc

@@ -2,7 +2,9 @@
 
 Reads the pipeline variables by their exact names from the environment, validates them offline, and then plans
 (Azure GET only) or applies (the agent's own ownership-checked operator commands). Disabled flags and Stage/Prod
-runs exit cleanly without contacting Azure; invalid combinations fail instead of being ignored.
+runs exit cleanly without contacting Azure. An invalid or incomplete configuration is never ignored silently: the
+pipeline apply warns and skips (``apply --apply``: a GitHub Actions / Azure DevOps warning, exit 0, no Azure contact),
+so the project run still reaches its goal; validate and plan fail on it (exit 1).
 
 aifactoryAgentConfigFile optionally names the customer's own agent configuration, a JSON file relative to the consumer
 checkout (BUILD_SOURCESDIRECTORY in Azure DevOps, GITHUB_WORKSPACE in GitHub Actions).
@@ -24,6 +26,7 @@ from agent_factory.agent_live_voice import (  # noqa: E402
     LiveVoiceIntegration, LiveVoiceRequest, decide, subprocess_runner)
 from agent_factory.azure import AzureSession  # noqa: E402
 from agent_factory.deployer_access import DeployerAccess  # noqa: E402
+from agent_factory.pipeline_warning import SKIPPED_INCOMPLETE, skipped_incomplete, warn_skipped  # noqa: E402
 
 INPUTS = (
     "enableFactoryChatAgent", "enableAIFactoryAgentLiveVoice",
@@ -74,11 +77,17 @@ def load_customer_configuration(relative: str, root: Path) -> dict:
 
 
 def run(args, environ=os.environ, session_factory=AzureSession, runner=subprocess_runner, *,
-        access_factory=DeployerAccess.for_session) -> dict:
-    request = LiveVoiceRequest.from_values({name: environ.get(name) for name in INPUTS})
-    if request.enable_live_voice and request.config_file:
-        request = replace(request, config_overlay=load_customer_configuration(request.config_file, consumer_root(environ)))
-    decision = decide(request)
+        access_factory=DeployerAccess.for_session, skip_incomplete=False) -> dict:
+    try:
+        request = LiveVoiceRequest.from_values({name: environ.get(name) for name in INPUTS})
+        if request.enable_live_voice and request.config_file:
+            overlay = load_customer_configuration(request.config_file, consumer_root(environ))
+            request = replace(request, config_overlay=overlay)
+        decision = decide(request)
+    except ValueError as error:
+        if not skip_incomplete:
+            raise
+        return skipped_incomplete(str(error))
     if args.command == "apply" and not args.apply:
         raise ValueError("apply requires --apply.")
     if not decision.act:
@@ -91,17 +100,20 @@ def run(args, environ=os.environ, session_factory=AzureSession, runner=subproces
     return engine.run(request, apply=args.command == "apply", skip_knowledge=getattr(args, "skip_knowledge", False))
 
 
-def main() -> int:
+def main(argv=None, environ=os.environ, session_factory=AzureSession) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["validate", "plan", "apply"])
     parser.add_argument("--apply", action="store_true", help="Required with apply; plan and validate never write.")
     parser.add_argument("--skip-knowledge", action="store_true",
                         help="Deploy only the application (code changes); the committed knowledge index stays.")
+    args = parser.parse_args(argv)
     try:
-        result = run(parser.parse_args())
+        result = run(args, environ, session_factory, skip_incomplete=args.command == "apply" and args.apply)
     except (ValueError, RuntimeError) as error:
         print(f"AI Factory Agent live voice configuration error: {error}", file=sys.stderr)
         return 1
+    if result["mode"] == SKIPPED_INCOMPLETE:
+        warn_skipped("AI Factory Agent live voice", result)
     print(json.dumps(result, indent=2))
     return 0
 

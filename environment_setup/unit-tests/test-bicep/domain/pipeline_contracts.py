@@ -237,7 +237,7 @@ def forwarding_errors(pipeline: dict, platform: str, required: dict[str, str] = 
     return errors
 
 
-_TOKEN = re.compile(r"\s*(?:('(?:[^']|'')*')|([A-Za-z_][\w.-]*)|(&&|\|\||==|!=|[(),\[\]]))")
+_TOKEN = re.compile(r"\s*(?:('(?:[^']|'')*')|([A-Za-z_][\w.-]*)|(&&|\|\||==|!=|!|[(),\[\]]))")
 
 
 def evaluate(expression: str, context: dict[str, Any]) -> Any:
@@ -283,6 +283,8 @@ def evaluate(expression: str, context: dict[str, Any]) -> Any:
 
     def atom():
         token = consume()
+        if token == "!":
+            return not atom()
         if token == "(":
             value = logical_or()
             consume(")")

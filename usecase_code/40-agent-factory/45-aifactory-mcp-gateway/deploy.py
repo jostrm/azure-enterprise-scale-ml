@@ -2,7 +2,9 @@
 
 Reads the pipeline variables by their exact names from the environment, validates them offline, and
 then plans (GET only) or applies (owned writes only). Disabled flags and Stage/Prod runs exit cleanly
-without contacting Azure; invalid combinations fail instead of being ignored.
+without contacting Azure. An invalid or incomplete configuration is never ignored silently: the pipeline
+apply warns and skips (``apply --apply``: a GitHub Actions / Azure DevOps warning, exit 0, no Azure contact),
+so the project run still reaches its goal; validate and plan fail on it (exit 1).
 
 ``apim-parameters --output FILE`` serves the AI gateway pipeline (addAIFactoryMCP2APIM): it reads the
 MCP and the APIM (GET only) and writes the apim-mcp-server.bicep parameters file that the pipeline
@@ -23,6 +25,7 @@ from agent_factory.azure import AzureSession  # noqa: E402
 from agent_factory.mcp_gateway import (  # noqa: E402
     PROJECT_NUMBER, IntegrationRequest, McpGatewayIntegration, decide, decide_apim,
 )
+from agent_factory.pipeline_warning import SKIPPED_INCOMPLETE, skipped_incomplete, warn_skipped  # noqa: E402
 
 INPUTS = (
     "enableAIFactoryMCP", "enableAIGatewaySKU", "addAIFactoryMCP2AIGatewaySKU",
@@ -44,11 +47,16 @@ APIM_INPUTS = (
 )
 
 
-def run(args, environ=os.environ, session_factory=AzureSession) -> dict:
+def run(args, environ=os.environ, session_factory=AzureSession, *, skip_incomplete=False) -> dict:
     if args.command == "apim-parameters":
         return apim_parameters(args, {name: environ.get(name) for name in APIM_INPUTS}, session_factory)
-    request = IntegrationRequest.from_values({name: environ.get(name) for name in INPUTS})
-    decision = decide(request)
+    try:
+        request = IntegrationRequest.from_values({name: environ.get(name) for name in INPUTS})
+        decision = decide(request)
+    except ValueError as error:
+        if not skip_incomplete:
+            raise
+        return skipped_incomplete(str(error))
     if args.command == "apply" and not args.apply:
         raise ValueError("apply requires --apply.")
     if not decision.act:
@@ -72,16 +80,19 @@ def apim_parameters(args, values, session_factory) -> dict:
     return result
 
 
-def main() -> int:
+def main(argv=None, environ=os.environ, session_factory=AzureSession) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["validate", "plan", "apply", "apim-parameters"])
     parser.add_argument("--apply", action="store_true", help="Required with apply; plan and validate never write.")
     parser.add_argument("--output", help="apim-parameters: file that receives the apim-mcp-server.bicep parameters.")
+    args = parser.parse_args(argv)
     try:
-        result = run(parser.parse_args())
+        result = run(args, environ, session_factory, skip_incomplete=args.command == "apply" and args.apply)
     except ValueError as error:
         print(f"MCP & AI Gateway configuration error: {error}", file=sys.stderr)
         return 1
+    if result["mode"] == SKIPPED_INCOMPLETE:
+        warn_skipped("AI Factory MCP & AI Gateway", result)
     print(json.dumps(result, indent=2))
     return 0
 

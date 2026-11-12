@@ -4662,6 +4662,25 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # The Foundry add-on steps below run last, long after the job's login; GitHub OIDC client assertions live five
+      # minutes, so their data-plane tokens failed with AADSTS700024 (byor-159 runs 43175705193, 43188010696).
+      # Log in again right before them, like the refresh before project lake access.
+      - name: Refresh Azure OIDC login before Foundry add-ons
+        if: ${{ success() && inputs.phase == 'foundry' && inputs.json_identity_auth && (env.enableFactoryChatAgent == 'true' || env.enableAIFactoryMCP == 'true' || env.enableAIGatewaySKU == 'true' || env.addAIFactoryMCP2AIGatewaySKU == 'true' || env.enableAIFactoryAgentLiveVoice == 'true' || env.enableBotService == 'true') && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ inputs.azure_client_id }}
+          tenant-id: ${{ inputs.azure_tenant_id }}
+          subscription-id: ${{ inputs.azure_subscription_id }}
+
+      - name: Refresh Azure OIDC login before Foundry add-ons (environment identity)
+        if: ${{ success() && inputs.phase == 'foundry' && !inputs.json_identity_auth && env.AZURE_CLIENT_ID != '' && (env.enableFactoryChatAgent == 'true' || env.enableAIFactoryMCP == 'true' || env.enableAIGatewaySKU == 'true' || env.addAIFactoryMCP2AIGatewaySKU == 'true' || env.enableAIFactoryAgentLiveVoice == 'true' || env.enableBotService == 'true') && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       - name: Deploy Factory Chat Agent in Foundry
         if: success() && inputs.phase == 'foundry' && env.enableFactoryChatAgent == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
         shell: bash

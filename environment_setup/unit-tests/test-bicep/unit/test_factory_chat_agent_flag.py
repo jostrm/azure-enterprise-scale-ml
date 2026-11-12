@@ -8,6 +8,9 @@ import json
 import pytest
 
 from base.config import REPO_ROOT, env_defaults, yaml_defaults
+from domain.optional_addons import (
+    PROJECT001_DEV, assert_pipeline_apply_warns_and_skips, assert_strict_outside_the_pipeline_apply, load_launcher,
+)
 from domain.pipeline_contracts import (
     ADO_ROOT, ADO_SERVICES, FEATURES, GHA_PHASE, evaluate, load_pipeline,
 )
@@ -117,3 +120,17 @@ def test_launcher_import_is_offline_and_side_effect_free():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.INPUTS and callable(module.run)
+
+
+# The step's gate does not check enableAIFoundry, so the chat agent alone reaches the launcher's offline validation.
+WITHOUT_FOUNDRY = {**PROJECT001_DEV, FLAG: "true", "enableAIFoundry": "false", "modelGPTXName": "gpt-4o"}
+
+
+def test_pipeline_apply_warns_and_skips_an_incomplete_configuration_without_azure(capsys):
+    module = load_launcher(LAUNCHER, "factory_chat_agent_launcher_incomplete")
+    assert_pipeline_apply_warns_and_skips(module, WITHOUT_FOUNDRY, "requires enableAIFoundry=true", capsys)
+
+
+def test_validate_plan_and_direct_callers_stay_strict_on_an_incomplete_configuration(capsys):
+    module = load_launcher(LAUNCHER, "factory_chat_agent_launcher_incomplete_strict")
+    assert_strict_outside_the_pipeline_apply(module, WITHOUT_FOUNDRY, capsys)
