@@ -34,7 +34,7 @@ Access to the private API source repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.103, complete executable and `_internal` folder |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.104, complete executable and `_internal` folder |
 | Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.36, self-contained executable |
 | macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.36, self-contained executable |
 
@@ -167,6 +167,11 @@ the same variables as settings.
 From v0.47.103, the packaged API has the project-team routes: use cases, My project and
 `POST /api/v1/esaf/export-allowed-projects`, which returns a validated read-only configuration bundle for a
 project team. The wizard explains what is relevant or blocked and why, and shows example text in empty fields.
+
+From v0.47.104, creating a Factory no longer stops on a hash or pin difference: when a published accelerator
+helper, the submodule pin or the `release/v1.25` branch head differs from the one the app was reviewed against,
+the wizard and the API log a warning and run the published code. v0.47.101 to v0.47.103 refused to create a
+Factory from the `release/v1.25` head; use v0.47.104 or later.
 
 Every parameter, jobs, errors and the CLI equivalents (`azurefactory esaf ...`) are in the
 [ESAF usage guide](../azurefactory-cli/docs/esaf/readme.md).
