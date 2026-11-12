@@ -9,6 +9,10 @@ Usage, from the repository root:
     python documentation/gh-io/tools/svg_to_gif.py SOURCE.svg OUTPUT.gif --preset header
     python documentation/gh-io/tools/svg_to_gif.py SOURCE.svg OUTPUT.gif --preset thumb
     python documentation/gh-io/tools/svg_to_gif.py SOURCE.svg OUTPUT.gif --width 600 --fps 10 --colors 64 --max-kb 900
+    python documentation/gh-io/tools/svg_to_gif.py --manifest
+
+``--manifest`` renders every GIF listed in ``documentation/gh-io/data/template_gifs.json`` again: the header and
+thumbnail GIFs of the code templates, each with its source SVG, preset and plaque position.
 
 Presets (explicit flags override them):
 
@@ -22,7 +26,7 @@ into the first. ffmpeg encodes the frames with a frame-difference palette and
 rectangle-diff frames. gifsicle ``-O3 --lossy`` runs afterwards when it is on
 PATH. The frame rate must divide 100 (GIF delays are whole centiseconds), so use
 12.5, 10, 5, 4 ... rather than 12. Every frame carries a small, nearly invisible
-"Enterprise Scale AI Factory (ESAIF)" plaque - light text in a hairline rounded
+"Enterprise Scale Azure Factory (ESAF)" plaque - light text in a hairline rounded
 border at very low opacity - centred horizontally (``--watermark-y`` moves it
 vertically, ``--watermark ""`` turns it off; the source SVG is not modified). CSS ``@keyframes`` SVGs are rejected instead of
 being exported as a single static frame. The JSON report is printed; the exit
@@ -47,7 +51,9 @@ PRESETS = {
     "header": {"width": 720, "fps": 12.5, "colors": 128, "max_kb": 1500},
     "thumb": {"width": 320, "fps": 10, "colors": 64, "max_kb": 400},
 }
-WATERMARK = "Enterprise Scale AI Factory (ESAIF)"
+WATERMARK = "Enterprise Scale Azure Factory (ESAF)"
+ROOT = Path(__file__).resolve().parents[3]
+MANIFEST = ROOT / "documentation" / "gh-io" / "data" / "template_gifs.json"
 WATERMARK_ID = "svg-to-gif-watermark"
 WATERMARK_TEXT, WATERMARK_STROKE, WATERMARK_FILL = 0.16, 0.14, 0.035
 ANIMATION = re.compile(r"<(?:animate|animateColor|animateMotion|animateTransform|set)\b[^>]*>")
@@ -251,8 +257,11 @@ def inspect_gif(path: Path) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("source", type=Path, nargs="?")
+    parser.add_argument("output", type=Path, nargs="?")
+    parser.add_argument("--manifest", type=Path, nargs="?", const=MANIFEST,
+                        help="render every GIF of this JSON list again instead of one SOURCE and OUTPUT")
+    parser.add_argument("--root", type=Path, default=ROOT, help="folder the paths of the manifest start from")
     parser.add_argument("--preset", choices=sorted(PRESETS), default="header")
     parser.add_argument("--width", type=int)
     parser.add_argument("--fps", type=float)
@@ -263,14 +272,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--watermark-y", type=float, default=0.5,
                         help="plaque centre as a fraction of the height, e.g. 0.62 to sit between card rows")
     args = parser.parse_args(argv)
-    settings = {**PRESETS[args.preset],
-                **{key: value for key, value in vars(args).items()
-                   if key in ("width", "fps", "colors", "max_kb") and value is not None}}
-    settings.update(watermark=args.watermark, watermark_y=args.watermark_y)
-    report = convert(args.source, args.output, lossy=args.lossy, **settings)
-    report.update(inspect_gif(args.output))
-    print(json.dumps(report, indent=2))
-    return 0 if report["within_budget"] else 2
+    if args.manifest:
+        jobs = [(args.root / job["source"], args.root / job["output"], job["preset"], job["watermark_y"])
+                for job in json.loads(args.manifest.read_text(encoding="utf-8"))["gifs"]]
+    elif args.source and args.output:
+        jobs = [(args.source, args.output, args.preset, args.watermark_y)]
+    else:
+        parser.error("give SOURCE and OUTPUT, or --manifest")
+    within_budget = True
+    for source, output, preset, watermark_y in jobs:
+        settings = {**PRESETS[preset],
+                    **{key: value for key, value in vars(args).items()
+                       if key in ("width", "fps", "colors", "max_kb") and value is not None}}
+        settings.update(watermark=args.watermark, watermark_y=watermark_y)
+        report = convert(source, output, lossy=args.lossy, **settings)
+        report.update(inspect_gif(output))
+        print(json.dumps(report, indent=2), flush=True)
+        within_budget = within_budget and report["within_budget"]
+    return 0 if within_budget else 2
 
 
 if __name__ == "__main__":

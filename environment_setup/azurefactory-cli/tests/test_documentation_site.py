@@ -139,6 +139,9 @@ def test_site_header_carries_the_product_name(site):
     home = (SITE / "docs" / "index.md").read_text(encoding="utf-8")
     assert "![Enterprise Scale Azure Factory](assets/images/header.png)" in home
     assert "Enterprise Scale AI Factory" not in home
+    # The repository README shows the same banner as the home page of the site.
+    assert (V2 / "10-19" / "images" / "header.png").read_bytes() == (
+        SITE / "docs" / "assets" / "images" / "header.png").read_bytes()
 
 
 def test_site_renders_mermaid_diagrams(site):

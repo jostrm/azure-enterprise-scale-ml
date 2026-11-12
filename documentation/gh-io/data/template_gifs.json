@@ -1,0 +1,76 @@
+{
+  "gifs": [
+    {
+      "source": "documentation/gh-io/docs/assets/animations/rag.svg",
+      "output": "usecase_code/40-agent-factory/40-aifactory-agent/images/aifactory-agent.gif",
+      "preset": "header",
+      "watermark_y": 0.633
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/rag.svg",
+      "output": "usecase_code/40-agent-factory/45-rag-agent/images/rag-agent.gif",
+      "preset": "header",
+      "watermark_y": 0.633
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/rag.svg",
+      "output": "usecase_code/40-agent-factory/images/aifactory-agent-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.633
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/rag.svg",
+      "output": "usecase_code/40-agent-factory/images/rag-agent-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.633
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/dataops-rag.svg",
+      "output": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/images/rag-split-tables-acl.gif",
+      "preset": "header",
+      "watermark_y": 0.667
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/dataops-rag.svg",
+      "output": "usecase_code/40-agent-factory/images/rag-split-tables-acl-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.667
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/mlops.svg",
+      "output": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/images/agent-training-ml-churn.gif",
+      "preset": "header",
+      "watermark_y": 0.653
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/mlops.svg",
+      "output": "usecase_code/40-agent-factory/images/agent-training-ml-churn-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.653
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/mlops.svg",
+      "output": "usecase_code/50-ml-model-factory/images/usecase-type-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.653
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/dataops-mlops.svg",
+      "output": "usecase_code/50-ml-model-factory/images/ml-model-factory.gif",
+      "preset": "header",
+      "watermark_y": 0.676
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/dataops-mlops.svg",
+      "output": "usecase_code/50-ml-model-factory/images/ml-environment-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.676
+    },
+    {
+      "source": "documentation/gh-io/docs/assets/animations/dataops.svg",
+      "output": "usecase_code/50-ml-model-factory/images/data-thumb.gif",
+      "preset": "thumb",
+      "watermark_y": 0.686
+    }
+  ]
+}

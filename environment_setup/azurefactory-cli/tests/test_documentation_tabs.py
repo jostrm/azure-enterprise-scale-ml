@@ -39,9 +39,10 @@ def test_site_header_identifies_main_instead_of_latest_github_release():
     site = ROOT / "documentation" / "gh-io"
     config = load_config(str(site / "mkdocs.yml"))
     header = config.theme.get_env().get_template("partials/source.html").render(config=config)
-    assert config.repo_name == "AI Factory - main"
+    assert config.repo_name == "Azure Factory - main"
     assert f'href="{config.repo_url}/tree/main"' in header
-    assert "AI Factory - main" in header
+    assert "Azure Factory - main" in header
+    assert 'title="Browse Azure Factory source on main"' in header
     # Material's source component fetches releases/latest, unrelated to the site build.
     assert 'data-md-component="source"' not in header
     assert "release_124" not in header

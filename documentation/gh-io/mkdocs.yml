@@ -3,7 +3,7 @@ site_url: https://jostrm.github.io/azure-enterprise-scale-ml/
 site_description: Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.
 site_author: Microsoft
 
-repo_name: AI Factory - main
+repo_name: Azure Factory - main
 repo_url: https://github.com/jostrm/azure-enterprise-scale-ml
 
 docs_dir: docs

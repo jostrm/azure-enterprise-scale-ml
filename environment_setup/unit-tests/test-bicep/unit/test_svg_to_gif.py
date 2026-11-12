@@ -1,9 +1,11 @@
 import importlib.util
+import json
 from pathlib import Path
 import re
 import struct
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -70,8 +72,9 @@ class GeometryTests(unittest.TestCase):
 
 class WatermarkTests(unittest.TestCase):
     def test_watermark_is_a_faint_centered_plaque_drawn_last(self):
-        marked = converter.add_watermark(ANIMATED, "Enterprise Scale AI Factory (ESAIF)")
-        self.assertEqual(marked.count("Enterprise Scale AI Factory (ESAIF)"), 1)
+        self.assertEqual(converter.WATERMARK, "Enterprise Scale Azure Factory (ESAF)")
+        marked = converter.add_watermark(ANIMATED, converter.WATERMARK)
+        self.assertEqual(marked.count("Enterprise Scale Azure Factory (ESAF)"), 1)
         self.assertTrue(marked.rstrip().endswith("</g></svg>"))
         plaque = marked[marked.index(f'<g id="{converter.WATERMARK_ID}"'):]
         text = plaque[plaque.index("<text"):]
@@ -90,7 +93,7 @@ class WatermarkTests(unittest.TestCase):
         self.assertAlmostEqual(rect_x + rect_width / 2, 100, msg="the border is centred on the text")
 
     def test_plaque_is_light_so_it_melts_into_dark_diagrams(self):
-        marked = converter.add_watermark(ANIMATED, "ESAIF")
+        marked = converter.add_watermark(ANIMATED, "ESAF")
         self.assertNotIn('#000', marked[marked.index(f'<g id="{converter.WATERMARK_ID}"'):])
         self.assertIn('fill="#fff"', marked)
 
@@ -187,9 +190,48 @@ class ConvertPipelineTests(unittest.TestCase):
             source = Path(temporary) / "bar.svg"
             source.write_text(ANIMATED, encoding="utf-8")
             report = converter.convert(source, Path(temporary) / "bar.gif", width=100, fps=10, colors=32,
-                                       lossy=None, watermark="ESAIF", render=render, encode=encode)
-        self.assertIn(">ESAIF</text>", seen["svg"])
-        self.assertEqual(report["watermark"], "ESAIF")
+                                       lossy=None, watermark="ESAF", render=render, encode=encode)
+        self.assertIn(">ESAF</text>", seen["svg"])
+        self.assertEqual(report["watermark"], "ESAF")
+
+
+class ManifestTests(unittest.TestCase):
+    """The GIFs of the code templates are rendered from the lesson SVGs of the site; the manifest says how."""
+
+    def test_manifest_covers_every_template_gif_and_names_an_existing_source(self):
+        jobs = json.loads(converter.MANIFEST.read_text(encoding="utf-8"))["gifs"]
+        outputs = [job["output"] for job in jobs]
+        self.assertEqual(len(outputs), len(set(outputs)))
+        self.assertEqual(sorted(outputs),
+                         sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "usecase_code").rglob("*.gif")))
+        for job in jobs:
+            self.assertTrue((ROOT / job["source"]).is_file(), job["source"])
+            self.assertIn(job["preset"], converter.PRESETS)
+            self.assertTrue(0 < job["watermark_y"] < 1, job)
+
+    def test_manifest_mode_renders_every_gif_with_its_preset_and_plaque_position(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "gifs.json"
+            manifest.write_text(json.dumps({"gifs": [
+                {"source": "a.svg", "output": "out/a.gif", "preset": "header", "watermark_y": 0.63},
+                {"source": "a.svg", "output": "out/a-thumb.gif", "preset": "thumb", "watermark_y": 0.63},
+            ]}), encoding="utf-8")
+            report = {"within_budget": True}
+            with mock.patch.object(converter, "convert", return_value=report) as convert, \
+                    mock.patch.object(converter, "inspect_gif", return_value={}), \
+                    mock.patch("builtins.print"):
+                code = converter.main(["--manifest", str(manifest), "--root", temporary])
+        self.assertEqual(code, 0)
+        self.assertEqual([call.args for call in convert.call_args_list],
+                         [(Path(temporary) / "a.svg", Path(temporary) / "out" / "a.gif"),
+                          (Path(temporary) / "a.svg", Path(temporary) / "out" / "a-thumb.gif")])
+        thumb = convert.call_args_list[1].kwargs
+        self.assertEqual((thumb["width"], thumb["fps"], thumb["colors"], thumb["max_kb"]), (320, 10, 64, 400))
+        self.assertEqual((thumb["watermark"], thumb["watermark_y"]), (converter.WATERMARK, 0.63))
+
+    def test_one_gif_still_needs_a_source_and_an_output(self):
+        with self.assertRaises(SystemExit), mock.patch("sys.stderr"):
+            converter.main([])
 
 
 class InspectTests(unittest.TestCase):
