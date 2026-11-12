@@ -5,7 +5,7 @@
 > **Deploy to Azure - meant for a quick test:** For a governed factory, use the app, the CLI or the Factory API described below.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Full set up</b></a>
 
 ![Header](documentation/v2/10-19/images/header.png)
-<p align="center"> ↓  See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below ↓ </p>
+See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below.
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
 <p align="center">
