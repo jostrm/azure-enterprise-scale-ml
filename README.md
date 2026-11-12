@@ -2,7 +2,7 @@
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 > [!NOTE]
-> **Deploy to Azure - meant for a quick test:** For a governed factory, use the app, the CLI or the Factory API described below.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Full set up</b></a>
+> **Deploy to Azure: meant for a quick test:** For a governed factory use the app, CLI or the Factory API.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>See Full set up</b></a>
 
 ![Header](documentation/v2/10-19/images/header.png)
 See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below.
