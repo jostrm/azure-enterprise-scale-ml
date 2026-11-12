@@ -42,15 +42,15 @@ The parts hold the compressed app; they're split so that no file is larger than 
 
 | File | What it is |
 |---|---|
-| [ESAF-Tutorials-0.2.1-win-x64-protected-unsigned.msi](ESAF-Tutorials-0.2.1-win-x64-protected-unsigned.msi) | The installer. Run only this file. |
-| [...-1.cab](ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-1.cab), [...-2.cab](ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-2.cab), [...-3.cab](ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-3.cab), [...-4.cab](ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-4.cab) | The app's compressed parts, read by the installer. |
+| [ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi) | The installer. Run only this file. |
+| [...-1.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-1.cab), [...-2.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-2.cab), [...-3.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-3.cab), [...-4.cab](ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-4.cab) | The app's compressed parts, read by the installer. |
 | [SHA256SUMS.txt](SHA256SUMS.txt) | The SHA-256 hash of every file. |
 
 To download all of them and check their hashes, run this in PowerShell:
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'
-$Version = '0.2.1'
+$Version = '0.2.2'
 $Base = 'https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_tutorial_guide'
 $Folder = Join-Path $HOME 'Downloads\ESAF-Tutorials'
 $Name = "ESAF-Tutorials-$Version-win-x64-protected-unsigned"
@@ -70,11 +70,11 @@ Get-Content (Join-Path $Folder 'SHA256SUMS.txt') | Where-Object { $_.Trim() } | 
 **Expected output:**
 
 ```text
-OK  ESAF-Tutorials-0.2.1-win-x64-protected-unsigned.msi
-OK  ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-1.cab
-OK  ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-2.cab
-OK  ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-3.cab
-OK  ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-4.cab
+OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned.msi
+OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-1.cab
+OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-2.cab
+OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-3.cab
+OK  ESAF-Tutorials-0.2.2-win-x64-protected-unsigned-4.cab
 ```
 
 The hashes catch a broken or incomplete download. They come from this same folder, so they don't replace your
