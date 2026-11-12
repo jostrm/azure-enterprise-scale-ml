@@ -1,32 +1,23 @@
 # Azure DevOps
 
-Choose Azure DevOps when your team uses its repositories, pipelines and service
-connections. It is a provider choice, not a different Factory configuration model.
+Choose Azure DevOps when your team keeps its repositories, pipelines and service connections there. The
+Factory, its settings and the Bicep templates are the same as with GitHub Actions.
 
-## Start with a registered factory
+## Start with a Factory
 
-Use the [CLI, Python SDK or REST guide](../factory-tools/19-cli-and-api-and-usage.md)
-to save configuration with the explicit `ado` orchestrator, review its binding and
-separately approve deployment or supported Full bootstrap.
+Create the Factory with the `ado` orchestrator: follow [Create your AI Factory](../setup/02-create-factory.md),
+or [Add and update](../factory-tools/19-cli-and-api-and-usage.md) when you want to review each step yourself.
 
-Selecting `ado` does not itself create a pipeline, authorize a service connection
-or deploy resources. A blocked registered operation is not permission to use a
-legacy launcher instead.
+## What to have ready
 
-## Collect the right inputs
-
-| Input | What to confirm |
+| Input | What it is |
 | --- | --- |
-| Azure tenant/subscription | The selected environment and deployment identity's permissions. |
-| ADO organization/project/repository | The actual source and pipeline location. |
-| ADO tenant | `azureDevOpsTenantId` can differ from Azure `tenantId`; do not change IDs merely to make them match. |
-| Service connections | Exact authorized names and permissions for each environment being deployed. |
-| Runner/pool | Supported OS, private connectivity and approved pool/image for the selected route. |
-| Version | Matching launcher, helpers, templates and API/runtime contracts. |
-
-Scoped registered workers use the supported Linux execution contract. Other
-legacy paths can have different runner assumptions. Do not infer Azure login
-from an agent being online.
+| Azure tenant and subscription | The environment you deploy to, and an identity that may deploy there. |
+| Azure DevOps organization, project and repository | Where the code and the pipelines live. |
+| Azure DevOps tenant | `azureDevOpsTenantId`. It can differ from the Azure `tenantId`. Keep both as they are. |
+| Service connections | One for each environment you deploy, by its exact name. |
+| Agent pool | A Linux pool. With private networking, its agents need a route to the private endpoints. |
+| Version | The ESAF version to deploy, such as `main` or a release. |
 
 ### Service-connection parameters
 
@@ -37,45 +28,37 @@ from an agent being online.
 | `test_service_connection` / `test_seeding_kv_service_connection` | Stage, when selected |
 | `prod_service_connection` / `prod_seeding_kv_service_connection` | Prod, when selected |
 
-These names do not necessarily require separate principals for every duty, but
-every referenced connection must be authorized for its intended use.
-Secret-name references are not credential values.
+One service principal can serve several of these connections. Each connection you name must be authorized
+for its pipeline. The settings that end in a secret name hold the name of a Key Vault secret, never the
+secret itself.
 
-## Follow the exact run
+## Follow the run
 
-Preserve the confirmation/job ID and the provider run details. Check the actual
-deployment result rather than treating HTTP acceptance or a local script exit
-as success. The CLI's `workflow status/watch` feature is GitHub-specific;
-use catalog job status and ADO's own run results for this provider.
+Keep the job ID that a call returns, and follow that job until it ends. Then open the pipeline run in Azure
+DevOps for the details of each step. The CLI commands `workflow status` and `workflow watch` follow GitHub
+runs only.
 
 [Parameters](../parameters/index.md) |
-[Deployment/status tutorials](../factory-tools/19-cli-and-api-and-usage.md) |
-[Deletion and recovery](../factory-tools/20-cli-and-api-and-usage.md)
+[Add and update](../factory-tools/19-cli-and-api-and-usage.md) |
+[Remove and recover](../factory-tools/20-cli-and-api-and-usage.md)
 
 <details markdown="1">
-<summary>Alternative and Legacy ways</summary>
+<summary>Earlier way: the launcher scripts</summary>
 
-Existing legacy consumer repositories use the matching scripts installed at the
-consumer root:
+A repository that was set up with v1.24 has these scripts in its root:
 
-- `ADO-create-new-aifactory-scaleset.sh`: full creation flow, including potentially
-  billable Azure/identity/repository changes.
-- `ADO-update-aifactory-and-run-project.sh`: reviewed update/project execution.
-- `--project-only`: excludes the template/library update portion; not a version
-  upgrade or a blanket safety guarantee.
-- `--aifactory-env dev|stage|prod`: selects the project environment.
+- `ADO-create-new-aifactory-scaleset.sh` creates a Factory with its identities, repository and pipelines.
+- `ADO-update-aifactory-and-run-project.sh` updates the templates and runs the project pipeline.
+- `--project-only` runs the project pipeline without updating the templates.
+- `--aifactory-env dev|stage|prod` selects the environment.
 
-Legacy create defaults to `124`; update normally inherits the saved version.
-Use an explicit supported version, including `main` for development, when
-intended. A version selection does not migrate layouts.
-`--prepare-only` can change Azure and configuration; it is not a read-only
-preview. Use the selected source's help and
-[complete input contract](../parameters/advanced.md#bash-create-and-update-contract).
+Create uses version `124` unless you give another, and update keeps the version that was saved. Name `main` to
+use the current development version. `--prepare-only` prepares Azure and the settings without completing the
+deployment, so it does change things. All inputs are in the
+[launcher reference](../parameters/advanced.md#bash-create-and-update-contract).
 
-The source YAML is copied into
-`aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml`.
-Project JSON overrides require the matching adapter; GitHub uppercase names
-are not a replacement for ADO keys.
+The variables live in `aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml`. Azure
+DevOps uses the YAML names, and GitHub uses its own uppercase names.
 
 [Current ADO templates](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops) |
 [Setup overview](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md)

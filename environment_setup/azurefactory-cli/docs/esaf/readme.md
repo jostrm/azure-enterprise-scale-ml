@@ -24,18 +24,22 @@ refusal and retries a failed run. The call returns at once with an `EsafJob`, an
 This guide runs everything **locally**, on Windows, with the API on your own machine. The example paths are a working
 local layout; replace them with your own folders.
 
+> [!NOTE]
+> New to ESAF? Start with the [quickstarts](../../../../documentation/v2/quickstarts/README.md). They start the
+> Factory API from the app, so you don't need the API's source repository that step 1 below uses.
+
 | What | Example path |
 |---|---|
-| Factory API source (repository `jostrm/azure-aifactory-config`) | `C:\code\code_py_25\008_aifactory_admin_ux_tkinter` |
-| Accelerator with the SDK (repository `jostrm/azure-enterprise-scale-ml`) | `C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml` |
-| Your consumer repository's `azurefactory` folder (the factory register) | `C:\Users\jostrm\source\tutorial-runs\take5\tutorial-repo\azurefactory` |
+| Factory API source (repository `jostrm/azure-aifactory-config`) | `C:\work\factory-api` |
+| Accelerator with the SDK (repository `jostrm/azure-enterprise-scale-ml`) | `C:\work\azure-enterprise-scale-ml` |
+| Your consumer repository's `azurefactory` folder (the factory register) | `C:\work\team-factory\azurefactory` |
 
 ## 1. Start the Factory API
 
 The API checkout must be on `main` (it has the `/api/v1/esaf` routes). From its folder:
 
 ```powershell
-Set-Location C:\code\code_py_25\008_aifactory_admin_ux_tkinter
+Set-Location C:\work\factory-api
 git pull --ff-only
 .\start-api.ps1
 ```
@@ -44,8 +48,8 @@ It prints, for example:
 
 ```text
 Factory API 1.0.0 is ready at http://127.0.0.1:8765 (pid 58448).
-API key: from the new file C:\Users\jostrm\.aifactory\api.key
-Logs: C:\Users\jostrm\AppData\Local\Temp\aifactory-api\api-8765.log and ...\api-8765.err.log
+API key: from the new file C:\Users\<you>\.aifactory\api.key
+Logs: C:\Users\<you>\AppData\Local\Temp\aifactory-api\api-8765.log and ...\api-8765.err.log
 ```
 
 `start-api.ps1` starts the API hidden on `127.0.0.1`, waits until `/health` answers and never prints the key.
@@ -55,7 +59,7 @@ Logs: C:\Users\jostrm\AppData\Local\Temp\aifactory-api\api-8765.log and ...\api-
 | `-Port` | `8765` | The port to listen on. |
 | `-Restart` | off | Replace a Factory API already listening on that port (after `git pull`, to load new code). |
 | `-ApiKeyFile` | `%USERPROFILE%\.aifactory\api.key` | The key file; created with a new random key when missing. `AIFACTORY_API_KEY`, when set, wins. |
-| `-AcceleratorRoot` | not set | The accelerator checkout the API deploys from, for example `..\003_aifactory_sub\azure-enterprise-scale-ml`. |
+| `-AcceleratorRoot` | not set | The accelerator checkout the API deploys from, for example `..\azure-enterprise-scale-ml`. |
 | `-Python` | `.venv\Scripts\python.exe` in the API folder, else `python` | The interpreter. |
 | `-DryRun` | off | Print what it would start, without starting it. |
 
@@ -75,8 +79,8 @@ The SDK needs Python 3.10 or later and has no third-party dependencies. Install 
 `main`; `-e` makes a later `git pull` take effect without reinstalling:
 
 ```powershell
-git -C C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml pull --ff-only
-python -m pip install -e C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
+git -C C:\work\azure-enterprise-scale-ml pull --ff-only
+python -m pip install -e C:\work\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
 python -c "from azurefactory import esaf; print(esaf.__all__)"
 ```
 
@@ -87,7 +91,7 @@ Every call uses one connection, so the calls name only what they change. Set it 
 ```powershell
 $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
 $env:AIFACTORY_API_KEY = (Get-Content -Raw "$env:USERPROFILE\.aifactory\api.key").Trim()
-$env:ESAF_FOLDER = (Resolve-Path 'C:\Users\jostrm\source\tutorial-runs\take5\tutorial-repo\azurefactory').Path
+$env:ESAF_FOLDER = (Resolve-Path 'C:\work\team-factory\azurefactory').Path
 ```
 
 | Variable | Required | Meaning |
@@ -102,8 +106,8 @@ Or connect in code instead of with variables. `connect()` returns the session ev
 ```python
 from azurefactory import esaf
 
-esaf.connect(folder=r"C:\Users\jostrm\source\tutorial-runs\take5\tutorial-repo\azurefactory",
-             url="http://127.0.0.1:8765", factory="aif-139")   # api_key= too, or AIFACTORY_API_KEY
+esaf.connect(folder=r"C:\work\team-factory\azurefactory",
+             url="http://127.0.0.1:8765", factory="acme-ai")   # api_key= too, or AIFACTORY_API_KEY
 ```
 
 | `connect()` parameter | Meaning |
@@ -139,7 +143,7 @@ Every method also accepts these keyword arguments:
 ### 1. `esaf.init_factory()`: Init the AI Factory
 
 ```python
-esaf.init_factory(*, creation_request=None)
+esaf.init_factory(*, creation_request=None, scale_set_settings=None, project_settings=None)
 ```
 
 | Parameter | Meaning |
@@ -147,13 +151,75 @@ esaf.init_factory(*, creation_request=None)
 | (none) | Submits the folder's **saved factory draft** (for example saved in the Config Wizard) as one approved workflow. |
 | `creation_request` | Saves a new factory and starts it in the same call. The body is the creation API's full-bootstrap request: `{"contract_version": 1, "mode": "full-bootstrap", "action": "create-factory", "folder": ..., "orchestrator": "gha", "config": {...}, "factory_key": ..., "region_short_name": ...}`. `config` needs at least `factory_prefix`, `location` and `scale_set_number`. |
 
+| `scale_set_settings` | With `creation_request`: flat wizard settings of the new factory's **first Dev scale set**, saved before it deploys. A BYO VNet is `byoVnetResourcegroupName` and `byoVnetName`; BYO subnets add `"enableByoSubnets": true` and the subnet names (then leave `dev_vnet_cidr` out of `config`). See the three examples below. |
+| `project_settings` | With `creation_request`: flat wizard settings of the **initial project**, saved before its first deploy, for example `enableAIFactoryMCP`, `addAIFactoryMCP2APIM` and `enableFactoryChatAgent`. |
+
 It deploys the common Dev resource group, its network and the initial project001. About one hour.
+
+One call and one file can describe the whole factory. The file's fields are the keyword arguments:
+
+```python
+import json
+with open("create-factory.json", encoding="utf-8") as file:
+    esaf.init_factory(**json.load(file), wait=True)
+```
+
+```json
+{
+  "creation_request": {"contract_version": 1, "mode": "full-bootstrap", "folder": "...", "config": {"...": "..."}},
+  "scale_set_settings": {"byoVnetResourcegroupName": "rg-network", "byoVnetName": "vnet-ai-dev"},
+  "project_settings": {"enableAIFactoryMCP": "true", "addAIFactoryMCP2APIM": "true",
+                       "enableFactoryChatAgent": "true"}
+}
+```
+
+`scale_set_settings` in the three network examples:
+
+| Example | `scale_set_settings` |
+|---|---|
+| Automated networking | Leave it out. ESAF creates the VNet and its subnets from `dev_vnet_cidr`. |
+| BYO VNet | `{"byoVnetResourcegroupName": "rg-network", "byoVnetName": "vnet-ai-dev"}`. ESAF creates the subnets in your VNet. |
+| BYO subnets | The two BYO VNet settings, `"enableByoSubnets": true` and your subnet names. ESAF creates no network. |
+
+```json
+"scale_set_settings": {
+  "byoVnetResourcegroupName": "rg-network",
+  "byoVnetName": "vnet-ai-dev",
+  "enableByoSubnets": true,
+  "subnetCommon": "snet-dev-esml-cmn-001",
+  "subnetCommonScoring": "snet-dev-esml-cmn-001-scoring",
+  "subnetCommonPowerbiGw": "snet-esml-cmn-pbi-001",
+  "subnetProjGenAI": "snt-dev-prj001-genai",
+  "subnetProjAKS": "snt-prj001-aks",
+  "subnetProjAKS2": "snt-dev-prj001-aks2",
+  "subnetProjACA": "snt-prj001-aca",
+  "subnetProjACA2": "snt-prj001-aca-002",
+  "subnetProjWebapp": "snt-prj001-webapp",
+  "subnetProjLogicapp": "",
+  "subnetProjDatabricksPublic": "snt-prj001-dbxpub",
+  "subnetProjDatabricksPrivate": "snt-prj001-dbxpriv"
+}
+```
+
+The three friendly names are mapped by the Factory API, in every `settings` object of scenarios 1 to 3; the
+wizard's own keys still work, and the subnet names are the wizard's:
+
+| Friendly name | Wizard key |
+|---|---|
+| `byoVnetResourcegroupName` | `vnetResourceGroup_param` |
+| `byoVnetName` | `vnetNameFull_param` |
+| `enableByoSubnets` | `BYO_subnets` |
+
+The Factory API saves both settings after it has created the factory in the catalog and before anything deploys,
+and checks them first: a key the catalog does not accept is refused by name before the factory is created (the
+accepted keys are the `field_keys` of `GET /api/v1/factory-catalog/settings`). Sending the same call again resumes
+the factory and does not save the same settings twice.
 
 ### 2. `esaf.add_scale_set(scale_set, environment)`: Add a scale set
 
 ```python
 esaf.add_scale_set(scale_set, environment, *, cidr=None, max_projects=None, subscription_id=None,
-                   tenant_id=None, orchestrator=None)
+                   tenant_id=None, orchestrator=None, settings=None)
 ```
 
 | Parameter | Meaning |
@@ -163,6 +229,7 @@ esaf.add_scale_set(scale_set, environment, *, cidr=None, max_projects=None, subs
 | `cidr` | The new scale set's **VNet range**, for example `"10.141.0.0/16"`. Required for a new scale set; the deployment pipeline computes its subnets (with BYOSubnet they already exist). It must not overlap the hub or any peered VNet. |
 | `max_projects` | Project capacity; default `7`. |
 | `subscription_id`, `tenant_id`, `orchestrator` | Default to the environment's existing scale set; `orchestrator` is `"gha"` or `"ado"`. |
+| `settings` | Optional flat wizard settings saved at scale-set scope before deployment, such as `byoVnetResourcegroupName`, `byoVnetName`, `enableByoSubnets` and the subnet names (see scenario 1), `byoASEv3` or `byoAseFullResourceId`. |
 
 It registers the scale set (if new), extends the factory's single writer to it and deploys its common part. Calling
 it again for an existing scale set resumes: registration is skipped. About 15-30 minutes.
@@ -294,10 +361,10 @@ def run(label, job):
         raise SystemExit(f"{label} stopped: {state.get('blockers') or state.get('problem')}")
 
 
-config = json.load(open(r"C:\Users\jostrm\source\tutorial-runs\take5\bootstrap-config.json", encoding="utf-8-sig"))
+config = json.load(open(r"C:\work\team-factory\bootstrap-config.json", encoding="utf-8-sig"))
 creation = {"contract_version": 1, "mode": "full-bootstrap", "action": "create-factory",
-            "folder": r"C:\Users\jostrm\source\tutorial-runs\take5\tutorial-repo\azurefactory",
-            "orchestrator": "gha", "config": config, "factory_key": "aif-139", "region_short_name": "sdc"}
+            "folder": r"C:\work\team-factory\azurefactory",
+            "orchestrator": "gha", "config": config, "factory_key": "acme-ai", "region_short_name": "sdc"}
 
 run("Scenario 1", esaf.init_factory(creation_request=creation))
 run("Scenario 2", esaf.add_scale_set("002", "dev", cidr="10.141.0.0/16"))
@@ -317,6 +384,7 @@ final job:
 
 ```powershell
 azurefactory esaf init-factory --wait
+azurefactory esaf init-factory --request-json .\create-factory.json --wait
 azurefactory esaf add-scale-set 002 dev --cidr 10.141.0.0/16 --wait
 azurefactory esaf upsert-project 002 dev --scale-set 001 --wait
 azurefactory esaf delete-project 002 dev --wait
@@ -324,6 +392,10 @@ azurefactory esaf delete-scale-set 002 dev --wait
 azurefactory esaf delete-factory --wait
 azurefactory esaf job 0b7d6c84-3a52-4f05-9a27-52a1c3f8e0d1 --wait
 ```
+
+`init-factory` reads a new factory from files: `--request-json FILE` holds `creation_request` and, optionally,
+`scale_set_settings` and `project_settings` in one file; or pass them as separate files with
+`--creation-request-json`, `--scale-set-settings-json` and `--project-settings-json`.
 
 `--folder` overrides `ESAF_FOLDER`, `--factory` selects a factory, and `--retries` and `--version-ref` work as in
 Python. The exit code is `0` when the job succeeded or is still running, `3` when it was blocked and `5` when it failed.

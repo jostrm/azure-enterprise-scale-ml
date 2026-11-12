@@ -5,7 +5,7 @@ For manual project runs, use `deploymentTarget: manual`, leave the reviewed
 project field as `XXX` (format `001`), the hash as `not-applicable` and `deploymentSettings` as `{}`, and
 uncheck the JSON override when using YAML. **For Dev only, deselect Stage and
 Prod under Stages to run.** See the
-[manual ADO setup parameters](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml)
+[manual ADO setup parameters](../../../../../../documentation/v2/20-29/24-legacy-v124-setup.md#manual-azure-devops-run-pipeline-variablesyaml)
 and [manual update settings](../../../../../../documentation/v2/20-29/26-update-AIFactory.md#manual-azure-devops-run-pipeline).
 
 The legacy ADO update launcher can override stale organization/project defaults

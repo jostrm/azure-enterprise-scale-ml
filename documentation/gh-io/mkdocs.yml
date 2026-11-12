@@ -1,4 +1,4 @@
-site_name: Enterprise Scale AI Factory
+site_name: Enterprise Scale Azure Factory
 site_url: https://jostrm.github.io/azure-enterprise-scale-ml/
 site_description: Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.
 site_author: Microsoft
@@ -41,7 +41,11 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.highlight:
@@ -59,9 +63,33 @@ plugins:
 
 hooks:
   - tools/factory_guides.py
+  - tools/code_templates.py
+
+extra_css:
+  - assets/stylesheets/diagrams.css
+  - assets/stylesheets/libraries.css
+
+extra_javascript:
+  - assets/javascripts/libraries.js
 
 nav:
   - Overview: index.md
+  - "Setup docs: Platform team":
+      - Set up your AI Factory: setup/index.md
+      - Install the ESAF tools: setup/01-install-esaf.md
+      - Create your AI Factory: setup/02-create-factory.md
+      - Add a scale set: setup/add-scale-set.md
+      - Add a project: setup/03-add-project.md
+      - Enable ESAF Agent Chat: setup/04-first-agent-chat.md
+      - Clean up: setup/05-clean-up.md
+  - "Usage docs: Project team":
+      - Build in your project: usage/index.md
+      - Prerequisites: usage/prerequisites.md
+      - Run your first agent: usage/01-first-agent.md
+      - Train your first model: usage/02-first-ml-model.md
+      - Project dashboards: usage/dashboards.md
+  - "Code templates library: Project team": code-templates/index.md
+  - Architecture: architectures.md
   - "Get started - CLI, SDK, API: Core team":
       - Get started: factory-tools/18-cli-and-api-and-usage.md
       - Add and update: factory-tools/19-cli-and-api-and-usage.md
@@ -70,8 +98,15 @@ nav:
       - Choose your workload: project-team/index.md
       - Agent Factory SDK: project-team/agent-factory.md
       - ML Model Factory SDK: project-team/ml-model-factory.md
+  - Reference:
+      - The six scenarios: reference/scenarios.md
+      - Hub and network modes: reference/hub-and-network-modes.md
+      - Folder structure: reference/folder-structure.md
+      - Settings: reference/settings.md
+  - Azure resource library: resources/index.md
   - Parameters:
       - Configure your factory: parameters/index.md
+      - Every variable in variables.json: parameters/variables.md
       - Required inputs: parameters/standard.md
       - All parameters: parameters/advanced.md
   - AI Factory Concepts:
@@ -83,7 +118,6 @@ nav:
           - DataOps: concepts/templates/dataops.md
           - MLOps: concepts/templates/mlops.md
           - GenAIOps: concepts/templates/genaiops.md
-  - Automated Architectures: architectures.md
   - IaC:
       - BICEP: iac/bicep.md
       - BYO Terraform: iac/terraform.md

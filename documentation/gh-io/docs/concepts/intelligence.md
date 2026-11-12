@@ -1,52 +1,42 @@
 # Platform automation
 
-AI Factory automation helps turn selected settings into a repeatable plan.
-It is not a self-aware system, and it does not replace your network, security
-or deployment approvals.
+ESAF turns the settings you choose into a repeatable deployment. This page lists what it works out for you
+and what you still decide.
 
 ## What the automation does
 
-| Area | Help provided | Your responsibility |
+| Area | What ESAF does | What you decide |
 | --- | --- | --- |
-| Address planning | Calculates supported project subnet layouts from the selected ranges and existing allocations. | Supply enough non-overlapping address space and verify connectivity. |
-| Service dependencies | Checks the selected service bundle and related settings. | Choose a supported architecture and resolve blockers. |
-| Identity and access | Applies configured identities, role assignments and storage permissions through supported steps. | Approve least-privilege scope and supply required privileges. |
-| Configuration translation | Maps supported JSON/YAML/GitHub names for the chosen route. | Use the correct input and avoid conflicting manual copies. |
-| Naming | Uses configured naming and salts where required. | Preserve identity and handle existing-name/ownership conflicts. |
-| Updates | Reviews and applies supported changes to existing targets. | Inspect the plan; do not assume a re-run leaves every resource untouched. |
+| Address planning | Calculates the subnets of each project from the range of the scale set and the subnets that already exist. | Give a range that is large enough and doesn't overlap your other networks. |
+| Service dependencies | Checks that the services you switched on have the services they need. Private Foundry agents, for example, need AI Search, Cosmos DB and Storage. | Choose the services. Resolve what the check reports. |
+| Identity and access | Creates the managed identities and assigns the roles for the project team and the services. | Name the people or the Entra ID groups of the team. |
+| Settings in three formats | Maps each setting to its name in `variables.json`, in the Azure DevOps variables and in the GitHub variables. | Change a setting in one place, with a tool. |
+| Naming | Builds every resource name from the Factory prefix, the project number, the region and the environment. | Choose the prefix and the suffix once, when you create the Factory. |
+| Updates | Runs the same pipeline again to add a service or change a setting. | Read the plan of a change before you run it. |
 
 ## Groups and personas
 
-The published templates support group principals and persona-labelled settings.
-Labels alone do not prove that a complete least-privilege permission policy has
-been applied.
+A project has a team. You name its members as users or as Entra ID groups (`use_ad_groups`). The pipeline
+gives the team the roles it needs on the project's services. Persona names such as team lead or data
+scientist label the groups. See [Parameters](../parameters/index.md) for the settings.
 
-Newer nine-persona `groups-v1` work described in local addenda is separate from
-the older release snapshot. Check the published source and installed host
-before assuming that policy, seeding and migration are available together.
-Never grant roles merely because a document or assistant suggests them.
+## Start here
 
-## Choose the supported path
-
-Start with [Parameters](../parameters/index.md), then use the
-[reviewed tool workflow](../factory-tools/19-cli-and-api-and-usage.md).
-A service flag requests behavior; it does not itself prove deployment,
-connectivity or cleanup.
+Start with [Parameters](../parameters/index.md), then use [Add and update](../factory-tools/19-cli-and-api-and-usage.md)
+to make the change.
 
 <details markdown="1">
 <summary>More info</summary>
 
-The shared `/18` planning pattern uses aligned Dev/Stage/Prod selectors
-`0`, `64`, `128`. Own-subscription `/20` plans use `0`, `16`, `32`.
-Planning does not move existing subnets or resize a VNet. Private DNS, routing,
-VPN client pools and the runner's access must also be checked.
+**Address ranges.** With shared subscriptions, a scale set uses a `/18` range and the third octet starts at
+`0` for Dev, `64` for Stage and `128` for Prod. With own subscriptions it uses a `/20` range, with `0`, `16`
+and `32`. Private DNS, routing, the VPN client pool and the access of the pipeline runner are part of the
+same plan.
 
-Names and salts reduce collisions but are not a universal uniqueness guarantee.
-Use recorded resource IDs for later operations rather than reconstructing a
-target from a prefix.
+**Names.** Use the resource IDs that a run returns in later calls, rather than building a name from the
+prefix yourself.
 
-Scoped review records, compatible runtime contracts and exact operation
-versions protect execution. They are not permission to retry an uncertain write.
-See [removal and recovery](../factory-tools/20-cli-and-api-and-usage.md).
+**Stopped runs.** When a run stops, read its status before you start it again. See
+[Remove and recover](../factory-tools/20-cli-and-api-and-usage.md).
 
 </details>

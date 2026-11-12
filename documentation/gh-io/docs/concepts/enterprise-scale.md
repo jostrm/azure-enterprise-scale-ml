@@ -1,18 +1,15 @@
 # Enterprise design and scale
 
-AI Factory helps teams reuse common infrastructure while keeping project and
-environment choices explicit. The resulting design still needs your
-organization's security, network, reliability and cost review.
+An AI Factory lets many teams reuse one common infrastructure, while every project keeps its own resources
+in each environment.
 
 ## Scale by projects and scale sets
 
-An AI Factory scale set groups an environment, subscription and network setup.
-It is **not Azure VM Scale Sets**. A project selects where it runs through its
-Dev/Stage/Prod placements.
+A scale set groups projects that share one network, in one environment and subscription. It has nothing to
+do with Azure Virtual Machine Scale Sets. A project names the scale set it runs in.
 
-There is no universal "200-300 projects per scale set" guarantee. Capacity
-depends on configured project limits, address ranges, existing subnets and
-service quotas. Add another scale set when the reviewed design requires it.
+How many projects fit in a scale set depends on its address range, the subnets that already exist and your
+service quotas. When a scale set is full, [add a scale set](../setup/add-scale-set.md).
 
 ## Environments and subscriptions
 
@@ -22,14 +19,14 @@ service quotas. Add another scale set when the reviewed design requires it.
 | Own subscriptions | Use the selected subscriptions for the intended isolated targets. |
 | Existing enterprise network | Reuse approved hub, DNS and subnet arrangements through supported inputs. |
 
-Register only the environments you need. Stage and Prod are not created simply
-because Dev exists, and a subscription reference does not create a subscription.
+Add only the environments you need. Dev is created first. Stage and Prod are created when you ask for them,
+in subscriptions that already exist.
 
 ## Watch Dev, Stage and Prod
 
-Follow a versioned candidate through development, evaluation, release approval
-and observation. This is an illustrative recommended process, not an executable
-promotion workflow. Promote reviewed artifacts, not production data or secrets.
+Follow a versioned candidate through development, evaluation, release approval and monitoring. The
+animation shows the recommended process. Promote code and models between environments. Keep production data
+and secrets where they are.
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../assets/animations/promotion.png">
@@ -50,30 +47,27 @@ promotion workflow. Promote reviewed artifacts, not production data or secrets.
 | Operations | Reviewed changes, exact run tracking, diagnostic settings and ownership. |
 | Performance | Workload needs, compute/service sizing, scaling limits and available capacity. |
 
-These align with [Well-Architected guidance](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas);
-they are not a blanket production or compliance certification.
+These are the pillars of the
+[Well-Architected guidance for AI workloads](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas).
 
 ## Plan network space before deployment
 
-Use aligned, non-overlapping ranges for selected environments, existing networks
-and VPN client pools. Address planning does not resize an existing VNet, move
-subnets or establish connectivity.
+Give each environment its own range, and keep the ranges apart from your existing networks and from the VPN
+client pool. ESAF plans subnets inside the range you give. It doesn't resize a VNet that already exists.
 
-The [Parameters checklist](../parameters/standard.md) and
-[platform automation guide](intelligence.md) explain the supported planning
-inputs. Private endpoints alone do not prove that a runner or user can reach a service.
+The [Parameters checklist](../parameters/standard.md) and the
+[platform automation guide](intelligence.md) list the settings. With private networking, the pipeline runner
+and your users also need a route and DNS to reach the private endpoints. See
+[Hub and network modes](../reference/hub-and-network-modes.md).
 
 <details markdown="1">
 <summary>More info</summary>
 
-The shared `/18` planning templates use environment selectors `0`, `64`, `128`;
-the own-subscription `/20` pattern uses `0`, `16`, `32`. Existing allocations,
-additional prefixes and provider requirements must still be checked.
-Do not copy older non-aligned examples as a deployment plan.
+With shared subscriptions, a scale set uses a `/18` range and the third octet starts at `0` for Dev, `64` for
+Stage and `128` for Prod. With own subscriptions it uses a `/20` range, with `0`, `16` and `32`.
 
-Service/API availability varies across Azure regions, Government and Sovereign
-clouds. Validate the exact route and service set for the chosen cloud rather than
-assuming Azure Public Cloud examples apply unchanged.
+Which services and models you can use depends on the Azure region and cloud. Check the region of your
+Factory before you switch on a service.
 
 [Registered operations](../factory-tools/19-cli-and-api-and-usage.md) |
 [Shared template parameters](../parameters/advanced.md)

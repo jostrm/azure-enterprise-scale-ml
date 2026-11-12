@@ -1,27 +1,32 @@
 # Parameters: configure your factory
 
-**Parameters** are the settings called variables in `variables.json`, ADO
-`variables.yaml` and GitHub `.env` files. Use this section to find the correct
-name, value and dependency for the route you are using.
+**Parameters** are the settings of a Factory and its projects. They are the variables in `variables.json`,
+and they have matching names in the Azure DevOps `variables.yaml` and in the GitHub `.env` file. Use this
+section to find the name of a setting, its values and what it depends on.
 
 | What you need | Open |
 | --- | --- |
-| Start configuring a registered factory | [CLI, Python SDK or REST tutorial](../factory-tools/18-cli-and-api-and-usage.md) |
+| Start configuring a Factory | [CLI, Python SDK or REST tutorial](../factory-tools/18-cli-and-api-and-usage.md) |
+| Choose the Azure services of a project | [Azure resource library](../resources/index.md) |
+| See every variable in `variables.json`, with its default and what it does | [Every variable in variables.json](variables.md) |
 | Know which inputs to collect | [Required inputs](standard.md) |
 | Look up an exact key, default or format mapping | [All parameters](advanced.md) |
-| Change settings and deploy separately | [Add and update](../factory-tools/19-cli-and-api-and-usage.md) |
-| Remove an override, draft or Azure resource | [Remove and recover](../factory-tools/20-cli-and-api-and-usage.md) |
+| Change settings and deploy them | [Add and update](../factory-tools/19-cli-and-api-and-usage.md) |
+| Delete a project, a scale set or a Factory | [Clean up](../setup/05-clean-up.md), [Remove and recover](../factory-tools/20-cli-and-api-and-usage.md) |
 
-!!! important "A saved setting is not a deployment"
-    Review and save your configuration first. Deployment needs a separate
-    approved operation. Turning a flag off or removing a parameter override
-    is not a general resource-deletion instruction.
+!!! important "Switching a service off"
+    A service set to `"false"` is no longer deployed. A resource that already exists stays in Azure while
+    `enableDeleteForDisabledResources` is `"false"`, the default. With `"true"`, the next run of the project
+    pipeline deletes the switched-off services that exist in the project resource group, and it purges
+    Foundry, AI Services, Azure OpenAI and Azure Machine Learning resources. It keeps Key Vault, storage,
+    Application Insights and managed identities. See
+    [what happens when you switch a service off](../index.md#what-happens-when-you-switch-a-service-off).
 
-## Recommended: let the registered-factory tools save settings
+## Change settings with a tool
 
-For a registered factory, read the available settings and choose the exact
-factory/project/environment before editing. Use the named CLI or SDK helpers,
-or the matching REST request.
+Read the settings of the Factory, the project and the environment you mean before you change them. The
+quickest way is one call, such as `esaf.upsert_project(..., settings=...)`: see
+[the six scenarios](../reference/scenarios.md). To review each change before it is saved, use these commands.
 
 | Task | CLI | Python SDK | REST |
 | --- | --- | --- | --- |
@@ -32,43 +37,36 @@ or the matching REST request.
 | Prepare typed parameter changes | `parameters prepare` | `parameter_prepare(...)` | `POST /api/v1/factory-catalog/parameters/prepare` |
 | Save reviewed parameter changes | `parameters confirm` | `parameter_confirm(...)` | `POST /api/v1/factory-catalog/parameters/confirm` |
 
-These are command/method names, not complete examples. The
-[tool-specific tutorial](../factory-tools/19-cli-and-api-and-usage.md) provides
-full examples with required inputs and separate confirmation.
+The table gives the names only. [Add and update](../factory-tools/19-cli-and-api-and-usage.md) has a full
+example for each one.
 
-The API writes the registered project files. Do not hand-edit `register.json`,
-review files or generated project exports to bypass validation. Changing a
-factory default does not necessarily change an existing project's saved settings.
+The Factory API writes `register.json` and the `variables.json` of each project. Change them with a tool, so
+that the API checks every value. A project keeps its own saved settings: changing a default of the Factory
+changes new projects only.
 
 ## Dev, Stage and Prod
 
-A generated registered project's `variables.json` has `dev` and `stage_prod`
-sections. Stage and Prod use their own selected subscriptions but share the
-Stage/Prod settings section. Review both environments before changing shared
-values. A placement selects a real registered scale set; it does not create a
-subscription or move deployed resources.
+The `variables.json` of a project has two sections: `dev`, and `stage_prod` for Stage and Prod. Stage and Prod
+have their own subscriptions and share the settings of `stage_prod`, so a change there reaches both.
 
-The checked-in [shared JSON template](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/variables.json)
-currently contains **`dev` only**, including paired Dev/StageProd fields.
-It is a template reference, not the full registered project's storage format.
+The [template of variables.json](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/variables.json)
+in the repository has a `dev` section only. It holds the Dev and the Stage/Prod value of each SKU side by side.
 
-## Feature choices to review together
+## Settings that belong together
 
-| Area | Parameters and guidance |
+| Area | Settings |
 | --- | --- |
-| Private Foundry agents | Review `enableAIFoundry`, `enableAFoundryCaphost`, Search, Cosmos DB and Storage dependencies together. A simple preset and raw template defaults are not interchangeable. |
-| Network and DNS | Select your address plan and whether DNS/network services are standalone, factory-owned or provided centrally. Flags alone do not establish private access. |
-| Models and compute | Choose the version, SKU and capacity supported in the selected region/subscription. A default is not reserved capacity. |
-| MCP and gateways | Factory MCP, dedicated AI Gateway, regular APIM/Kong and Application Gateway are distinct choices. See [the current parameter guide](advanced.md#mcp-and-ai-gateway-parameters). |
-| Access | Existing group/object IDs, managed identities, role assignments and secret-name references have different meanings. Do not put credential values in these files. |
-| Deletion | Use the separate reviewed removal flow; ordinary settings replacements cannot request arbitrary destructive actions. |
+| Private Foundry agents | `enableAIFoundry` and `enableAFoundryCaphost` need AI Search, Cosmos DB and Storage. Switch them on together. |
+| Network and DNS | The address range, and where the private DNS zones live: in the Factory or in your hub. See [Hub and network modes](../reference/hub-and-network-modes.md). |
+| Models and compute | The model version, the SKU and the capacity. What you can choose depends on the region and on your quota. |
+| MCP and gateways | The Factory MCP server, the AI gateway on API Management or Kong, and Application Gateway each have their own settings. See [MCP and AI gateway](advanced.md#mcp-and-ai-gateway-parameters). |
+| Access | Entra ID object IDs of users or groups, and the names of Key Vault secrets. A setting holds the name of a secret, never the secret itself. |
+| Deletion | `enableDeleteForDisabledResources` for switched-off services. [Clean up](../setup/05-clean-up.md) for a whole project, scale set or Factory. |
 
 ## Optional project ownership labels
 
-`org-department-name` and `org-department-id` describe who owns a project. Both
-default to an empty string. Keep them consistent across that project's
-environments. They do not grant permissions, change identity or automatically
-write Azure resource tags.
+`org-department-name` and `org-department-id` say who owns a project. Both are empty by default. Use the same
+values in every environment of the project. They are labels only: they change no access and no Azure tags.
 
 <details markdown="1">
 <summary>More info</summary>
@@ -79,37 +77,29 @@ JSON/YAML use the hyphenated names; `.env` uses `ORG_DEPARTMENT_NAME` and
 `ORG_DEPARTMENT_ID`. Read/edit them at project scope, not as an inherited factory
 label.
 
-The [generated reference](advanced.md#source-coverage) reads shared repository
-templates, not a customer's files. It lists actual assigned values and explicit
-format mappings. A template-only field may still be rejected by an older API.
-The selected host's `/api/v1/schema` describes editor fields; `/openapi.json`
-describes HTTP requests; `parameters get` describes the selected published
-deployment templates. These are different schemas.
+The [generated reference](advanced.md#source-coverage) is built from the templates in the repository. It
+lists the default of every setting and its name in each format. An older Factory API can lack a setting that
+is new in the templates. `/api/v1/schema` lists the settings your API knows, `/openapi.json` lists its HTTP
+requests, and `parameters get` lists the settings of the deployed templates.
 
 </details>
 
 <details markdown="1">
-<summary>Alternative and Legacy ways</summary>
+<summary>Earlier way: edit the files of a v1.24 repository (Legacy)</summary>
 
-For a consumer-owned legacy JSON file, you may edit the exact input used by its
-pipeline. Preserve other keys, value types and environments, and review the
-effective result. Updating `.env`, YAML and JSON independently can create
-conflicting inputs; remote GitHub variables have their own publication step.
+In a repository that was set up with v1.24, you edit the file that its pipeline reads. Keep the other keys,
+the value types and the environments as they are. Change a setting in one format only, because the `.env`
+file, the YAML and the JSON are separate inputs. GitHub variables are published by their own step.
 
-Legacy `config review/save` and `ConfigurationDraft` preserve a persistent JSON
-project's source information. They are not registered catalog save commands.
-The legacy HTTP routes include `/api/v1/projects/load`, `/api/v1/import`,
-`/api/v1/validation`, `/api/v1/export` and `/api/v1/projects/save`.
-Export can write a host-local file when a path is supplied; it does not deploy.
+The commands `config review` and `config save`, and the routes `/api/v1/projects/load`, `/api/v1/import`,
+`/api/v1/validation`, `/api/v1/export` and `/api/v1/projects/save`, work on such a JSON file. Export writes a
+file on the machine that runs the API. It doesn't deploy.
 
-The pipeline JSON reader can overlay `dev`, `stage_prod`, then exact `test` or
-`prod` sections. That entry-point-specific behavior does not permit adding those
-sections to a registered project snapshot. See the
-[file-first versus wrapper-first guidance](../factory-tools/18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
+The pipeline reads the `dev` section first, then `stage_prod`, then a `test` or `prod` section when one
+exists. See
+[file first or wrapper first](../factory-tools/18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
 
-The API is an administrative service with local-host restrictions, not a public
-ticket-system endpoint. Keep keys on an approved backend/worker, not in browser
-JavaScript. Authentication, Azure/provider permissions and operation approval
-remain separate.
+The Factory API is an administration service that listens on the local machine. Keep its key on a server you
+trust, never in browser JavaScript.
 
 </details>

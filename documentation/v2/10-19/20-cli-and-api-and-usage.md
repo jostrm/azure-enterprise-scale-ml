@@ -11,14 +11,14 @@ its own setup, review, confirmation and observation steps.
 On GitHub, expand the matching tool section. The documentation website presents
 the same content as a single linked tab selector.
 
-!!! warning "Resource deletion is destructive"
-
-    Removing configuration is **not** deleting Azure resources. Preparation is
-    **not approval** and can read real Azure and pipeline information.
-    **STOP and review before confirming.** Confirm once only; a lost response or
-    timeout means **unknown outcome**, not permission to retry. Use an approved
-    real host and identity, never chapter 18's empty demo folder or example key.
-    API folder paths refer to the **API host**, not your client computer.
+> [!WARNING]
+> **Resource deletion is destructive.**
+> Removing configuration is **not** deleting Azure resources. Preparation is
+> **not approval** and can read real Azure and pipeline information.
+> **STOP and review before confirming.** Confirm once only; a lost response or
+> timeout means **unknown outcome**, not permission to retry. Use an approved
+> real host and identity, never chapter 18's empty demo folder or example key.
+> API folder paths refer to the **API host**, not your client computer.
 
 ## Choose your tool
 

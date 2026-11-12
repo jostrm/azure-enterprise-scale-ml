@@ -27,7 +27,7 @@ The values from prerequisites, will be used to set the PARAMETERS in the AI Fact
     - **What:** 
         - **3 service principles** (ObjectID, AppId, Secret)
             - **Why**: MI is not supported from all Azure Services. Project-specific service principle is needed to:
-                - Projects: Enable Authentication on WebApp (only possible via SP), see [config-webapp-post-deplpoyment-of-webapp](../20-29/24-end-2-end-setup.md#config-webapp-post-deplpoyment-of-webapp)
+                - Projects: Enable Authentication on WebApp (only possible via SP), see [config-webapp-post-deplpoyment-of-webapp](../20-29/24-legacy-v124-setup.md#config-webapp-post-deployment-of-webapp)
                 - Projects: Enable unattended CI/CD with unattended Evaluation.
                 - Projects: ACL on Datalake for project folders, to run pipelines that reads/writes data.
                 - Core team: Connect from Azure Data factory to certain services.
@@ -64,6 +64,7 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
         - ESML-AIFactory-Project001
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/repos/git/creatingrepo?view=azure-devops&tabs=visual-studio-2022) : Create GIT repos
 
+<a id="step-2"></a>
 ## ☁️ Step 2) Create Azure subscriptions (Enterprise Scale landing zone: Application landing zones)
 - **Purpose:** To have the AIFactory DEV, TEST, PROD environments
 - **Role needed:** Central IT / Cloud Team
@@ -103,7 +104,7 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 > [Read more about networking here](14-networking-privateDNS.md)
 
 
-## 👤 Step 5) EntraID: Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
+## 👤 Step 5) EntraID: Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#-step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
 
 This remains applicable when DataOps/MLOps automation or application
 authentication needs those identities. The automated scale-set launchers use a
@@ -170,20 +171,20 @@ create the optional project automation SP unless requested.
     - Note: If you see this view below, you see another Object ID, the wrong one. You probably clicked on "App registrations" in Entra ID, instead of step 1
         - See image of Wrong Object ID: ![](./images/sp-incorrect-oid.png)
     - NB! We have created a SCRIPT, that automatically created service principals, and adds the triplet of information (oid, secret, app id) to the seeding keyvault. If you use that, it is fetching correct info, and it creates SP's for 1 or 100 projects automatically:
-        - BASH Script: [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+        - BASH Script: [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | Local copy: `aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh`
 
 
 
 ## ✅ Step 6: Verify: Resource Providers, Private DNS zones (if not standalone)
-VERIFY, BEFORE running any pipelines. See [Scripts to run to verify/create if not exists](#scripts)
+VERIFY, BEFORE running any pipelines. See [Scripts to run to verify/create if not exists](#-scripts)
 - Ensure Azure `Resource providers` are enabled (create if not exists)
-    - [Script: E](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
+    - [Script: E](#-e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
 - Ensure `Private DNS zones` exists in "hub", if flag is set to true
     - Note: Not needed for `Standalone AI Factory`
-    - [Script: H](#h-verify-before-running-any-pipelinesensure-private-dns-zones-exists-in-hub-if-flag-is-set-to-true)
+    - [Script: H](#-h-verify-before-running-any-pipelines-ensure-private-dns-zones-exists-in-hub-if-flag-is-set-to-true)
 - Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
     - Note: Not needed for `Standalone AI Factory`
-    - [Script: I](#i-before-running-any-pipelines-ensure-policies-are-created-on-subscription-level-note-need-to-be-manually-edited-for-regionlocation)
+    - [Script: I](#-i-before-running-any-pipelines-ensure-policies-are-created-on-subscription-level-note-need-to-be-manually-edited-for-regionlocation)
 
 After all pre-requisites are verified - [go to the SETUP page and choose your preferred orchestrator: Azure Devops - YAML or Github Actions](../20-29/24-end-2-end-setup.md)
 
@@ -201,8 +202,8 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
         - Access to GIT in that Azure Devops project is required.
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/organizations/security/add-users-team-project?view=azure-devops&tabs=preview-page) : Delegate user access
     3) Azure: Delegate either permission as option A or B to user. (A downside with option B is lower means to trouble shoot during the setup phase)
-        - Option A) Delegate OWNER permission on the Subscriptions created in [Step 2](#step-2---created-azure-subscriptions--enterprise-scale-landing-zones)
-        - Option B) Delegate OWNER permission on the Resource Groups created by the AIFactory via the service principal `esml-common-bicep-sp` [created in step 5](#step-5-create-3-service-principals-where-1-of-them-has-owner-permission-on-the-subscriptions-created-in-step-2-and-store-information-in-the-seeding-keyvault-see-step-3)
+        - Option A) Delegate OWNER permission on the Subscriptions created in [Step 2](#step-2)
+        - Option B) Delegate OWNER permission on the Resource Groups created by the AIFactory via the service principal `esml-common-bicep-sp` [created in step 5](#-step-5-entraid-create-3-service-principals-and-store-infoappid-objectid-secret-in-the-seeding-keyvault-see-step-3)
             - Note: To delegate a user access to the resource groups, you need to have [SETUP the AIFactory first](./13-setup-aifactory.md)
                 - Resource groups that will be created looks similar as this: `dc-heroes-esml-project001-weu-dev-001-rg`, `dc-heroes-esml-project001-weu-test-001-rg`, `dc-heroes-esml-project001-weu-prod-001-rg` 
 
@@ -257,7 +258,7 @@ git submodule foreach 'git checkout main || git checkout -b main origin/main'
 ```
 
 >[!NOTE]
-> Note: Local-repo-link only works, after you have finished step 1. Docs-link will work relative from this Github documentation, useful to browse the file where Local-repo-link is the file you may edit.
+> Note: The local copy exists in your own repository after you run script C below. Docs-link opens the same file in this documentation. Edit the local copy.
 > 
 
 # 📜 SCRIPTS
@@ -271,7 +272,7 @@ Most scripts (starting with bash) is bash script has been tested with Git bash o
 - Note: It has been tested in UBUNTU and on Mac OS, where it does not work straight of the box (extra bash libraries needs to be installed)
 
 ### 🔷 Install Powershell: Version 7.5.1 or higher
-Scripts starting with pwsh,is POWERSHELL commands, such as [Verify resource providers](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
+Scripts starting with pwsh,is POWERSHELL commands, such as [Verify resource providers](#-e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
 
 - [Download & Install Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5)
 
@@ -305,7 +306,7 @@ bash ./01-aif-copy-aifactory-templates.sh
 ```
 
 >[!IMPORTANT]
-> This will copy all template files to a folder at root called **aifactory-template**. You need to rename that folder to **aifactory**, then you can edit parameters and variables. After this **Local-repo-link** and the code examples will work.
+> This will copy all template files to a folder at root called **aifactory-template**. You need to rename that folder to **aifactory**, then you can edit parameters and variables. After this the local copies and the code examples will work.
 
 ## 🔄 D) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
 Purpose: To refresh the IaC pipelines (get new features, added AI Factory project types etc).
@@ -350,7 +351,7 @@ name checks and storage provisioning; denied, failed, unknown or timed-out
 registration never proceeds to storage. This does not replace the workload
 provider, private DNS-zone or policy prerequisite checks below.
 
-[Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | [Local-repo-link](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
+[Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | Local copy: `aifactory/esml-util/26-enable-resource-providers.ps1`
 
 How to run from root:
 
@@ -363,9 +364,9 @@ Best practice is to have **1 seeding keyvault per environment** (Dev, Stage, Pro
 - The secret names in keyvaults, can stay the same across the environments (you don't need to reconfigure Variables)
 - The same service environment-specific **Azure Devops service connection** can be used for seeding keyvault as for the actual resources, without needing to assign the **esml-common-bicep-sp** service principle access to further subscriptions, e.g. in the case the seeding keyvault resides in another subscription.
 
-    [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+    [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | Local copy: `aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh`
     
-How-to: Manually edit the variables (`Local-repo-link`) at the top at the script, then run from root:
+How-to: Manually edit the variables at the top of your local copy of the script, then run from root:
 
 ```sh
 bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
@@ -399,7 +400,7 @@ az aks get-versions --location eastus --output table
 
 ## ✅ H) VERIFY, BEFORE running any pipelines: Ensure Private DNS zones exists in "hub", if flag is set to true
 
-[Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
+[Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1) | Local copy: `aifactory/esml-util/27-create-private-dns-zones.ps1`
 
 How to run from root: 
 
@@ -409,7 +410,7 @@ pwsh ./aifactory/esml-util/27-create-private-dns-zones.ps1 -spID TODO -tenantID 
 
 ## ✅ I) BEFORE running any pipelines: Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
 
-[Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | [Local-repo-link](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
+[Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | Local copy: `aifactory/esml-util/28-Initiatives.bicep`
 
 # 📰 FEATURE NEWS UPDATE
 
@@ -442,7 +443,7 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
 - **Current release 1.20** includes all Done up until 2024-04
 
 ### [Release 1.23](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120) <br>
-- **ESML + GenAI merged into GenAI. enableServiceX=true, for all services. See [Variables.yaml file, lines: 178-240](./environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml)
+- **ESML + GenAI merged into GenAI. enableServiceX=true, for all services. See [Variables.yaml file, lines: 178-240](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml)
     - STATUS: Done (2025-08)
 - **New services: LogicApps **: Added as a service
     - STATUS: Done (2025-10)
@@ -471,7 +472,7 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
         - 5) `public-secure perimeter with conditional-access`(If you cannot do: Hub-peering, VPN, cannot work with IP-whitelisting due to split-tunneling/dynamic IP)
     - STATUS: Done (2025-04)
 - **Exposing on/off for more services in GENAI type**: Base parameter file `31-esgenai-default.json` to include more true/false flags if to create the following services: `Container Apps, App Service/WebApp, Function App, Bing, CosmosDB, Azure Dashboard for Apps`.
-    - [Go here for full list of services and on/off](./documentation/v2/20-29/24-configure-AIfactory-project.md)
+    - [Go here for full list of services and on/off](../20-29/24-configure-AIfactory-project.md)
     - STATUS: Completed (2025-03)
 - **BYOVnet + BYOsubnets**: Bring your own vNet in a separate resource group,  instead of having the AI Factory create it. Also BYOsubnets.
     - STATUS: Completed (2024-05)
@@ -480,7 +481,7 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
 - **Azure ContainerApps (with Env), Bing Search, CosmosDB, Azure OpenAI standalone**: Added. All are optional with feature flags (true/false)
     - STATUS: Completed (2024-08)
 
- See [See Arhicteture diagrames - for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
+ See [See Arhicteture diagrames - for all features](./11-architecture-diagrams.md)
 
 </details>
 
@@ -492,11 +493,11 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
 
 |Date     |Category   | What   | Link   |
 |------------|-----------|--------|--------|
-|2025-03  |infra (IaC)|ADO YAML also supported for project type GenAI. Now GHA or ADO supports both ESML, GenAI-1 |[IaC orchestration](../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/)|
-|2024-10  |Best Practices| Well-Arhitected framework for AI| [WAF AI workload - AI Factory personas](./documentation/v2/20-29/25-personas.md)|
-|2024-03  |Automation | Add project member & core team memeber| [Workflow diagram](./documentation/v2/10-19/13-flow-diagram-1.md)|
-|2024-03  |Docs | New Docs v.2 | [Documentation](./documentation/v2/10_index.md)|
-|2024-02  |infra (IaC) | NEW! ESGenAI project type: Azure AI Foundry+AI Search (RAG/Agentic) | [15-aifactory-overview.md](./documentation/v2/10-19/15-aifactory-overview.md) |
+|2025-03  |infra (IaC)|ADO YAML also supported for project type GenAI. Now GHA or ADO supports both ESML, GenAI-1 |[IaC orchestration](../../../environment_setup/aifactory/bicep/copy_to_local_settings/)|
+|2024-10  |Best Practices| Well-Arhitected framework for AI| [WAF AI workload - AI Factory personas](../20-29/25-personas.md)|
+|2024-03  |Automation | Add project member & core team memeber| [Workflow diagram](./13-flow-diagram-1.md)|
+|2024-03  |Docs | New Docs v.2 | [Documentation](../10_index.md)|
+|2024-02  |infra (IaC) | NEW! ESGenAI project type: Azure AI Foundry+AI Search (RAG/Agentic) | [15-aifactory-overview.md](./15-aifactory-overview.md) |
 |2024-02  |Datalake - Onboarding |Auto-ACL on PROJECT folder in lakel|-|
 |2023-03  |Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
 |2021-02  |ESML Pipeline templates|Azure Databricks: Training and Batch pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|

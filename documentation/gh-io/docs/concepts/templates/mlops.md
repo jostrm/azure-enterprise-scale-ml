@@ -1,14 +1,12 @@
 # ML Model Factory and MLOps
 
-Use reusable examples and shared engines to prepare data, train and compare
-models, then deliberately deploy the selected result.
+The Model Factory is a set of code templates and shared engines to prepare data, train and compare models,
+and deploy the one you choose. Find them in the [code templates library](../../code-templates/index.md).
 
 ## Watch the model lifecycle
 
-Follow versioned data through training, held-out evaluation and comparison,
-reviewed registration, separate deployment approval, and monitoring. This
-configuration-wizard lesson is illustrative: playback never submits a job,
-registers a model or approves a production release.
+Follow versioned data through training, evaluation on held-out data, comparison, registration, the approval
+to deploy, and monitoring.
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/mlops.png">
@@ -33,9 +31,8 @@ The current Model Factory organizes examples by pattern, task and technology:
 classification, regression, forecasting and supported vision routes using
 custom Python, AutoML, Azure ML pipelines and Databricks.
 
-Start at the [current use-case tree](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/50-ml-model-factory/usecase-type)
-and read that leaf's prerequisites. A notebook's presence is not proof that all
-engine/task combinations are supported or deployed.
+Start at the [use-case tree](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/50-ml-model-factory/usecase-type),
+or follow [Train your first model](../../usage/02-first-ml-model.md). Each example lists what it needs.
 
 ## Where to make your changes
 
@@ -54,20 +51,17 @@ engine/task combinations are supported or deployed.
 4. Review registration and deployment as separate actions.
 5. Monitor inputs, performance and freshness after deployment.
 
-A winning model is not production approval. Missing labels or insufficient
-observations are unknown, not a successful health result.
+The best model of a comparison still needs your approval before it goes to production. When labels or
+observations are missing, the monitoring shows the result as unknown.
 
 ## Version and engine limits
 
-`azure-esml-sdk` / `azure_esml` is a newer API, **not a drop-in ESML v1 replacement**.
-Older pipelines remain separate compatibility paths.
-AutoML forecasting is not offered for streaming where the prediction method
-requires observed history with each request; use the supported alternative
-described in the model-factory guide.
+`azure-esml-sdk` (`azure_esml`) is a new API. Code written for the ESML v1 SDK needs changes to use it.
+AutoML forecasting isn't available for streaming, because that forecast needs the observed history with
+every request. The Model Factory guide names the alternative.
 
-Compute SKU/version defaults change and have regional constraints. Read the
-[current Parameters reference](../../parameters/advanced.md) instead of copying
-an old hard-coded compute table.
+The compute sizes and versions of a project are settings, and what you can choose depends on the region. See
+the [Parameters reference](../../parameters/advanced.md).
 
 <details markdown="1">
 <summary>More info</summary>
@@ -76,9 +70,7 @@ an old hard-coded compute table.
 [Shared pipeline templates](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/copy_my_subfolders_to_my_grandparent/mlops) |
 [DataOps](dataops.md)
 
-Storage selection does not provision or migrate data. Dataset licences, vision
-dependencies, existing compute/cluster references and authenticated cloud access
-remain explicit requirements. Framework examples are not a universal model CRUD
-API across every runtime.
+Each example lists what it needs: the licence of its sample data, the vision packages, a compute cluster that
+exists, and a sign-in to Azure.
 
 </details>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" role="img" aria-labelledby="t">
+  <title id="t">An AI factory as a production line for AI projects</title>
+  <rect width="960" height="400" rx="28" fill="#faf8f5"/>
+  <ellipse cx="480" cy="330" rx="420" ry="26" fill="#efeae2"/>
+  <!-- factory -->
+  <path d="M70 300V170l70 38v-38l70 38v-38l70 38V120h56l14 180z" fill="#7c3aed"/>
+  <path d="M280 120h56l-8-22h-40z" fill="#5b21b6"/>
+  <circle cx="306" cy="74" r="16" fill="#ddd6fe"/><circle cx="338" cy="50" r="11" fill="#ede9fe"/><circle cx="362" cy="32" r="7" fill="#f3efff"/>
+  <g fill="#ede9fe"><rect x="92" y="236" width="30" height="30" rx="5"/><rect x="142" y="236" width="30" height="30" rx="5"/><rect x="192" y="236" width="30" height="30" rx="5"/><rect x="242" y="236" width="30" height="30" rx="5"/></g>
+  <rect x="296" y="232" width="44" height="68" rx="6" fill="#4c1d95"/>
+  <rect x="56" y="300" width="304" height="12" rx="6" fill="#4c1d95"/>
+  <!-- conveyor -->
+  <rect x="340" y="268" width="372" height="20" rx="10" fill="#94a3b8"/>
+  <g fill="#475569"><circle cx="362" cy="278" r="7"/><circle cx="422" cy="278" r="7"/><circle cx="482" cy="278" r="7"/><circle cx="542" cy="278" r="7"/><circle cx="602" cy="278" r="7"/><circle cx="662" cy="278" r="7"/></g>
+  <g fill="#64748b"><rect x="372" y="288" width="10" height="24" rx="3"/><rect x="536" y="288" width="10" height="24" rx="3"/><rect x="690" y="288" width="10" height="24" rx="3"/></g>
+  <!-- project crates -->
+  <g id="crate"><path d="M400 222l30-14 30 14v32l-30 14-30-14z" fill="#16a34a"/><path d="M400 222l30-14 30 14-30 14z" fill="#4ade80"/><path d="M430 236v32l-30-14v-32z" fill="#22c55e"/><circle cx="445" cy="246" r="5" fill="#dcfce7"/></g>
+  <use href="#crate" x="110"/><use href="#crate" x="220"/>
+  <!-- teams -->
+  <g id="person"><circle cx="800" cy="196" r="20" fill="#3b82f6"/><path d="M768 300v-40a32 32 0 0 1 64 0v40z" fill="#3b82f6"/></g>
+  <use href="#person" x="72" y="14" opacity=".8"/><use href="#person" x="36" y="-22" opacity=".6"/>
+  <path d="M722 264l18 12-18 12z" fill="#22c55e"/>
+</svg>

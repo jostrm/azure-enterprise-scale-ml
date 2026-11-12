@@ -9,6 +9,12 @@ on:
       - 'documentation/v2/10-19/18-cli-and-api-and-usage.md'
       - 'documentation/v2/10-19/19-cli-and-api-and-usage.md'
       - 'documentation/v2/10-19/20-cli-and-api-and-usage.md'
+      - 'documentation/v2/quickstarts/**'
+      - 'documentation/v2/usage/**'
+      - 'documentation/v2/reference/**'
+      - 'documentation/v2/concepts/**'
+      - 'documentation/v2/images/**'
+      - 'environment_setup/azurefactory-cli/tests/test_documentation_site.py'
       - 'usecase_code/40-agent-factory/agent_factory/readme.md'
       - 'usecase_code/50-ml-model-factory/user-config/readme.md'
       - 'environment_setup/azurefactory-cli/tests/test_documentation_tabs.py'
@@ -41,7 +47,7 @@ jobs:
           pip install mkdocs-material pytest ./environment_setup/azurefactory-cli
 
       - name: Check shared tutorials and generated onboarding
-        run: python -m pytest environment_setup/azurefactory-cli/tests/test_documentation_tabs.py -q
+        run: python -m pytest environment_setup/azurefactory-cli/tests/test_documentation_tabs.py environment_setup/azurefactory-cli/tests/test_documentation_site.py -q
 
       - name: Check complete parameter reference
         run: python documentation/gh-io/tools/generate_parameters.py --check

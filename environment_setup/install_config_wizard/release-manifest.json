@@ -1,16 +1,16 @@
 {
   "artifacts": [
     {
-      "version": "v0.47.100",
-      "source_commit": "5d7344f2a17eeffad60cd0592bd04e6a262e4743",
-      "accelerator_commit": "6c41374b265297e876cd487fdd3794d66244800f",
+      "version": "v0.47.102",
+      "source_commit": "0ffd1b3aae8f529e522b7b36bd8c884a6bcba41c",
+      "accelerator_commit": "89eca66185366a702b026cec8c938570548c649c",
       "platform": "windows",
       "architecture": "AMD64",
       "python": "3.13.17",
       "archive": "aifactory-config-windows.zip",
-      "bytes": 44577423,
-      "sha256": "c83a808bcfc7fc72252b3448043d5c0537bcd9356e33c194f06445ba9dbc5c7c",
-      "run_id": "41653033690"
+      "bytes": 44888239,
+      "sha256": "489f261d1ebcc2c0ce10423bc1e75acb811befb1eb882ea82f0c7120cd87e2c9",
+      "run_id": "43115796294"
     },
     {
       "version": "v0.47.36",

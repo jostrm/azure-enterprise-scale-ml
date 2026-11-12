@@ -86,7 +86,7 @@ execution remain separate explicit actions.
 ## Project-team quickstart
 
 The Python import is `ml_model_factory`; install from the maintained
-`usecase_code\50-ml-model-factory` project or its orange project copy. Configure
+`usecase_code\50-ml-model-factory` project or its copy in the repository of your project. Configure
 scenarios under `user-config`; do not edit shared engines or generated notebooks.
 
 ### 1. Prepare the local environment

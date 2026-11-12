@@ -5,8 +5,8 @@ target, transformation and versioning approach before running a workload.
 
 ## Watch the data flow
 
-These configuration-wizard lessons illustrate reusable data paths, not running
-pipelines. Choose a workload below. Reduced-motion preferences show still images.
+These lessons from the configuration wizard show the data path for each kind of workload. Choose a tab. If
+your device asks for reduced motion, you get a still image.
 
 === "DataOps"
 
@@ -38,8 +38,7 @@ pipelines. Choose a workload below. Reduced-motion preferences show still images
 
 === "DataOps + RAG"
 
-    Prepare approved documents and retrieval copies without changing the
-    source owner's data or treating ingestion as model training.
+    Prepare approved documents and the copies that retrieval reads. The source owner's data stays unchanged.
 
     <picture>
       <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops-rag.png">
@@ -52,8 +51,7 @@ pipelines. Choose a workload below. Reduced-motion preferences show still images
 
 === "DataOps + fine-tuning"
 
-    Prepare an approved, versioned training dataset with separate evaluation
-    inputs. This lesson does not submit a fine-tuning job.
+    Prepare an approved, versioned training dataset, with separate data for evaluation.
 
     <picture>
       <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops-finetuning.png">
@@ -74,31 +72,27 @@ pipelines. Choose a workload below. Reduced-motion preferences show still images
 | Gold | Create the model/application-ready view and reproducible splits. |
 | Inference and feedback | Track scoring inputs, outputs, checkpoints and feedback separately. |
 
-Current model-factory examples support versioned lake configuration, Delta-based
-flows and explicit compatibility paths. Select the documented scenario rather
-than treating every folder as an interchangeable input.
+The Model Factory examples read and write a versioned data lake, with Delta tables where the scenario uses
+them. Each scenario names its input folders.
 
 ## Choose the tools for the workload
 
-Data Factory can orchestrate ingestion, Databricks can transform/process data,
-and Event Hubs can provide event streams when configured. These resource options
-do not automatically create a complete data pipeline for every source.
-Fabric/OneLake integration needs its own documented connections and permissions.
+Data Factory orchestrates ingestion, Databricks transforms the data, and Event Hubs carries event streams.
+Switch on the ones your workload needs. To read from Fabric or OneLake, add a connection and give the
+project access to the workspace. The [code templates library](../../code-templates/index.md) has templates that use
+Fabric.
 
 ## Common or project storage
 
-`use_common_datalake_storage` chooses the existing common or project data account
-in supported workload examples. New example configurations use project storage;
-omitting the setting in an older configuration retains its documented behavior.
+`use_common_datalake_storage` chooses where a workload example keeps its data: the common data lake of the
+scale set, or the storage account of the project. New examples use project storage.
 
-!!! important "Selection does not move data"
-    Changing this setting does not copy data, provision an account, grant access
-    or repoint an already-deployed agent automatically. Reconfigure and verify
-    the affected workload deliberately.
+!!! important "Changing the setting doesn't move your data"
+    When you change it, copy the data yourself and deploy the workload again, so that it reads from the new
+    place.
 
-Keep team access and producer/consumer ownership explicit. Sharing Silver data
-through a reference or an approved copy is not permission to overwrite another
-project's data.
+A project writes only to its own data. To share Silver data with another project, give that project read
+access or an approved copy.
 
 ## Continue
 
@@ -109,13 +103,10 @@ project's data.
 <details markdown="1">
 <summary>More info</summary>
 
-Keep user configuration and project-specific example copies separate from
-maintainer-owned shared engines and generated outputs. Dataset licensing,
-private connectivity, storage format, hierarchical namespace and checkpoint
-requirements vary by scenario.
+Keep your configuration and your copies of the examples apart from the shared engines and from generated
+output. Each scenario lists what it needs: the storage format, a hierarchical namespace, checkpoints and the
+licence of its sample data.
 
-Provisioning storage and assigning an ACL are different from validating the
-end user's effective access. Never infer access from the existence of a folder
-or a successful deployment script.
+After you assign access to a folder, test it as the person who will use it.
 
 </details>

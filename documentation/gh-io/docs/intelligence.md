@@ -1,79 +1,59 @@
 # Monitor and operate
 
-Choose the question you want to answer. Factory inventory, deployment progress,
-usage, billing and workload health are different views.
+Choose the question you want to answer.
 
-| Your question | Use | Important limit |
+| Your question | Use | Good to know |
 | --- | --- | --- |
-| Is the Factory API running? | `health` | Process health, not Azure resource health. |
-| What is registered or deployed? | Catalog/inventory and the selected run's results | Refreshing a list is not telemetry collection. |
-| Did this deployment finish? | Exact job status, logs and provider/worker completion records | Submission or local script exit does not prove deployment success. |
-| How much was used or billed? | Usage workbooks/reports and explicit Cost Management reads | Billing can be delayed; modelled cost is not billed cost. |
-| Are services healthy together? | Optional Azure Monitor health-model component | Preview service and separate setup; missing signals remain unknown. |
+| Is the Factory API running? | `azurefactory health` | It checks the API process. For the health of Azure resources, use the health model below. |
+| What exists in my Factory? | The catalog: factories, scale sets and projects | It shows what the API has saved and deployed. |
+| Did this deployment finish? | The status and the logs of the job that the call returned | A job ends as succeeded or failed. Follow it until then. |
+| How much did we use, and what did it cost? | The usage workbooks and the cost reports | Azure reports cost with a delay, so today's cost is incomplete. |
+| Are the services of a project healthy together? | The optional Azure Monitor health model | It is a preview service that you set up for each project. |
 
-[CLI, SDK and REST observation examples](factory-tools/20-cli-and-api-and-usage.md)
-include job status, logs, GitHub workflow watch, saved reports and resource-group
-cost reads. A GitHub watcher is not an ADO watcher.
+[Remove and recover](factory-tools/20-cli-and-api-and-usage.md) has the commands for job status, logs,
+watching a GitHub workflow, saved reports and the cost of a resource group. Project teams start at
+[Project dashboards](usage/dashboards.md).
 
 ## Metrics, reports and dashboards
 
-- **Sample reports** use demonstration data, not customer usage.
-- **Saved reports** read existing results. They do not silently collect new
-  telemetry or provision monitoring.
-- **Live reads** require the correct identity and scope. A request may read
-  Azure even when it does not change resources.
-- **Dashboard-only refresh** is a separate plan/apply operation for dashboard
-  resources, not a side effect of reading a report.
+- **Sample reports** show demonstration data, so that you can see a report before you have usage of your own.
+- **Saved reports** show results that were collected earlier.
+- **Live reads** ask Azure now. Your identity needs read access to the subscription or the resource group.
+- **Dashboards** have their own refresh operation, apart from reading a report.
 
-Missing, stale or incomplete observations are not zero cost or good health.
-Business-outcome reporting needs application instrumentation and agreed measures.
-Creating a report does not mean its attachments were emailed.
+Treat missing or old data as unknown, never as zero cost or good health. To report business results, add
+your own measures to the application.
 
 ## Optional health models
 
-The published `healthmodel` package provides an optional Azure Monitor health
-tree, signal configuration, alerts and separate ADO/GHA deployment entry points.
-It uses the preview `Microsoft.CloudHealth` API. Check supported regions,
-permissions and signal sources for your environment.
+The `healthmodel` package deploys an Azure Monitor health model for a project: a tree of the services, the
+signals of each one and the alerts. It has its own Azure DevOps and GitHub Actions pipelines and uses the
+preview API `Microsoft.CloudHealth`. Check that your region supports it.
 
-This is not the same as API `health`, an MCP dependency check, or a universally
-integrated `azurefactory healthmodel` command. The package's recorded test results
-are not a guarantee of current availability in another subscription.
-
-[Health-model component guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/readme.md)
+[Health model guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/readme.md)
 
 ## Agent Chat and MCP
 
-| Component | Purpose |
+| Component | What it is for |
 | --- | --- |
-| Factory Agent Chat | A scoped, source-grounded management assistant using configured Search/Foundry and Factory operation adapters. |
-| Factory MCP | MCP clients/servers and host adapters for available Factory capabilities. |
-| Private Azure MCP example | A distinct narrow, read-only Azure resource-tool example for workloads. |
-| Project001 Dev MCP/AI Gateway integration | An opt-in pipeline component with explicit image, identity and network prerequisites. |
-| Factory Agent Chat live voice | An opt-in speech layer (Azure Voice Live) on the same governed chat: talk to the agent and watch the voice orb listen, think and speak. Needs the chat agent flag, an Entra registration and private connectivity to Foundry. |
+| ESAF Agent Chat | Ask questions about your Factory and its documentation, in a chat that answers from the sources. See [Enable ESAF Agent Chat](setup/04-first-agent-chat.md). |
+| Agent Chat live voice | Talk to the same agent. A voice orb shows when it listens, thinks and speaks. It needs Agent Chat, an Entra ID app registration and private access to Foundry. |
+| Factory MCP server | Gives MCP clients, such as an agent, the read-only tools of the Factory. |
+| Private Azure MCP template | Gives the agents of your workload read-only tools for Azure resources. |
+| MCP on the AI gateway | Publishes the Factory MCP server through API Management. It is an optional step of the project 001 Dev pipeline. |
 
-These components do not bypass caller permissions or human approval. Enabling
-a conversational interface does not grant access to every factory or turn
-missing actions into successful operations.
+Each of these acts with the permissions of the person or the identity that calls it.
 
 <details markdown="1">
 <summary>More info</summary>
 
-Published references:
-[dashboards](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/30-39/32-dashboards.md),
-[Factory Agent Chat](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md),
-[Factory MCP](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/mcp/readme.md),
-[private Azure MCP example](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md),
-[gateway integration](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md),
-[Agent Factory chat and live voice](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md).
+[Dashboards](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/30-39/32-dashboards.md) |
+[Agent Chat template](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md) |
+[Factory MCP](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/mcp/readme.md) |
+[Private Azure MCP template](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md) |
+[MCP on the AI gateway](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md) |
+[Agent Chat and live voice](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md)
 
-The local dual graph combines code relationships and architecture notes. It is
-a navigation aid, not current Azure state. Unpublished graph/authentication or
-multi-model health enhancements described in local release addenda are not
-automatically present in published `main` or an installed application.
-
-Cloud inference, monitoring queries and actual operations have their own
-permissions and potential costs. A successful source build is not a live
-deployment or compliance certification.
+Model calls, monitoring queries and deployments each need their own permissions, and each has its own cost.
 
 </details>
