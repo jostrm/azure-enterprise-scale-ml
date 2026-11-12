@@ -1,5 +1,5 @@
-6b308babdfa9dc616eb9e7e279511a546f433a60615275972bece8f996e500a8  ESAIF.ConfigWizard-1.0.25-win-x64.msi
-428d39d0d4680175669089461662dd7347a4ab3ccdfe0bc562fdd2dec9f28154  ESAIF.ConfigWizard-1.0.25-win-x64-1.cab
-1b38d8323b6c628a69e43b32f4b9bd7dee47184f8446e8111b32bd9c1cd47322  ESAIF.ConfigWizard-1.0.25-win-x64-2.cab
-c2b86d33a426b81d6623ab40ea9c32f562dfd9c05ab16a8da2a9ad8850d7203c  ESAIF.ConfigWizard-1.0.25-win-x64-3.cab
-aa9834750e44fcd784d4d0cd61a9c194312a53760ba782ccfc2435bda916ef6b  ESAIF.ConfigWizard-1.0.25-win-x64-4.cab
+f0cb1c29a14c18b2f9cfc04689eb47aae7b28814eb961c8d9d99684eeb5ef59b  ESAIF.ConfigWizard-1.0.26-win-x64.msi
+b43eec324bb448c2dbe9bc534c6319ac0bf2d103101191af70d42df17342baef  ESAIF.ConfigWizard-1.0.26-win-x64-1.cab
+f475d43d6d94cd0e68d28ba6f84b7c16328668776de941ab2ed304324b5a8dc4  ESAIF.ConfigWizard-1.0.26-win-x64-2.cab
+611235793518d4dbf971ca6d083d63281575506e42b2eec410e995bf0a204ad0  ESAIF.ConfigWizard-1.0.26-win-x64-3.cab
+c2a5a8bf134a94bdea104e0576458a0dbd309be98019ac5aa5c45f2ff7078a27  ESAIF.ConfigWizard-1.0.26-win-x64-4.cab

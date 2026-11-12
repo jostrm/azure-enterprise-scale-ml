@@ -1,4 +1,4 @@
-Enterprise Scale AI Factory - Windows desktop edition
+Enterprise Scale Azure Factory - Windows desktop edition
 
 Supported target: Windows 11 x64, build 22000 or newer.
 Verified build platform: Windows 11 x64 build 26100.
