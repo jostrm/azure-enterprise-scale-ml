@@ -779,6 +779,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#create-your-factory-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your Factory folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-your-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect your tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next step
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2520,6 +2564,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#create-your-factory-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your Factory folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-your-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect your tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next step
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2583,7 +2671,7 @@ preview code.</p>
 
 </details>
 
-<details> 
+<details>
 <summary><b>Option B) Mac & Linux - Start via ESAF Wizard App (Windows, Mac OS, Linux)</b></summary>
 
 The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for Windows, Linux and macOS.
@@ -2604,143 +2692,154 @@ The Factory API ships inside the **AIFactory Config Wizard**, a desktop app for 
 
 Keep the app open. The API stops when you close it.
 
-## Create your Factory folder
+</details>
 
-Your Factory's configuration lives in an `azurefactory` folder in your consumer repository.
-
-1. Open Bash in the root of your consumer repository. On Windows, that's Git Bash.
-2. Add this repository as a submodule and create the folder:
-
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>submodule<span class="w"> </span>add<span class="w"> </span>-b<span class="w"> </span>release/v1.25<span class="w"> </span>https://github.com/jostrm/azure-enterprise-scale-ml
+<h2 id="create-your-factory-folder">Create your Factory folder<a class="headerlink" href="#create-your-factory-folder" title="Permanent link">&para;</a></h2>
+<p>Your Factory's configuration lives in an <code>azurefactory</code> folder in your consumer repository.</p>
+<ol>
+<li>Open Bash in the root of your consumer repository. On Windows, that's Git Bash.</li>
+<li>Add this repository as a submodule and create the folder:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>submodule<span class="w"> </span>add<span class="w"> </span>-b<span class="w"> </span>release/v1.25<span class="w"> </span>https://github.com/jostrm/azure-enterprise-scale-ml
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>bash<span class="w"> </span>./azure-enterprise-scale-ml/01-start-v125-and-above.sh
 </code></pre></div>
-
-Expected output, among other lines:
-
+<p>Expected output, among other lines:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Initialized empty register: C:\work\team-factory\azurefactory\register.json
 </code></pre></div>
-
-The script creates `azurefactory\register.json` with no factories in it. It changes nothing in Azure. See
-[folder structure](../reference/folder-structure.md).
-
-## Connect your tool
-
-Choose one tool. You can add the others later; they all use the same API address, key and folder.
-
-=== "App"
-
-    The App tabs use **Enterprise Scale AI Factory**, the ESAF desktop app for Windows 11. It starts its own
-    Factory API, so you can skip "Start the Factory API" above.
-
-    1. Install the app from its [download folder](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/maui).
-       You need version 1.0.24 or later.
-    2. Open **Enterprise Scale AI Factory** from Start.
-    3. On **Start Guide**, under **Consumer repository root**, select **Browse repository** and pick your
-       consumer repository.
-
-
-=== "CLI (PowerShell)"
-
-    Open PowerShell in the root of your consumer repository:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">.\</span><span class="n">azure-enterprise-scale-ml</span><span class="p">\</span><span class="n">environment_setup</span><span class="p">\</span><span class="n">azurefactory-cli</span>
+<p>The script creates <code>azurefactory\register.json</code> with no factories in it. It changes nothing in Azure. See
+<a href="../../reference/folder-structure/">folder structure</a>.</p>
+<h2 id="connect-your-tool">Connect your tool<a class="headerlink" href="#connect-your-tool" title="Permanent link">&para;</a></h2>
+<p>Choose one tool. You can add the others later; they all use the same API address, key and folder.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:5"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><input id="__tabbed_1_5" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">App</label><label for="__tabbed_1_2">CLI (PowerShell)</label><label for="__tabbed_1_3">CLI (bash)</label><label for="__tabbed_1_4">Python SDK</label><label for="__tabbed_1_5">REST (curl)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The App tabs use <strong>Enterprise Scale AI Factory</strong>, the ESAF desktop app for Windows 11. It starts its own
+Factory API, so you can skip "Start the Factory API" above.</p>
+<ol>
+<li>Install the app from its <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/maui">download folder</a>.
+   You need version 1.0.24 or later.</li>
+<li>Open <strong>Enterprise Scale AI Factory</strong> from Start.</li>
+<li>On <strong>Start Guide</strong>, under <strong>Consumer repository root</strong>, select <strong>Browse repository</strong> and pick your
+   consumer repository.</li>
+</ol>
+</div>
+<div class="tabbed-block">
+<p>Open PowerShell in the root of your consumer repository:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">.\</span><span class="n">azure-enterprise-scale-ml</span><span class="p">\</span><span class="n">environment_setup</span><span class="p">\</span><span class="n">azurefactory-cli</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">$env:AIFACTORY_API_URL</span> <span class="p">=</span> <span class="s1">'http://127.0.0.1:8765'</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">$env:AIFACTORY_API_KEY</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s1">'API key you entered in the app'</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nv">$env:ESAF_FOLDER</span> <span class="p">=</span> <span class="p">(</span><span class="nb">Resolve-Path</span> <span class="p">.\</span><span class="n">azurefactory</span><span class="p">).</span><span class="n">Path</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">azurefactory</span> <span class="n">health</span>
 </code></pre></div>
-
-
-=== "CLI (bash)"
-
-    Open Bash in the root of your consumer repository:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>./azure-enterprise-scale-ml/environment_setup/azurefactory-cli
+</div>
+<div class="tabbed-block">
+<p>Open Bash in the root of your consumer repository:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>./azure-enterprise-scale-ml/environment_setup/azurefactory-cli
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AIFACTORY_API_URL</span><span class="o">=</span><span class="s1">'http://127.0.0.1:8765'</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-s<span class="w"> </span>-p<span class="w"> </span><span class="s1">'API key you entered in the app: '</span><span class="w"> </span>AIFACTORY_API_KEY<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>AIFACTORY_API_KEY
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ESAF_FOLDER</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/azurefactory"</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>azurefactory<span class="w"> </span>health
 </code></pre></div>
-
-    In Git Bash on Windows, the API needs a Windows path:
-    `export ESAF_FOLDER="$(cygpath -w "$PWD/azurefactory")"`.
-
-
-=== "Python SDK"
-
-    Install the SDK and set the connection once. This is PowerShell; on Linux or macOS, use the three `export`
-    lines from the CLI (bash) tab instead:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">.\</span><span class="n">azure-enterprise-scale-ml</span><span class="p">\</span><span class="n">environment_setup</span><span class="p">\</span><span class="n">azurefactory-cli</span>
+<p>In Git Bash on Windows, the API needs a Windows path:
+<code>export ESAF_FOLDER="$(cygpath -w "$PWD/azurefactory")"</code>.</p>
+</div>
+<div class="tabbed-block">
+<p>Install the SDK and set the connection once. This is PowerShell; on Linux or macOS, use the three <code>export</code>
+lines from the CLI (bash) tab instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">.\</span><span class="n">azure-enterprise-scale-ml</span><span class="p">\</span><span class="n">environment_setup</span><span class="p">\</span><span class="n">azurefactory-cli</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">$env:AIFACTORY_API_KEY</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s1">'API key you entered in the app'</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">$env:ESAF_FOLDER</span> <span class="p">=</span> <span class="p">(</span><span class="nb">Resolve-Path</span> <span class="p">.\</span><span class="n">azurefactory</span><span class="p">).</span><span class="n">Path</span>
 </code></pre></div>
-
-    Then save this as `check_connection.py` and run it:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
+<p>Then save this as <code>check_connection.py</code> and run it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">session</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>  <span class="c1"># reads ESAF_FOLDER, AIFACTORY_API_URL and AIFACTORY_API_KEY</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">catalog</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">catalog_list</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">folder</span><span class="p">)</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nb">print</span><span class="p">([</span><span class="n">factory</span><span class="p">[</span><span class="s2">"key"</span><span class="p">]</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">catalog</span><span class="p">[</span><span class="s2">"factories"</span><span class="p">]])</span>
 </code></pre></div>
-
-
-=== "REST (curl)"
-
-    Open Bash (on Windows: Git Bash). Health needs no key:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>http://127.0.0.1:8765/health
+</div>
+<div class="tabbed-block">
+<p>Open Bash (on Windows: Git Bash). Health needs no key:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>http://127.0.0.1:8765/health
 </code></pre></div>
-
-    List the scenario routes that the API serves:
-
-    <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>http://127.0.0.1:8765/openapi.json<span class="w"> </span><span class="se">\</span>
+<p>List the scenario routes that the API serves:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>http://127.0.0.1:8765/openapi.json<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">'"/api/v1/esaf/[^"]*"'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-u
 </code></pre></div>
-
-    Every other request needs your key in the `X-API-Key` header.
-
-
-## Verify the result
-
-Your tool reaches the API, and your folder holds no factory yet.
-
-| Tool | Expected output |
-|---|---|
-| App | The status light at the bottom shows **API connected**. |
-| CLI, in either shell | `azurefactory health` prints `"status": "ok"`. |
-| Python SDK | The script prints `[]`. |
-| REST | The second command lists seven routes that start with `/api/v1/esaf/`. |
-
-For example, the CLI prints:
-
+<p>Every other request needs your key in the <code>X-API-Key</code> header.</p>
+</div>
+</div>
+</div>
+<h2 id="verify-the-result">Verify the result<a class="headerlink" href="#verify-the-result" title="Permanent link">&para;</a></h2>
+<p>Your tool reaches the API, and your folder holds no factory yet.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Expected output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App</td>
+<td>The status light at the bottom shows <strong>API connected</strong>.</td>
+</tr>
+<tr>
+<td>CLI, in either shell</td>
+<td><code>azurefactory health</code> prints <code>"status": "ok"</code>.</td>
+</tr>
+<tr>
+<td>Python SDK</td>
+<td>The script prints <code>[]</code>.</td>
+</tr>
+<tr>
+<td>REST</td>
+<td>The second command lists seven routes that start with <code>/api/v1/esaf/</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>For example, the CLI prints:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="p">,</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.0.0"</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">}</span>
 </code></pre></div>
-
-If something goes wrong:
-
-| Message | Fix |
-|---|---|
-| `AIFACTORY_API_KEY is required`, or HTTP 401 | Set the key again. It must match the key you entered in the app. |
-| `The Factory API has no /api/v1/esaf routes` | Your app package is older than v0.47.100. Download the current package. On Linux and macOS, check the download table for a package with that version. |
-| `Select an absolute local factory folder without traversal.` | Set `ESAF_FOLDER` with `Resolve-Path`, as shown. |
-| `ModuleNotFoundError: azurefactory` | Run the `pip install` line again with the same `python`. |
-
-## Next step
-
-**Back:** [Setup docs](index.md)
-
-**Next:** [Quickstart: Create your AI Factory](02-create-factory.md)
-
-Related:
-
-- [Settings](../reference/settings.md): the connection settings in one table.
-- [The six scenarios](../reference/scenarios.md): what you can run now.
-- [Guide 18](../factory-tools/18-cli-and-api-and-usage.md): try the tools against a local demo service first.
+<p>If something goes wrong:</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AIFACTORY_API_KEY is required</code>, or HTTP 401</td>
+<td>Set the key again. It must match the key you entered in the app.</td>
+</tr>
+<tr>
+<td><code>The Factory API has no /api/v1/esaf routes</code></td>
+<td>Your app package is older than v0.47.100. Download the current package. On Linux and macOS, check the download table for a package with that version.</td>
+</tr>
+<tr>
+<td><code>Select an absolute local factory folder without traversal.</code></td>
+<td>Set <code>ESAF_FOLDER</code> with <code>Resolve-Path</code>, as shown.</td>
+</tr>
+<tr>
+<td><code>ModuleNotFoundError: azurefactory</code></td>
+<td>Run the <code>pip install</code> line again with the same <code>python</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="next-step">Next step<a class="headerlink" href="#next-step" title="Permanent link">&para;</a></h2>
+<p><strong>Back:</strong> <a href="../">Setup docs</a></p>
+<p><strong>Next:</strong> <a href="../02-create-factory/">Quickstart: Create your AI Factory</a></p>
+<p>Related:</p>
+<ul>
+<li><a href="../../reference/settings/">Settings</a>: the connection settings in one table.</li>
+<li><a href="../../reference/scenarios/">The six scenarios</a>: what you can run now.</li>
+<li><a href="../../factory-tools/18-cli-and-api-and-usage/">Guide 18</a>: try the tools against a local demo service first.</li>
+</ul>
 
 
 
