@@ -1,0 +1,16 @@
+/artifacts/
+/staging/
+/payload/
+/private/
+/symbols/
+/tests/.work-*/
+/hosting/appsettings.Production.json
+/hosting/*.private.*
+/releases/**/*.exe
+/releases/**/*.bin
+/releases/**/*.zip
+*.pfx
+*.p12
+*.pdb
+previewsettings.json
+!hosting/previewsettings.example.json

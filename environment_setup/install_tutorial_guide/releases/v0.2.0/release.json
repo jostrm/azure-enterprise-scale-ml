@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "product": "ESAIF.TutorialApp",
+  "version": "0.2.0",
+  "developmentOnly": true,
+  "status": "tooling-only-not-built-not-published",
+  "releaseTag": "tutorialapp-v0.2.0",
+  "plannedReleaseUrl": "https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/tutorialapp-v0.2.0",
+  "apiBaseUri": null,
+  "accessMode": "local-invitation-gate/nonconfidential-guides",
+  "sourceFingerprintSha256": null,
+  "artifacts": [],
+  "content": {
+    "tutorialId": "esaif-python-sdk-01",
+    "catalogRevision": "example-incomplete-not-for-production",
+    "completeMetadata": false,
+    "recordingsVerified": false,
+    "serviceApprovalReference": null,
+    "bundled": true
+  },
+  "signing": {
+    "signed": false,
+    "certificateThumbprint": null,
+    "timestampUri": null
+  },
+  "blockers": [
+    "integrated client validation and build",
+    "production service, cost and lifetime approvals",
+    "six approved primary recordings",
+    "proprietary and third-party notice approval",
+    "approved signing certificate and trusted timestamp",
+    "Windows installation, playback, upgrade and rollback acceptance"
+  ]
+}

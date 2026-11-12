@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "product": "ESAIF.TutorialApp",
+  "previewVersion": "0.2.0",
+  "developmentOnly": true,
+  "appId": "{B781D214-B734-49AD-931C-41EAE3BA87A2}",
+  "project": "src\\ESAIF.TutorialApp\\ESAIF.TutorialApp.csproj",
+  "targetFramework": "net10.0-windows10.0.19041.0",
+  "runtimeIdentifier": "win-x64",
+  "manifest": "src\\ESAIF.TutorialApp\\Tutorials\\esaif-python-sdk-01\\tutorial.json",
+  "tutorialId": "esaif-python-sdk-01",
+  "releaseTagPrefix": "tutorialapp-v",
+  "repositoryUrl": "https://github.com/jostrm/azure-enterprise-scale-ml",
+  "maximumAssetBytesExclusive": 2147483648,
+  "coreScenarios": [
+    { "id": "scenario-1", "title": "Scenario 1: Init AI Factory" },
+    { "id": "scenario-2", "title": "Scenario 2: Add scaleset" },
+    { "id": "scenario-3", "title": "Scenario 3: Add or update project" },
+    { "id": "scenario-4", "title": "Scenario 4: Delete project" },
+    { "id": "scenario-5", "title": "Scenario 5: Delete scaleset" },
+    { "id": "scenario-6", "title": "Scenario 6: Delete AI Factory" }
+  ]
+}

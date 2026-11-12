@@ -1,0 +1,26 @@
+Open Sans application fonts
+
+The following statements were read from the bundled TrueType name tables
+(copyright ID 0, license description ID 13, license URL ID 14), 2026-11-09.
+This attribution inventory is not a legal audit.
+
+OpenSans-Regular.ttf
+Digitized data copyright © 2010-2011, Google Corporation.
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0
+Observed SHA256: 2dce8399579c789af0958042051c0afa141a0e403e0d824a4f3f7efa7b468021
+
+OpenSans-Semibold.ttf
+Digitized data copyright © 2011, Google Corporation.
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0
+Observed SHA256: c7df7b8f7ade7de5c8ba9310164ae6012b69cbfbb7e3ccae45cfaf2d6251f9dc
+
+The full license is included as Apache-2.0.txt, retrieved from
+https://www.apache.org/licenses/LICENSE-2.0.txt on 2026-11-09.
+License file SHA256:
+cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+
+Compare these observed hashes with Licenses\font-inventory.json on every release.
+Any replacement/additional font needs its own license and attribution review.
+The application's proprietary license does not supersede these font licenses.

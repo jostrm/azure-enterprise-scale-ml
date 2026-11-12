@@ -4,7 +4,7 @@
       {
         "matcher": "Bash|PowerShell",
         "hooks": [
-          {"type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_idle_wait.py\""}
+          {"type": "command", "command": "python -c \"import os, runpy; runpy.run_path(os.path.join(os.environ.get('CLAUDE_PROJECT_DIR') or os.getcwd(), '.claude', 'hooks', 'no_idle_wait.py'), run_name='__main__')\""}
         ]
       }
     ]
