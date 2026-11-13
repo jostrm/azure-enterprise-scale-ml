@@ -1,7 +1,8 @@
 # Icons of the architecture images
 
-`generate_architecture.py` embeds these icons in the three ESAF architecture images. Every SVG file is an
-official Microsoft icon from Microsoft's own icon sets, copied unchanged under a short name.
+`generate_architecture.py` embeds these icons in the three ESAF architecture images. An SVG file is an official
+Microsoft icon from Microsoft's own icon sets, copied unchanged under a short name, unless it is listed under
+"Icons from another place".
 
 | Icons | Official set | Downloaded |
 |---|---|---|
@@ -15,25 +16,25 @@ each icon as it is: don't crop, flip, rotate or recolor it, and put the product 
 
 ## Icons from another place
 
-Two icons are not in Microsoft's icon sets. Each is a PNG file, and the generator puts the picture into the
-image as the file has it:
+Four icons are not in Microsoft's icon sets. Joakim gave the link or the picture for each. The generator puts
+a PNG file into the image as the file has it:
 
 | Icon | Product | From | Added |
 |---|---|---|---|
+| `bing.svg` | Grounding with Bing Search and with Bing Custom Search | [Bing Fluent Logo.svg](https://commons.wikimedia.org/wiki/File:Bing_Fluent_Logo.svg) on Wikimedia Commons, public domain there, a Microsoft trademark. Unchanged. | 2026-11-13 |
+| `elasticsearch.svg` | Elasticsearch | [Elasticsearch logo.svg](https://commons.wikimedia.org/wiki/File:Elasticsearch_logo.svg) on Wikimedia Commons, Apache License 2.0, a trademark of Elastic. The six paths of the mark, unchanged, without the word "elasticsearch" beside it. | 2026-11-13 |
 | `microsoft-foundry.png` | Microsoft Foundry: the hosted, prompt and chat agents | [selfhst/icons](https://github.com/selfhst/icons) on GitHub (`png/microsoft-foundry.png`), the link Joakim gave | 2026-11-13 |
 | `foundry-iq.png` | Foundry IQ knowledge base | A picture of the Foundry IQ mark that Joakim gave. The white around the mark was made transparent, the empty margin trimmed and the picture scaled to 144 x 144. The mark itself is unchanged. | 2026-11-13 |
 
 ## Lettered tiles
 
-Six products have no official icon in those sets and are drawn as a lettered dark tile:
+Four products have no icon and are drawn as a lettered dark tile:
 
 | Tile | Product | Why |
 |---|---|---|
 | `sharepoint.svg` | SharePoint | The Microsoft 365 set has symbols in the SharePoint color, but no SharePoint icon. |
 | `kong.svg` | Kong | Not a Microsoft product. |
 | `pipelines.svg` | Azure DevOps or GitHub Actions | One tile stands for either of the two. |
-| `bing.svg` | Grounding with Bing Search and with Bing Custom Search | The Azure set has no Bing icon. |
-| `elasticsearch.svg` | Elasticsearch | Not a Microsoft product. |
 | `factory-apps.svg` | The Factory apps, such as the Configuration Wizard | ESAF's own apps: the tile has the purple border of the AI Factory. |
 
 To replace a tile, add the official SVG here under that name, remove the name from `TILES` in the generator

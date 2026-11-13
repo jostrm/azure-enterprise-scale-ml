@@ -66,8 +66,8 @@ PLACES = {
     "functions-storage": "storage", "starter-rag": "models", "starter-fabric": "fabric-agent",
 }
 # Products without an official icon in the Microsoft icon sets: the letters and the border color of their tile.
-TILES = {"sharepoint": ("SP", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue"), "bing": ("B", "blue"),
-         "elasticsearch": ("ES", "blue"), "factory-apps": ("ESAF", "purple")}
+TILES = {"sharepoint": ("SP", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue"),
+         "factory-apps": ("ESAF", "purple")}
 
 
 def load():

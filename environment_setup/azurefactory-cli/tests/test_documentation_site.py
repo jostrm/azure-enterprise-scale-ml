@@ -475,6 +475,24 @@ def test_architecture_images_use_the_modern_foundry_icon_from_a_png_file():
         assert drawing.render(mode).count('href="#icon-foundry-iq"') == 1, "The Foundry IQ knowledge base."
 
 
+def test_architecture_images_draw_bing_and_elasticsearch_with_their_logos():
+    drawing = tool("generate_architecture")
+    icons = SITE / "tools" / "architecture_icons"
+    readme = (icons / "README.md").read_text(encoding="utf-8")
+    assert set(drawing.TILES) == {"sharepoint", "kong", "pipelines", "factory-apps"}
+    for name in ("bing", "elasticsearch"):
+        assert (icons / f"{name}.svg").is_file() and "<script" not in (icons / f"{name}.svg").read_text("utf-8")
+        row = next(line for line in readme.splitlines() if line.startswith(f"| `{name}.svg`"))
+        assert "Wikimedia Commons" in row, "The README says where the logo comes from."
+    # The Elasticsearch file is the mark of the logo, without the word: it fills a square like the other icons.
+    box = re.search(r'<symbol id="icon-elasticsearch" viewBox="([^"]+)"', drawing.symbol("elasticsearch"))[1].split()
+    assert box[2] == box[3]
+    for mode in drawing.MODES:
+        text = drawing.render(mode)
+        assert text.count('href="#icon-bing"') == 2, "Bing Search and Bing Custom Search."
+        assert text.count('href="#icon-elasticsearch"') == 1
+
+
 def test_repository_readme_shows_the_external_hub_image_from_the_generated_png():
     drawing = tool("generate_architecture")
     copy = ROOT / "documentation" / "v2" / "20-29" / "images" / "esaf-architecture-external-hub.png"
