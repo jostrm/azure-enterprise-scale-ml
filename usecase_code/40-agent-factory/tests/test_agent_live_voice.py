@@ -476,6 +476,26 @@ def test_a_failed_step_stops_the_sequence_and_does_not_leak_command_output(tmp_p
     assert "deploy.py" not in runner.names() and runner.names()[-1] == "ingest"
 
 
+def test_a_failed_virtual_environment_names_the_missing_venv_package(tmp_path):
+    # Ubuntu runners without python3-venv fail `python -m venv` with "ensurepip is not available" (aif-160, 2026-11-13).
+    engine, runner = integration(tmp_path, runner=FakeRunner(fail_on="venv"))
+    with pytest.raises(live.CommandError) as raised:
+        engine.run(request(), apply=True)
+    message = str(raised.value)
+    assert message.startswith("isolated python environment failed")
+    assert "python3-venv" in message and "apt-get install" in message
+    assert f"python{sys.version_info.major}.{sys.version_info.minor}-venv" in message
+    assert runner.names() == ["venv"]
+
+
+def test_a_failed_pip_install_does_not_blame_the_venv_package(tmp_path):
+    engine, _ = integration(tmp_path, runner=FakeRunner(fail_on="pip install"))
+    with pytest.raises(live.CommandError) as raised:
+        engine.run(request(), apply=True)
+    assert "isolated python environment failed" in str(raised.value)
+    assert "python3-venv" not in str(raised.value)
+
+
 @pytest.mark.parametrize("arm", [FakeArm(deployments=[]), FakeArm(agent="missing"), FakeArm(agent="foreign"), FakeArm(app="operator")])
 def test_missing_prerequisites_fail_before_any_command_runs(tmp_path, arm):
     engine, runner = integration(tmp_path, arm=arm)

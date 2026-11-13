@@ -18,6 +18,29 @@ aif_runner_version_at_least() {
   [[ "$(printf '%s\n%s\n' "$actual" "$minimum" | sort -V | head -n 1)" == "$minimum" ]]
 }
 
+# Pipeline steps (e.g. AI Factory Agent live voice) run `python3 -m venv` and pip. Ubuntu ships ensurepip
+# separately (python3-venv), so probe a real venv with pip in a throwaway directory, removed afterwards.
+aif_runner_python_venv_ready() {
+  local probe status=0
+  probe="$(mktemp -d "${TMPDIR:-/tmp}/aifactory-venv-probe.XXXXXX")" || return
+  python3 -m venv "$probe/venv" >/dev/null 2>&1 || status=$?
+  rm -rf -- "$probe"
+  return "$status"
+}
+
+# python3-venv first; if python3 is not the distribution default, the package matching its minor version.
+aif_runner_python_venv_install() {
+  local version package
+  apt-get install -y --no-upgrade python3-venv || printf '%s\n' 'python3-venv install failed; trying the versioned package.' >&2
+  aif_runner_python_venv_ready && return 0
+  version="$(aif_runner_version python3)" && [[ "$version" =~ ^([0-9]+)\.([0-9]+) ]] ||
+    { printf '%s\n' 'Post-install verification failed: python3 -m venv (unknown python3 version).' >&2; return 1; }
+  package="python${BASH_REMATCH[1]}.${BASH_REMATCH[2]}-venv"
+  apt-get install -y --no-upgrade "$package" || return
+  aif_runner_python_venv_ready ||
+    { printf 'Post-install verification failed: python3 -m venv (installed python3-venv and %s).\n' "$package" >&2; return 1; }
+}
+
 aif_runner_python_alias() {
   local destination="${1:-/usr/local/bin/python}" python3_path actual
   if command -v python >/dev/null 2>&1; then
@@ -290,6 +313,15 @@ aif_runner_prerequisites_main() (
     fi
   done
   [[ "$invalid" == false ]] || return 2
+  local venv_missing=false
+  if ! command -v python3 >/dev/null 2>&1; then
+    venv_missing=true
+  elif aif_runner_python_venv_ready; then
+    printf '%s\n' 'ready: python3-venv (python3 -m venv)'
+  else
+    printf '%s\n' 'missing: python3-venv (python3 -m venv fails: ensurepip is not available)'
+    venv_missing=true
+  fi
   local -a runtime_missing=() runtime_packages=(libkrb5-3 zlib1g)
   if [[ "$VERSION_ID" == 22.04 ]]; then
     runtime_packages+=(liblttng-ust1 libicu70 libssl3 libcurl4)
@@ -301,7 +333,7 @@ aif_runner_prerequisites_main() (
       dpkg-query -W -f='${Status}' "$name" 2>/dev/null | grep -qx 'install ok installed' || runtime_missing+=("$name")
     done
   fi
-  if (( ${#missing[@]} == 0 && ${#runtime_missing[@]} == 0 )); then
+  if (( ${#missing[@]} == 0 && ${#runtime_missing[@]} == 0 )) && [[ "$venv_missing" == false ]]; then
     if [[ "$require_modules" == true ]]; then
       if [[ "$install_missing" == true ]]; then
         aif_runner_require_root || return
@@ -334,6 +366,7 @@ aif_runner_prerequisites_main() (
   done
   if (( ${#base_missing[@]} )); then apt-get install -y --no-upgrade "${base_missing[@]}" || return; fi
   if (( ${#runtime_missing[@]} )); then apt-get install -y --no-upgrade "${runtime_missing[@]}" || return; fi
+  if [[ "$venv_missing" == true ]]; then aif_runner_python_venv_install || return; fi
   for name in "${missing[@]}"; do
     case "$name" in
       git|jq|python3) ;;

@@ -2055,6 +2055,89 @@ aif_runner_python_alias
                 self.assertFalse((root / "python").exists())
 
 
+class RunnerPythonVenvTests(unittest.TestCase):
+    """The live-voice step runs `python3 -m venv` + pip; Ubuntu ships ensurepip separately (python3-venv)."""
+
+    def run_fixture(self, directory: Path, *, distro: str, version: str, venv_after: str,
+                    args: str) -> subprocess.CompletedProcess[str]:
+        path = shlex.quote(str(LIB / "runner-prerequisites.sh").replace("\\", "/"))
+        script = f"""
+builtin source {path}
+fixture="$PWD"
+export TMPDIR="$fixture"
+uname() {{ if [[ "$1" == -m ]]; then echo x86_64; else echo Linux; fi; }}
+source() {{ ID=ubuntu; VERSION_ID={distro}; VERSION_CODENAME=noble; }}
+for tool in git bash python az pwsh gh bicep jq curl gpg; do
+  eval "$tool() {{ echo 99.0.0; }}"
+done
+installed=" "
+python3() {{
+  if [[ "$1" == -m && "$2" == venv ]]; then
+    echo "venv-probe $3" >> "$fixture/probes"
+    case {venv_after} in
+      ready) return 0 ;;
+      never) return 1 ;;
+      *) [[ "$installed" == *" {venv_after} "* ]]; return ;;
+    esac
+  fi
+  echo 'Python {version}'
+}}
+dpkg-query() {{ printf 'install ok installed'; }}
+aif_runner_require_root() {{ :; }}
+aif_runner_mark_prerequisites_changed() {{ :; }}
+apt-get() {{
+  if [[ "$1" == install ]]; then echo "APT $*"; installed+="${{@: -1}} "; fi
+  return 0
+}}
+aif_runner_prerequisites_main {args}
+"""
+        return subprocess.run([BASH, "-c", script], cwd=directory, capture_output=True, text=True, timeout=30)
+
+    @staticmethod
+    def installs(result: subprocess.CompletedProcess[str]) -> list[str]:
+        return [line[len("APT install -y --no-upgrade "):] for line in result.stdout.splitlines() if line.startswith("APT ")]
+
+    def test_check_reports_missing_python_venv_without_installing(self) -> None:
+        for venv_after, expected in (("ready", 0), ("python3-venv", 2)):
+            with self.subTest(venv_after=venv_after), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                result = self.run_fixture(Path(directory), distro="24.04", version="3.12.3",
+                                          venv_after=venv_after, args="--check")
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                self.assertEqual(self.installs(result), [])
+                self.assertTrue((Path(directory) / "probes").exists(), "check must probe python3 -m venv")
+                self.assertEqual(list(Path(directory).glob("aifactory-venv-probe*")), [], "probe directory is removed")
+                if expected:
+                    self.assertIn("missing: python3-venv", result.stdout)
+
+    def test_install_adds_python3_venv_and_falls_back_to_the_python3_minor_package(self) -> None:
+        for distro, version, minor_package in (("22.04", "3.10.12", "python3.10-venv"),
+                                                ("24.04", "3.12.3", "python3.12-venv")):
+            for venv_after, expected, packages in (
+                ("python3-venv", 0, ["python3-venv"]),
+                (minor_package, 0, ["python3-venv", minor_package]),
+                ("never", 1, ["python3-venv", minor_package]),
+            ):
+                with self.subTest(distro=distro, venv_after=venv_after), \
+                        tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                    result = self.run_fixture(Path(directory), distro=distro, version=version,
+                                              venv_after=venv_after, args="--install-missing")
+                    self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                    self.assertEqual(self.installs(result), packages)
+                    self.assertEqual(list(Path(directory).glob("aifactory-venv-probe*")), [])
+                    if expected:
+                        self.assertIn("Post-install verification failed: python3 -m venv", result.stderr)
+                    else:
+                        self.assertIn("Prerequisites verified.", result.stdout)
+
+    def test_ready_python_venv_installs_nothing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            result = self.run_fixture(Path(directory), distro="24.04", version="3.12.3",
+                                      venv_after="ready", args="--install-missing")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self.installs(result), [])
+            self.assertIn("ready: python3-venv", result.stdout)
+
+
 @unittest.skipUnless(BASH and Path(BASH).exists(), "Bash is required")
 class RunnerMicrosoftRepositoryTests(unittest.TestCase):
     """Defender for Endpoint (MDE.Linux) adds the same Microsoft repository with its own signed-by keyring."""

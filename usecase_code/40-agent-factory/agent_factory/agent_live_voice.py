@@ -62,6 +62,15 @@ class CommandError(RuntimeError):
     """An operator command failed. The message never includes command output."""
 
 
+def venv_failure_hint() -> str:
+    """Ubuntu/Debian ship ensurepip separately, so `python -m venv` fails on a runner without python3-venv
+    (aif-160, 2026-11-13). bootstrap/lib/runner-prerequisites.sh --install-missing installs it on new runners."""
+    versioned = f"python{sys.version_info.major}.{sys.version_info.minor}-venv"
+    return (f": the runner's Python cannot create a virtual environment with pip; on Ubuntu/Debian the runner lacks "
+            f"python3-venv: sudo apt-get install -y python3-venv (or {versioned} for {sys.executable}), "
+            f"or rerun bootstrap/lib/runner-prerequisites.sh --install-missing")
+
+
 class ArmPort(Protocol):
     def arm(self, method: str, resource_id: str, body: dict | None = None, api_version: str = ...) -> dict: ...
 
@@ -568,7 +577,8 @@ class LiveVoiceIntegration:
                 try:
                     result = self.runner(command, cwd=self.agent_dir, env=self._command_env())
                 except CommandError as error:
-                    raise CommandError(f"{resource} failed ({error})") from None
+                    hint = venv_failure_hint() if command[1:3] == ["-m", "venv"] else ""
+                    raise CommandError(f"{resource} failed ({error}){hint}") from None
             report.add(resource, "ran", details.get(marker, ""))
             if marker in ready:
                 path, lock = ready[marker]
