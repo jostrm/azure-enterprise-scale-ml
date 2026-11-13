@@ -493,6 +493,25 @@ def test_architecture_images_draw_bing_and_elasticsearch_with_their_logos():
         assert text.count('href="#icon-elasticsearch"') == 1
 
 
+def test_architecture_images_show_fabric_iq_with_its_own_mark():
+    import xml.etree.ElementTree as ET
+
+    drawing = tool("generate_architecture")
+    icons = SITE / "tools" / "architecture_icons"
+    picture = (icons / "fabric-iq.png").read_bytes()
+    assert picture[:8] == b"\x89PNG\r\n\x1a\n" and picture[25] == 6, "A PNG with an alpha channel."
+    readme = (icons / "README.md").read_text(encoding="utf-8")
+    assert any(line.startswith("| `fabric-iq.png` | Fabric IQ") for line in readme.splitlines())
+    svg = "{http://www.w3.org/2000/svg}"
+    for mode in drawing.MODES:
+        text = drawing.render(mode)
+        assert text.count('href="#icon-fabric-iq"') == 1 and text.count('id="icon-fabric-iq"') == 1
+        # Fabric IQ is a tile of its own, beside OneLake and the Fabric data agent.
+        labels = [[span.text for span in node.iter(f"{svg}tspan")] for node in ET.fromstring(text).iter(f"{svg}text")]
+        assert ["Fabric IQ"] in labels and ["OneLake"] in labels, mode
+        assert ["Fabric data agent", "(Fabric IQ)"] in labels, mode
+
+
 def test_repository_readme_shows_the_external_hub_image_from_the_generated_png():
     drawing = tool("generate_architecture")
     copy = ROOT / "documentation" / "v2" / "20-29" / "images" / "esaf-architecture-external-hub.png"

@@ -16,7 +16,7 @@ each icon as it is: don't crop, flip, rotate or recolor it, and put the product 
 
 ## Icons from another place
 
-Four icons are not in Microsoft's icon sets. Joakim gave the link or the picture for each. The generator puts
+Five icons are not in Microsoft's icon sets. Joakim gave the link or the picture for each. The generator puts
 a PNG file into the image as the file has it:
 
 | Icon | Product | From | Added |
@@ -25,6 +25,7 @@ a PNG file into the image as the file has it:
 | `elasticsearch.svg` | Elasticsearch | [Elasticsearch logo.svg](https://commons.wikimedia.org/wiki/File:Elasticsearch_logo.svg) on Wikimedia Commons, Apache License 2.0, a trademark of Elastic. The six paths of the mark, unchanged, without the word "elasticsearch" beside it. | 2026-11-13 |
 | `microsoft-foundry.png` | Microsoft Foundry: the hosted, prompt and chat agents | [selfhst/icons](https://github.com/selfhst/icons) on GitHub (`png/microsoft-foundry.png`), the link Joakim gave | 2026-11-13 |
 | `foundry-iq.png` | Foundry IQ knowledge base | A picture of the Foundry IQ mark that Joakim gave. The white around the mark was made transparent, the empty margin trimmed and the picture scaled to 144 x 144. The mark itself is unchanged. | 2026-11-13 |
+| `fabric-iq.png` | Fabric IQ | The mark from a small "Fabric IQ" banner picture, from the link Joakim gave (an image search thumbnail, 474 x 276). Cut out of the banner, on a transparent background, 96 x 96. Replace it when a sharper file or an official SVG is at hand. | 2026-11-13 |
 
 ## Lettered tiles
 

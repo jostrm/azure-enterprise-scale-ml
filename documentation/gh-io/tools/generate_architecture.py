@@ -264,9 +264,10 @@ def render(mode, data=None):
 
     d.container(16, 240, 300, 202, "Knowledge and data outside the Factory", "blue")
     d.icon("sharepoint", "sharepoint", 86, 276, ["SharePoint", "sites and files"])
-    d.icon("onelake", "onelake", 86, 362, ["@onelake"])
+    d.icon("onelake", "onelake", 66, 362, ["@onelake"])
+    d.icon("fabric-iq", "fabric-iq", 166, 362, ["Fabric IQ"])
     d.icon("fabric", "fabric", 236, 276, ["Microsoft Fabric"])
-    d.icon("fabric-agent", "fabric-data-agent", 236, 362, ["Fabric data agent", "(Fabric IQ)"])
+    d.icon("fabric-agent", "fabric-data-agent", 262, 362, ["Fabric data agent", "(Fabric IQ)"])
 
     hub(d, mode)
 
