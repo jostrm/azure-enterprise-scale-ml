@@ -15,15 +15,13 @@ each icon as it is: don't crop, flip, rotate or recolor it, and put the product 
 
 ## Icons from another place
 
-One icon is not in Microsoft's icon sets. It is a PNG file, and the generator puts the picture into the image
-unchanged:
+Two icons are not in Microsoft's icon sets. Each is a PNG file, and the generator puts the picture into the
+image as the file has it:
 
-| Icon | Product | From | Downloaded |
+| Icon | Product | From | Added |
 |---|---|---|---|
 | `microsoft-foundry.png` | Microsoft Foundry: the hosted, prompt and chat agents | [selfhst/icons](https://github.com/selfhst/icons) on GitHub (`png/microsoft-foundry.png`), the link Joakim gave | 2026-11-13 |
-
-`foundry-iq.svg` is still the icon of the Azure set. Joakim has a newer Foundry IQ icon: add it here as
-`foundry-iq.png` (or replace the SVG), and add a row to this table.
+| `foundry-iq.png` | Foundry IQ knowledge base | A picture of the Foundry IQ mark that Joakim gave. The white around the mark was made transparent, the empty margin trimmed and the picture scaled to 144 x 144. The mark itself is unchanged. | 2026-11-13 |
 
 ## Lettered tiles
 

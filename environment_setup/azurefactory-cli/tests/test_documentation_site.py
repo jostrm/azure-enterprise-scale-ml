@@ -465,6 +465,14 @@ def test_architecture_images_use_the_modern_foundry_icon_from_a_png_file():
         assert 'id="icon-foundry"' not in text and text.count('id="icon-microsoft-foundry"') == 1
     readme = (icons / "README.md").read_text(encoding="utf-8")
     assert "`microsoft-foundry.png`" in readme and "selfhst/icons" in readme
+    # Foundry IQ has its own mark, also from a PNG file. The corners are transparent: no white square around it.
+    assert (icons / "foundry-iq.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    assert (icons / "foundry-iq.png").read_bytes()[25] == 6, "RGBA: the picture has an alpha channel."
+    assert not (icons / "foundry-iq.svg").exists() and "`foundry-iq.png`" in readme
+    mark = drawing.symbol("foundry-iq")
+    assert mark.startswith('<symbol id="icon-foundry-iq" viewBox="0 0 ') and "data:image/png;base64," in mark
+    for mode in drawing.MODES:
+        assert drawing.render(mode).count('href="#icon-foundry-iq"') == 1, "The Foundry IQ knowledge base."
 
 
 def test_repository_readme_shows_the_external_hub_image_from_the_generated_png():
