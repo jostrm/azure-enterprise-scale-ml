@@ -903,6 +903,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connect-to-the-private-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect to the private network
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ask-your-first-question" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2587,6 +2598,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connect-to-the-private-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect to the private network
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ask-your-first-question" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2841,13 +2863,39 @@ Later runs are faster.</p>
 <p>You can also deploy only the agent from a terminal, without a full project run. From your consumer
 repository root, <code>./GHA-azurefactory.sh add-aifactory-agent-chat --to-project 001</code> shows the plan, and
 <code>--apply</code> deploys. <code>ADO-azurefactory.sh</code> takes the same options.</p>
+<h2 id="connect-to-the-private-network">Connect to the private network<a class="headerlink" href="#connect-to-the-private-network" title="Permanent link">&para;</a></h2>
+<p>The chat app is internal, so you reach it through your Factory's VPN gateway. You sign in to the VPN with
+Microsoft. Do this once per computer and Factory.</p>
+<ol>
+<li>Install Azure VPN Client:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="p">-</span><span class="n">-id</span> <span class="n">9NP355QT2SQB</span> <span class="p">-</span><span class="n">-source</span> <span class="n">msstore</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">-</span><span class="n">-accept-source-agreements</span>
+</code></pre></div>
+<ol>
+<li>Download your Factory's VPN profile. The gateway is in the common resource group:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">$sub</span> <span class="p">=</span> <span class="s1">'&lt;your Dev subscription ID&gt;'</span><span class="p">;</span> <span class="nv">$rg</span> <span class="p">=</span> <span class="s1">'&lt;common resource group&gt;'</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nv">$gateway</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">list</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].name"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nv">$url</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">vpn-client</span> <span class="n">generate</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-name</span> <span class="nv">$gateway</span> <span class="p">`</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>  <span class="p">-</span><span class="n">-processor-architecture</span> <span class="n">Amd64</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nb">Invoke-WebRequest</span> <span class="nv">$url</span> <span class="n">-OutFile</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nb">Expand-Archive</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile"</span> <span class="n">-Force</span>
+</code></pre></div>
+<p>The profile is <code>esaf-vpn-profile\AzureVPN\azurevpnconfig.xml</code> in your Downloads folder. It stays out of
+   your Factory repository.</p>
+<ol>
+<li>Open Azure VPN Client, select <strong>+</strong> &gt; <strong>Import</strong>, open <code>azurevpnconfig.xml</code>, and select <strong>Save</strong>.</li>
+<li>Select <strong>Connect</strong> and sign in with Microsoft. First disconnect any other VPN that uses the same client
+   address range.</li>
+</ol>
+<p>The profile sets your Factory's DNS resolver, so the chat address resolves to its private IP.</p>
 <h2 id="ask-your-first-question">Ask your first question<a class="headerlink" href="#ask-your-first-question" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Connect your VPN.</li>
+<li>Connect your VPN, as in <a href="#connect-to-the-private-network">Connect to the private network</a>.</li>
 <li>Get the chat address:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
 </code></pre></div>
 <ol>
 <li>Open <code>https://&lt;that address&gt;/</code> in Edge, Chrome, Safari or Firefox, and sign in with Microsoft.</li>
