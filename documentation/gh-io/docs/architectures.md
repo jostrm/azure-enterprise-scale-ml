@@ -11,8 +11,10 @@ template, and the team switches on the Azure services it needs. You choose one o
 [hub modes](reference/hub-and-network-modes.md) when you create the Factory.
 
 Each image shows the Factory with one hub mode, and how it connects to Microsoft 365, Microsoft Power
-Platform, SharePoint, Microsoft Fabric and the AI gateway. A numbered blue circle is a code template for that
-part: select the circle, or find the number in [the table](#the-numbers-on-the-images) below.
+Platform, SharePoint, Microsoft Fabric and the AI gateway. Every resource of the
+[Azure resource library](resources/index.md) is on the image, under the same name. A numbered blue circle is
+a code template for that part: select the circle, or find the number in
+[the table](#the-numbers-on-the-images) below.
 
 === "External hub"
 
@@ -22,21 +24,21 @@ part: select the circle, or find the number in [the table](#the-numbers-on-the-i
 
     <div class="esaf-architecture">
       <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-external-hub.svg" aria-label="Diagram that shows the AI Factory connected to an external hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
-        <img src="../assets/architecture/esaf-architecture-external-hub.png" alt="Diagram that shows the AI Factory connected to an external hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+        <img src="../assets/architecture/esaf-architecture-external-hub.png" alt="Diagram that shows the AI Factory connected to an external hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1300">
       </object>
     </div>
 
     [Open the image at full size](assets/architecture/esaf-architecture-external-hub.svg) |
     [PNG](assets/architecture/esaf-architecture-external-hub.png)
 
-=== "Own hub"
+=== "Standalone - Own Hub"
 
     The Factory creates its own hub in its Dev network, with a VPN gateway, a DNS Private Resolver and
     Bastion. Choose it when you need private access and have no central hub.
 
     <div class="esaf-architecture">
       <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-own-hub.svg" aria-label="Diagram that shows the AI Factory with its own hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
-        <img src="../assets/architecture/esaf-architecture-own-hub.png" alt="Diagram that shows the AI Factory with its own hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+        <img src="../assets/architecture/esaf-architecture-own-hub.png" alt="Diagram that shows the AI Factory with its own hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1300">
       </object>
     </div>
 
@@ -51,7 +53,7 @@ part: select the circle, or find the number in [the table](#the-numbers-on-the-i
 
     <div class="esaf-architecture">
       <object type="image/svg+xml" data="../assets/architecture/esaf-architecture-standalone.svg" aria-label="Diagram that shows a standalone AI Factory without a hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway.">
-        <img src="../assets/architecture/esaf-architecture-standalone.png" alt="Diagram that shows a standalone AI Factory without a hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1010">
+        <img src="../assets/architecture/esaf-architecture-standalone.png" alt="Diagram that shows a standalone AI Factory without a hub, with Microsoft 365, Power Platform, SharePoint, Fabric and the AI gateway." width="1600" height="1300">
       </object>
     </div>
 
@@ -95,7 +97,7 @@ device asks for reduced motion, you get a still image.
     [GIF](assets/animations/factory-topology-external-hub.gif) |
     [Still image](assets/animations/factory-topology-external-hub.png)
 
-=== "Own hub"
+=== "Standalone - Own Hub"
 
     <picture>
       <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-own-hub.png">

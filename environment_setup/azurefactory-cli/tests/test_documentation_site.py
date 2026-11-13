@@ -368,7 +368,8 @@ def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site)
     assert library.NUMBERS in source and {"Architecture": "architectures.md"} in site[1].nav
     svg = "{http://www.w3.org/2000/svg}"
     drawn_labels = ""
-    for label, mode in (("External hub", "external-hub"), ("Own hub", "own-hub"), ("Standalone", "standalone")):
+    for label, mode in (("External hub", "external-hub"), ("Standalone - Own Hub", "own-hub"),
+                        ("Standalone", "standalone")):
         assert source.count(f'=== "{label}"') == 2, "The image tab and the animation tab switch together."
         path = SITE / "docs" / "assets" / "architecture" / f"esaf-architecture-{mode}.svg"
         text = path.read_text(encoding="utf-8")
@@ -413,6 +414,57 @@ def test_architecture_page_shows_each_hub_mode_with_the_numbered_templates(site)
     for number, template in numbered.items():
         row = next(line for line in table.splitlines() if line.startswith(f"| **{number}** |"))
         assert f"(code-templates/index.md#{template['id']})" in row and library.GITHUB_TREE + template["path"] in row
+
+
+def test_architecture_images_show_every_resource_of_the_resource_library():
+    import xml.etree.ElementTree as ET
+
+    drawing = tool("generate_architecture")
+    resources = tool("code_templates").load_resources()["resources"]
+    everything = {resource["id"] for resource in resources}
+    # The VPN gateway and the DNS resolver exist only when the Factory creates its own hub.
+    own_hub_only = {resource["id"] for resource in resources if resource["settings"] == ["enableAIFactoryHub"]}
+    assert own_hub_only == {"vpn-gateway", "dns-resolver"}
+    for resource in resources:
+        assert resource.get("label"), f"{resource['id']} has no name for the architecture images."
+    drawn = {}
+    for mode in drawing.MODES:
+        root = ET.fromstring(drawing.render(mode))
+        named = [node for node in root.iter() if node.get("data-resource")]
+        drawn[mode] = {identifier for node in named for identifier in node.get("data-resource").split()}
+        text = " ".join(piece for node in named for piece in node.itertext())
+        for resource in resources:
+            if resource["id"] in drawn[mode]:
+                for line in resource["label"]:
+                    assert line in text, f"{mode}: {resource['id']} is named as in the resource library."
+    assert drawn["own-hub"] == everything, sorted(everything - drawn["own-hub"])
+    assert drawn["standalone"] == everything - own_hub_only, "A Factory without a hub has no hub resources."
+    assert everything - own_hub_only <= drawn["external-hub"] <= everything
+    # The page shows the images at the size the generator draws them.
+    size = f'width="{drawing.WIDTH}" height="{drawing.HEIGHT}"'
+    assert (SITE / "docs" / "architectures.md").read_text(encoding="utf-8").count(size) == len(drawing.MODES)
+    styles = (SITE / "docs" / "assets" / "stylesheets" / "libraries.css").read_text(encoding="utf-8")
+    assert f"aspect-ratio: {drawing.WIDTH} / {drawing.HEIGHT};" in styles
+
+
+def test_architecture_images_use_the_modern_foundry_icon_from_a_png_file():
+    import base64
+
+    drawing = tool("generate_architecture")
+    icons = SITE / "tools" / "architecture_icons"
+    picture = (icons / "microsoft-foundry.png").read_bytes()
+    assert picture[:8] == b"\x89PNG\r\n\x1a\n" and not (icons / "foundry.svg").exists()
+    # A PNG icon becomes a symbol with the picture inside, at the size the file says.
+    symbol = drawing.symbol("microsoft-foundry")
+    assert symbol.startswith('<symbol id="icon-microsoft-foundry" viewBox="0 0 512 512">')
+    assert '<image width="512" height="512" href="data:image/png;base64,' in symbol
+    assert base64.b64decode(re.search(r'base64,([^"]+)"', symbol)[1]) == picture
+    for mode in drawing.MODES:
+        text = drawing.render(mode)
+        assert text.count('href="#icon-microsoft-foundry"') == 3, "Hosted, prompt and chat agents."
+        assert 'id="icon-foundry"' not in text and text.count('id="icon-microsoft-foundry"') == 1
+    readme = (icons / "README.md").read_text(encoding="utf-8")
+    assert "`microsoft-foundry.png`" in readme and "selfhst/icons" in readme
 
 
 def test_pages_workflow_rebuilds_the_site_when_a_docs_page_changes(site):

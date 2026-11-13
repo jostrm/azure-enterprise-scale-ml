@@ -5,11 +5,14 @@
     python documentation/gh-io/tools/generate_architecture.py --png      # also write the PNG stills (Playwright)
 
 The numbered blue circles come from documentation/gh-io/data/code_templates.json: a template with a "number" gets
-a circle at its "place". The icons are the official Microsoft icons in architecture_icons/ (see its README).
-A product in TILES has no official icon in those sets and is drawn as a lettered dark tile.
+a circle at its "place". The names come from documentation/gh-io/data/azure_resources.json: every resource of
+the Azure resource library is on the images. The icons are in architecture_icons/ (see its README): SVG files,
+or a PNG file for a product without an official SVG. A product in TILES has no icon and is drawn as a lettered
+dark tile.
 """
 
 import argparse
+import base64
 import json
 from pathlib import Path
 import re
@@ -21,7 +24,8 @@ DATA = SITE / "data" / "code_templates.json"
 RESOURCES = SITE / "data" / "azure_resources.json"
 ICONS = Path(__file__).resolve().parent / "architecture_icons"
 OUTPUT = SITE / "docs" / "assets" / "architecture"
-WIDTH, HEIGHT = 1600, 1010
+WIDTH, HEIGHT = 1600, 1300
+HUB_HEIGHT = HEIGHT - 20 - 566   # the hub box ends where the AI Factory box ends
 FONT = "Segoe UI, Roboto, Helvetica, Arial, sans-serif"
 
 # Colors carry meaning: blue is neutral, purple is the AI Factory, pink is a project. No red and no orange.
@@ -40,7 +44,7 @@ MODES = {
                    "connection, the firewall and the private DNS zones.",
     },
     "own-hub": {
-        "title": "ESAF with its own hub",
+        "title": "ESAF standalone, with its own hub",
         "summary": "The AI Factory creates its own hub in its Dev network, with a VPN gateway, a DNS resolver and "
                    "Bastion. The private DNS zones live in the common resource group.",
     },
@@ -58,16 +62,30 @@ PLACES = {
     "functions-storage": "storage", "starter-rag": "models", "starter-fabric": "fabric-agent",
 }
 # Products without an official icon in the Microsoft icon sets: the letters and the border color of their tile.
-TILES = {"sharepoint": ("SP", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue")}
+TILES = {"sharepoint": ("SP", "blue"), "kong": ("K", "blue"), "pipelines": ("CI", "blue"), "bing": ("B", "blue"),
+         "elasticsearch": ("ES", "blue"), "factory-apps": ("ESAF", "purple")}
 
 
 def load():
     return json.loads(DATA.read_text(encoding="utf-8"))
 
 
+def icon_file(name):
+    """The file of an icon: an SVG, or a PNG for a product without an official SVG. None for a lettered tile."""
+    return next((path for path in (ICONS / f"{name}.svg", ICONS / f"{name}.png") if path.is_file()), None)
+
+
 def symbol(name):
     """One icon file as an SVG symbol. Its ids get a prefix, so that two icons never share a gradient."""
-    text = (ICONS / f"{name}.svg").read_text(encoding="utf-8")
+    path = icon_file(name)
+    if path.suffix == ".png":
+        # A PNG says its width and height in bytes 16 to 24. The picture goes into the image unchanged.
+        data = path.read_bytes()
+        width, height = (int.from_bytes(data[start:start + 4], "big") for start in (16, 20))
+        picture = base64.b64encode(data).decode("ascii")
+        return (f'<symbol id="icon-{name}" viewBox="0 0 {width} {height}">'
+                f'<image width="{width}" height="{height}" href="data:image/png;base64,{picture}"/></symbol>')
+    text = path.read_text(encoding="utf-8")
     opening = re.search(r"<svg\b[^>]*>", text)[0]
     box = re.search(r'viewBox="([^"]+)"', opening)
     # The Fabric icons have a width and a height instead of a viewBox, and set the fill on the root element.
@@ -100,30 +118,38 @@ class Drawing:
         self.add(f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{weight}" fill="{PALETTE[color]}" '
                  f'text-anchor="{anchor}"{style}>{escape(value)}</text>')
 
-    def lines(self, x, y, values, size=11, color="ink", anchor="middle", step=13, weight="400"):
+    def lines(self, x, y, values, size=11, color="ink", anchor="middle", step=13, weight="400", style=""):
         spans = "".join(f'<tspan x="{x}" dy="{0 if index == 0 else step}">{escape(value)}</tspan>'
                         for index, value in enumerate(values))
         self.add(f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{weight}" fill="{PALETTE[color]}" '
-                 f'text-anchor="{anchor}">{spans}</text>')
+                 f'text-anchor="{anchor}"{style}>{spans}</text>')
+
+    def named(self, items):
+        """The lines of a label, and the attribute that says which resources of the library it names.
+
+        An item that starts with @ is the id of a resource: it becomes the name of that resource.
+        """
+        lines = [line for item in items for line in (self.names[item[1:]] if item.startswith("@") else [item])]
+        resources = " ".join(item[1:] for item in items if item.startswith("@"))
+        return lines, f' data-resource="{resources}"' if resources else ""
 
     def container(self, x, y, w, h, title, tone, note="", dashed=False):
+        """A box with a title bar. A title can be a list, with the id of a resource in it: see `named`."""
+        title, resources = self.named(title) if isinstance(title, list) else ([title], "")
         dash = ' stroke-dasharray="6 4"' if dashed else ""
         self.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{PALETTE[tone + "_tint"]}" '
                  f'stroke="{PALETTE[tone]}" stroke-width="1.5"{dash}/>')
         self.add(f'<path d="M{x + 1} {y + 26} V{y + 8} a7 7 0 0 1 7 -7 H{x + w - 8} a7 7 0 0 1 7 7 V{y + 26} Z" '
                  f'fill="{PALETTE[tone + "_bar"]}"/>')
-        self.text(x + 12, y + 18, title, size=12.5, weight="700")
+        self.text(x + 12, y + 18, " ".join(title), size=12.5, weight="700", style=resources)
         if note:
             self.text(x + w - 12, y + 18, note, size=11, color="muted", anchor="end")
 
     def icon(self, key, name, cx, top, label, size=30):
-        """An icon with its label underneath. `key` names the spot for circles and arrows.
-
-        A label line that starts with @ is the id of a resource: it becomes the name of that resource.
-        """
+        """An icon with its label underneath. `key` names the spot for circles and arrows."""
         self.at[key] = (cx, top)
-        label = [line for item in label for line in (self.names[item[1:]] if item.startswith("@") else [item])]
-        if (ICONS / f"{name}.svg").is_file():
+        label, resources = self.named(label)
+        if icon_file(name):
             if name not in self.icons:
                 self.icons.append(name)
             self.add(f'<use href="#icon-{name}" x="{cx - size / 2:g}" y="{top}" width="{size}" height="{size}"/>')
@@ -133,7 +159,7 @@ class Drawing:
                      f'fill="{PALETTE["box"]}" stroke="{PALETTE[tone]}" stroke-width="2"/>')
             self.text(cx, top + size / 2 + (4 if len(letters) < 3 else 3.5), letters, size=12 if len(letters) < 3 else 9,
                       weight="700", color="light", anchor="middle")
-        self.lines(cx, top + size + 14, label)
+        self.lines(cx, top + size + 14, label, style=resources)
 
     def arrow(self, points, dashed=False, label="", label_at=None, anchor="middle"):
         dash = ' stroke-dasharray="5 4"' if dashed else ""
@@ -160,15 +186,15 @@ def hub(drawing, mode):
         drawing.container(16, 456, 300, 96, "On-premises network", "blue")
         drawing.icon("people", "users", 76, 492, ["Your people"])
         drawing.icon("onprem", "expressroute", 226, 492, ["Site-to-site VPN", "or ExpressRoute"])
-        drawing.container(16, 566, 300, 424, "Your hub · connectivity subscription", "blue",
+        drawing.container(16, 566, 300, HUB_HEIGHT, "Your hub · connectivity subscription", "blue",
                           note="you own it")
-        drawing.icon("hub-vpn", "vpn-gateway", 86, 612, ["VPN or ExpressRoute", "gateway"])
-        drawing.icon("hub-firewall", "firewall", 236, 612, ["Azure Firewall"])
-        drawing.icon("hub-resolver", "dns-resolver", 86, 716, ["@dns-resolver"])
-        drawing.icon("hub-dns", "dns-zones", 236, 716, ["@dns-zones", "(central)"])
-        drawing.icon("hub-bastion", "bastion", 86, 820, ["@bastion"])
-        drawing.icon("hub-vnet", "vnet", 236, 820, ["Hub virtual", "network"])
-        drawing.lines(166, 926, ["One hub can serve several AI Factories.",
+        drawing.icon("hub-vpn", "vpn-gateway", 86, 620, ["VPN or ExpressRoute", "gateway"])
+        drawing.icon("hub-firewall", "firewall", 236, 620, ["Azure Firewall"])
+        drawing.icon("hub-resolver", "dns-resolver", 86, 765, ["@dns-resolver"])
+        drawing.icon("hub-dns", "dns-zones", 236, 765, ["@dns-zones", "(central)"])
+        drawing.icon("hub-bastion", "bastion", 86, 910, ["@bastion"])
+        drawing.icon("hub-vnet", "vnet", 236, 910, ["Hub virtual", "network"])
+        drawing.lines(166, 1040, ["One hub can serve several AI Factories.",
                                  "Settings: centralDnsZoneByPolicyInHub = true,",
                                  "access_hub_mode = external"], size=10.5, color="muted")
         drawing.arrow([(166, 552), (166, 566)])
@@ -176,12 +202,12 @@ def hub(drawing, mode):
         drawing.container(16, 456, 300, 96, "People who work in the Factory", "blue")
         drawing.icon("people", "users", 76, 492, ["Your people"])
         drawing.icon("onprem", "vpn-gateway", 226, 492, ["Azure VPN client", "(point-to-site)"])
-        drawing.container(16, 566, 300, 424, "Own hub · created by ESAF", "purple", note="Dev network")
-        drawing.icon("hub-vpn", "vpn-gateway", 86, 612, ["@vpn-gateway"])
-        drawing.icon("hub-resolver", "dns-resolver", 236, 612, ["@dns-resolver"])
-        drawing.icon("hub-bastion", "bastion", 86, 716, ["@bastion"])
-        drawing.icon("hub-vnet", "vnet", 236, 716, ["Hub virtual", "network"])
-        drawing.lines(166, 826, ["The Factory needs no other hub.",
+        drawing.container(16, 566, 300, HUB_HEIGHT, "Own hub · created by ESAF", "purple", note="Dev network")
+        drawing.icon("hub-vpn", "vpn-gateway", 86, 620, ["@vpn-gateway"])
+        drawing.icon("hub-resolver", "dns-resolver", 236, 620, ["@dns-resolver"])
+        drawing.icon("hub-bastion", "bastion", 86, 750, ["@bastion"])
+        drawing.icon("hub-vnet", "vnet", 236, 750, ["Hub virtual", "network"])
+        drawing.lines(166, 880, ["The Factory needs no other hub.",
                                  "Each Factory pays for its own VPN gateway.",
                                  "Settings: enableAIFactoryHub = true,",
                                  "setup_hub_access = true, vpn_client_cidr"], size=10.5, color="muted")
@@ -190,13 +216,13 @@ def hub(drawing, mode):
         drawing.container(16, 456, 300, 96, "People who work in the Factory", "blue")
         drawing.icon("people", "users", 76, 492, ["Your people"])
         drawing.icon("onprem", "browser", 226, 492, ["Allowed IP", "addresses"])
-        drawing.container(16, 566, 300, 424, "No hub", "blue", dashed=True)
-        for y, block in ((636, ["The Factory keeps its network and its", "private DNS zones in the common",
+        drawing.container(16, 566, 300, HUB_HEIGHT, "No hub", "blue", dashed=True)
+        for y, block in ((650, ["The Factory keeps its network and its", "private DNS zones in the common",
                                 "resource group."]),
-                         (710, ["Networking is hybrid or public:", "people reach the services over the",
+                         (760, ["Networking is hybrid or public:", "people reach the services over the",
                                 "internet, from the IP addresses you allow."]),
-                         (784, ["Fastest to create, easiest to delete.", "For private-only access, choose a hub."]),
-                         (844, ["Settings: access_hub_mode = integrated,", "setup_hub_access = false,",
+                         (870, ["Fastest to create, easiest to delete.", "For private-only access, choose a hub."]),
+                         (960, ["Settings: access_hub_mode = integrated,", "setup_hub_access = false,",
                                 "network_mode = hybrid or public"])):
             drawing.lines(166, y, block, size=11, color="muted", step=15)
 
@@ -208,7 +234,7 @@ def connect_hub(drawing, mode):
         drawing.text(308, 484, "over the internet", size=10.5, color="muted", anchor="end")
         return
     cx, top = drawing.at["hub-vnet"]
-    drawing.arrow([(cx + 18, top + 15), (338, top + 15), (338, 780), (360, 780)], dashed=True)
+    drawing.arrow([(cx + 18, top + 15), (338, top + 15), (338, 1006), (360, 1006)], dashed=True)
     drawing.text(cx + 22, top + 9, "VNet peering", size=10.5, color="muted")
 
 
@@ -234,31 +260,35 @@ def render(mode, data=None):
 
     d.container(16, 240, 300, 202, "Knowledge and data outside the Factory", "blue")
     d.icon("sharepoint", "sharepoint", 86, 276, ["SharePoint", "sites and files"])
-    d.icon("onelake", "onelake", 86, 362, ["OneLake"])
+    d.icon("onelake", "onelake", 86, 362, ["@onelake"])
     d.icon("fabric", "fabric", 236, 276, ["Microsoft Fabric"])
     d.icon("fabric-agent", "fabric-data-agent", 236, 362, ["Fabric data agent", "(Fabric IQ)"])
 
     hub(d, mode)
 
     # ---- the AI Factory
-    d.container(332, 96, 1252, 894,
+    d.container(332, 96, 1252, HEIGHT - 20 - 96,
                 "AI Factory · scale set 001 · Dev subscription (Stage and Prod have the same layout)", "purple")
-    d.container(346, 132, 1224, 428, "Project resource group · one for each team (project 001, 002, ...)", "pink")
+    d.container(346, 132, 1224, 654, "Project resource group · one for each team (project 001, 002, ...)", "pink")
 
-    d.container(360, 186, 490, 360, "Microsoft Foundry · account and project", "blue")
+    d.container(360, 186, 490, 454, ["@foundry", "· account and project"], "blue")
     for key, name, column, row, label in (
-        ("hosted", "foundry", 0, 0, ["Hosted agents"]),
-        ("prompt", "foundry", 1, 0, ["Prompt agents"]),
-        ("chat-agent", "foundry", 2, 0, ["@agent-chat"]),
+        ("hosted", "microsoft-foundry", 0, 0, ["Hosted agents"]),
+        ("prompt", "microsoft-foundry", 1, 0, ["Prompt agents"]),
+        ("chat-agent", "microsoft-foundry", 2, 0, ["@agent-chat"]),
         ("models", "azure-openai", 3, 0, ["Models"]),
         ("foundry-iq", "foundry-iq", 0, 1, ["Foundry IQ", "knowledge base"]),
         ("tools", "mcp", 1, 1, ["Tools:", "MCP servers"]),
-        ("agent-service", "cognitive-services", 2, 1, ["Agent service"]),
+        ("agent-service", "cognitive-services", 2, 1, ["@foundry-caphost"]),
         ("evaluations", "evaluations", 3, 1, ["Evaluations"]),
         ("fabric-tool", "fabric-data-agent", 0, 2, ["Fabric data agent", "tool"]),
         ("voice", "speech", 1, 2, ["@agent-chat-voice"]),
         ("content-safety", "content-safety", 2, 2, ["@content-safety"]),
         ("doc-intelligence", "document-intelligence", 3, 2, ["@document-intelligence"]),
+        ("bing", "bing", 0, 3, ["@bing"]),
+        ("bing-custom", "bing", 1, 3, ["@bing-custom"]),
+        ("azure-mcp", "mcp", 2, 3, ["@azure-mcp"]),
+        ("foundry-gateway", "api-management", 3, 3, ["@ai-gateway"]),
     ):
         d.icon(key, name, 424 + column * 120, 232 + row * 102, label)
 
@@ -268,13 +298,15 @@ def render(mode, data=None):
     d.icon("storage", "storage", 924, 290, ["Storage"])
     d.icon("keyvault", "key-vault", 1044, 290, ["@key-vault"])
 
-    d.container(864, 372, 240, 174, "Azure Machine Learning and data", "blue")
+    d.container(864, 372, 240, 268, "Azure Machine Learning and data", "blue")
     d.icon("aml", "machine-learning", 924, 402, ["@azure-ml"])
     d.icon("eventhubs", "event-hubs", 1044, 402, ["@event-hubs"])
     d.icon("adf", "data-factory", 924, 486, ["@data-factory"])
     d.icon("databricks", "databricks", 1044, 486, ["@databricks"])
+    d.icon("aks-ml", "aks", 924, 570, ["@aks-for-ml"])
+    d.icon("logic-apps", "logic-apps", 1044, 570, ["@logic-apps"])
 
-    d.container(1118, 186, 438, 174, "Applications · full stack", "blue")
+    d.container(1118, 186, 438, 252, "Applications · full stack", "blue")
     for key, name, column, row, label in (
         ("containerapps", "container-apps", 0, 0, ["@container-apps"]),
         ("functions", "functions", 1, 0, ["@function-app"]),
@@ -284,53 +316,79 @@ def render(mode, data=None):
         ("sql", "sql-database", 1, 1, ["@sql"]),
         ("postgres", "postgresql", 2, 1, ["@postgresql"]),
         ("redis", "redis", 3, 1, ["@redis-cache"]),
+        ("app-gateway", "application-gateway", 0, 2, ["@app-gateway"]),
+        ("cosmos-mongodb", "cosmos-db", 1, 2, ["@cosmos-mongodb"]),
+        ("elasticsearch", "elasticsearch", 2, 2, ["@elasticsearch"]),
+        ("redis-managed", "managed-redis", 3, 2, ["@redis-managed"]),
     ):
         d.icon(key, name, 1178 + column * 108, 220 + row * 70, label)
 
-    d.container(1118, 372, 438, 174, "Project subnets · in the common virtual network", "blue")
-    d.icon("pe", "private-endpoint", 1178, 410, ["@private-endpoints"])
-    d.icon("agent-subnet", "subnet", 1286, 410, ["Agent subnet"])
-    d.icon("aca-subnet", "subnet", 1394, 410, ["Container Apps", "subnet"])
-    d.icon("identity", "managed-identity", 1502, 410, ["Managed", "identities"])
-    d.lines(1337, 508, ["The services of a project are reached through private endpoints.",
+    d.container(1118, 450, 438, 190, "Project subnets · in the common virtual network", "blue")
+    d.icon("pe", "private-endpoint", 1178, 488, ["@private-endpoints"])
+    d.icon("agent-subnet", "subnet", 1286, 488, ["Agent subnet"])
+    d.icon("aca-subnet", "subnet", 1394, 488, ["Container Apps", "subnet"])
+    d.icon("identity", "managed-identity", 1502, 488, ["Managed", "identities"])
+    d.lines(1337, 590, ["The services of a project are reached through private endpoints.",
                         "Each service runs with a managed identity of the project."], size=10.5, color="muted")
 
-    d.container(346, 574, 1224, 402, "Common resource group · shared by the projects of the scale set", "purple")
-    d.container(360, 608, 600, 190, "Common virtual network", "blue")
-    d.icon("pp-subnet", "subnet", 424, 648, ["Power Platform", "subnet (delegated)"])
-    d.icon("common-subnet", "private-endpoint", 544, 648, ["Common subnet:", "private endpoints"])
-    d.icon("scoring-subnet", "subnet", 664, 648, ["Scoring subnet"])
-    d.icon("bastion-subnet", "bastion", 784, 648, ["@bastion", "(optional)"])
-    d.icon("admin-vm", "virtual-machine", 904, 648, ["@admin-vm", "(optional)"])
+    d.container(360, 652, 490, 120, "Azure AI services · beside Foundry", "blue")
+    d.icon("azure-openai", "azure-openai", 442, 686, ["@azure-openai"])
+    d.icon("speech", "speech", 605, 686, ["@speech"])
+    d.icon("vision", "vision", 768, 686, ["@vision"])
+
+    d.container(864, 652, 692, 120, "Reach and protect the project", "blue")
+    d.icon("project-vm", "virtual-machine", 924, 686, ["@project-vm"])
+    d.icon("vm-backup", "recovery-services-vault", 1044, 686, ["@vm-backup"])
+    d.icon("defender-resource", "defender", 1178, 686, ["@defender-resource"])
+    d.lines(1400, 700, ["The project VM is private: reach it through Bastion or the VPN.",
+                        "Azure Backup keeps the admin VM and the project VMs.",
+                        "Defender for AI watches each AI resource of the project."], size=10.5, color="muted")
+
+    d.container(346, 800, 1224, 466, "Common resource group · shared by the projects of the scale set", "purple")
+    d.container(360, 834, 600, 190, "Common virtual network", "blue")
+    d.icon("pp-subnet", "subnet", 424, 874, ["Power Platform", "subnet (delegated)"])
+    d.icon("common-subnet", "private-endpoint", 544, 874, ["Common subnet:", "private endpoints"])
+    d.icon("scoring-subnet", "subnet", 664, 874, ["Scoring subnet"])
+    d.icon("bastion-subnet", "bastion", 784, 874, ["@bastion", "(optional)"])
+    d.icon("admin-vm", "virtual-machine", 904, 874, ["@admin-vm", "(optional)"])
     dns = {"external-hub": "Private DNS zones are in your hub. Peering connects this network to it.",
            "own-hub": "Private DNS zones are in this resource group. Peering connects this network to the own hub.",
            "standalone": "Private DNS zones are in this resource group. There is no peering."}[mode]
-    d.lines(660, 760, [dns, "A new project gets its own subnets from the address range of this network."],
+    d.lines(660, 986, [dns, "A new project gets its own subnets from the address range of this network."],
             size=10.5, color="muted")
 
-    d.container(360, 812, 600, 150, "Common services", "blue")
-    d.icon("datalake", "storage", 424, 848, ["Data lake", "(ADLS Gen2)"])
-    d.icon("common-kv", "key-vault", 544, 848, ["@key-vault"])
-    d.icon("acr", "container-registry", 664, 848, ["Container", "registry"])
-    d.icon("log-analytics", "log-analytics", 784, 848, ["Log Analytics"])
+    d.container(360, 1038, 600, 214, "Common services", "blue")
+    d.icon("datalake", "storage", 424, 1074, ["Data lake", "(ADLS Gen2)"])
+    d.icon("common-kv", "key-vault", 544, 1074, ["@key-vault"])
+    d.icon("acr", "container-registry", 664, 1074, ["Container", "registry"])
+    d.icon("log-analytics", "log-analytics", 784, 1074, ["Log Analytics"])
     if mode == "external-hub":
-        d.icon("dashboards", "dashboard", 904, 848, ["Dashboards"])
+        d.icon("dashboards", "dashboard", 904, 1074, ["Dashboards"])
     else:
-        d.icon("common-dns", "dns-zones", 904, 848, ["@dns-zones"])
+        d.icon("common-dns", "dns-zones", 904, 1074, ["@dns-zones"])
+    d.icon("common-adf", "data-factory", 424, 1166, ["@data-factory-common"])
+    d.icon("defender", "defender", 544, 1166, ["@defender-subscription"])
+    d.lines(784, 1184, ["Defender for Cloud covers the whole subscription,",
+                        "with the plans for AI and Key Vault."], size=10.5, color="muted")
 
-    d.container(974, 608, 582, 190, "AI gateway · its own pipeline", "blue")
-    d.icon("apim", "api-management", 1050, 648, ["@apim"])
-    d.text(1150, 668, "or", size=12, color="muted", anchor="middle")
-    d.icon("kong", "kong", 1250, 648, ["@kong"])
-    d.icon("factory-mcp", "container-apps", 1450, 648, ["@factory-mcp", "(published on the gateway)"])
-    d.lines(1265, 760, ["One endpoint in front of a pool of model deployments, with retries.",
-                        "Settings: ENABLE_APIM or ENABLE_KONG, addAIFactoryMCP2APIM."], size=10.5, color="muted")
+    d.container(974, 834, 582, 190, "AI gateway · its own pipeline", "blue")
+    d.icon("apim", "api-management", 1050, 874, ["@apim"])
+    d.text(1150, 894, "or", size=12, color="muted", anchor="middle")
+    d.icon("kong", "kong", 1250, 874, ["@kong"])
+    d.icon("factory-mcp", "container-apps", 1450, 874, ["@factory-mcp", "(published on the gateway)"])
+    d.lines(1265, 980, ["One endpoint in front of a pool of model deployments, with retries.",
+                        "Settings: ENABLE_APIM or ENABLE_KONG, addAIFactoryMCP2APIM.",
+                        "The Foundry account can also have its own AI gateway (new SKU): enableAIGatewaySKU."],
+            size=10.5, color="muted")
 
-    d.container(974, 812, 582, 150, "Run and watch the Factory", "blue")
-    d.icon("pipelines", "pipelines", 1050, 848, ["Azure DevOps or", "GitHub Actions"])
-    d.icon("monitor", "monitor", 1184, 848, ["Azure Monitor", "health model"])
-    d.icon("appinsights", "application-insights", 1318, 848, ["@app-insights"])
-    d.icon("dashboards2", "dashboard", 1452, 848, ["@dashboards"])
+    d.container(974, 1038, 582, 214, "Run and watch the Factory", "blue")
+    d.icon("pipelines", "pipelines", 1050, 1074, ["Azure DevOps or", "GitHub Actions"])
+    d.icon("monitor", "monitor", 1184, 1074, ["Azure Monitor", "health model"])
+    d.icon("appinsights", "application-insights", 1318, 1074, ["@app-insights"])
+    d.icon("dashboards2", "dashboard", 1452, 1074, ["@dashboards"])
+    d.icon("factory-apps", "factory-apps", 1050, 1166, ["@factory-apps"])
+    d.icon("ampls", "private-link", 1184, 1166, ["@ampls"])
+    d.icon("appinsights-dashboard", "dashboard", 1318, 1166, ["@app-insights-dashboard"])
 
     # ---- how it connects
     d.arrow([(1508, 88), (1508, 216)])
@@ -338,14 +396,14 @@ def render(mode, data=None):
            anchor="end")
     d.arrow([(1492, 216), (1492, 172), (424, 172), (424, 228)])
     d.text(1000, 167, "Bot Service passes each message to the agent", size=10.5, color="muted", anchor="middle")
-    d.arrow([(316, 160), (324, 160), (324, 663), (405, 663)], dashed=True)
-    d.text(374, 656, "private", size=10.5, color="muted", anchor="middle")
+    d.arrow([(316, 160), (324, 160), (324, 889), (405, 889)], dashed=True)
+    d.text(374, 882, "private", size=10.5, color="muted", anchor="middle")
     d.arrow([(316, 349), (405, 349)], dashed=True)
     d.arrow([(316, 400), (338, 400), (338, 451), (405, 451)], dashed=True)
     d.arrow([(850, 236), (903, 236)])
     d.arrow([(850, 421), (903, 421)])
-    d.arrow([(800, 546), (800, 567), (1050, 567), (1050, 644)], dashed=True)
-    d.text(1060, 593, "model and MCP calls", size=10.5, color="muted")
+    d.arrow([(850, 553), (857, 553), (857, 793), (1050, 793), (1050, 870)], dashed=True)
+    d.text(1060, 819, "model and MCP calls", size=10.5, color="muted")
     connect_hub(d, mode)
 
     # ---- one blue circle for each numbered code template
@@ -363,7 +421,9 @@ def render(mode, data=None):
                    "Foundry agent through Bot Service; Microsoft Power Platform with Copilot Studio and Power "
                    "Automate, which reach the common virtual network; SharePoint and Microsoft Fabric as knowledge "
                    "and data for Foundry IQ and the Fabric data agent tool; and API Management or Kong as the AI "
-                   "gateway. Numbered blue circles mark the code template for each part.")
+                   "gateway. Every Azure resource of the resource library is on the image, in the project "
+                   "resource group or in the common resource group. Numbered blue circles mark the code "
+                   "template for each part.")
     return "\n".join([
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" height="{HEIGHT}" '
         f'role="img" aria-labelledby="title desc" font-family="{FONT}">',
