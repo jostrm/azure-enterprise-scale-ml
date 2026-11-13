@@ -107,6 +107,17 @@ Close the app before upgrading. Same-version reinstallations are supported.
 To deliberately install an older version, first uninstall the newer app in
 **Windows Settings > Apps > Installed apps**, then run the older MSI. Settings
 and progress are retained. The installer never silently removes a newer version.
+
+Builds containing the in-app updater check
+[`app-updates.json`](../app-updates.json) at startup and ask before downloading
+and installing a newer TutorialApp release. **Check for updates** also runs from
+the app menu. All CAB parts are staged with the MSI before installer handoff.
+`AIFACTORY_UPDATE_SOURCE` can point to an absolute local `environment_setup`
+folder or an HTTPS base URL; otherwise the published GitHub folder is used.
+Older installed builds still need one manual upgrade to gain this feature.
+Publishers regenerate the feed with `python environment_setup\generate_app_updates.py`
+from the accelerator repository root after copying the complete installer set.
+
 ## Install
 
 1. Open the download folder: `explorer "$HOME\Downloads\ESAF-Tutorials"`.

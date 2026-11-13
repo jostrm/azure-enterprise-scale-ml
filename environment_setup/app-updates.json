@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "apps": {
+    "esaif-configwizard": {
+      "displayName": "Enterprise Scale AI Factory",
+      "platforms": {
+        "windows-x64": {
+          "version": "1.0.27",
+          "installerType": "msi",
+          "files": [
+            {
+              "path": "install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64.msi",
+              "bytes": 1410696,
+              "sha256": "66b5befdf9022091fb9cb6cb7f83934b47935cbc2e25a00181d7319a4ef2458e"
+            },
+            {
+              "path": "install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-1.cab",
+              "bytes": 28787052,
+              "sha256": "3d6b66f6cd175e91a18ce89735e937e77e66a92087bbf270b10ffb92b6ee9fab"
+            },
+            {
+              "path": "install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-2.cab",
+              "bytes": 25122393,
+              "sha256": "7f547d1a7c72ed145e555fe636329ebb5b170c85d03ceca9b808ef4e31984c85"
+            },
+            {
+              "path": "install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-3.cab",
+              "bytes": 34533180,
+              "sha256": "eafcedb92e0dccc0b50ff1ac6e1402fddc2338e669562f99529e9fb7231c585a"
+            },
+            {
+              "path": "install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-4.cab",
+              "bytes": 35031234,
+              "sha256": "ea4bd95b8ae88902ac4a9cf682115c1244fb8777593c4eb3aa66cd4e8b8a61b9"
+            }
+          ]
+        }
+      }
+    },
+    "esaif-configwizard-project": {
+      "displayName": "ESAF - My Project",
+      "platforms": {}
+    },
+    "esaif-tutorialapp": {
+      "displayName": "ESAF Tutorials",
+      "platforms": {
+        "windows-x64": {
+          "version": "0.2.3",
+          "installerType": "msi",
+          "files": [
+            {
+              "path": "install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi",
+              "bytes": 995581,
+              "sha256": "aaacb4614e261dc2a03e2332501fae305bde8188ef5e438fe84cfdd4633cd5e7"
+            },
+            {
+              "path": "install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab",
+              "bytes": 32003127,
+              "sha256": "17be51bd24c9630d106fb4d6e4a3cce926dfdbd24504dea0ff7a8eea294b67d3"
+            },
+            {
+              "path": "install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab",
+              "bytes": 24237373,
+              "sha256": "d354b9f9152f781f3288a32b468f34dd76494b718de0f7b339deafaa9e27024f"
+            },
+            {
+              "path": "install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab",
+              "bytes": 30348057,
+              "sha256": "a7dbde430ab6eb2b34b7860cd56259275bf9af38af973ed8c20b31679426a819"
+            },
+            {
+              "path": "install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab",
+              "bytes": 34791645,
+              "sha256": "faec01e87e74154740401fe52d874cd2569f38bfa5f0a3eeab7b1bb44866ebcd"
+            }
+          ]
+        }
+      }
+    },
+    "aifactory-config": {
+      "displayName": "AIFactory Config Wizard",
+      "platforms": {
+        "windows-x64": {
+          "version": "0.47.105",
+          "installerType": "zip",
+          "entryPoint": "aifactory-config/aifactory-config.exe",
+          "files": [
+            {
+              "path": "install_config_wizard/windows/aifactory-config-windows.zip",
+              "bytes": 45148841,
+              "sha256": "5bfdbe9217dc20293b9c4e47bbe2b86e189c55dfdf61cec8d7d93e7610910b68"
+            }
+          ]
+        },
+        "linux-x64": {
+          "version": "0.47.36",
+          "installerType": "tar.gz",
+          "entryPoint": "aifactory-config",
+          "files": [
+            {
+              "path": "install_config_wizard/linux/aifactory-config-linux.tar.gz",
+              "bytes": 59124117,
+              "sha256": "45a909158f2aa7d8e9e8ea4b169632a9b88426fc4d58527a2ab938dbbf7af749"
+            }
+          ]
+        },
+        "macos-arm64": {
+          "version": "0.47.36",
+          "installerType": "tar.gz",
+          "entryPoint": "aifactory-config",
+          "files": [
+            {
+              "path": "install_config_wizard/macos/aifactory-config-macos.tar.gz",
+              "bytes": 40494392,
+              "sha256": "677150d3d3c18d8e2a18cde8e6923dcbfb6aabcee3de5685966d183d7a42bf52"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
