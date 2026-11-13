@@ -7,6 +7,7 @@
 ![Header](documentation/v2/10-19/images/header.png)
 See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below.
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+![](./documentation/v2/10-19/images/esaf-architecture-own-hub.svg)
 
 <p align="center">
 <b>Private, WAF-aligned full stack landing zones with AI on Azure, used since 2019.</b><br>
