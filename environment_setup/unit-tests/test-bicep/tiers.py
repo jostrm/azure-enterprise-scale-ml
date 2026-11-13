@@ -17,6 +17,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "test_workflow_parity.py",
         "unit/test_agent_live_voice_flags.py",
         "unit/test_bicep_matrix.py",
+        "unit/test_bundled_path_lengths.py",
         "unit/test_ci_runner.py",
         "unit/test_config_integrity.py",
         "unit/test_config_wizard_parity.py",
