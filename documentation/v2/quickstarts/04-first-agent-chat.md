@@ -191,9 +191,40 @@ You can also deploy only the agent from a terminal, without a full project run. 
 repository root, `./GHA-azurefactory.sh add-aifactory-agent-chat --to-project 001` shows the plan, and
 `--apply` deploys. `ADO-azurefactory.sh` takes the same options.
 
+## Connect to the private network
+
+The chat app is internal, so you reach it through your Factory's VPN gateway. You sign in to the VPN with
+Microsoft. Do this once per computer and Factory.
+
+1. Install Azure VPN Client:
+
+   ```powershell
+   winget install --id 9NP355QT2SQB --source msstore --accept-package-agreements --accept-source-agreements
+   ```
+
+2. Download your Factory's VPN profile. The gateway is in the common resource group:
+
+   ```powershell
+   $sub = '<your Dev subscription ID>'; $rg = '<common resource group>'
+   $gateway = az network vnet-gateway list --subscription $sub --resource-group $rg --query "[0].name" --output tsv
+   $url = az network vnet-gateway vpn-client generate --subscription $sub --resource-group $rg --name $gateway `
+     --processor-architecture Amd64 --output tsv
+   Invoke-WebRequest $url -OutFile "$HOME\Downloads\esaf-vpn-profile.zip"
+   Expand-Archive "$HOME\Downloads\esaf-vpn-profile.zip" "$HOME\Downloads\esaf-vpn-profile" -Force
+   ```
+
+   The profile is `esaf-vpn-profile\AzureVPN\azurevpnconfig.xml` in your Downloads folder. It stays out of
+   your Factory repository.
+
+3. Open Azure VPN Client, select **+** > **Import**, open `azurevpnconfig.xml`, and select **Save**.
+4. Select **Connect** and sign in with Microsoft. First disconnect any other VPN that uses the same client
+   address range.
+
+The profile sets your Factory's DNS resolver, so the chat address resolves to its private IP.
+
 ## Ask your first question
 
-1. Connect your VPN.
+1. Connect your VPN, as in [Connect to the private network](#connect-to-the-private-network).
 2. Get the chat address:
 
    ```powershell
