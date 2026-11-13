@@ -2711,7 +2711,8 @@ preview code. The guide has no Agent Chat lab yet.</p>
 </div>
 <h2 id="create-the-sign-in-registration">Create the sign-in registration<a class="headerlink" href="#create-the-sign-in-registration" title="Permanent link">&para;</a></h2>
 <p>An Entra admin does this once per project. Pipelines never write to Microsoft Entra. The commands in this
-section are PowerShell. In Bash, end a continued line with a backslash instead of a backtick.</p>
+section are PowerShell and need Python 3.12. In Bash, end a continued line with a backslash instead of a
+backtick.</p>
 <ol>
 <li>Find the address your chat app gets. The app name is <code>aifactory-agent-project&lt;NNN&gt;-dev</code>:</li>
 </ol>
@@ -2719,19 +2720,32 @@ section are PowerShell. In Bash, end a continued line with a backslash instead o
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].properties.defaultDomain"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
 </code></pre></div>
 <ol>
-<li>Copy <code>config.example.json</code> in <code>usecase_code\40-agent-factory\40-aifactory-agent</code> and put your own object
-   ID under <code>auth.grants</code>.</li>
-<li>From that folder, plan the registration. Add <code>--apply</code> when the plan looks right:</li>
+<li>From the root of your consumer repository, go to the agent folder and install what the tool needs in its
+   own virtual environment. Do this once per computer:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">aifactory_agent</span><span class="p">.</span><span class="n">browser_auth</span> <span class="p">-</span><span class="n">-config</span> <span class="p">./</span><span class="n">my-agent</span><span class="p">.</span><span class="n">json</span> <span class="p">`</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  <span class="p">-</span><span class="n">-redirect-uri</span> <span class="s2">"https://aifactory-agent-project001-dev.&lt;default domain&gt;/"</span> <span class="p">`</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  <span class="p">-</span><span class="n">-user-object-id</span> <span class="s2">"&lt;your Entra object ID&gt;"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">Set-Location</span> <span class="p">.\</span><span class="n">azure-enterprise-scale-ml</span><span class="p">\</span><span class="n">usecase_code</span><span class="p">\</span><span class="n">40-agent-factory</span><span class="p">\</span><span class="n">40-aifactory-agent</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">py</span> <span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">12</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">-r</span> <span class="n">requirements</span><span class="p">.</span><span class="n">lock</span><span class="p">.</span><span class="n">txt</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">-e</span> <span class="p">..\..\..\</span><span class="n">environment_setup</span><span class="p">\</span><span class="n">azurefactory-cli</span>
+</code></pre></div>
+<ol>
+<li>Copy <code>config.example.json</code> in that folder to <code>my-agent.json</code> and put your own object ID under
+   <code>auth.grants</code>.</li>
+<li>Plan the registration. Add <code>--apply</code> when the plan looks right:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">aifactory_agent</span><span class="p">.</span><span class="n">browser_auth</span> <span class="p">-</span><span class="n">-config</span> <span class="p">./</span><span class="n">my-agent</span><span class="p">.</span><span class="n">json</span> <span class="p">`</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  <span class="p">-</span><span class="n">-redirect-uri</span> <span class="s2">"https://aifactory-agent-project001-dev.&lt;default domain&gt;/"</span> <span class="p">`</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  <span class="p">-</span><span class="n">-user-object-id</span> <span class="s2">"&lt;your Entra object ID&gt;"</span>
 </code></pre></div>
 <ol>
 <li>Copy <code>client_id</code> from the output. You need it in the next step.</li>
 </ol>
-<p>The tool gives sign-in access to you only. Ask your Entra admin to assign the other readers to the
-<strong>Enterprise Scale AI Factory Agent</strong> enterprise application. For the details, see
+<p>Each project gets its own registration. Its name comes from the address, for example
+<code>Enterprise Scale AI Factory Agent (aifactory-agent-project001-dev.&lt;first part of the default domain&gt;)</code>, so
+other Factories and projects in your tenant keep theirs. The output shows the name as <code>display_name</code>. To pick
+another name, add <code>--display-name "&lt;name&gt;"</code>, and use the same option every time you run the tool again.</p>
+<p>The tool gives sign-in access to you only. Ask your Entra admin to assign the other readers to the enterprise
+application with the name in <code>display_name</code>. For the details, see
 <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md#authentication-tools-and-approvals">authentication in the agent guide</a>.</p>
 <h2 id="turn-on-the-four-settings">Turn on the four settings<a class="headerlink" href="#turn-on-the-four-settings" title="Permanent link">&para;</a></h2>
 <p>Agent Chat is an update of your project, so it's scenario 3 with four settings. The call saves the settings
@@ -2810,50 +2824,50 @@ and then deploys them.</p>
 Mode</strong> page and in the <strong>Configuration wizard</strong>.</p>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">@{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  <span class="n">enableFactoryChatAgent</span>        <span class="p">=</span> <span class="s1">'true'</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  <span class="n">enableAIFactoryAgentLiveVoice</span> <span class="p">=</span> <span class="s1">'true'</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  <span class="n">aifactoryAgentEntraAppId</span>      <span class="p">=</span> <span class="s1">'&lt;client ID&gt;'</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  <span class="n">aifactoryAgentReaderObjectIds</span> <span class="p">=</span> <span class="s1">'&lt;object ID 1&gt;,&lt;object ID 2&gt;'</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">}</span> <span class="p">|</span> <span class="nb">ConvertTo-Json</span> <span class="p">|</span> <span class="nb">Set-Content</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">azurefactory</span> <span class="n">esaf</span> <span class="n">upsert-project</span> <span class="n">001</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-scale-set</span> <span class="n">001</span> <span class="p">-</span><span class="n">-settings-json</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span> <span class="p">-</span><span class="n">-wait</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">@{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  <span class="n">enableFactoryChatAgent</span>        <span class="p">=</span> <span class="s1">'true'</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  <span class="n">enableAIFactoryAgentLiveVoice</span> <span class="p">=</span> <span class="s1">'true'</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  <span class="n">aifactoryAgentEntraAppId</span>      <span class="p">=</span> <span class="s1">'&lt;client ID&gt;'</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  <span class="n">aifactoryAgentReaderObjectIds</span> <span class="p">=</span> <span class="s1">'&lt;object ID 1&gt;,&lt;object ID 2&gt;'</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">}</span> <span class="p">|</span> <span class="nb">ConvertTo-Json</span> <span class="p">|</span> <span class="nb">Set-Content</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">azurefactory</span> <span class="n">esaf</span> <span class="n">upsert-project</span> <span class="n">001</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-scale-set</span> <span class="n">001</span> <span class="p">-</span><span class="n">-settings-json</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span> <span class="p">-</span><span class="n">-wait</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>agent-chat.json<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s">{</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="s">  "enableFactoryChatAgent": "true",</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s">  "enableAIFactoryAgentLiveVoice": "true",</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s">  "aifactoryAgentEntraAppId": "&lt;client ID&gt;",</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="s">  "aifactoryAgentReaderObjectIds": "&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="s">}</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="s">JSON</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>azurefactory<span class="w"> </span>esaf<span class="w"> </span>upsert-project<span class="w"> </span><span class="m">001</span><span class="w"> </span>dev<span class="w"> </span>--scale-set<span class="w"> </span><span class="m">001</span><span class="w"> </span>--settings-json<span class="w"> </span>./agent-chat.json<span class="w"> </span>--wait
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>agent-chat.json<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="s">{</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="s">  "enableFactoryChatAgent": "true",</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="s">  "enableAIFactoryAgentLiveVoice": "true",</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s">  "aifactoryAgentEntraAppId": "&lt;client ID&gt;",</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s">  "aifactoryAgentReaderObjectIds": "&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s">}</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s">JSON</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>azurefactory<span class="w"> </span>esaf<span class="w"> </span>upsert-project<span class="w"> </span><span class="m">001</span><span class="w"> </span>dev<span class="w"> </span>--scale-set<span class="w"> </span><span class="m">001</span><span class="w"> </span>--settings-json<span class="w"> </span>./agent-chat.json<span class="w"> </span>--wait
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">job</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"001"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="s2">"enableFactoryChatAgent"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="s2">"enableAIFactoryAgentLiveVoice"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="s2">"aifactoryAgentEntraAppId"</span><span class="p">:</span> <span class="s2">"&lt;client ID&gt;"</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="s2">"aifactoryAgentReaderObjectIds"</span><span class="p">:</span> <span class="s2">"&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">})</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">job</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"001"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s2">"enableFactoryChatAgent"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">"enableAIFactoryAgentLiveVoice"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="s2">"aifactoryAgentEntraAppId"</span><span class="p">:</span> <span class="s2">"&lt;client ID&gt;"</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="s2">"aifactoryAgentReaderObjectIds"</span><span class="p">:</span> <span class="s2">"&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">})</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">])</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <p>In Bash, with <code>API_URL</code>, <code>API_KEY</code> and <code>FOLDER</code> set as in
 <a href="../02-create-factory/#create-the-factory">Quickstart: Create your AI Factory</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>jq<span class="w"> </span>-n<span class="w"> </span>--arg<span class="w"> </span>folder<span class="w"> </span><span class="s2">"</span><span class="nv">$FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="s1">'{folder: $folder, approved: true, project: "001", environment: "dev",</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="s1">  scale_set: "001",</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="s1">  settings: {enableFactoryChatAgent: "true", enableAIFactoryAgentLiveVoice: "true",</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s1">    aifactoryAgentEntraAppId: "&lt;client ID&gt;", aifactoryAgentReaderObjectIds: "&lt;object ID 1&gt;,&lt;object ID 2&gt;"}}'</span><span class="w"> </span><span class="p">|</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/esaf/upsert-project"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span>--header<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>--data<span class="w"> </span>@-
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>jq<span class="w"> </span>-n<span class="w"> </span>--arg<span class="w"> </span>folder<span class="w"> </span><span class="s2">"</span><span class="nv">$FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="s1">'{folder: $folder, approved: true, project: "001", environment: "dev",</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="s1">  scale_set: "001",</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="s1">  settings: {enableFactoryChatAgent: "true", enableAIFactoryAgentLiveVoice: "true",</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="s1">    aifactoryAgentEntraAppId: "&lt;client ID&gt;", aifactoryAgentReaderObjectIds: "&lt;object ID 1&gt;,&lt;object ID 2&gt;"}}'</span><span class="w"> </span><span class="p">|</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/esaf/upsert-project"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span>--header<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>--data<span class="w"> </span>@-
 </code></pre></div>
 </div>
 </div>
@@ -2869,17 +2883,17 @@ Microsoft. Do this once per computer and Factory.</p>
 <ol>
 <li>Install Azure VPN Client:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="p">-</span><span class="n">-id</span> <span class="n">9NP355QT2SQB</span> <span class="p">-</span><span class="n">-source</span> <span class="n">msstore</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">-</span><span class="n">-accept-source-agreements</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="p">-</span><span class="n">-id</span> <span class="n">9NP355QT2SQB</span> <span class="p">-</span><span class="n">-source</span> <span class="n">msstore</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">-</span><span class="n">-accept-source-agreements</span>
 </code></pre></div>
 <ol>
 <li>Download your Factory's VPN profile. The gateway is in the common resource group:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">$sub</span> <span class="p">=</span> <span class="s1">'&lt;your Dev subscription ID&gt;'</span><span class="p">;</span> <span class="nv">$rg</span> <span class="p">=</span> <span class="s1">'&lt;common resource group&gt;'</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nv">$gateway</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">list</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].name"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nv">$url</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">vpn-client</span> <span class="n">generate</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-name</span> <span class="nv">$gateway</span> <span class="p">`</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>  <span class="p">-</span><span class="n">-processor-architecture</span> <span class="n">Amd64</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nb">Invoke-WebRequest</span> <span class="nv">$url</span> <span class="n">-OutFile</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nb">Expand-Archive</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile"</span> <span class="n">-Force</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">$sub</span> <span class="p">=</span> <span class="s1">'&lt;your Dev subscription ID&gt;'</span><span class="p">;</span> <span class="nv">$rg</span> <span class="p">=</span> <span class="s1">'&lt;common resource group&gt;'</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">$gateway</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">list</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].name"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nv">$url</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">vpn-client</span> <span class="n">generate</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-name</span> <span class="nv">$gateway</span> <span class="p">`</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  <span class="p">-</span><span class="n">-processor-architecture</span> <span class="n">Amd64</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">Invoke-WebRequest</span> <span class="nv">$url</span> <span class="n">-OutFile</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nb">Expand-Archive</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile"</span> <span class="n">-Force</span>
 </code></pre></div>
 <p>The profile is <code>esaf-vpn-profile\AzureVPN\azurevpnconfig.xml</code> in your Downloads folder. It stays out of
    your Factory repository.</p>
@@ -2894,8 +2908,8 @@ Microsoft. Do this once per computer and Factory.</p>
 <li>Connect your VPN, as in <a href="#connect-to-the-private-network">Connect to the private network</a>.</li>
 <li>Get the chat address:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
 </code></pre></div>
 <ol>
 <li>Open <code>https://&lt;that address&gt;/</code> in Edge, Chrome, Safari or Firefox, and sign in with Microsoft.</li>
