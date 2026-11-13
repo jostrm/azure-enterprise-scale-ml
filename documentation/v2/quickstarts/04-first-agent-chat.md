@@ -46,7 +46,8 @@ sequenceDiagram
 ## Create the sign-in registration
 
 An Entra admin does this once per project. Pipelines never write to Microsoft Entra. The commands in this
-section are PowerShell. In Bash, end a continued line with a backslash instead of a backtick.
+section are PowerShell and need Python 3.12. In Bash, end a continued line with a backslash instead of a
+backtick.
 
 1. Find the address your chat app gets. The app name is `aifactory-agent-project<NNN>-dev`:
 
@@ -55,20 +56,35 @@ section are PowerShell. In Bash, end a continued line with a backslash instead o
      --query "[0].properties.defaultDomain" --output tsv
    ```
 
-2. Copy `config.example.json` in `usecase_code\40-agent-factory\40-aifactory-agent` and put your own object
-   ID under `auth.grants`.
-3. From that folder, plan the registration. Add `--apply` when the plan looks right:
+2. From the root of your consumer repository, go to the agent folder and install what the tool needs in its
+   own virtual environment. Do this once per computer:
 
    ```powershell
-   python -m aifactory_agent.browser_auth --config ./my-agent.json `
+   Set-Location .\azure-enterprise-scale-ml\usecase_code\40-agent-factory\40-aifactory-agent
+   py -3.12 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+   .\.venv\Scripts\python.exe -m pip install -e ..\..\..\environment_setup\azurefactory-cli
+   ```
+
+3. Copy `config.example.json` in that folder to `my-agent.json` and put your own object ID under
+   `auth.grants`.
+4. Plan the registration. Add `--apply` when the plan looks right:
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m aifactory_agent.browser_auth --config ./my-agent.json `
      --redirect-uri "https://aifactory-agent-project001-dev.<default domain>/" `
      --user-object-id "<your Entra object ID>"
    ```
 
-4. Copy `client_id` from the output. You need it in the next step.
+5. Copy `client_id` from the output. You need it in the next step.
 
-The tool gives sign-in access to you only. Ask your Entra admin to assign the other readers to the
-**Enterprise Scale AI Factory Agent** enterprise application. For the details, see
+Each project gets its own registration. Its name comes from the address, for example
+`Enterprise Scale AI Factory Agent (aifactory-agent-project001-dev.<first part of the default domain>)`, so
+other Factories and projects in your tenant keep theirs. The output shows the name as `display_name`. To pick
+another name, add `--display-name "<name>"`, and use the same option every time you run the tool again.
+
+The tool gives sign-in access to you only. Ask your Entra admin to assign the other readers to the enterprise
+application with the name in `display_name`. For the details, see
 [authentication in the agent guide](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md#authentication-tools-and-approvals).
 
 ## Turn on the four settings

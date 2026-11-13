@@ -32,24 +32,31 @@ class FakeDirectory:
                 self.before_application_read(self)
             return copy.deepcopy(next(app for app in self.apps if app["id"] == path.split("/")[2]))
         if method == "GET":
-            if path.startswith("/applications?"):
+            if path.startswith(("/applications?", "/servicePrincipals?")):
                 query = parse_qs(urlsplit(path).query).get("$filter", [""])[0]
                 field, _, value = query.partition(" eq ")
-                return {"value": copy.deepcopy([app for app in self.apps if app.get(field) == value.strip("'")])}
-            values = self.assignments if path.endswith("/appRoleAssignedTo") else self.principals
-            return {"value": copy.deepcopy(values)}
+                values = self.apps if path.startswith("/applications?") else self.principals
+                return {"value": copy.deepcopy([item for item in values if item.get(field) == value.strip("'")])}
+            if path.endswith("/appRoleAssignedTo"):
+                resource = path.split("/")[2]
+                return {"value": copy.deepcopy([item for item in self.assignments if item["resourceId"] == resource])}
+            return {"value": copy.deepcopy(self.principals)}
         if method == "POST" and path == "/applications":
-            result = {**copy.deepcopy(body), "id": APPLICATION, "appId": CLIENT}
+            # The first application keeps the historic IDs; later ones (another project) get their own.
+            number = len(self.apps)
+            result = {**copy.deepcopy(body), "id": APPLICATION if not number else f"{number:08x}-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                      "appId": CLIENT if not number else f"{number:08x}-cccc-4ccc-8ccc-cccccccccccc"}
             self.apps.append(result)
             return copy.deepcopy(result)
         if method == "PATCH":
             if self.ignore_api_patch and "api" in body:
                 return None
-            target = self.apps[0] if path.startswith("/applications/") else self.principals[0]
+            target = next(app for app in self.apps if app["id"] == path.split("/")[2])
             target.update(copy.deepcopy(body))
             return None
         if method == "POST" and path == "/servicePrincipals":
-            result = {**copy.deepcopy(body), "id": SERVICE}
+            number = len(self.principals)
+            result = {**copy.deepcopy(body), "id": SERVICE if not number else f"{number:08x}-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}
             self.principals.append(result)
             return copy.deepcopy(result)
         if method == "POST" and path.endswith("/appRoleAssignedTo"):
@@ -324,6 +331,115 @@ def test_example_configuration_binds_to_the_runtime_registration_before_any_dire
     source, loaded = runtime_files(tmp_path, settings, clients=(AZURE_CLI,))
     bound = registration_from_configuration(source, loaded, REDIRECT, CALLER)
     assert bound.expected_client_id == CLIENT and bound.pre_authorized_clients == (AZURE_CLI,)
+
+
+PROJECT_001 = "https://aifactory-agent-project001-dev.nicegrass-1a2b3c4d.swedencentral.azurecontainerapps.io/"
+PROJECT_002 = "https://aifactory-agent-project002-dev.nicegrass-1a2b3c4d.swedencentral.azurecontainerapps.io/"
+OTHER_FACTORY = "https://aifactory-agent-project001-dev.bluesky-9f8e7d6c.swedencentral.azurecontainerapps.io/"
+
+
+def for_redirect(redirect, **values):
+    return BrowserRegistration(tenant_id=TENANT, redirect_uri=redirect, user_object_id=CALLER, **values)
+
+
+def test_registration_name_identifies_the_project_app_and_its_environment():
+    from aifactory_agent.browser_auth import display_name_for
+    expected = "Enterprise Scale AI Factory Agent (aifactory-agent-project001-dev.nicegrass-1a2b3c4d)"
+    assert display_name_for(PROJECT_001) == expected
+    assert for_redirect(PROJECT_001).display_name == expected
+    assert EntraRegistrationService.plan(for_redirect(PROJECT_001))["display_name"] == expected
+    directory = FakeDirectory()
+    result = EntraRegistrationService(directory).apply(for_redirect(PROJECT_001))
+    assert directory.apps[0]["displayName"] == expected and result["display_name"] == expected
+
+
+def test_each_project_and_factory_in_one_tenant_gets_its_own_registration():
+    directory = FakeDirectory()
+    service = EntraRegistrationService(directory)
+    results = [service.apply(for_redirect(redirect)) for redirect in (PROJECT_001, PROJECT_002, OTHER_FACTORY)]
+    assert len({result["client_id"] for result in results}) == 3
+    assert [app["spa"]["redirectUris"] for app in directory.apps] == [[PROJECT_001], [PROJECT_002], [OTHER_FACTORY]]
+    assert len({app["displayName"] for app in directory.apps}) == 3
+    count = len(directory.calls)
+    assert [service.apply(for_redirect(redirect)) for redirect in (PROJECT_001, PROJECT_002, OTHER_FACTORY)] == results
+    assert all(method == "GET" for method, _, _ in directory.calls[count:])
+
+
+def test_another_factorys_legacy_named_registration_is_left_alone():
+    """aif-160, 2026-11-13: the tenant already held another Factory's "Enterprise Scale AI Factory Agent"."""
+    from aifactory_agent.browser_auth import LEGACY_DISPLAY_NAME
+    directory = FakeDirectory()
+    service = EntraRegistrationService(directory)
+    service.apply(for_redirect(OTHER_FACTORY, display_name=LEGACY_DISPLAY_NAME))
+    legacy = copy.deepcopy(directory.apps[0])
+    count = len(directory.calls)
+    result = service.apply(for_redirect(PROJECT_001))
+    assert directory.apps[0] == legacy
+    assert not any(method == "PATCH" and legacy["id"] in path for method, path, _ in directory.calls[count:])
+    assert result["client_id"] != legacy["appId"] and result["redirect_uri"] == PROJECT_001
+    assert directory.apps[1]["displayName"] == for_redirect(PROJECT_001).display_name
+
+
+def test_existing_legacy_registration_for_this_address_is_still_reused():
+    from aifactory_agent.browser_auth import LEGACY_DISPLAY_NAME
+    directory = FakeDirectory()
+    service = EntraRegistrationService(directory)
+    first = service.apply(for_redirect(PROJECT_001, display_name=LEGACY_DISPLAY_NAME))
+    count = len(directory.calls)
+    assert service.apply(for_redirect(PROJECT_001))["client_id"] == first["client_id"]
+    assert service.apply(for_redirect(PROJECT_001, expected_client_id=first["client_id"]))["client_id"] == first["client_id"]
+    assert len(directory.apps) == 1 and all(method == "GET" for method, _, _ in directory.calls[count:])
+
+
+def test_legacy_registration_keeps_the_owner_and_drift_checks():
+    from aifactory_agent.browser_auth import LEGACY_DISPLAY_NAME
+    directory = FakeDirectory()
+    service = EntraRegistrationService(directory)
+    service.apply(for_redirect(PROJECT_001, display_name=LEGACY_DISPLAY_NAME))
+    directory.owners = ["dddddddd-dddd-4ddd-8ddd-dddddddddddd"]
+    with pytest.raises(RuntimeError, match="owner"):
+        service.apply(for_redirect(PROJECT_001))
+    directory.owners = [CALLER]
+    directory.apps[0]["tags"] = []
+    count = len(directory.calls)
+    with pytest.raises(RuntimeError, match="owned"):
+        service.apply(for_redirect(PROJECT_001))
+    assert all(method == "GET" for method, _, _ in directory.calls[count:])
+
+
+def test_two_legacy_registrations_for_this_address_are_ambiguous():
+    from aifactory_agent.browser_auth import LEGACY_DISPLAY_NAME
+    directory = FakeDirectory()
+    service = EntraRegistrationService(directory)
+    service.apply(for_redirect(PROJECT_001, display_name=LEGACY_DISPLAY_NAME))
+    directory.apps.append({**copy.deepcopy(directory.apps[0]), "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                           "appId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"})
+    count = len(directory.calls)
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        service.apply(for_redirect(PROJECT_001))
+    assert all(method == "GET" for method, _, _ in directory.calls[count:])
+
+
+def test_explicit_display_name_is_used_and_checked():
+    directory = FakeDirectory()
+    result = EntraRegistrationService(directory).apply(for_redirect(PROJECT_001, display_name="Team A Agent Chat"))
+    assert directory.apps[0]["displayName"] == result["display_name"] == "Team A Agent Chat"
+    for name in ("", "  ", "it's", "tab\there", "x" * 257):
+        with pytest.raises(ValueError):
+            for_redirect(PROJECT_001, display_name=name)
+
+
+def test_display_name_option_reaches_the_registration(tmp_path, settings):
+    from aifactory_agent.browser_auth import parser, registration_for, registration_from_configuration
+    arguments = parser().parse_args(["--config", "x.json", "--redirect-uri", PROJECT_001, "--user-object-id", CALLER,
+                                     "--display-name", "Team A Agent Chat"])
+    assert arguments.display_name == "Team A Agent Chat"
+    assert parser().parse_args(["--config", "x.json", "--redirect-uri", PROJECT_001,
+                                "--user-object-id", CALLER]).display_name is None
+    assert registration_for(settings, PROJECT_001, CALLER, display_name="Team A Agent Chat").display_name == "Team A Agent Chat"
+    source, loaded = runtime_files(tmp_path, settings)
+    bound = registration_from_configuration(source, loaded, PROJECT_001, CALLER, display_name="Team A Agent Chat")
+    assert bound.display_name == "Team A Agent Chat" and bound.expected_client_id == CLIENT
 
 
 @pytest.mark.parametrize("changes,message", [

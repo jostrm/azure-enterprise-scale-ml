@@ -285,6 +285,19 @@ For the smallest form, select **Use Simple Mode** instead: GitHub Actions, Dev a
 > Running a scenario is the approval. It deploys billable resources to Azure, and there is no separate confirm
 > step.
 
+First, commit and push your consumer repository. The pipelines read it from GitHub or Azure DevOps, not from
+your computer, so the submodule and the `azurefactory` folder must be there before the run. From the root of
+your consumer repository, in PowerShell or Bash:
+
+```bash
+git status
+git add --all
+git commit -m "Add the AI Factory submodule and Factory folder"
+git push
+```
+
+Check the `git status` list first: never commit keys or other secrets.
+
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 

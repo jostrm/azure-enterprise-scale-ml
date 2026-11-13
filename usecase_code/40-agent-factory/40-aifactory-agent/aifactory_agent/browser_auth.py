@@ -17,7 +17,17 @@ from .config import REVIEWED_ADDITIONAL_CLIENTS
 
 
 OWNER = "enterprise-scale-ai-factory-agent-browser-sign-in"
-DISPLAY_NAME = "Enterprise Scale AI Factory Agent"
+# The one fixed name every Factory used before 2026-11: still adopted, but only for its own exact redirect URI.
+LEGACY_DISPLAY_NAME = "Enterprise Scale AI Factory Agent"
+DISPLAY_NAME = LEGACY_DISPLAY_NAME
+MAX_DISPLAY_NAME = 256
+
+
+def display_name_for(redirect_uri: str) -> str:
+    """Name the registration after its chat app and environment, so every project and Factory in a tenant
+    gets its own: aifactory-agent-project001-dev.<default-domain label> from the Container Apps host."""
+    host = urlsplit(redirect_uri).hostname or ""
+    return f"{LEGACY_DISPLAY_NAME} ({'.'.join(host.split('.')[:2])})"
 
 
 @dataclass(frozen=True)
@@ -27,6 +37,7 @@ class BrowserRegistration:
     user_object_id: str
     pre_authorized_clients: tuple[str, ...] = ()
     expected_client_id: str | None = None
+    display_name: str | None = None
 
     def __post_init__(self):
         for name in ("tenant_id", "user_object_id"):
@@ -48,9 +59,16 @@ class BrowserRegistration:
             if not expected.int:
                 raise ValueError("A configured Agent registration must be a concrete client ID.")
             object.__setattr__(self, "expected_client_id", str(expected))
+        name = display_name_for(self.redirect_uri) if self.display_name is None else self.display_name
+        # The name goes into an OData filter: no quotes or control characters, and Entra's length limit.
+        if (not name.strip() or name != name.strip() or len(name) > MAX_DISPLAY_NAME
+                or any(char in "'\"" or not char.isprintable() for char in name)):
+            raise ValueError("Use a registration display name of 1-256 printable characters without quotes.")
+        object.__setattr__(self, "display_name", name)
 
 
-def registration_for(settings, redirect_uri: str, user_object_id: str) -> BrowserRegistration:
+def registration_for(settings, redirect_uri: str, user_object_id: str,
+                     display_name: str | None = None) -> BrowserRegistration:
     """The backend's reviewed additional clients are the only clients pre-authorized in Entra.
 
     An already configured client ID binds the run to that exact application: a same-named application is
@@ -58,7 +76,7 @@ def registration_for(settings, redirect_uri: str, user_object_id: str) -> Browse
     """
     return BrowserRegistration(settings.tenant_id, redirect_uri, user_object_id,
                                pre_authorized_clients=tuple(str(client) for client in settings.auth.additional_client_ids),
-                               expected_client_id=settings.auth.client_id or None)
+                               expected_client_id=settings.auth.client_id or None, display_name=display_name)
 
 
 def verify_runtime_clients(config_path: Path, registration: BrowserRegistration) -> None:
@@ -72,13 +90,14 @@ def verify_runtime_clients(config_path: Path, registration: BrowserRegistration)
                            "configuration. Align them so Entra pre-authorization and the running Agent accept the same clients.")
 
 
-def registration_from_configuration(config_path: Path, settings, redirect_uri: str, user_object_id: str) -> BrowserRegistration:
+def registration_from_configuration(config_path: Path, settings, redirect_uri: str, user_object_id: str,
+                                    display_name: str | None = None) -> BrowserRegistration:
     """Bind the run to the runtime identity in config.local.json before any directory call.
 
     Running the documented example configuration after a local registration exists must reuse that exact
     application, never create or adopt another one; tenant, client and pre-authorization mismatches stop here.
     """
-    registration = registration_for(settings, redirect_uri, user_object_id)
+    registration = registration_for(settings, redirect_uri, user_object_id, display_name)
     verify_runtime_clients(config_path, registration)
     local = config_path.parent / "config.local.json"
     if not local.exists() or local.resolve() == config_path.resolve():
@@ -139,7 +158,7 @@ class EntraRegistrationService:
     @staticmethod
     def plan(registration: BrowserRegistration):
         return {
-            "tenant_id": registration.tenant_id, "display_name": DISPLAY_NAME,
+            "tenant_id": registration.tenant_id, "display_name": registration.display_name,
             "redirect_uri": registration.redirect_uri, "sign_in_audience": "AzureADMyOrg",
             "protocol": "authorization_code_with_PKCE", "client_secret": False,
             "requested_permissions": ["access_as_user"],
@@ -168,7 +187,7 @@ class EntraRegistrationService:
     @staticmethod
     def _manifest(registration: BrowserRegistration) -> dict:
         return {
-            "displayName": DISPLAY_NAME, "signInAudience": "AzureADMyOrg",
+            "displayName": registration.display_name, "signInAudience": "AzureADMyOrg",
             "tags": [OWNER], "isFallbackPublicClient": False,
             "spa": {"redirectUris": [registration.redirect_uri]},
             "web": {"redirectUris": [], "implicitGrantSettings": {
@@ -199,7 +218,8 @@ class EntraRegistrationService:
         api, web = app.get("api") or {}, app.get("web") or {}
         scopes, roles = api.get("oauth2PermissionScopes", []), app.get("appRoles", [])
         if (
-            app.get("displayName") != DISPLAY_NAME or app.get("signInAudience") != "AzureADMyOrg"
+            app.get("displayName") not in (registration.display_name, LEGACY_DISPLAY_NAME)
+            or app.get("signInAudience") != "AzureADMyOrg"
             or app.get("spa", {}).get("redirectUris") != [registration.redirect_uri]
             or app.get("passwordCredentials") or app.get("keyCredentials")
             or app.get("publicClient", {}).get("redirectUris") or web.get("redirectUris")
@@ -231,6 +251,9 @@ class EntraRegistrationService:
             raise RuntimeError("The Agent registration must be owned exclusively by the approved operator; "
                                "review its owners before changing anything.")
 
+    def _named(self, display_name: str) -> list[dict]:
+        return self._list("/applications?" + urlencode({"$filter": f"displayName eq '{display_name}'"}))
+
     def _application(self, object_id: str) -> dict:
         app = self.directory.request("GET", "/applications/" + object_id)
         if not isinstance(app, dict) or app.get("id") != object_id:
@@ -245,7 +268,12 @@ class EntraRegistrationService:
                 raise RuntimeError("The configured Agent registration (client ID " + registration.expected_client_id
                                    + ") was not found. Refusing to create or adopt a different application.")
         else:
-            apps = self._list("/applications?" + urlencode({"$filter": f"displayName eq '{DISPLAY_NAME}'"}))
+            apps = self._named(registration.display_name)
+            if not apps and registration.display_name != LEGACY_DISPLAY_NAME:
+                # A registration made before names were per project is reused only for its own redirect URI;
+                # another Factory's or project's legacy registration is left alone.
+                apps = [app for app in self._named(LEGACY_DISPLAY_NAME)
+                        if (app.get("spa") or {}).get("redirectUris") == [registration.redirect_uri]]
             if len(apps) > 1:
                 raise RuntimeError("The Agent registration name is ambiguous; no application was changed.")
         app = apps[0] if apps else self.directory.request("POST", "/applications", self._manifest(registration))
@@ -297,7 +325,8 @@ class EntraRegistrationService:
         if not assignments:
             self.directory.request("POST", "/servicePrincipals/" + resource_id + "/appRoleAssignedTo", assignment)
         return {
-            "tenant_id": registration.tenant_id, "client_id": client_id, "audience": client_id,
+            "tenant_id": registration.tenant_id, "display_name": app["displayName"],
+            "client_id": client_id, "audience": client_id,
             "required_scope": "access_as_user", "scope_uri": "api://" + client_id + "/access_as_user",
             "scope_id": scope_id, "application_object_id": app["id"], "service_principal_id": resource_id,
             "redirect_uri": registration.redirect_uri, "assigned_user_object_id": registration.user_object_id,
@@ -305,16 +334,24 @@ class EntraRegistrationService:
         }
 
 
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(allow_abbrev=False)
+    result.add_argument("--config", type=Path, required=True)
+    result.add_argument("--redirect-uri", required=True)
+    result.add_argument("--user-object-id", required=True)
+    result.add_argument("--display-name", default=None,
+                        help="Registration name. Default: 'Enterprise Scale AI Factory Agent (<app>.<environment>)' "
+                             "from the redirect URI host, so each project and Factory gets its own.")
+    result.add_argument("--apply", action="store_true")
+    return result
+
+
 def main():
-    parser = argparse.ArgumentParser(allow_abbrev=False)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--redirect-uri", required=True)
-    parser.add_argument("--user-object-id", required=True)
-    parser.add_argument("--apply", action="store_true")
-    args = parser.parse_args()
+    args = parser().parse_args()
     from .config import load_settings
     settings = load_settings(args.config)
-    registration = registration_from_configuration(args.config, settings, args.redirect_uri, args.user_object_id)
+    registration = registration_from_configuration(args.config, settings, args.redirect_uri, args.user_object_id,
+                                                   args.display_name)
     if not any(str(grant.object_id) == registration.user_object_id for grant in settings.auth.grants):
         raise ValueError("The approved user must already have an explicit Agent access grant.")
     if not args.apply:

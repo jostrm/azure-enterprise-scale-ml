@@ -950,7 +950,19 @@ This creates an owned application and service principal with only the Agent's
 `access_as_user` delegated scope, an exact SPA redirect, v2 tokens and that
 user's app assignment. No client secret, Microsoft Graph permission, Azure
 resource role, MAUI registration edit or Factory write enablement is included.
-Registration drift is a blocker, not silently reset. Settings are saved to ignored
+Registration drift is a blocker, not silently reset.
+
+Each Agent gets its own registration, named after the redirect URI host:
+`Enterprise Scale AI Factory Agent (<app>.<environment>)`, for example
+`Enterprise Scale AI Factory Agent (aifactory-agent-project001-dev.nicegrass-1a2b3c4d)`
+(the Container App name and the first label of the environment's default
+domain). So several Factories and projects in one tenant never share or fight
+over one application. `--display-name "<name>"` sets another name; pass the same
+value on every later run. The plan and result show it as `display_name`.
+A legacy registration with the fixed name `Enterprise Scale AI Factory Agent`
+(before 2026-11) is still reused, but only for the same redirect URI; another
+Factory's legacy registration is left untouched and a new, named one is created.
+The owner tag, exclusive directory ownership and drift checks apply to both. Settings are saved to ignored
 `config.local.json`; use it for the next approved `deploy.py --apply`.
 
 The standalone browser may reuse the Microsoft sign-in session already on the
