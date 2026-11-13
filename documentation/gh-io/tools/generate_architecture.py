@@ -3,6 +3,7 @@
     python documentation/gh-io/tools/generate_architecture.py            # write the three SVG files
     python documentation/gh-io/tools/generate_architecture.py --check    # fail when a checked-in SVG is stale
     python documentation/gh-io/tools/generate_architecture.py --png      # also write the PNG stills (Playwright)
+                                                                         # and the copy the README shows
 
 The numbered blue circles come from documentation/gh-io/data/code_templates.json: a template with a "number" gets
 a circle at its "place". The names come from documentation/gh-io/data/azure_resources.json: every resource of
@@ -16,6 +17,7 @@ import base64
 import json
 from pathlib import Path
 import re
+import shutil
 import sys
 from xml.sax.saxutils import escape
 
@@ -24,6 +26,8 @@ DATA = SITE / "data" / "code_templates.json"
 RESOURCES = SITE / "data" / "azure_resources.json"
 ICONS = Path(__file__).resolve().parent / "architecture_icons"
 OUTPUT = SITE / "docs" / "assets" / "architecture"
+# The repository README shows the external hub as a PNG: --png also writes that copy.
+README_IMAGE = SITE.parent / "v2" / "20-29" / "images" / "esaf-architecture-external-hub.png"
 WIDTH, HEIGHT = 1600, 1300
 HUB_HEIGHT = HEIGHT - 20 - 566   # the hub box ends where the AI Factory box ends
 FONT = "Segoe UI, Roboto, Helvetica, Arial, sans-serif"
@@ -446,6 +450,8 @@ def png(mode):
         page.goto(source.resolve().as_uri())
         page.screenshot(path=str(source.with_suffix(".png")))
         browser.close()
+    if source.with_suffix(".png").name == README_IMAGE.name:
+        shutil.copyfile(source.with_suffix(".png"), README_IMAGE)
 
 
 def main():

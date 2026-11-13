@@ -467,6 +467,21 @@ def test_architecture_images_use_the_modern_foundry_icon_from_a_png_file():
     assert "`microsoft-foundry.png`" in readme and "selfhst/icons" in readme
 
 
+def test_repository_readme_shows_the_external_hub_image_from_the_generated_png():
+    drawing = tool("generate_architecture")
+    copy = ROOT / "documentation" / "v2" / "20-29" / "images" / "esaf-architecture-external-hub.png"
+    assert drawing.README_IMAGE == copy, "The generator keeps the copy for the README current."
+    generated = SITE / "docs" / "assets" / "architecture" / copy.name
+    assert copy.read_bytes() == generated.read_bytes(), "Run generate_architecture.py --png."
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    image = "./documentation/v2/20-29/images/esaf-architecture-external-hub.png"
+    assert readme.count(image) == 1 and "esaf-architecture-own-hub.svg" not in readme
+    # Below the landing zone image, above the tagline, with a text for screen readers.
+    assert readme.index("14-eslz-full-1.png") < readme.index(image) < readme.index("Private, WAF-aligned full stack")
+    alternative = re.search(r'<img src="' + re.escape(image) + r'"[^>]*\balt="([^"]+)"', readme)
+    assert alternative and "external hub" in alternative[1]
+
+
 def test_pages_workflow_rebuilds_the_site_when_a_docs_page_changes(site):
     import yaml
 
