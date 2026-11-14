@@ -254,12 +254,12 @@ sends only RFC1918 traffic into the VNet and would bypass private endpoints in
 other private ranges such as `100.64.0.0/10`. Internet-bound connector traffic then
 uses the VNet's egress. These are offline-tested source contracts.
 
-AKS outbound type on the ESML project route (main source, 2026-10-21):
-`esml-project/22-main.bicep` and `modules/machineLearning.bicep` allow only
-`loadBalancer` and `userDefinedRouting` for `aksOutboundType`. These are the values
+AKS outbound type (main source, 2026-10-21): the ESML v1 project route, which allowed only
+`loadBalancer` and `userDefinedRouting` for `aksOutboundType`, is not part of `release/v1.26`
+(it stays on `main`). These are the values
 that variables.json, variables.yaml, .env.template and the pink wizard document.
 `modules/aksCluster.bicep` owns the AKS values. Since c7a9d8d8 its `@allowed` list
-rejects `none`, so the stale `none` in both callers stopped 22-main from compiling (BCP036).
+rejects `none`, so a stale `none` in a caller stops that caller from compiling (BCP036).
 The GA AKS API enum also lacks `none`. `none` is not mapped to null: the module default
 `loadBalancer` would then apply, which means a public egress IP. AKS `none`
 belongs to network-isolated clusters (a private ACR bootstrap profile), which this module
@@ -279,8 +279,8 @@ to `snt-<project>-aks-002`, which the AML AKS in 07 uses. The GenAI cluster in 0
 (`enableAKS`) lands on `snt-<project>-aks`, which has no route table. So without BYO
 subnets, `enableAKS` with `userDefinedRouting` fails in preflight
 (`AKS_UDR_GENAI_SUBNET_NO_ROUTE`). Attaching a route table to that subnet in 31-network
-is not done yet. A compile test keeps 22-main building and follows each
-value through the compiled ARM to the cluster. This proves the source contract
+is not done yet. A compile test of `modules/aksCluster.bicep` follows each
+value through the compiled ARM to the cluster's network profile. This proves the source contract
 offline, not a live deployment.
 
 ADO/GHA parameter parity on the GenAI route (2026-10-21): GHA's

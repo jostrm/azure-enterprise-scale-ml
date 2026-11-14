@@ -243,7 +243,7 @@ Registered workers bind the manifest to the reviewed consumer commit and require
 exact scope locks. Registered creation additionally requires the separate API to
 advertise `persona-groups-v1`; an older server fails closed. Pink/MAUI packaging
 is outside this folder. The legacy direct
-[`22-main.bicep`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/esml-project/22-main.bicep) route (on `main` only) is blocked for
+[`22-main`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/esml-project/22-main.bicep) route (on `main` only) is blocked for
 the new model; AML is supported through the phased project route.
 
 Changing this checkout does not publish a release or update a consumer's pinned

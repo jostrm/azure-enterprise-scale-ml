@@ -278,7 +278,7 @@ separately reviewed common-access operation.
 The separate creation API must advertise **`persona-groups-v1`**. Its server
 implementation is outside Purple and was not changed here; unsupported API
 versions fail closed. The direct old
-[`esml-project/22-main.bicep`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/esml-project/22-main.bicep) route (on `main` only) is also
+[`esml-project/22-main`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/esml-project/22-main.bicep) route (on `main` only) is also
 blocked for `groups-v1`: use the phased project route, not an attempt to mix new
 groups with legacy broad assignments. Explicit dashboard/network resources in
 an existing-deployment manifest must exist before its security preflight; add
