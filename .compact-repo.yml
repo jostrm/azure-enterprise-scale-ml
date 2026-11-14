@@ -1,0 +1,214 @@
+# compact-repo profile for purple (jostrm/azure-enterprise-scale-ml), contract version 1.
+# Tool: https://github.com/jostrm/compact-repo (private). Format: docs/prompt-A-build-brief.md there.
+#
+# Purpose: compact `main` into `release/v1.26`, the "mini" AI Factory v1.25: only what the six ESAF
+# scenarios, the ML Model Factory, the Agent Factory, ESML v2, the GitHub Actions workflows, the Azure
+# DevOps pipelines and the API, SDK and CLI depend on.
+#
+# How this run used it (release/v1.26 existed before the compaction, so the plan is made from its tip):
+#   compact-repo analyze . --base release/v1.26 --profile .compact-repo.yml --out <dir>
+#   compact-repo verify  . --plan <dir>/plan.json --base-worktree <path>
+#   compact-repo apply   . --plan <dir>/plan.json --target release/v1.26 --update --push
+#
+# Rules behind the lists (from the release brief, 2026-11-14):
+#   R1 strict:   environment_setup/aifactory/**, bootstrap/** and every folder that is not a named
+#                component stay only when a root reaches them. They get no `keep` entry.
+#   R2 named:    Agent Factory, ML Model Factory, ESML v2 and the CLI stay whole until Joakim has decided
+#                on their unreached files (see "Named components" under keep).
+#   R3 installers: previous-release/ and old/ are dropped. A current installer stays only when a kept
+#                script or test reads it from the checkout by relative path.
+#   R4 copied folders: copy_to_local_settings/ and copy_my_subfolders_to_my_grandparent/ are copied
+#                wholesale into the consumer repo; files nothing uses there are on the decision list and
+#                stay until Joakim has decided.
+#   R5 failure paths are used: retry, recovery, clean-up and self-heal code stays; operator recovery
+#                scripts named in kept docs are roots.
+#   R6 v1.24 layout support (variables.yaml, .env.template, the legacy paths of 00-start.sh) stays.
+#   R7 docs follow: documentation/v2, RELEASE_125.md and the root docs stay; they never keep code alive.
+#   R8 tests follow what they test.
+#   R9 knowledge graph: documentation/architecture, environment_setup/graphify and what AGENTS.md names.
+version: 1
+base: main
+target: release/v1.26
+
+roots:
+  # --- Repo CI (decided per workflow) ------------------------------------------------------------
+  - path: ".github/workflows/infrastructure-tests.yml"
+    reason: "Purple CI: runs on every push to any branch (unit on Ubuntu and Windows, syntax, bicep)."
+  - path: ".github/workflows/verify-aifactory-dev.yml"
+    reason: "Purple CI: offline unit tests on pushes that touch copy_to_local_settings/** or unit-tests/**."
+  - path: ".github/workflows/verify-aifactory-stage.yml"
+    reason: "Purple CI: manual placeholder; reaches no repo file."
+  - path: ".github/workflows/verify-aifactory-prod.yml"
+    reason: "Purple CI: manual placeholder; reaches no repo file."
+  # Not a root: .github/workflows/deploy-docs.yml publishes the docs site from main only (see drop).
+
+  # --- Start and bootstrap -----------------------------------------------------------------------
+  - path: "00-start.sh"
+    reason: "Consumer entry point, all layouts (v1.24 legacy paths included, R6)."
+  - path: "01-start-v125-and-above.sh"
+    reason: "Consumer entry point, registered layout (v1.25 and above)."
+  - path: "bootstrap/{ADO-azurefactory.sh,ADO-create-new-aifactory-scaleset.sh,ADO-update-aifactory-and-run-project.sh,AIFactory-lifecycle.sh,ALL-create-new-aifactory-scaleset.sh,GH-update-aifactory-and-run-project.sh,GHA-azurefactory.sh,GHA-create-new-aifactory-scaleset.sh,GHA-update-aifactory-and-run-project.sh}"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/lib/{layout_router.sh,agent_chat_entry.py,aifactory_private_dns.py,aifactory_scaleset_config.py,aifactory_vpn_profile.py,create-new-aifactory-scaleset.sh,factory_enrollment.py,factory_enrollment_entry.py,factory_lifecycle.py,github_environments.py,project_deployment.py,project_environment.py,registered_creation.py,registered_personas.py,release_version.py,release_version.sh,runner-prerequisites.sh,runner-prerequisites.ps1,runner-registration.sh,runner-registration.ps1,runner_bootstrap.py,runner-only-registration.sh}"
+    reason: "AIF_DUAL_LAYOUT_LIBRARIES: the launcher bundle's libraries, listed by bare name in layout_router.sh."
+  - path: "bootstrap/ui/terminal.sh"
+    reason: "Sourced by every launcher; part of the launcher bundle."
+  - path: "bootstrap/templates/**"
+    reason: "The Factory API commits factory-lifecycle-*.yml into the consumer repo (.github/workflows/factory-lifecycle.yml or aifactory/pipelines/factory-lifecycle.yml) and hub_private_probe.py into .azurefactory/; it requires them in purple's GitHub tree (pink registered_repository.py)."
+  - path: "bootstrap/lib/{factory_deletion_pipeline.py,provider_repository_state.py,common_network_preservation.py,hub_private_transition.py,hub_lock_foundation.py,registered_prerequisites.py,registered_repository.py,registered_setup.py,workflow_run_monitor.py,initialize_azurefactory.py,bootstrap_no_delete.py,factory_lifecycle_contract.txt}"
+    reason: "Loaded as siblings by factory_lifecycle.py or required by the Factory API from the consumer's submodule checkout or GitHub tree (scenarios 1, 2, 5 and 6); pink also vendors them byte for byte."
+
+  # --- GitHub Actions and Azure DevOps (all of them) -----------------------------------------------
+  - path: "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/**"
+    reason: "GitHub Actions workflows, .env.template and the variable script copied into the consumer repo; scenarios 1 to 6 on GitHub run infra-common.yml and infra-project.yml (which calls infra-project-phase.yml)."
+  - path: "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/**"
+    reason: "Azure DevOps pipelines, job templates and variables.yaml copied into the consumer repo; the Factory API reads variables.yaml from the submodule in every scenario."
+  - path: "environment_setup/aifactory/variables.json"
+    reason: "Canonical v1.25 configuration template: the variable contract shared with pink and MAUI."
+
+  # --- CLI, SDK and the API seen from purple ---------------------------------------------------------
+  - path: "environment_setup/azurefactory-cli/pyproject.toml"
+    reason: "CLI and SDK package `azurefactory`; console script azurefactory = azurefactory.cli:main."
+  - path: "environment_setup/azurefactory-cli/setup.py"
+    reason: "Builds the CLI wheel and vendors bootstrap/lib/factory_enrollment.py and provider_repository_state.py."
+  - path: "environment_setup/azurefactory-cli/src/azurefactory/**"
+    reason: "The package: cli.py, client.py, esaf.py (the six scenarios) and their modules."
+  - path: "environment_setup/install_config_wizard/api-usage-examples/**"
+    reason: "API usage examples (Python, PowerShell, Node, raw requests) and scenarios.json."
+
+  # --- ESML v2 ------------------------------------------------------------------------------------------
+  - path: "esml-v2/pyproject.toml"
+    reason: "ESML v2 package `azure_esml`; console script esml = azure_esml.cli:main."
+  - path: "esml-v2/esml_build.py"
+    reason: "ESML v2 build backend (bundles the shared ML Model Factory engine)."
+  - path: "esml-v2/azure_esml/**"
+    reason: "The ESML v2 package."
+  - path: "esml-v2/examples/**"
+    reason: "Documented ESML v2 app-layer examples."
+
+  # --- ML Model Factory: documented entry points -------------------------------------------------------
+  - path: "usecase_code/50-ml-model-factory/pyproject.toml"
+    reason: "ML Model Factory package; console script ml-model-factory = ml_model_factory.cli:main."
+  - path: "usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/**"
+    reason: "The ML Model Factory package (python -m ml_model_factory)."
+  - path: "usecase_code/50-ml-model-factory/accelerator/{scripts,databricks,environments,schemas}/**"
+    reason: "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+  - path: "usecase_code/50-ml-model-factory/usecase-type/**"
+    reason: "Generated use-case notebooks and pipelines; the Factory API's project-team catalog links each of them."
+  - path: "usecase_code/50-ml-model-factory/user-config/**"
+    reason: "Documented user configuration (model, storage selection, lake) the package reads."
+
+  # --- Agent Factory: documented entry points -----------------------------------------------------------
+  - path: "usecase_code/40-agent-factory/agent_factory/**"
+    reason: "Shared operator package (python -m agent_factory); the project workflows and pipelines call it."
+  - path: "usecase_code/40-agent-factory/40-aifactory-agent/{deploy.py,probe_factory.py,aifactory_agent/**,infra/**}"
+    reason: "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+  - path: "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/{Start-FoundryVoiceSales.ps1,sales_agent/**,scripts/**}"
+    reason: "Voice sales agent: documented start script and package."
+  - path: "usecase_code/40-agent-factory/{41-single-agent,42-multi-agent,42-multi-agent-fabric-iq,43-data,45-rag-agent}/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/{44-azure-mcp,45-aifactory-mcp-gateway,46-factory-chat-agent,47-aifactory-agent-live-voice}/deploy.py"
+    reason: "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/{main.py,sync.py,webhook.py,preview.py,retrieval_only.py,check_sum.py,acl_scenario.py,sales_demo/**}"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/{main.py,hosted_main.py,ml_agent/**}"
+    reason: "Agent that trains an ML churn model: documented entry scripts and package."
+
+  # --- Knowledge graph (R9) ----------------------------------------------------------------------------
+  - path: "environment_setup/graphify/generate.py"
+    reason: "Graph maintenance entry point named in AGENTS.md."
+
+externals:
+  # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule
+  # checkout (bootstrap/lib/factory_lifecycle.py and siblings), copies workflows out of it, compiles its
+  # Bicep, and bundles the whole bootstrap/ and environment_setup/aifactory/ trees at a pinned commit.
+  - repo: jostrm/azure-aifactory-config
+    ref: main
+    path_prefix: "azure-enterprise-scale-ml/"
+    include: ["src/**", "template-files/**", "scripts/**", "sync-creation-source.py"]
+  # MAUI ConfigWizard and TutorialApp: build from a pinned purple commit (bootstrap/, environment_setup/aifactory/,
+  # LICENSE) and name tutorial paths.
+  - repo: jostrm/maui-apps
+    ref: main
+    path_prefix: "azure-enterprise-scale-ml/"
+    include: ["ESAIF.*/**", ".github/workflows/**"]
+
+keep:
+  # --- Root files and agent instructions ------------------------------------------------------------
+  - "LICENSE"
+  - ".gitignore"
+  - ".gitattributes"
+  - "__init__.py"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - ".claude/**"
+  - ".github/copilot-instructions.md"
+  - ".compact-repo.yml"
+  # --- Docs (R7): they follow, they never keep code alive ---------------------------------------------
+  - "README.md"
+  - "RELEASE_120.md"
+  - "RELEASE_123.md"
+  - "RELEASE_124.md"
+  - "RELEASE_125.md"
+  - "ROADMAP_MAIN.md"
+  - "SECURITY.md"
+  - "SUPPORT.md"
+  - "CODE_OF_CONDUCT.md"
+  - "CONTRIBUTING.md"
+  - "documentation/readme.md"
+  - "documentation/v2/**"
+  # --- Knowledge graph (R9) ------------------------------------------------------------------------------
+  - "documentation/architecture/**"
+  - "environment_setup/graphify/**"
+  - "meta/graphify/.gitignore"
+  # --- Named components (R2): whole until Joakim has decided on their unreached files ------------------
+  - "usecase_code/40-agent-factory/**"          # Agent Factory            (decision D5)
+  - "usecase_code/50-ml-model-factory/**"       # ML Model Factory         (decision D5)
+  - "esml-v2/**"                                # ESML v2                  (decision D5)
+  - "environment_setup/azurefactory-cli/**"     # CLI and SDK              (decision D5)
+  # --- Copied folders (R4): whole until Joakim has decided on the files nothing uses -------------------
+  - "environment_setup/aifactory/bicep/copy_to_local_settings/**"   # decision D6
+  - "copy_my_subfolders_to_my_grandparent/**"                       # decision D7 (ESML v1 templates)
+
+drop:
+  # --- Installers (R3) -----------------------------------------------------------------------------------
+  - "**/previous-release/**"                                  # 589 MB, older MAUI ConfigWizard installers
+  - "environment_setup/install_tutorial_guide/old/**"         # 349 MB, older TutorialApp installers
+  - "environment_setup/install_config_wizard/maui/*.cab"      # current MAUI ConfigWizard set: docs link it on main by URL
+  - "environment_setup/install_config_wizard/maui/*.msi"
+  - "environment_setup/install_tutorial_guide/*.cab"          # current TutorialApp set: docs link it on main by URL
+  - "environment_setup/install_tutorial_guide/*.msi"
+  # --- Docs site: published from main only ----------------------------------------------------------------
+  - ".github/workflows/deploy-docs.yml"
+
+followers:
+  tests:
+    - "**/test_*.py"
+    - "**/conftest.py"
+    - "**/tests/**"
+    - "**/*.test.js"
+    - "environment_setup/unit-tests/test-bicep/integration/**"
+  docs:
+    - "**/*.md"
+    - "documentation/**"
+
+limits:
+  max_text_blob_mb: 2          # larger files are leaves: never downloaded, never parsed
+
+verify:
+  # Run with Python 3.12, environment_setup/unit-tests/test-bicep/requirements.txt installed, and the
+  # pinned Bicep compiler from ci/install-bicep.sh plus PowerShell 7 on PATH. Offline: LIVE_AZURE=0.
+  - name: iac-unit
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --tiers all
+    timeout_minutes: 45
+  - name: iac-syntax
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase syntax
+    timeout_minutes: 45
+  - name: iac-bicep
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase bicep --bicep bicep
+    timeout_minutes: 45
+
+self_heal:
+  max_rounds: 5
+
+embed_report: true             # writes .compact-repo/manifest.json and report.md into the branch
