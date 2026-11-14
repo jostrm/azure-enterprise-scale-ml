@@ -214,6 +214,12 @@ roots:
   - path: "environment_setup/install_config_wizard/windows/SHA256SUMS.txt"
     reason: "Read by unit/test_install_config_wizard_downloads.py."
 
+  # --- Templates for the consumer repository that are current (the rest of the folder was ESML v1) ------
+  - path: "copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/**"
+    reason: "ML Model Factory data-ops template; accelerator/tests/test_orchestration_matrix.py and test_storage_selection.py read it."
+  - path: "copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/**"
+    reason: "ML Model Factory MLOps template for Azure DevOps and GitHub; accelerator/tests/test_orchestration_matrix.py reads it."
+
 externals:
   # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule
   # checkout (bootstrap/lib/factory_lifecycle.py and siblings), copies workflows out of it, compiles its
@@ -263,11 +269,27 @@ keep:
   - "usecase_code/50-ml-model-factory/**"       # ML Model Factory         (decision D5)
   - "esml-v2/**"                                # ESML v2                  (decision D5)
   - "environment_setup/azurefactory-cli/**"     # CLI and SDK              (decision D5)
-  # --- Azure ML SDK install set that the v2 docs describe (documentation/v2/30-39/33-install-azureml-sdk-v1+v2.md)
-  - "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/**"
   # --- Copied folders (R4): whole until Joakim has decided on the files nothing uses -------------------
   - "environment_setup/aifactory/bicep/copy_to_local_settings/**"   # decision D6
-  - "copy_my_subfolders_to_my_grandparent/**"                       # decision D7 (ESML v1 templates)
+
+  # --- Images that README.md and two v2 documents embed (37-datascientist-ml-acceleration, 42-FAQ-01).
+  # They live under esml/images; everything else under esml/ is dropped in round 3.
+  - "esml/images/01_setup_model_10.png"
+  - "esml/images/01_setup_model_3.png"
+  - "esml/images/01_setup_model_9.png"
+  - "esml/images/23_esml_pipeline_overview_intro.png"
+  - "esml/images/aml-pipeline_batch_ppt-3.png"
+  - "esml/images/deploy-to-aks.png"
+  - "esml/images/esml-automapping.png"
+  - "esml/images/esml-mlops-2.png"
+  - "esml/images/esml-s01e01-3.png"
+  - "esml/images/esml-s02e01-challenge.png"
+  - "esml/images/esml-s02e01-the-solution.png"
+  - "esml/images/esml-settings.png"
+  - "esml/images/esml-testset-scoring.png"
+  - "esml/images/mlops-env-arg.png"
+  - "esml/images/split_gold_and_train_automl_small.png"
+  - "esml/images/templates-aml.png"
 
 drop:
   # --- Installers (R3) -----------------------------------------------------------------------------------
@@ -360,6 +382,27 @@ drop:
   - "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.json"
   - "esml/azure_provisioning/azure_devops_pipelines/Release/Dev/Release-Online-Dev.json"
   - "esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json"
+
+  # --- Round 3 (2026-11-14): ESML v1, decided by Joakim ("Yes, remove v1") -----------------------------
+  # The v1 SDK (esml, esmlrt, esmlfac), its notebook, pipeline and settings templates, the Azure ML SDK
+  # install scripts for its developer machines, and the v1 documentation. Nothing outside these folders
+  # imports the v1 packages, and the Azure DevOps consumer repository names none of these paths.
+  # ESML v2 (esml-v2/) and the ML Model Factory are not part of this and stay.
+  - "esml/**"
+  - "esmlrt/**"
+  - "esmlfac/**"
+  - "copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb"
+  - "copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb"
+  - "copy_my_subfolders_to_my_grandparent/adf/**"
+  - "copy_my_subfolders_to_my_grandparent/dbx/**"
+  - "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**"
+  - "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**"
+  - "copy_my_subfolders_to_my_grandparent/mlops/old/**"
+  - "copy_my_subfolders_to_my_grandparent/notebook_templates/**"
+  - "copy_my_subfolders_to_my_grandparent/settings/**"
+  - "environment_setup/install_sdk/**"
+  - "usecase_code/00-install-prereqs/**"      # installs the removed Azure ML SDK v1.55 set on a developer VM
+  - "documentation/v1/**"
 
 followers:
   tests:
