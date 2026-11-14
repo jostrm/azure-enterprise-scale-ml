@@ -1,0 +1,139 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "16193225759104726990"
+    }
+  },
+  "parameters": {
+    "runnerVmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing Linux runner VM in the selected resource group, with private access to the Dev project. No VM is created."
+      }
+    },
+    "runnerLocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region of the existing runner VM. Change this if the VM is in a different region from its resource group."
+      }
+    },
+    "consumerRoot": {
+      "type": "string",
+      "metadata": {
+        "description": "Absolute path to the prepared consumer repository on that VM. Its accelerator submodule and project configuration are reused, not overwritten."
+      }
+    },
+    "pythonExecutable": {
+      "type": "string",
+      "metadata": {
+        "description": "Absolute path to the existing Python 3.12+ environment on the VM with the Agent Factory operator dependencies installed."
+      }
+    },
+    "managedIdentityClientId": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "metadata": {
+        "description": "Client ID of the existing user-assigned managed identity attached to the VM and authorized to deploy Agent Chat. No identity or role assignment is created by this entry point."
+      }
+    },
+    "projectSubscriptionId": {
+      "type": "string",
+      "defaultValue": "[subscription().subscriptionId]",
+      "metadata": {
+        "description": "Subscription containing the Dev project; must match its variables.json. The selected resource group above contains the runner VM."
+      }
+    },
+    "projectNumber": {
+      "type": "string",
+      "defaultValue": "001",
+      "minLength": 3,
+      "maxLength": 3,
+      "metadata": {
+        "description": "Existing Dev project number, 001-999. This deploys the Foundry agent, knowledge index and private chat app with live voice, not Factory infrastructure or model deployments."
+      }
+    },
+    "configurationPath": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional path to the project variables.json, relative to consumerRoot or absolute on the VM. Leave empty to resolve the unique matching project."
+      }
+    },
+    "runId": {
+      "type": "string",
+      "defaultValue": "[utcNow('yyyyMMddHHmmss')]",
+      "metadata": {
+        "description": "Change this value to rerun a completed deployment. Do not run this entry and a project pipeline concurrently."
+      }
+    }
+  },
+  "variables": {
+    "$fxv#0": "#!/usr/bin/env bash\nset -euo pipefail\n\n# Run only the operator-maintained checkout and Python; never fetch source or install the operator environment.\n: \"${AIF_CONSUMER_ROOT:?An absolute durable consumer checkout is required}\"\n: \"${AIF_PYTHON:?An absolute prepared Python 3.12+ executable is required}\"\n[[ \"$AIF_CONSUMER_ROOT\" == /* && -d \"$AIF_CONSUMER_ROOT\" ]] || {\n  echo \"AIF_CONSUMER_ROOT must be an existing absolute Linux directory.\" >&2\n  exit 2\n}\n[[ \"$AIF_PYTHON\" == /* && -x \"$AIF_PYTHON\" ]] || {\n  echo \"AIF_PYTHON must be an existing absolute executable.\" >&2\n  exit 2\n}\nadapter=\"$AIF_CONSUMER_ROOT/azure-enterprise-scale-ml/bootstrap/lib/agent_chat_portal.py\"\n[[ -f \"$adapter\" ]] || {\n  echo \"Update the prepared accelerator submodule: bootstrap/lib/agent_chat_portal.py is missing.\" >&2\n  exit 2\n}\n# The adapter validates configuration before its isolated managed-identity login, and owns cleanup and readiness.\nexec \"$AIF_PYTHON\" -B \"$adapter\"\n"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/virtualMachines/runCommands",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]",
+      "location": "[parameters('runnerLocation')]",
+      "properties": {
+        "asyncExecution": false,
+        "treatFailureAsDeploymentFailure": true,
+        "timeoutInSeconds": 14400,
+        "source": {
+          "script": "[variables('$fxv#0')]"
+        },
+        "parameters": [
+          {
+            "name": "AIF_CONSUMER_ROOT",
+            "value": "[parameters('consumerRoot')]"
+          },
+          {
+            "name": "AIF_PROJECT_NUMBER",
+            "value": "[parameters('projectNumber')]"
+          },
+          {
+            "name": "AIF_PYTHON",
+            "value": "[parameters('pythonExecutable')]"
+          },
+          {
+            "name": "AIF_IDENTITY_CLIENT_ID",
+            "value": "[parameters('managedIdentityClientId')]"
+          },
+          {
+            "name": "AIF_SUBSCRIPTION_ID",
+            "value": "[parameters('projectSubscriptionId')]"
+          },
+          {
+            "name": "AIF_TENANT_ID",
+            "value": "[subscription().tenantId]"
+          },
+          {
+            "name": "AIF_CONFIGURATION_PATH",
+            "value": "[parameters('configurationPath')]"
+          },
+          {
+            "name": "AIF_RUN_ID",
+            "value": "[parameters('runId')]"
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "runCommandResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Compute/virtualMachines/runCommands', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]"
+    },
+    "results": {
+      "type": "string",
+      "value": "Read this Run Command instance view for the application URL or failure details. The chat URL requires private network access and the configured Entra sign-in."
+    }
+  }
+}

@@ -5,9 +5,24 @@
 ![](./documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png)
 <br>
 
+**Deploy Factory infrastructure (quick test)**
+
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
+
+Creates a standalone test Factory and project 001. This button **does not deploy ESAF Agent Chat** or AI models.
+
+**Deploy ESAF Agent Chat + live voice (preview)**
+
+[![Deploy ESAF Agent Chat to Azure](./portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+
+Deploys the Foundry agent, knowledge index and private web chat with live voice into an **existing private Dev project**.
+Runs the actual deployment on your prepared Linux runner VM after you review and create the Azure deployment.
+Requires configured models, Entra sign-in, reader permissions and private connectivity; it does not create a new Factory.
+[Prerequisites and portal inputs](./documentation/v2/quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal).
+
 > [!NOTE]
-> **Deploy to Azure: for a quick test:** For a governed factory use the app, CLI or the Factory API.<a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b> Full set up</b></a>
+> **For a governed Factory**, use the app, CLI or Factory API. The infrastructure-only quick test is not registered with the Factory API.
+> [Full setup](./documentation/v2/20-29/24-end-2-end-setup.md).
 
 ![Header](documentation/v2/10-19/images/header.png)
 See <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> for all three designs similar as below.

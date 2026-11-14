@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="288" height="40" viewBox="0 0 288 40" role="img" aria-labelledby="title">
+  <title id="title">Deploy ESAF Agent Chat to Azure</title>
+  <rect width="288" height="40" rx="4" fill="#6f42c1"/>
+  <path d="M13 11h19v14H21l-6 5v-5h-2z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M18 16h9M18 20h6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <text x="44" y="25" fill="#fff" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="600">Deploy ESAF Agent Chat to Azure</text>
+</svg>

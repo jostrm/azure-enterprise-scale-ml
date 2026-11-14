@@ -97,6 +97,7 @@ def run(args, environ=os.environ, session_factory=AzureSession, runner=subproces
         return {"mode": "validated", "reason": decision.reason, "voice": decision.voice, "mutations": False}
     session = session_factory(request.subscription_id, request.tenant_id)
     engine = LiveVoiceIntegration(session, runner, work_dir=work_directory(environ), repository_root=REPOSITORY_ROOT,
+                                  agent_dir=REPOSITORY_ROOT / "usecase_code/40-agent-factory/40-aifactory-agent",
                                   access=access_factory(session), cache_dir=cache_directory(environ))
     return engine.run(request, apply=args.command == "apply", skip_knowledge=getattr(args, "skip_knowledge", False))
 

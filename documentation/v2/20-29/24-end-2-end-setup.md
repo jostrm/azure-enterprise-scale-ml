@@ -75,7 +75,7 @@ The [six scenarios](../reference/scenarios.md) lists every call. Before you crea
 [![Deploy to Azure button that opens the ESAF quick-test template in the Azure portal.](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 
 The button deploys a test Factory from the Azure portal: private networking, a dedicated hub, Dev and
-project 001. Read the
+project 001. It **does not deploy ESAF Agent Chat or AI models**. Read the
 [portal guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/portal-125/portal/README.md) before
 you select it. It lists the permissions, the regions and the checklist for afterwards.
 
@@ -84,6 +84,16 @@ you select it. It lists the permissions, the regions and the checklist for after
 > pipelines, and it doesn't register the Factory with the Factory API. It doesn't create dashboards, and it
 > leaves out some of the roughly 35 Azure services and SKU settings you can choose from. It's a preview: it
 > stays proposed until one deployment is confirmed.
+
+### Deploy ESAF Agent Chat into an existing project
+
+[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+
+This separate button runs the Agent Chat deployment on your prepared private Linux runner VM: it creates
+the Foundry agent, builds its knowledge index and deploys the private chat app with live voice into an
+existing Dev project. It does not create Factory infrastructure, models or an Entra app registration.
+Read the [Agent Chat prerequisites and portal inputs](../quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal)
+before selecting **Review + create**.
 
 **Next:** [Quickstart: Install the ESAF tools](../quickstarts/01-install-esaf.md)
 

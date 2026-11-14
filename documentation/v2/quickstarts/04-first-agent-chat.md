@@ -114,6 +114,91 @@ and then deploys them.
 
 </details>
 
+## Deploy Agent Chat from the Azure portal
+
+[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+
+This preview button **runs the deployment**, rather than opening this guide. After you select **Review + create**
+and **Create**, Azure runs the existing Agent Chat deployers on a prepared private Linux VM. They create
+the Foundry agent, build its knowledge index and deploy the private chat app with live voice.
+This is an **existing-project** route, not a new Factory bootstrap. The blue infrastructure-only button
+does not supply the models, sign-in registration or prepared runner required here.
+
+### Prepare the runner once
+
+Use a running Linux VM with the Azure VM agent and private DNS/routing to the project's Foundry, Search,
+Storage and Container Apps endpoints. It also needs outbound access to the approved Python package feed
+for the locked application dependencies and Linux wheels. Azure CLI, Bicep, Python 3.12 or newer with
+`venv` support, and Bash must already be installed. A project DSVM is not automatically a prepared runner.
+
+Keep a **dedicated, persistent consumer checkout** on that VM, including its accelerator submodule and the
+project's own `variables.json`. Do not point this deployment at a temporary ADO/GHA `_work` checkout:
+another pipeline can clean or replace it. The operator maintains the checkout and reviews its source;
+the button does not clone repositories, fetch a new revision, ask for Git credentials or overwrite configuration.
+Update the accelerator to a revision containing `bootstrap/lib/agent_chat_portal.py` before using the button.
+
+Prepare a separate operator environment in that checkout (replace the path with your actual location):
+
+```bash
+cd /opt/esaf/consumer
+python3 -m venv .venv-agent-operator
+.venv-agent-operator/bin/python -m pip install \
+  -r azure-enterprise-scale-ml/usecase_code/40-agent-factory/requirements.txt
+```
+
+The live-voice deployer prepares its own application environment; do not mix it with the operator environment.
+Allow free disk space for an isolated copy of the accelerator source, application environment and downloaded wheels.
+The runner removes its temporary source, build files and Azure CLI credentials when the command exits normally.
+The four settings above, model deployments and Entra registration must be ready in the selected project's configuration.
+
+An administrator must attach an **explicitly selected user-assigned managed identity** to this VM and
+authorize it to deploy into the target Dev project. It needs Contributor and User Access Administrator
+on the project resource group, plus read access to the subscription and any referenced common resources.
+The shared build runner's default common-resource-group identity is **not automatically authorized** for this.
+The existing deployers create application identities and resource-scoped role assignments, including their
+own Foundry/Search/Storage data roles. The portal entry itself neither grants the runner permissions nor
+creates an Entra application registration.
+
+The person selecting **Create** also needs permission to deploy ARM templates in the runner's resource group
+and run commands on that VM, for example Virtual Machine Contributor. Run Command executes with
+administrator privileges on the VM; keep that permission and the maintained checkout restricted to trusted operators.
+
+### Fill in the deployment
+
+Select the **subscription and resource group containing the runner VM**, which can differ from the project's
+resource group. Then supply:
+
+| Input | Value |
+|---|---|
+| `runnerVmName` | Existing, running Linux VM in the selected resource group. |
+| `runnerLocation` | The VM's Azure region; defaults to the selected resource group's region. |
+| `consumerRoot` | Absolute persistent checkout path, for example `/opt/esaf/consumer`. |
+| `pythonExecutable` | Absolute prepared operator interpreter, for example `/opt/esaf/consumer/.venv-agent-operator/bin/python`. |
+| `managedIdentityClientId` | Client ID of the authorized user-assigned identity attached to that VM, not an object ID. |
+| `projectSubscriptionId` | Subscription containing the Dev project; must match `variables.json` and the current tenant. |
+| `projectNumber` | Existing project `001` to `999`; Dev only. |
+| `configurationPath` | Optional project `variables.json` path; required when automatic project lookup is ambiguous. |
+| `runId` | Generated rerun marker. Change it to execute a completed deployment again. |
+
+> [!WARNING]
+> Selecting **Create** changes Azure and incurs application, model and embedding charges. Do not run this
+> deployment and a project pipeline concurrently. Azure CLI authentication is isolated from other VM sessions.
+
+Azure waits for the deployment script to finish, with a four-hour limit. A skipped stage, a failed deployer
+or a failed private `/health/ready` check fails the deployment instead of reporting a successful chat.
+The Run Command instance view shows the result and application URL; its captured output is limited to the
+last 4 KB. Read `runCommandResourceId` in the deployment outputs to find the command.
+After deployment, sign in from an authorized browser and try a question and live voice.
+
+For a failed run, fix the reported prerequisite and rerun with a new `runId`; there is no automatic rollback
+of Azure resources already created. No live Azure deployment is asserted by this template's offline coverage.
+For the implementation, see [the portal template](../../../portal/agent-chat/main.bicep) and
+[Microsoft's managed Run Command documentation](https://learn.microsoft.com/azure/virtual-machines/linux/run-command-managed).
+Maintainers regenerate the published template with
+`bicep build portal/agent-chat/main.bicep --outfile portal/agent-chat/azuredeploy.json`.
+
+## Deploy with the app, CLI, SDK or REST
+
 <details markdown="1" data-factory-tool="App" open>
 <summary>App</summary>
 

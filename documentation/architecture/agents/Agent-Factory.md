@@ -2,6 +2,9 @@
 id: agent-factory
 status: observed
 sources:
+  - portal/agent-chat/main.bicep
+  - portal/agent-chat/run.sh
+  - bootstrap/lib/agent_chat_portal.py
   - usecase_code/40-agent-factory/readme.md
   - usecase_code/40-agent-factory/agent_factory/readme.md
   - usecase_code/40-agent-factory/agent_factory/cli.py
@@ -64,6 +67,8 @@ sources:
   - usecase_code/40-agent-factory/42-multi-agent-fabric-iq/data/rewards.json
   - usecase_code/40-agent-factory/42-multi-agent-fabric-iq/data/inventory.csv
 tests:
+  - environment_setup/unit-tests/test-bicep/unit/test_agent_chat_portal.py
+  - environment_setup/unit-tests/test-bicep/unit/test_agent_chat_portal_runner.py
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
   - usecase_code/40-agent-factory/tests/test_cli.py
@@ -118,6 +123,22 @@ reviewed_source: '117f877e + 48 S09 per-folder ACL scenario (offline tests only 
 | Live voice step (`47-aifactory-agent-live-voice`, task `72-aifactory-agent-live-voice`, `enableAIFactoryAgentLiveVoice`) | Opt-in late project-pipeline step for project001 Dev: verifies that owned agent (never creates it), builds the knowledge index and deploys the private chat application with Azure Voice Live using the application's own ownership-checked commands. Voice without the chat flag fails, as does a delete-all flag; other environments are skipped; an app deployed by hand is never replaced; false never deletes. |
 
 The shared operator and Factory Chat application have separate Python/dependency/configuration boundaries. Parent operator `--apply` conventions are not portable to Chat's immediate `ingest`/`deploy-agent` commands. Offline plans/help do not imply live connectivity; invocation and ingestion can incur model/service charges.
+
+### Agent Chat portal entry
+
+`portal/agent-chat/main.bicep` is a separate existing-project deployment entry, not an extension of the
+infrastructure-only `portal-125` bootstrap. It embeds `run.sh` into a synchronous managed Run Command on
+an existing prepared private Linux VM. The operator supplies a persistent consumer checkout, Python
+environment and explicitly authorized attached user-assigned identity. No temporary pipeline checkout,
+default runner identity, model deployment or Entra registration is assumed.
+
+The portal adapter reuses `agent_chat_entry.py` and the same two deployers as the terminal/pipeline route.
+It isolates Azure CLI authentication, rejects tenant/subscription mismatches and skipped stages, and waits
+for the private application readiness endpoint. ARM uses `treatFailureAsDeploymentFailure` rather than
+treating script launch as success. Existing deployers still own application identities and resource-scoped
+RBAC; the entry does not provision its own permission or bypass ownership checks. The four-hour timeout
+does not provide rollback. This entry's source/offline coverage is not evidence of a live deployment or
+an authenticated chat/voice session (introduced 2026-11-14).
 
 Storage selection is explicit common/project data storage. Changing it does not move the Foundry target, create permission, infer an account by first-match discovery or rewrite historical lake paths.
 
