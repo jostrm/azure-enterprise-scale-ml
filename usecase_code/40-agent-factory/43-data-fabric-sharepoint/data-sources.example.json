@@ -1,0 +1,25 @@
+{
+  "sharepoint": {
+    "enabled": false,
+    "project_connection_name": "<sharepoint-project-connection>"
+  },
+  "foundry_iq": {
+    "enabled": false,
+    "server_label": "kb-docs",
+    "server_url": "https://<search-service>.search.windows.net/knowledgebases/<knowledge-base>/mcp?api-version=2026-08-01-preview",
+    "project_connection_name": "<kb-project-connection>"
+  },
+  "fabric_iq": {
+    "enabled": false,
+    "project_connection_name": "<fabric-data-agent-project-connection>"
+  },
+  "uploaded_documents": {
+    "enabled": false,
+    "storage_account": "<projectdatastorageaccount>",
+    "container": "agent-uploads",
+    "folder": "users/<user>",
+    "server_label": "kb-uploads",
+    "server_url": "https://<search-service>.search.windows.net/knowledgebases/<uploads-knowledge-base>/mcp?api-version=2026-08-01-preview",
+    "project_connection_name": "<uploads-kb-project-connection>"
+  }
+}

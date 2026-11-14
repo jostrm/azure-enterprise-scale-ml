@@ -81,7 +81,11 @@ own commands, required inputs and expected results.
 <sub>A Foundry agent that trains, retrains and batch-scores Azure ML models through ESML v2.</sub><br>
 <sub><code>Agents</code> <code>MLOps</code> <code>Azure ML</code></sub>
 </td>
-<td width="33%"></td>
+<td align="center" valign="top" width="33%">
+<a href="43-data-fabric-sharepoint/readme.md"><b>Agent data sources: SharePoint, Foundry IQ, Fabric IQ and own documents</b></a><br>
+<sub>Generic "Settings > Data sources" template: one agent tool per enabled source, uploads to project storage.</sub><br>
+<sub><code>SharePoint</code> <code>Foundry IQ</code> <code>Fabric IQ</code> <code>Uploads</code></sub>
+</td>
 </tr>
 </table>
 
@@ -106,6 +110,7 @@ own commands, required inputs and expected results.
   42-multi-agent\              Hosted knowledge -> reviewer -> synthesis team
   42-multi-agent-fabric-iq\    Minimal lab code: supervisor workflow over Foundry IQ and Fabric IQ agents
   43-data\                     Managed-identity ingestion and optional Azure-hosted worker
+  43-data-fabric-sharepoint\   Settings-driven data sources: SharePoint, Foundry IQ, Fabric IQ, own uploads
   44-azure-mcp\                Private, read-only Azure inventory service setup
   45-rag-agent\                Explicit source-bound common/project storage RAG
   48-rag-with-splitted-tables-acl-adlsgen2\ Native-ACL split tables and exact multi-source sales
@@ -122,6 +127,7 @@ own commands, required inputs and expected results.
 | [42-multi-agent](42-multi-agent/readme.md) | Deploy knowledge/reviewer participants, then the hosted team; invoke its persisted name. |
 | [42-multi-agent-fabric-iq](42-multi-agent-fabric-iq/readme.md) | Its own environment and `parameters.env`: `setup_knowledge.py`, optional `setup_fabric.py` (paid F2 Fabric capacity), `agents.py`, then `chat.py`; no operator CLI. |
 | [43-data](43-data/readme.md) | Shared `*-datafactory` commands; optional `worker.py` runs only on approved managed-identity compute. |
+| [43-data-fabric-sharepoint](43-data-fabric-sharepoint/readme.md) | Its own environment, `parameters.env` and `data-sources.json`: optional `upload_documents.py`, then `agents.py` and `chat.py`; no operator CLI. |
 | [44-azure-mcp](44-azure-mcp/readme.md) | `44-azure-mcp\deploy.py` for infrastructure planning; shared commands configure/verify the connection. |
 | [45-rag-agent](45-rag-agent/readme.md) | `45-rag-agent\main.py` with one explicit `--source`; its own prepare/deploy/ask lifecycle. |
 | [48-rag-with-splitted-tables-acl-adlsgen2](48-rag-with-splitted-tables-acl-adlsgen2/readme.md) | Whole-table Text Split, native ADLS chunk permissions, two-index evidence and an exhaustive calculator; isolated synthetic image branch. Separate environment/configuration and explicit deployment/paid-call approval. |
