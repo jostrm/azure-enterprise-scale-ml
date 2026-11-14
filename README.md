@@ -1,5 +1,5 @@
 # Enterprise Scale Azure Factory (ESAF) - submodule 
-- "Dare to delete"|Project based|Pps:Dev->Prod|Secure from day 1|"Battle tested since 20119|Only GA:No AVD,AZD
+- "Dare to delete" |Project based | Ops: Dev->Prod | Secure from day 1 | Battle tested since 20119 | Only GA:No AVD,AZD
 - "Result & Value" - Get AI to Production, accelerated: 147 templats with Ops, such as below "Live voice AI chat" created in <1h
 
 ![](./documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png)
