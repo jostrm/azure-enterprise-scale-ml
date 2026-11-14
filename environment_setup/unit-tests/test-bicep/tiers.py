@@ -32,6 +32,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_parameter_documentation.py",
         "unit/test_svg_to_gif.py",
         "unit/test_pipeline_feature_contracts.py",
+        "unit/test_repository_root_layout.py",
         "unit/test_scenario_matrix.py",
         "unit/test_security_mock.py",
         "unit/test_template_flag_sync.py",
