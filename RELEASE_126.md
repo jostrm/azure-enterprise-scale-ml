@@ -4,7 +4,8 @@
 
 v1.26 is v1.25 made small. It has the same features as `main` on 14 November 2026 (commit `ebd300db`),
 with what nothing uses removed, with fixed waits in the pipelines replaced by checks of the real
-condition, and with deployment steps that try again after a transient Azure error. It adds no feature.
+condition, and with deployment steps that try again after a transient Azure error. It adds one thing:
+Terraform templates for the factory foundation (see [Terraform](#terraform-the-factory-foundation)).
 No deployed Bicep template, no variable and no API version was changed.
 
 ESML v1, the first-generation SDK with its notebook templates, is not part of this branch. It lives on
@@ -348,6 +349,30 @@ Azure DevOps tasks 62, 63, 69a and 69b.
 
 Not checked: no deployment to Azure was run from this branch. The checks are static analysis, compilation
 and the offline test suites.
+
+## Terraform: the factory foundation
+
+Added on top of the compaction. It is the first Terraform slice of the AI Factory, in
+`environment_setup/aifactory/terraform/`:
+
+* **What it deploys.** The root `esml-common` deploys what `11-rgCommon.bicep`, `12-networkCommon.bicep` and
+  `13-rgLevel.bicep` deploy, with the 41 modules they reach. The resources, names, conditions and outputs are
+  the same. It uses azurerm 5.12.0, plus azapi 2.13.0 where azurerm cannot express the Bicep:
+  `parity_map.json` maps all 51 resource types (31 azurerm, 20 azapi) and gives the reason for each azapi one.
+* **Inputs.** It reads the same `variables.json`. The parameters it builds for each stage are checked against
+  a replay of `infra-common.yml` on that file.
+* **Workflow.** `copy_to_local_settings/github-actions/infra-common-terraform.yml` mirrors `infra-common.yml`:
+  same inputs, OIDC login, preflight and persona steps. It runs `terraform plan` then `apply` under the
+  shared retry helper, with remote state in Azure Storage.
+* **Tests.** `environment_setup/unit-tests/test-terraform` runs in the new CI job "Terraform" on Ubuntu and
+  Windows: fmt, `init -backend=false` + validate, parity map coverage, `uniqueString` against the Bicep
+  compiler, names, parameters, and every module condition on and off. It is offline; nothing is deployed.
+* **Found on the way.** `provider::azapi::unique_string()` in azapi 2.13.0 differs from ARM's `uniqueString()`
+  for many inputs whose length modulo 8 is 5 to 7. The port uses its own exact implementation.
+* **Still Bicep only.** Projects (`esml-genai-1`, the next slice), the AI gateway, Kong, FinOps, policies and
+  dashboards. A factory deployed with Bicep must be imported before Terraform manages it.
+
+No Bicep template, variable or existing pipeline was changed for this.
 
 ## Open decisions
 

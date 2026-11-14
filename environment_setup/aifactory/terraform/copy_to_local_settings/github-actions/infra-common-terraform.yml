@@ -1,0 +1,1116 @@
+name: infra-common-terraform
+# Terraform port of infra-common.yml: the same inputs, jobs, identity, preflight and persona steps;
+# 11-rgCommon/12-networkCommon/13-rgLevel are deployed by environment_setup/aifactory/terraform/esml-common.
+run-name: infra-common-terraform [${{ inputs.deployment_id || 'manual' }}]
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_dev:
+        type: boolean
+        default: true
+        description: Run Dev (matches ADO Dev stage)
+      deploy_stage:
+        type: boolean
+        default: false
+        description: Run Stage after Dev (ADO manual stage)
+      deploy_prod:
+        type: boolean
+        default: false
+        description: Run Prod after Stage/Dev
+      use_json_config_override:
+        type: boolean
+        default: false
+        description: Use repository-backed variables.json instead of GitHub Environment configuration
+      config_file:
+        type: string
+        default: aifactory/variables.json
+        description: Repository-relative canonical AI Factory JSON configuration file
+      config_secret:
+        type: string
+        required: false
+        default: AIFACTORY_CONFIG_JSON
+        description: Environment secret containing this run's immutable configuration (reviewed API runs)
+      deployment_id:
+        type: string
+        required: false
+        default: ''
+        description: Unique reviewed deployment correlation UUID (empty for manual runs)
+      config_hash:
+        type: string
+        required: false
+        default: ''
+        description: SHA256 of the reviewed configuration
+      scale_set_suffix:
+        type: string
+        required: false
+        default: ''
+        description: Reviewed scale set suffix (NNN) the configuration must target
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  common-dev:
+    name: Dev Common
+    if: ${{ github.event.inputs.deploy_dev == 'true' }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').dev }}
+    runs-on: ubuntu-latest
+    env:
+      AIFACTORY_REPORT_JOB: common-dev
+      TF_ROOT: azure-enterprise-scale-ml/environment_setup/aifactory/terraform/esml-common
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+      dev_test_prod: dev
+      dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+      network_env: "${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
+      admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}"
+      admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
+      admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
+      tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
+      technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
+      technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: dev
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
+
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment dev \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml" \
+            --github-identity-output
+
+      - name: Load the configuration file (GitHub Environment mode)
+        if: ${{ !inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Terraform reads every deployment input from this file; the helper scripts read the same values.
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment dev \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml"
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment dev --scope common --phase preflight --format github
+
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG --scope common \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
+      - name: Validate required configuration
+        shell: pwsh
+        run: |
+          $required = @(
+            'dev_test_prod',
+            'dev_test_prod_sub_id',
+            'admin_location',
+            'admin_locationSuffix',
+            'admin_aifactoryPrefixRG',
+            'admin_aifactorySuffixRG',
+            'admin_bicep_input_keyvault_subscription',
+            'admin_bicep_kv_fw',
+            'admin_bicep_kv_fw_rg',
+            'tenantId'
+          )
+          $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
+          $errors = @()
+          foreach ($key in $required) {
+            $raw = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+            $val = if ($null -ne $raw) { $raw.ToString().Trim() } else { '' }
+            if ([string]::IsNullOrWhiteSpace($val)) { $errors += "$key is required"; continue }
+            if ($placeholders -contains $val) { $errors += "$key still has placeholder value '$val'" }
+          }
+          if ($Env:BYO_subnets -eq 'true') {
+            foreach ($k in @('vnetResourceGroup_param', 'vnetNameFull_param')) {
+              $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+              if (-not $v) { $errors += "$k is required when BYO_subnets=true" }
+            }
+          }
+          if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+
+      - name: Initialize derived variables
+        shell: pwsh
+        run: |
+          $envName = '${{ env.dev_test_prod }}'
+          switch ($envName) {
+            'dev'  { $net = '${{ vars.DEV_NETWORK_ENV }}' }
+            'test' { $net = '${{ vars.STAGE_NETWORK_ENV }}' }
+            'prod' { $net = '${{ vars.PROD_NETWORK_ENV }}' }
+            default { $net = '' }
+          }
+          if (-not $net) { $net = '${{ vars.NETWORK_ENV }}' }
+          if (-not $net) { $net = $envName }
+          "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          $tags = $Env:tags
+          if (-not $tags) { $tags = '{}' }
+          "tags=$tags" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Terraform inputs
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          JSON_CLIENT_ID: ${{ steps.json_identity.outputs.azure_client_id }}
+          JSON_TENANT_ID: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          JSON_SUBSCRIPTION_ID: ${{ steps.json_identity.outputs.azure_subscription_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          SP_CREDENTIALS_LOGIN: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        run: |
+          set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$admin_password"
+          subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
+          {
+            # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
+            # GitHub variables or its own steps. Every other input is read from the configuration file.
+            echo "TF_VAR_config_file=$GITHUB_WORKSPACE/$CONFIG_FILE"
+            echo "TF_VAR_environment=${{ env.dev_test_prod }}"
+            echo "TF_VAR_subscription_id=$subscription"
+            echo "TF_VAR_tenant_id=${JSON_TENANT_ID:-${tenantId:-}}"
+            echo "TF_VAR_seeding_keyvault_subscription_id=${admin_bicep_input_keyvault_subscription:-}"
+            echo "TF_VAR_seeding_keyvault_name=${admin_bicep_kv_fw:-}"
+            echo "TF_VAR_seeding_keyvault_resource_group=${admin_bicep_kv_fw_rg:-}"
+            echo "TF_VAR_cidr_range=${cidr_range:-}"
+            echo "TF_VAR_network_env=${network_env:-}"
+            echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
+            echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
+            echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
+            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
+            echo "TF_VAR_admin_password=$admin_password"
+            echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
+            # Provider and backend authentication: the same identity azure/login used.
+            echo "ARM_SUBSCRIPTION_ID=$subscription"
+            if [ "$SP_CREDENTIALS_LOGIN" = "true" ]; then
+              echo "ARM_USE_CLI=true"
+            else
+              echo "ARM_USE_OIDC=true"
+              echo "ARM_CLIENT_ID=${JSON_CLIENT_ID:-${AZURE_CLIENT_ID:-}}"
+              echo "ARM_TENANT_ID=${JSON_TENANT_ID:-${tenantId:-}}"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Terraform init (remote state)
+        shell: bash
+        env:
+          TFSTATE_SUBSCRIPTION_ID: ${{ vars.TFSTATE_SUBSCRIPTION_ID }}
+          TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER || 'tfstate' }}
+        run: |
+          set -euo pipefail
+          for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
+            if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
+          done
+          # One state per factory and environment: the common resource group name is unique per factory,
+          # scale set and environment (13-rgLevel commonResourceGroupName).
+          common_rg="${commonResourceGroup_param:-}"
+          if [ -z "$common_rg" ]; then
+            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
+          fi
+          backend=(
+            -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
+            -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
+            -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
+            -backend-config="container_name=$TFSTATE_CONTAINER"
+            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="use_azuread_auth=true"
+          )
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry --label "terraform_init" -- terraform -chdir="$TF_ROOT" init -input=false -no-color "${backend[@]}"
+
+      - name: 01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
+          # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          aif_tf_plan_apply() {
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
+          }
+          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
+            --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
+            --label "terraform_plan_apply" -- aif_tf_plan_apply
+
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment dev --scope common --phase apply --format github
+
+      - name: Report final pipeline job result (offline)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-dev-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  common-stage:
+    name: Stage Common
+    needs: common-dev
+    if: ${{ github.event.inputs.deploy_stage == 'true' && needs.common-dev.result == 'success' }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').stage }}
+    runs-on: ubuntu-latest
+    env:
+      AIFACTORY_REPORT_JOB: common-stage
+      TF_ROOT: azure-enterprise-scale-ml/environment_setup/aifactory/terraform/esml-common
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+      dev_test_prod: test
+      dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+      network_env: "${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
+      admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}"
+      admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
+      admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
+      tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
+      technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
+      technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: stage
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
+
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment stage \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml" \
+            --github-identity-output
+
+      - name: Load the configuration file (GitHub Environment mode)
+        if: ${{ !inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Terraform reads every deployment input from this file; the helper scripts read the same values.
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment stage \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml"
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment test --scope common --phase preflight --format github
+
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG --scope common \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
+      - name: Validate required configuration
+        shell: pwsh
+        run: |
+          $required = @(
+            'dev_test_prod',
+            'dev_test_prod_sub_id',
+            'admin_location',
+            'admin_locationSuffix',
+            'admin_aifactoryPrefixRG',
+            'admin_aifactorySuffixRG',
+            'admin_bicep_input_keyvault_subscription',
+            'admin_bicep_kv_fw',
+            'admin_bicep_kv_fw_rg',
+            'tenantId'
+          )
+          $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
+          $errors = @()
+          foreach ($key in $required) {
+            $raw = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+            $val = if ($null -ne $raw) { $raw.ToString().Trim() } else { '' }
+            if ([string]::IsNullOrWhiteSpace($val)) { $errors += "$key is required"; continue }
+            if ($placeholders -contains $val) { $errors += "$key still has placeholder value '$val'" }
+          }
+          if ($Env:BYO_subnets -eq 'true') {
+            foreach ($k in @('vnetResourceGroup_param', 'vnetNameFull_param')) {
+              $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+              if (-not $v) { $errors += "$k is required when BYO_subnets=true" }
+            }
+          }
+          if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+
+      - name: Initialize derived variables
+        shell: pwsh
+        run: |
+          $envName = '${{ env.dev_test_prod }}'
+          switch ($envName) {
+            'dev'  { $net = '${{ vars.DEV_NETWORK_ENV }}' }
+            'test' { $net = '${{ vars.STAGE_NETWORK_ENV }}' }
+            'prod' { $net = '${{ vars.PROD_NETWORK_ENV }}' }
+            default { $net = '' }
+          }
+          if (-not $net) { $net = '${{ vars.NETWORK_ENV }}' }
+          if (-not $net) { $net = $envName }
+          "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Terraform inputs
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          JSON_CLIENT_ID: ${{ steps.json_identity.outputs.azure_client_id }}
+          JSON_TENANT_ID: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          JSON_SUBSCRIPTION_ID: ${{ steps.json_identity.outputs.azure_subscription_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          SP_CREDENTIALS_LOGIN: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        run: |
+          set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$admin_password"
+          subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
+          {
+            # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
+            # GitHub variables or its own steps. Every other input is read from the configuration file.
+            echo "TF_VAR_config_file=$GITHUB_WORKSPACE/$CONFIG_FILE"
+            echo "TF_VAR_environment=${{ env.dev_test_prod }}"
+            echo "TF_VAR_subscription_id=$subscription"
+            echo "TF_VAR_tenant_id=${JSON_TENANT_ID:-${tenantId:-}}"
+            echo "TF_VAR_seeding_keyvault_subscription_id=${admin_bicep_input_keyvault_subscription:-}"
+            echo "TF_VAR_seeding_keyvault_name=${admin_bicep_kv_fw:-}"
+            echo "TF_VAR_seeding_keyvault_resource_group=${admin_bicep_kv_fw_rg:-}"
+            echo "TF_VAR_cidr_range=${cidr_range:-}"
+            echo "TF_VAR_network_env=${network_env:-}"
+            echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
+            echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
+            echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
+            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
+            echo "TF_VAR_admin_password=$admin_password"
+            echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
+            # Provider and backend authentication: the same identity azure/login used.
+            echo "ARM_SUBSCRIPTION_ID=$subscription"
+            if [ "$SP_CREDENTIALS_LOGIN" = "true" ]; then
+              echo "ARM_USE_CLI=true"
+            else
+              echo "ARM_USE_OIDC=true"
+              echo "ARM_CLIENT_ID=${JSON_CLIENT_ID:-${AZURE_CLIENT_ID:-}}"
+              echo "ARM_TENANT_ID=${JSON_TENANT_ID:-${tenantId:-}}"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Terraform init (remote state)
+        shell: bash
+        env:
+          TFSTATE_SUBSCRIPTION_ID: ${{ vars.TFSTATE_SUBSCRIPTION_ID }}
+          TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER || 'tfstate' }}
+        run: |
+          set -euo pipefail
+          for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
+            if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
+          done
+          # One state per factory and environment: the common resource group name is unique per factory,
+          # scale set and environment (13-rgLevel commonResourceGroupName).
+          common_rg="${commonResourceGroup_param:-}"
+          if [ -z "$common_rg" ]; then
+            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
+          fi
+          backend=(
+            -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
+            -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
+            -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
+            -backend-config="container_name=$TFSTATE_CONTAINER"
+            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="use_azuread_auth=true"
+          )
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry --label "terraform_init" -- terraform -chdir="$TF_ROOT" init -input=false -no-color "${backend[@]}"
+
+      - name: 01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
+          # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          aif_tf_plan_apply() {
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
+          }
+          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
+            --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
+            --label "terraform_plan_apply" -- aif_tf_plan_apply
+
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment test --scope common --phase apply --format github
+
+      - name: Report final pipeline job result (offline)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-stage-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  common-prod:
+    name: Prod Common
+    needs:
+      - common-dev
+      - common-stage
+    if: ${{ github.event.inputs.deploy_prod == 'true' && ((github.event.inputs.deploy_stage == 'true' && needs.common-stage.result == 'success') || (github.event.inputs.deploy_stage != 'true' && needs.common-dev.result == 'success')) }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').prod }}
+    runs-on: ubuntu-latest
+    env:
+      AIFACTORY_REPORT_JOB: common-prod
+      TF_ROOT: azure-enterprise-scale-ml/environment_setup/aifactory/terraform/esml-common
+      AIFACTORY_CONFIG_JSON: ${{ inputs.use_json_config_override && secrets[inputs.config_secret] || '' }}
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+      dev_test_prod: prod
+      dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+      network_env: "${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
+      admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}"
+      admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
+      admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
+      tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
+      technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
+      technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Materialize protected JSON configuration
+        if: ${{ inputs.use_json_config_override && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed common target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-common-config.json' }}
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: prod
+          SCALE_SET_SUFFIX: ${{ inputs.scale_set_suffix }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          if os.environ["USE_JSON_CONFIG_OVERRIDE"] != "true":
+              raise SystemExit("Reviewed common deployments require use_json_config_override")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "SCALE_SET_SUFFIX", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed common deployments require deployment_id, scale_set_suffix, config_hash, config_file and config_secret")
+          try:
+              uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          except ValueError:
+              raise SystemExit("Reviewed common deployments require a UUID deployment_id")
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-common-config.json":
+              raise SystemExit("Reviewed common configuration path mismatch")
+          raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not protected:
+              raise SystemExit("Reviewed common deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed common deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          suffix = str(values.get("admin_aifactorySuffixRG", "")).removeprefix("-").zfill(3)
+          if suffix != os.environ["SCALE_SET_SUFFIX"].removeprefix("-").zfill(3):
+              raise SystemExit("Reviewed common deployment scale set mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
+
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment prod \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml" \
+            --github-identity-output
+
+      - name: Load the configuration file (GitHub Environment mode)
+        if: ${{ !inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Terraform reads every deployment input from this file; the helper scripts read the same values.
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment prod \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/terraform/copy_to_local_settings/github-actions/infra-common-terraform.yml"
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment prod --scope common --phase preflight --format github
+
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
+          admin_aiSearchTier: ${{ env.admin_aiSearchTier || vars.ADMIN_AISEARCH_TIER || 'basic' }}
+          enableAISearch: ${{ env.enableAISearch || vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ env.enableAIFoundry || vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ env.enableCosmosDB || vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ env.enableElasticsearch || vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG --scope common \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
+      - name: Validate required configuration
+        shell: pwsh
+        run: |
+          $required = @(
+            'dev_test_prod',
+            'dev_test_prod_sub_id',
+            'admin_location',
+            'admin_locationSuffix',
+            'admin_aifactoryPrefixRG',
+            'admin_aifactorySuffixRG',
+            'admin_bicep_input_keyvault_subscription',
+            'admin_bicep_kv_fw',
+            'admin_bicep_kv_fw_rg',
+            'tenantId'
+          )
+          $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
+          $errors = @()
+          foreach ($key in $required) {
+            $raw = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+            $val = if ($null -ne $raw) { $raw.ToString().Trim() } else { '' }
+            if ([string]::IsNullOrWhiteSpace($val)) { $errors += "$key is required"; continue }
+            if ($placeholders -contains $val) { $errors += "$key still has placeholder value '$val'" }
+          }
+          if ($Env:BYO_subnets -eq 'true') {
+            foreach ($k in @('vnetResourceGroup_param', 'vnetNameFull_param')) {
+              $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+              if (-not $v) { $errors += "$k is required when BYO_subnets=true" }
+            }
+          }
+          if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+
+      - name: Initialize derived variables
+        shell: pwsh
+        run: |
+          $envName = '${{ env.dev_test_prod }}'
+          switch ($envName) {
+            'dev'  { $net = '${{ vars.DEV_NETWORK_ENV }}' }
+            'test' { $net = '${{ vars.STAGE_NETWORK_ENV }}' }
+            'prod' { $net = '${{ vars.PROD_NETWORK_ENV }}' }
+            default { $net = '' }
+          }
+          if (-not $net) { $net = '${{ vars.NETWORK_ENV }}' }
+          if (-not $net) { $net = $envName }
+          "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Terraform inputs
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          JSON_CLIENT_ID: ${{ steps.json_identity.outputs.azure_client_id }}
+          JSON_TENANT_ID: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          JSON_SUBSCRIPTION_ID: ${{ steps.json_identity.outputs.azure_subscription_id }}
+          USE_JSON_CONFIG_OVERRIDE: ${{ inputs.use_json_config_override }}
+          SP_CREDENTIALS_LOGIN: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
+        run: |
+          set -euo pipefail
+          # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
+          bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$admin_password"
+          subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
+          {
+            # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
+            # GitHub variables or its own steps. Every other input is read from the configuration file.
+            echo "TF_VAR_config_file=$GITHUB_WORKSPACE/$CONFIG_FILE"
+            echo "TF_VAR_environment=${{ env.dev_test_prod }}"
+            echo "TF_VAR_subscription_id=$subscription"
+            echo "TF_VAR_tenant_id=${JSON_TENANT_ID:-${tenantId:-}}"
+            echo "TF_VAR_seeding_keyvault_subscription_id=${admin_bicep_input_keyvault_subscription:-}"
+            echo "TF_VAR_seeding_keyvault_name=${admin_bicep_kv_fw:-}"
+            echo "TF_VAR_seeding_keyvault_resource_group=${admin_bicep_kv_fw_rg:-}"
+            echo "TF_VAR_cidr_range=${cidr_range:-}"
+            echo "TF_VAR_network_env=${network_env:-}"
+            echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
+            echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
+            echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
+            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
+            echo "TF_VAR_admin_password=$admin_password"
+            echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
+            # Provider and backend authentication: the same identity azure/login used.
+            echo "ARM_SUBSCRIPTION_ID=$subscription"
+            if [ "$SP_CREDENTIALS_LOGIN" = "true" ]; then
+              echo "ARM_USE_CLI=true"
+            else
+              echo "ARM_USE_OIDC=true"
+              echo "ARM_CLIENT_ID=${JSON_CLIENT_ID:-${AZURE_CLIENT_ID:-}}"
+              echo "ARM_TENANT_ID=${JSON_TENANT_ID:-${tenantId:-}}"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Terraform init (remote state)
+        shell: bash
+        env:
+          TFSTATE_SUBSCRIPTION_ID: ${{ vars.TFSTATE_SUBSCRIPTION_ID }}
+          TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER || 'tfstate' }}
+        run: |
+          set -euo pipefail
+          for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
+            if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
+          done
+          # One state per factory and environment: the common resource group name is unique per factory,
+          # scale set and environment (13-rgLevel commonResourceGroupName).
+          common_rg="${commonResourceGroup_param:-}"
+          if [ -z "$common_rg" ]; then
+            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
+          fi
+          backend=(
+            -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
+            -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
+            -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
+            -backend-config="container_name=$TFSTATE_CONTAINER"
+            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="use_azuread_auth=true"
+          )
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry --label "terraform_init" -- terraform -chdir="$TF_ROOT" init -input=false -no-color "${backend[@]}"
+
+      - name: 01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
+          # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          aif_tf_plan_apply() {
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
+          }
+          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
+            --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
+            --label "terraform_plan_apply" -- aif_tf_plan_apply
+
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment prod --scope common --phase apply --format github
+
+      - name: Report final pipeline job result (offline)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-prod-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod/*.json
+          if-no-files-found: warn
+          retention-days: 14

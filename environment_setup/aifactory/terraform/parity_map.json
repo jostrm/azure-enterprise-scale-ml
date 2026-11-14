@@ -1,0 +1,589 @@
+{
+  "description": "Bicep resource type@apiVersion -> Terraform resource, for every resource the 11/12/13 entry files of bicep/esml-common/main deploy (existing references excluded), and Bicep file -> Terraform module. Read by environment_setup/unit-tests/test-terraform/test_parity_map.py.",
+  "providers": {
+    "azurerm": "5.12.0",
+    "azapi": "2.13.0"
+  },
+  "types": {
+    "Microsoft.Authorization/roleAssignments@2020-04-01-preview": {
+      "terraform": [
+        "azurerm_role_assignment"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/contributor-rbac",
+        "modules/vm-admin-login-rbac"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Authorization/roleAssignments@2022-04-01": {
+      "terraform": [
+        "azurerm_role_assignment"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/managed-identity",
+        "modules/kv-rbac-principals",
+        "modules/kv-rbac-single-assignment"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Compute/virtualMachines/extensions@2024-07-01": {
+      "terraform": [
+        "azurerm_virtual_machine_extension"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/virtual-machine-private",
+        "modules/vm-security-extensions"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Compute/virtualMachines@2024-07-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/virtual-machine-private"
+      ],
+      "reason": "azurerm_windows_virtual_machine cannot create the inline Empty data disk (lun 0) in the VM PUT and requires os_disk caching the Bicep leaves to the platform; the admin password goes in the write-only sensitive_body."
+    },
+    "Microsoft.ContainerRegistry/registries@2025-05-01-preview": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/container-registry"
+      ],
+      "reason": "azurerm_container_registry (5.12.0) has no trust policy, cannot send retentionPolicy disabled with days 7, and uses a GA API instead of the Bicep's preview API."
+    },
+    "Microsoft.DataFactory/factories/credentials@2018-06-01": {
+      "terraform": [
+        "azurerm_data_factory_credential_user_managed_identity"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": ""
+    },
+    "Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": "azurerm_data_factory_integration_runtime_azure always sends dataFlowProperties defaults; the Bicep sends only computeProperties.location AutoResolve and the managed virtual network reference."
+    },
+    "Microsoft.DataFactory/factories/linkedservices@2018-06-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": "The azurerm linked-service resources cannot set typeProperties.credential (a CredentialReference to the factory's managed identity credential)."
+    },
+    "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01": {
+      "terraform": [
+        "azurerm_data_factory_managed_private_endpoint"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": ""
+    },
+    "Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01": {
+      "terraform": [
+        "azurerm_data_factory"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": "azurerm_data_factory.managed_virtual_network_enabled PUTs the 'default' managed virtual network (properties {}), the same request as the Bicep child resource."
+    },
+    "Microsoft.DataFactory/factories@2018-06-01": {
+      "terraform": [
+        "azurerm_data_factory"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-factory"
+      ],
+      "reason": ""
+    },
+    "Microsoft.DevTestLab/schedules@2018-09-15": {
+      "terraform": [
+        "azurerm_dev_test_global_vm_shutdown_schedule"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/virtual-machine-private"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Insights/dataCollectionEndpoints@2022-06-01": {
+      "terraform": [
+        "azurerm_monitor_data_collection_endpoint"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-collection-endpoint"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Insights/diagnosticSettings@2021-05-01-preview": {
+      "terraform": [
+        "azurerm_monitor_diagnostic_setting"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/key-vault-diagnostics"
+      ],
+      "reason": ""
+    },
+    "microsoft.insights/privateLinkScopes/scopedResources@2021-07-01-preview": {
+      "terraform": [
+        "azurerm_monitor_private_link_scoped_service"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/ampls"
+      ],
+      "reason": ""
+    },
+    "microsoft.insights/privateLinkScopes@2021-07-01-preview": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/ampls"
+      ],
+      "reason": "The Bicep sets location to the deployment location; azurerm_monitor_private_link_scope has no location argument (always global)."
+    },
+    "Microsoft.KeyVault/vaults/secrets@2019-09-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/kv-secrets-cmn",
+        "modules/virtual-machine-private"
+      ],
+      "reason": "Control-plane write into a private vault; secret values from the seeding vault and the VM password go in the write-only sensitive_body (never in plan or state)."
+    },
+    "Microsoft.KeyVault/vaults/secrets@2021-10-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/kv-secrets-cmn"
+      ],
+      "reason": "Control-plane write into the private common Key Vault."
+    },
+    "Microsoft.KeyVault/vaults/secrets@2023-07-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/log-analytics-workspace"
+      ],
+      "reason": "Control-plane write into the private common Key Vault."
+    },
+    "Microsoft.KeyVault/vaults/secrets@2024-11-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/key-vault"
+      ],
+      "reason": "Control-plane write: the vault is private (publicNetworkAccess Disabled), so the data-plane azurerm_key_vault_secret would fail from a CI runner."
+    },
+    "Microsoft.KeyVault/vaults@2024-11-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/key-vault"
+      ],
+      "reason": "azurerm_key_vault cannot send networkAcls.virtualNetworkRules[].ignoreMissingVnetServiceEndpoint = true (a BYO subnet without the KeyVault service endpoint would fail), and it makes data-plane calls a private vault refuses."
+    },
+    "Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30": {
+      "terraform": [
+        "azurerm_user_assigned_identity"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/managed-identity"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/bastionHosts@2021-05-01": {
+      "terraform": [
+        "azurerm_bastion_host"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/bastion-host-common"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/networkInterfaces@2020-06-01": {
+      "terraform": [
+        "azurerm_network_interface"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/virtual-machine-private"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/networkSecurityGroups@2020-06-01": {
+      "terraform": [
+        "azurerm_network_security_group"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/nsg-common",
+        "modules/nsg-common-scoring",
+        "modules/nsg-bastion",
+        "modules/nsg-bastion-no-whitelist",
+        "modules/nsg-power-bi",
+        "modules/nsg-ai-gateway",
+        "modules/nsg-function-app"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/networkWatchers/flowLogs@2023-05-01": {
+      "terraform": [
+        "azurerm_network_watcher_flow_log"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/nsg-common",
+        "modules/nsg-common-scoring",
+        "modules/nsg-bastion",
+        "modules/nsg-bastion-no-whitelist",
+        "modules/nsg-power-bi",
+        "modules/nsg-ai-gateway",
+        "modules/nsg-function-app"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01": {
+      "terraform": [
+        "azurerm_private_dns_zone_virtual_network_link",
+        "azapi_resource"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/create-private-dns-zones",
+        "modules/private-dns-zone-vnet-links"
+      ],
+      "reason": "azapi only for the regional link (allGlobal false); azurerm links are always global."
+    },
+    "Microsoft.Network/privateDnsZones@2024-06-01": {
+      "terraform": [
+        "azurerm_private_dns_zone",
+        "azapi_resource"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/create-private-dns-zones"
+      ],
+      "reason": "azurerm for the global zones (every zone 13-rgLevel creates by default); azapi only for the regional '<location>.data.privatelink.azurecr.io' zone when allGlobal is false, which azurerm_private_dns_zone cannot place."
+    },
+    "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/private-dns",
+        "modules/ampls-private-endpoint"
+      ],
+      "reason": "azurerm has no standalone zone-group resource (only an inline block on azurerm_private_endpoint owned by another module), and that block names configs after the zone, not the Bicep names."
+    },
+    "Microsoft.Network/privateEndpoints@2023-04-01": {
+      "terraform": [
+        "azurerm_private_endpoint"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/key-vault",
+        "modules/data-lake",
+        "modules/data-factory"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/privateEndpoints@2024-01-01": {
+      "terraform": [
+        "azurerm_private_endpoint"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/ampls-private-endpoint"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/privateEndpoints@2024-05-01": {
+      "terraform": [
+        "azurerm_private_endpoint"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/container-registry"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/publicIPAddresses@2021-03-01": {
+      "terraform": [
+        "azurerm_public_ip"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/bastion-host-common"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/routeTables@2023-11-01": {
+      "terraform": [
+        "azurerm_route_table"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/route-table-ai-gateway"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/virtualNetworks/subnets@2021-03-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/vnet-common"
+      ],
+      "reason": "BYO vNet path: the same subnet bodies with serviceEndpoints[].locations, which azurerm_subnet cannot express."
+    },
+    "Microsoft.Network/virtualNetworks/subnets@2023-05-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/subnet-with-nsg"
+      ],
+      "reason": "Every service endpoint is sent with locations: [location], which azurerm_subnet cannot express."
+    },
+    "Microsoft.Network/virtualNetworks/subnets@2023-11-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/vnet-common-preserve"
+      ],
+      "reason": "subnet.properties is an arbitrary ARM property bag from the preservation plan; azurerm_subnet cannot take a raw property object."
+    },
+    "Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-05-01": {
+      "terraform": [
+        "azurerm_virtual_network_peering"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/vnet-peering"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Network/virtualNetworks@2021-03-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/vnet-common"
+      ],
+      "reason": "The subnets are inline (one PUT, as the Bicep) and the common subnet sets serviceEndpoints[].locations; azurerm 5.12.0 subnets (inline or azurerm_subnet) have no service endpoint locations."
+    },
+    "Microsoft.Network/virtualNetworks@2023-11-01": {
+      "terraform": [
+        "azurerm_virtual_network"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/vnet-common-preserve"
+      ],
+      "reason": ""
+    },
+    "Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/log-analytics-queries"
+      ],
+      "reason": "azurerm_log_analytics_saved_search cannot express properties.version (2)."
+    },
+    "Microsoft.OperationalInsights/workspaces@2023-09-01": {
+      "terraform": [
+        "azurerm_log_analytics_workspace"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/log-analytics-workspace"
+      ],
+      "reason": ""
+    },
+    "Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems@2024-04-01": {
+      "terraform": [
+        "azurerm_backup_protected_vm"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/vm-backup"
+      ],
+      "reason": ""
+    },
+    "Microsoft.RecoveryServices/vaults/backupPolicies@2024-04-01": {
+      "terraform": [
+        "azurerm_backup_policy_vm"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/vm-backup"
+      ],
+      "reason": ""
+    },
+    "Microsoft.RecoveryServices/vaults@2024-04-01": {
+      "terraform": [
+        "azurerm_recovery_services_vault"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/vm-backup"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Resources/resourceGroups@2021-04-01": {
+      "terraform": [
+        "azurerm_resource_group"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/resource-group-unmanaged"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Security/pricings@2024-01-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/defender"
+      ],
+      "reason": "azurerm_security_center_subscription_pricing (5.12.0) has no `enforce` property and manages the whole extension set instead of the exact extensions array the Bicep sends (additionalExtensionProperties)."
+    },
+    "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01": {
+      "terraform": [
+        "azurerm_storage_container"
+      ],
+      "provider": "azurerm",
+      "modules": [
+        "modules/data-lake"
+      ],
+      "reason": ""
+    },
+    "Microsoft.Storage/storageAccounts/blobServices@2023-05-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/data-lake"
+      ],
+      "reason": "No standalone azurerm resource (the blob properties live inside azurerm_storage_account, which is azapi here)."
+    },
+    "Microsoft.Storage/storageAccounts/fileServices@2023-05-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/data-lake"
+      ],
+      "reason": "No standalone azurerm resource (share properties live inside azurerm_storage_account, which is azapi here)."
+    },
+    "Microsoft.Storage/storageAccounts@2023-05-01": {
+      "terraform": [
+        "azapi_resource"
+      ],
+      "provider": "azapi",
+      "modules": [
+        "modules/data-lake"
+      ],
+      "reason": "azurerm_storage_account (5.12.0) cannot express keyPolicy.keyExpirationPeriodInDays, and its CMK block needs a key id rather than the Bicep's keyname + keyvaulturi pair."
+    }
+  },
+  "files": {
+    "esml-common/ai-gateway/14-add-networking-aigw.bicep": "modules/ai-gateway-networking",
+    "esml-common/main/11-rgCommon.bicep": "modules/stage-11-rg-common",
+    "esml-common/main/12-networkCommon.bicep": "modules/stage-12-network-common",
+    "esml-common/main/13-rgLevel.bicep": "modules/stage-13-rg-level",
+    "esml-common/modules-common/bastionHostCommon.bicep": "modules/bastion-host-common",
+    "esml-common/modules-common/kvSecretsCmn.bicep": "modules/kv-secrets-cmn",
+    "esml-common/modules-common/nsgAIGateway.bicep": "modules/nsg-ai-gateway",
+    "esml-common/modules-common/nsgBastion.bicep": "modules/nsg-bastion",
+    "esml-common/modules-common/nsgBastionNoWhitelist.bicep": "modules/nsg-bastion-no-whitelist",
+    "esml-common/modules-common/nsgCommon.bicep": "modules/nsg-common",
+    "esml-common/modules-common/nsgCommonScoring.bicep": "modules/nsg-common-scoring",
+    "esml-common/modules-common/nsgFunctionApp.bicep": "modules/nsg-function-app",
+    "esml-common/modules-common/nsgPowerBI.bicep": "modules/nsg-power-bi",
+    "esml-common/modules-common/routeTableAIGateway.bicep": "modules/route-table-ai-gateway",
+    "esml-common/modules-common/vNetCommon.bicep": "modules/vnet-common",
+    "esml-common/modules-common/vNetCommonPreserve.bicep": "modules/vnet-common-preserve",
+    "esml-common/security/defender.bicep": "modules/defender",
+    "modules/common/vmSecurity.bicep": "modules/virtual-machine-private",
+    "modules/containerRegistry.bicep": "modules/container-registry",
+    "modules/contributorRbac.bicep": "modules/contributor-rbac",
+    "modules/createPrivateDnsZones.bicep": "modules/create-private-dns-zones",
+    "modules/dataFactory.bicep": "modules/data-factory",
+    "modules/dataLake.bicep": "modules/data-lake",
+    "modules/diagnostics/keyVaultDiagnostics.bicep": "modules/key-vault-diagnostics",
+    "modules/keyVault.bicep": "modules/key-vault",
+    "modules/kvRbacPrincipals.bicep": "modules/kv-rbac-principals",
+    "modules/kvRbacSingleAssignment.bicep": "modules/kv-rbac-single-assignment",
+    "modules/logAnalyticsQueries.bicep": "modules/log-analytics-queries",
+    "modules/logAnalyticsWorkspace.bicep": "modules/log-analytics-workspace",
+    "modules/mi.bicep": "modules/managed-identity",
+    "modules/monitoring/ampls.bicep": "modules/ampls",
+    "modules/monitoring/amplsHubSimple.bicep": "modules/ampls-hub-simple",
+    "modules/monitoring/amplsIntegration.bicep": "modules/ampls-integration",
+    "modules/monitoring/amplsPrivateEndpoint.bicep": "modules/ampls-private-endpoint",
+    "modules/monitoring/dataCollectionEndpoint.bicep": "modules/data-collection-endpoint",
+    "modules/networking/privateDnsZoneVnetLinks.bicep": "modules/private-dns-zone-vnet-links",
+    "modules/networking/vnetPeering.bicep": "modules/vnet-peering",
+    "modules/privateDns.bicep": "modules/private-dns",
+    "modules/resourcegroupUnmanaged.bicep": "modules/resource-group-unmanaged",
+    "modules/subnetWithNsg.bicep": "modules/subnet-with-nsg",
+    "modules/virtualMachinePrivate.bicep": "modules/virtual-machine-private",
+    "modules/vmAdminLoginRbac.bicep": "modules/vm-admin-login-rbac",
+    "modules/vmBackup.bicep": "modules/vm-backup",
+    "modules/vmSecurityExtensions.bicep": "modules/vm-security-extensions"
+  },
+  "terraform_only": {}
+}

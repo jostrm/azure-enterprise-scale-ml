@@ -146,3 +146,10 @@ ignore.md
 # Claude Code worktrees: never commit them (an undeclared gitlink breaks recursive submodule checkouts)
 .claude/worktrees/
 documentation/gh-io/site/
+
+# Terraform (environment_setup/aifactory/terraform): working directories, state and plans never belong in the repository
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
