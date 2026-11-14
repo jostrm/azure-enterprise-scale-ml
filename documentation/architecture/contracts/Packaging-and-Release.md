@@ -2,7 +2,7 @@
 id: packaging-and-release
 status: observed
 sources:
-  - RELEASE_125.md
+  - documentation/releases/RELEASE_125.md
   - environment_setup/install_config_wizard/readme.md
   - environment_setup/azurefactory-cli/setup.py
   - usecase_code/esml-v2/esml_build.py
@@ -52,4 +52,4 @@ Graph runtime queries are standard-library-only. Generation remains offline and 
 
 See [[Repository-Boundaries]], [[Factory-API-and-SDK]], [[Chat-and-Grounding]], [[Retrieval-Provenance]], [[Evidence-and-Gaps]] and [[Index]].
 
-Authority: [release caveats](../../../RELEASE_125.md), [SDK packaging](../../../environment_setup/azurefactory-cli/readme.md), [ML package boundary](../../v2/30-39/37-mlops.md), [agent deployment](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md).
+Authority: [release caveats](../../releases/RELEASE_125.md), [SDK packaging](../../../environment_setup/azurefactory-cli/readme.md), [ML package boundary](../../v2/30-39/37-mlops.md), [agent deployment](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md).

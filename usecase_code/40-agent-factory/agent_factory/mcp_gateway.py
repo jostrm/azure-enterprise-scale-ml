@@ -80,7 +80,7 @@ KNOWLEDGE_INCLUDES = [
     "usecase_code/40-agent-factory/readme.md", "usecase_code/40-agent-factory/agent_factory/readme.md",
     "environment_setup/azurefactory-cli/readme.md",
     "environment_setup/install_config_wizard/api-usage-examples/**/*.md",
-    "bootstrap/python-sdk/*.py", "RELEASE_*.md",
+    "bootstrap/python-sdk/*.py", "RELEASE_*.md", "documentation/releases/RELEASE_*.md",
 ]
 KNOWLEDGE_EXCLUDES = [
     "**/.git/**", "**/.env*", "**/*secret*", "**/*credential*", "**/__pycache__/**", "**/node_modules/**",

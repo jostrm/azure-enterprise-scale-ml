@@ -24,7 +24,7 @@ def test_configuration_is_portable_without_code_edits():
 
 def test_relative_repository_root_is_config_relative():
     settings = load_settings(EXAMPLE)
-    assert (settings.knowledge.repository_root / "RELEASE_125.md").is_file()
+    assert (settings.knowledge.repository_root / "RELEASE_126.md").is_file()
 
 
 def test_unknown_scope_grant_rejected():

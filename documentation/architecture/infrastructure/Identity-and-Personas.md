@@ -187,4 +187,4 @@ Offline policy tests establish contract behavior; the cited opt-in live authoriz
 
 See [[Factory-Scope-Model]], [[IaC-and-Private-Networking]], [[Trust-and-Authorization]], [[Lake-and-Data-Lineage]] and [[Index]].
 
-Authority: [persona walkthrough](../../../environment_setup/aifactory/bicep/personas/readme.md), [release clarification](../../../RELEASE_125.md).
+Authority: [persona walkthrough](../../../environment_setup/aifactory/bicep/personas/readme.md), [release clarification](../../releases/RELEASE_125.md).

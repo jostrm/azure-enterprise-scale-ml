@@ -2,9 +2,9 @@
 id: evidence-and-gaps
 status: observed
 sources:
-  - CONTRIBUTING.md
-  - RELEASE_125.md
-  - ROADMAP_MAIN.md
+  - .github/CONTRIBUTING.md
+  - documentation/releases/RELEASE_125.md
+  - documentation/releases/ROADMAP_MAIN.md
   - documentation/v2/20-29/25-personas-aifactory.md
   - environment_setup/aifactory/bicep/esml-genai-1/1-10-SUMMARY.md
   - usecase_code/30-machine-learning/README.md
@@ -40,4 +40,4 @@ Vault validation checks note frontmatter, unique IDs, wiki-link resolution, sour
 
 See [[Repository-Boundaries]], [[Packaging-and-Release]], [[Monitoring-and-Retraining]], [[ADR-001-Dual-Graph]], [[Trust-and-Authorization]] and [[Index]].
 
-Authority: [contribution checks](../../../CONTRIBUTING.md), [release caveats](../../../RELEASE_125.md), [persona evidence](../../v2/20-29/25-personas-aifactory.md).
+Authority: [contribution checks](../../../.github/CONTRIBUTING.md), [release caveats](../../releases/RELEASE_125.md), [persona evidence](../../v2/20-29/25-personas-aifactory.md).

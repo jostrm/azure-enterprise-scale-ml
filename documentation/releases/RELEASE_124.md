@@ -620,7 +620,7 @@ tagsProject: '{"CostCenter":"$(tag_costcenter)",...}'  # Auto-populated
 - 📖 [Full Documentation](https://github.com/jostrm/azure-enterprise-scale-ml)
 - 🐛 [Report Issues](https://github.com/jostrm/azure-enterprise-scale-ml/issues)
 - 💬 [Discussions](https://github.com/jostrm/azure-enterprise-scale-ml/discussions)
-- 🔐 [Security Policy](SECURITY.md)
+- 🔐 [Security Policy](../../.github/SECURITY.md)
 
 ---
 

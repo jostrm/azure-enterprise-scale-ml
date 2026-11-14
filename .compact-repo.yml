@@ -23,7 +23,7 @@
 #   R5 failure paths are used: retry, recovery, clean-up and self-heal code stays; operator recovery
 #                scripts named in kept docs are roots.
 #   R6 v1.24 layout support (variables.yaml, .env.template, the legacy paths of 00-start.sh) stays.
-#   R7 docs follow: documentation/v2, RELEASE_125.md and the root docs stay; they never keep code alive.
+#   R7 docs follow: documentation/v2, documentation/releases/ and the root docs stay; they never keep code alive.
 #   R8 tests follow what they test.
 #   R9 knowledge graph: documentation/architecture, environment_setup/graphify and what AGENTS.md names.
 #
@@ -259,7 +259,6 @@ keep:
   - "LICENSE"
   - ".gitignore"
   - ".gitattributes"
-  - "__init__.py"
   - "AGENTS.md"
   - "CLAUDE.md"
   - ".claude/**"
@@ -267,16 +266,14 @@ keep:
   - ".compact-repo.yml"
   # --- Docs (R7): they follow, they never keep code alive ---------------------------------------------
   - "README.md"
-  - "RELEASE_120.md"
-  - "RELEASE_123.md"
-  - "RELEASE_124.md"
-  - "RELEASE_125.md"
   - "RELEASE_126.md"
-  - "ROADMAP_MAIN.md"
-  - "SECURITY.md"
-  - "SUPPORT.md"
-  - "CODE_OF_CONDUCT.md"
-  - "CONTRIBUTING.md"
+  # Round 4 moved the older release notes and the roadmap to documentation/releases/ and the community
+  # files to .github/, where GitHub reads them.
+  - "documentation/releases/**"
+  - ".github/SECURITY.md"
+  - ".github/SUPPORT.md"
+  - ".github/CODE_OF_CONDUCT.md"
+  - ".github/CONTRIBUTING.md"
   - "documentation/readme.md"
   - "documentation/v2/**"
   # --- Knowledge graph (R9) ------------------------------------------------------------------------------

@@ -41,7 +41,8 @@
       "environment_setup/azurefactory-cli/readme.md",
       "environment_setup/install_config_wizard/api-usage-examples/**/*.md",
       "bootstrap/python-sdk/*.py",
-      "RELEASE_*.md"
+      "RELEASE_*.md",
+      "documentation/releases/RELEASE_*.md"
     ],
     "excludes": [
       "**/.git/**", "**/.env*", "**/*secret*", "**/*credential*",

@@ -16,12 +16,12 @@ or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any addi
 ## Infrastructure regression checks
 
 Before changing Bicep, ADO/GHA templates or bootstrap configuration, run the
-[AI Factory IaC test suite](environment_setup/unit-tests/test-bicep/README.md).
+[AI Factory IaC test suite](../environment_setup/unit-tests/test-bicep/README.md).
 It provides credential-free unit, syntax, pipeline-contract and real Bicep
 parameter-matrix checks, plus setup instructions for automatic push/PR checks.
 No Azure deployment is performed by the default suite. Live integration tests
 are separate and require explicit opt-in.
 
-The [interactive VisualLearner guide](environment_setup/unit-tests/test-bicep/docs/ci-visual-guide.html)
-and [static flow diagram](environment_setup/unit-tests/test-bicep/docs/ci-flow.svg)
+The [interactive VisualLearner guide](../environment_setup/unit-tests/test-bicep/docs/ci-visual-guide.html)
+and [static flow diagram](../environment_setup/unit-tests/test-bicep/docs/ci-flow.svg)
 explain the test stages, flag-pair matrix and CI activation steps.
