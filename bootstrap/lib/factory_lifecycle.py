@@ -2281,21 +2281,41 @@ def endpoint_managed_nic_parent(key, bodies):
     return endpoint if key in {str(row.get("id", "")).lower() for row in rows if isinstance(row, dict)} else None
 
 
+def machine_managed_disk_parent(key, bodies):
+    """The virtual machine whose managed disk this is: Azure creates the OS and data disks of a machine without tags
+    and without a deployment receipt, and sets managedBy only while that machine has the disk attached (aif-160
+    2026-11-14: both disks of the tagged dsvm-cmn machine were retained as unowned and the whole-group common teardown
+    refused). Only a machine that lists the disk back in its storage profile qualifies; the caller still requires the
+    same resource group and the machine's own ownership."""
+    machine = str((bodies.get(key) or {}).get("managedBy") or "").lower()
+    if not machine or resource_type_from_id(machine) != "microsoft.compute/virtualmachines":
+        return None
+    profile = ((bodies.get(machine) or {}).get("properties") or {}).get("storageProfile") or {}
+    rows = [profile.get("osDisk"), *(profile.get("dataDisks") or [])] if isinstance(profile, dict) else []
+    listed = {str((row.get("managedDisk") or {}).get("id") or "").lower() for row in rows if isinstance(row, dict)}
+    return machine if key in listed else None
+
+
+# Untaggable top-level resources Azure creates for, and deletes with, exactly one other resource that names them back.
+MANAGER_PARENTS = {"microsoft.network/networkinterfaces": endpoint_managed_nic_parent,
+                   "microsoft.compute/disks": machine_managed_disk_parent}
+
+
 def managed_parent_id(resource_id, bodies, owner):
     """Whole-group deletion only: the owned resource an untagged child is deleted with, so it needs no receipt of its
     own - its nested parent, the resource an extension sits on, the owned group of an RG-scoped role assignment, the
-    owned source of an Event Grid system topic, or the private endpoint whose managed NIC it is. A top-level resource
-    never inherits its group's owner."""
+    owned source of an Event Grid system topic, the private endpoint whose managed NIC it is, or the virtual machine
+    whose managed disk it is. Any other top-level resource never inherits its group's owner."""
     key = resource_id.lower()
     scope, relative = key.rsplit("/providers/", 1)
     parts = relative.split("/")
     resource_type = resource_type_from_id(key)
     topic = resource_type == "microsoft.eventgrid/systemtopics"
-    endpoint = endpoint_managed_nic_parent(key, bodies) if resource_type == "microsoft.network/networkinterfaces" else None
+    manager = MANAGER_PARENTS.get(resource_type, lambda *_: None)(key, bodies)
     if topic:
         parent = str(((bodies.get(key) or {}).get("properties") or {}).get("source", "")).lower()
-    elif endpoint:
-        parent = endpoint
+    elif manager:
+        parent = manager
     elif len(parts) > 3:
         parent = scope + "/providers/" + "/".join(parts[:-2])
     else:
