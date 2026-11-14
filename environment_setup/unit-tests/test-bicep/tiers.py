@@ -181,6 +181,8 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_private_endpoint_connection_reverse_link.py",
         "unit/test_private_endpoint_disconnect_churn.py",
         "unit/test_private_endpoint_nic_ownership.py",
+        "unit/test_project_deletion_aca_jobs.py",
+        "unit/test_project_deletion_aca_jobs_shell.py",
         "unit/test_project_deletion_foundry_children.py",
         "unit/test_project_deletion_lifecycle.py",
         "unit/test_project_deletion_pipelines.py",
