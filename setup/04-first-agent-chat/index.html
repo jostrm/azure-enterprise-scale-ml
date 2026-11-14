@@ -903,6 +903,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deploy-agent-chat-from-the-azure-portal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy Agent Chat from the Azure portal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploy Agent Chat from the Azure portal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prepare-the-runner-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare the runner once
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill-in-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill in the deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploy-with-the-app-cli-sdk-or-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy with the app, CLI, SDK or REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#connect-to-the-private-network" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2598,6 +2648,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deploy-agent-chat-from-the-azure-portal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy Agent Chat from the Azure portal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploy Agent Chat from the Azure portal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prepare-the-runner-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare the runner once
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill-in-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill in the deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploy-with-the-app-cli-sdk-or-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy with the app, CLI, SDK or REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#connect-to-the-private-network" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2817,6 +2917,109 @@ and then deploys them.</p>
 </tbody>
 </table>
 </details>
+<h2 id="deploy-agent-chat-from-the-azure-portal">Deploy Agent Chat from the Azure portal<a class="headerlink" href="#deploy-agent-chat-from-the-azure-portal" title="Permanent link">&para;</a></h2>
+<p><a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json"><img alt="Deploy ESAF Agent Chat to Azure" src="../../assets/repository/portal/agent-chat/deploy-button.svg" /></a></p>
+<p>This preview button <strong>runs the deployment</strong>, rather than opening this guide. After you select <strong>Review + create</strong>
+and <strong>Create</strong>, Azure runs the existing Agent Chat deployers on a prepared private Linux VM. They create
+the Foundry agent, build its knowledge index and deploy the private chat app with live voice.
+This is an <strong>existing-project</strong> route, not a new Factory bootstrap. The blue infrastructure-only button
+does not supply the models, sign-in registration or prepared runner required here.</p>
+<h3 id="prepare-the-runner-once">Prepare the runner once<a class="headerlink" href="#prepare-the-runner-once" title="Permanent link">&para;</a></h3>
+<p>Use a running Linux VM with the Azure VM agent and private DNS/routing to the project's Foundry, Search,
+Storage and Container Apps endpoints. It also needs outbound access to the approved Python package feed
+for the locked application dependencies and Linux wheels. Azure CLI, Bicep, Python 3.12 or newer with
+<code>venv</code> support, and Bash must already be installed. A project DSVM is not automatically a prepared runner.</p>
+<p>Keep a <strong>dedicated, persistent consumer checkout</strong> on that VM, including its accelerator submodule and the
+project's own <code>variables.json</code>. Do not point this deployment at a temporary ADO/GHA <code>_work</code> checkout:
+another pipeline can clean or replace it. The operator maintains the checkout and reviews its source;
+the button does not clone repositories, fetch a new revision, ask for Git credentials or overwrite configuration.
+Update the accelerator to a revision containing <code>bootstrap/lib/agent_chat_portal.py</code> before using the button.</p>
+<p>Prepare a separate operator environment in that checkout (replace the path with your actual location):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>/opt/esaf/consumer
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv-agent-operator
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>.venv-agent-operator/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-r<span class="w"> </span>azure-enterprise-scale-ml/usecase_code/40-agent-factory/requirements.txt
+</code></pre></div>
+<p>The live-voice deployer prepares its own application environment; do not mix it with the operator environment.
+Allow free disk space for an isolated copy of the accelerator source, application environment and downloaded wheels.
+The runner removes its temporary source, build files and Azure CLI credentials when the command exits normally.
+The four settings above, model deployments and Entra registration must be ready in the selected project's configuration.</p>
+<p>An administrator must attach an <strong>explicitly selected user-assigned managed identity</strong> to this VM and
+authorize it to deploy into the target Dev project. It needs Contributor and User Access Administrator
+on the project resource group, plus read access to the subscription and any referenced common resources.
+The shared build runner's default common-resource-group identity is <strong>not automatically authorized</strong> for this.
+The existing deployers create application identities and resource-scoped role assignments, including their
+own Foundry/Search/Storage data roles. The portal entry itself neither grants the runner permissions nor
+creates an Entra application registration.</p>
+<p>The person selecting <strong>Create</strong> also needs permission to deploy ARM templates in the runner's resource group
+and run commands on that VM, for example Virtual Machine Contributor. Run Command executes with
+administrator privileges on the VM; keep that permission and the maintained checkout restricted to trusted operators.</p>
+<h3 id="fill-in-the-deployment">Fill in the deployment<a class="headerlink" href="#fill-in-the-deployment" title="Permanent link">&para;</a></h3>
+<p>Select the <strong>subscription and resource group containing the runner VM</strong>, which can differ from the project's
+resource group. Then supply:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>runnerVmName</code></td>
+<td>Existing, running Linux VM in the selected resource group.</td>
+</tr>
+<tr>
+<td><code>runnerLocation</code></td>
+<td>The VM's Azure region; defaults to the selected resource group's region.</td>
+</tr>
+<tr>
+<td><code>consumerRoot</code></td>
+<td>Absolute persistent checkout path, for example <code>/opt/esaf/consumer</code>.</td>
+</tr>
+<tr>
+<td><code>pythonExecutable</code></td>
+<td>Absolute prepared operator interpreter, for example <code>/opt/esaf/consumer/.venv-agent-operator/bin/python</code>.</td>
+</tr>
+<tr>
+<td><code>managedIdentityClientId</code></td>
+<td>Client ID of the authorized user-assigned identity attached to that VM, not an object ID.</td>
+</tr>
+<tr>
+<td><code>projectSubscriptionId</code></td>
+<td>Subscription containing the Dev project; must match <code>variables.json</code> and the current tenant.</td>
+</tr>
+<tr>
+<td><code>projectNumber</code></td>
+<td>Existing project <code>001</code> to <code>999</code>; Dev only.</td>
+</tr>
+<tr>
+<td><code>configurationPath</code></td>
+<td>Optional project <code>variables.json</code> path; required when automatic project lookup is ambiguous.</td>
+</tr>
+<tr>
+<td><code>runId</code></td>
+<td>Generated rerun marker. Change it to execute a completed deployment again.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Selecting <strong>Create</strong> changes Azure and incurs application, model and embedding charges. Do not run this
+deployment and a project pipeline concurrently. Azure CLI authentication is isolated from other VM sessions.</p>
+</div>
+<p>Azure waits for the deployment script to finish, with a four-hour limit. A skipped stage, a failed deployer
+or a failed private <code>/health/ready</code> check fails the deployment instead of reporting a successful chat.
+The Run Command instance view shows the result and application URL; its captured output is limited to the
+last 4 KB. Read <code>runCommandResourceId</code> in the deployment outputs to find the command.
+After deployment, sign in from an authorized browser and try a question and live voice.</p>
+<p>For a failed run, fix the reported prerequisite and rerun with a new <code>runId</code>; there is no automatic rollback
+of Azure resources already created. No live Azure deployment is asserted by this template's offline coverage.
+For the implementation, see <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/portal/agent-chat/main.bicep">the portal template</a> and
+<a href="https://learn.microsoft.com/azure/virtual-machines/linux/run-command-managed">Microsoft's managed Run Command documentation</a>.
+Maintainers regenerate the published template with
+<code>bicep build portal/agent-chat/main.bicep --outfile portal/agent-chat/azuredeploy.json</code>.</p>
+<h2 id="deploy-with-the-app-cli-sdk-or-rest">Deploy with the app, CLI, SDK or REST<a class="headerlink" href="#deploy-with-the-app-cli-sdk-or-rest" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:5"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><input id="__tabbed_1_5" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">App</label><label for="__tabbed_1_2">CLI (PowerShell)</label><label for="__tabbed_1_3">CLI (bash)</label><label for="__tabbed_1_4">Python SDK</label><label for="__tabbed_1_5">REST (curl)</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
@@ -2832,50 +3035,50 @@ and then deploys them.</p>
 Mode</strong> page and in the <strong>Configuration wizard</strong>.</p>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">@{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  <span class="n">enableFactoryChatAgent</span>        <span class="p">=</span> <span class="s1">'true'</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  <span class="n">enableAIFactoryAgentLiveVoice</span> <span class="p">=</span> <span class="s1">'true'</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  <span class="n">aifactoryAgentEntraAppId</span>      <span class="p">=</span> <span class="s1">'&lt;client ID&gt;'</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  <span class="n">aifactoryAgentReaderObjectIds</span> <span class="p">=</span> <span class="s1">'&lt;object ID 1&gt;,&lt;object ID 2&gt;'</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">}</span> <span class="p">|</span> <span class="nb">ConvertTo-Json</span> <span class="p">|</span> <span class="nb">Set-Content</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">azurefactory</span> <span class="n">esaf</span> <span class="n">upsert-project</span> <span class="n">001</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-scale-set</span> <span class="n">001</span> <span class="p">-</span><span class="n">-settings-json</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span> <span class="p">-</span><span class="n">-wait</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">@{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  <span class="n">enableFactoryChatAgent</span>        <span class="p">=</span> <span class="s1">'true'</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  <span class="n">enableAIFactoryAgentLiveVoice</span> <span class="p">=</span> <span class="s1">'true'</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  <span class="n">aifactoryAgentEntraAppId</span>      <span class="p">=</span> <span class="s1">'&lt;client ID&gt;'</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  <span class="n">aifactoryAgentReaderObjectIds</span> <span class="p">=</span> <span class="s1">'&lt;object ID 1&gt;,&lt;object ID 2&gt;'</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span> <span class="p">|</span> <span class="nb">ConvertTo-Json</span> <span class="p">|</span> <span class="nb">Set-Content</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">azurefactory</span> <span class="n">esaf</span> <span class="n">upsert-project</span> <span class="n">001</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-scale-set</span> <span class="n">001</span> <span class="p">-</span><span class="n">-settings-json</span> <span class="p">.\</span><span class="n">agent-chat</span><span class="p">.</span><span class="n">json</span> <span class="p">-</span><span class="n">-wait</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>agent-chat.json<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="s">{</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="s">  "enableFactoryChatAgent": "true",</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="s">  "enableAIFactoryAgentLiveVoice": "true",</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s">  "aifactoryAgentEntraAppId": "&lt;client ID&gt;",</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s">  "aifactoryAgentReaderObjectIds": "&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s">}</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s">JSON</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>azurefactory<span class="w"> </span>esaf<span class="w"> </span>upsert-project<span class="w"> </span><span class="m">001</span><span class="w"> </span>dev<span class="w"> </span>--scale-set<span class="w"> </span><span class="m">001</span><span class="w"> </span>--settings-json<span class="w"> </span>./agent-chat.json<span class="w"> </span>--wait
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>agent-chat.json<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="s">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="s">  "enableFactoryChatAgent": "true",</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s">  "enableAIFactoryAgentLiveVoice": "true",</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s">  "aifactoryAgentEntraAppId": "&lt;client ID&gt;",</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s">  "aifactoryAgentReaderObjectIds": "&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="s">}</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="s">JSON</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>azurefactory<span class="w"> </span>esaf<span class="w"> </span>upsert-project<span class="w"> </span><span class="m">001</span><span class="w"> </span>dev<span class="w"> </span>--scale-set<span class="w"> </span><span class="m">001</span><span class="w"> </span>--settings-json<span class="w"> </span>./agent-chat.json<span class="w"> </span>--wait
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">job</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"001"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s2">"enableFactoryChatAgent"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">"enableAIFactoryAgentLiveVoice"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="s2">"aifactoryAgentEntraAppId"</span><span class="p">:</span> <span class="s2">"&lt;client ID&gt;"</span><span class="p">,</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="s2">"aifactoryAgentReaderObjectIds"</span><span class="p">:</span> <span class="s2">"&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span><span class="p">,</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">})</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">azurefactory</span><span class="w"> </span><span class="kn">import</span> <span class="n">esaf</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">job</span> <span class="o">=</span> <span class="n">esaf</span><span class="o">.</span><span class="n">upsert_project</span><span class="p">(</span><span class="s2">"001"</span><span class="p">,</span> <span class="s2">"dev"</span><span class="p">,</span> <span class="n">scale_set</span><span class="o">=</span><span class="s2">"001"</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="s2">"enableFactoryChatAgent"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="s2">"enableAIFactoryAgentLiveVoice"</span><span class="p">:</span> <span class="s2">"true"</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="s2">"aifactoryAgentEntraAppId"</span><span class="p">:</span> <span class="s2">"&lt;client ID&gt;"</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="s2">"aifactoryAgentReaderObjectIds"</span><span class="p">:</span> <span class="s2">"&lt;object ID 1&gt;,&lt;object ID 2&gt;"</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">})</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">])</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <p>In Bash, with <code>API_URL</code>, <code>API_KEY</code> and <code>FOLDER</code> set as in
 <a href="../02-create-factory/#create-the-factory">Quickstart: Create your AI Factory</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>jq<span class="w"> </span>-n<span class="w"> </span>--arg<span class="w"> </span>folder<span class="w"> </span><span class="s2">"</span><span class="nv">$FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="s1">'{folder: $folder, approved: true, project: "001", environment: "dev",</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="s1">  scale_set: "001",</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="s1">  settings: {enableFactoryChatAgent: "true", enableAIFactoryAgentLiveVoice: "true",</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="s1">    aifactoryAgentEntraAppId: "&lt;client ID&gt;", aifactoryAgentReaderObjectIds: "&lt;object ID 1&gt;,&lt;object ID 2&gt;"}}'</span><span class="w"> </span><span class="p">|</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/esaf/upsert-project"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span>--header<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>--data<span class="w"> </span>@-
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>jq<span class="w"> </span>-n<span class="w"> </span>--arg<span class="w"> </span>folder<span class="w"> </span><span class="s2">"</span><span class="nv">$FOLDER</span><span class="s2">"</span><span class="w"> </span><span class="s1">'{folder: $folder, approved: true, project: "001", environment: "dev",</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="s1">  scale_set: "001",</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s1">  settings: {enableFactoryChatAgent: "true", enableAIFactoryAgentLiveVoice: "true",</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s1">    aifactoryAgentEntraAppId: "&lt;client ID&gt;", aifactoryAgentReaderObjectIds: "&lt;object ID 1&gt;,&lt;object ID 2&gt;"}}'</span><span class="w"> </span><span class="p">|</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>curl<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>--fail-with-body<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API_URL</span><span class="s2">/api/v1/esaf/upsert-project"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$API_KEY</span><span class="s2">"</span><span class="w"> </span>--header<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>--data<span class="w"> </span>@-
 </code></pre></div>
 </div>
 </div>
@@ -2891,17 +3094,17 @@ Microsoft. Do this once per computer and Factory.</p>
 <ol>
 <li>Install Azure VPN Client:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="p">-</span><span class="n">-id</span> <span class="n">9NP355QT2SQB</span> <span class="p">-</span><span class="n">-source</span> <span class="n">msstore</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">-</span><span class="n">-accept-source-agreements</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="p">-</span><span class="n">-id</span> <span class="n">9NP355QT2SQB</span> <span class="p">-</span><span class="n">-source</span> <span class="n">msstore</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">-</span><span class="n">-accept-source-agreements</span>
 </code></pre></div>
 <ol>
 <li>Download your Factory's VPN profile. The gateway is in the common resource group:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">$sub</span> <span class="p">=</span> <span class="s1">'&lt;your Dev subscription ID&gt;'</span><span class="p">;</span> <span class="nv">$rg</span> <span class="p">=</span> <span class="s1">'&lt;common resource group&gt;'</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">$gateway</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">list</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].name"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nv">$url</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">vpn-client</span> <span class="n">generate</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-name</span> <span class="nv">$gateway</span> <span class="p">`</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  <span class="p">-</span><span class="n">-processor-architecture</span> <span class="n">Amd64</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">Invoke-WebRequest</span> <span class="nv">$url</span> <span class="n">-OutFile</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nb">Expand-Archive</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile"</span> <span class="n">-Force</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">$sub</span> <span class="p">=</span> <span class="s1">'&lt;your Dev subscription ID&gt;'</span><span class="p">;</span> <span class="nv">$rg</span> <span class="p">=</span> <span class="s1">'&lt;common resource group&gt;'</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">$gateway</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">list</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-query</span> <span class="s2">"[0].name"</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nv">$url</span> <span class="p">=</span> <span class="n">az</span> <span class="n">network</span> <span class="n">vnet-gateway</span> <span class="n">vpn-client</span> <span class="n">generate</span> <span class="p">-</span><span class="n">-subscription</span> <span class="nv">$sub</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="nv">$rg</span> <span class="p">-</span><span class="n">-name</span> <span class="nv">$gateway</span> <span class="p">`</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  <span class="p">-</span><span class="n">-processor-architecture</span> <span class="n">Amd64</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nb">Invoke-WebRequest</span> <span class="nv">$url</span> <span class="n">-OutFile</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nb">Expand-Archive</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile.zip"</span> <span class="s2">"$HOME\Downloads\esaf-vpn-profile"</span> <span class="n">-Force</span>
 </code></pre></div>
 <p>The profile is <code>esaf-vpn-profile\AzureVPN\azurevpnconfig.xml</code> in your Downloads folder. It stays out of
    your Factory repository.</p>
@@ -2916,8 +3119,8 @@ Microsoft. Do this once per computer and Factory.</p>
 <li>Connect your VPN, as in <a href="#connect-to-the-private-network">Connect to the private network</a>.</li>
 <li>Get the chat address:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">show</span> <span class="p">-</span><span class="n">-name</span> <span class="n">aifactory-agent-project001-dev</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">project</span> <span class="n">resource</span> <span class="n">group</span><span class="p">&gt;</span> <span class="p">`</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  <span class="p">-</span><span class="n">-query</span> <span class="n">properties</span><span class="p">.</span><span class="n">configuration</span><span class="p">.</span><span class="n">ingress</span><span class="p">.</span><span class="n">fqdn</span> <span class="p">-</span><span class="n">-output</span> <span class="n">tsv</span>
 </code></pre></div>
 <ol>
 <li>Open <code>https://&lt;that address&gt;/</code> in Edge, Chrome, Safari or Firefox, and sign in with Microsoft.</li>
