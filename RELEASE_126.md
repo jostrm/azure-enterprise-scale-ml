@@ -49,7 +49,7 @@ would give every job the 208 MB.
 
 | | `main` (`ebd300db`) | `release/v1.26` | Change |
 |---|---:|---:|---:|
-| Files | 3,234 | 2,708 | 540 removed, 14 added |
+| Files | 3,234 | 2,705 | 542 removed, 13 added |
 | Tree size | 1,553 MB | 295 MB | 81% smaller |
 | Shallow clone (`--depth 1 --single-branch`), time | 128 s | 15 s | 8 times faster |
 | Shallow clone, download | 1,147 MB | 208 MB | 5.5 times smaller |
@@ -92,14 +92,63 @@ Nothing is lost: every removed file is still on `main`.
 | 2 | Code that no pipeline, workflow, script, test or document names: 23 Bicep modules, 27 operator scripts in `esml-util`, 7 other scripts, 4 old dashboards, 4 ESML v1 pipeline definitions and 9 other files | 75 | 0.3 MB |
 | 3 | ESML v1, by decision: the v1 SDK packages (`esml`, `esmlrt`, `esmlfac`), its notebook, pipeline, Data Factory, Databricks and settings templates, the Azure ML SDK install scripts for v1 developer machines, and the v1 documentation | 337 | 14 MB |
 | Fix-up | Put back, because a kept document or test needs them: one Kong operator script and six tutorial packaging files | -7 | -0.06 MB |
+| 4 | The root: the empty `__init__.py` and `meta/graphify/.gitignore` (see "Round 4: the root"; its other removed files were made on this branch) | 2 | 0.0 MB |
 
-Per top-level folder: `environment_setup/` 219 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, repository root 1. In total 540 files and 1,258 MB.
+Per top-level folder: `environment_setup/` 219 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, `meta/` 1, repository root 2. In total 542 files and 1,258 MB. The folder names are the ones on `main`; "Round 4: the root" says where the kept parts are now.
 
 What stays of the two folders that held ESML v1:
 
-- `copy_my_subfolders_to_my_grandparent/` keeps the 23 files that are current: the ML Model Factory
+- `usecase_code/copy_my_subfolders_to_my_grandparent/` (at the root until round 4) keeps the 23 files that are current: the ML Model Factory
   templates in `dataops/azure-datafactory/` and `mlops/03_mlops_2026-09/`, and four readme files.
-- `esml/images/` keeps the 16 images that `README.md` and two v2 documents show.
+- The 16 images that `README.md` and two v2 documents show are kept; round 4 moved them from `esml/images/`
+  to `documentation/images/esml/`.
+
+## Round 4: the root
+
+The repository root now shows four folders and four Markdown files. Joakim, before this round: "This is
+a bad example. Too many folders, and md." Nothing was deleted that was in use: the components moved one
+level down, and four files that nothing reads went. Every path under `environment_setup/`, `bootstrap/`
+and `usecase_code/` before this round is unchanged, and the two start scripts stay at the root.
+
+| At the root | Before (`4b6e7c1e`) | After |
+|---|---:|---:|
+| Folders (`.github/` and `.claude/` not counted) | 10 | 4 |
+| Other dot-folders | 1 (`.compact-repo/`) | 0 |
+| Markdown files | 13 | 4 |
+| Other files | 7 | 6 |
+| Files in the branch | 2,708 | 2,705 |
+
+2,708 - 4 removed + 1 added = 2,705; 259 files moved. The four folders are `bootstrap/`, `documentation/`,
+`environment_setup/` and `usecase_code/`; the four Markdown files are `README.md`, `RELEASE_126.md`,
+`AGENTS.md` and `CLAUDE.md`. The other files are the two start scripts, `LICENSE`, `.gitignore`,
+`.gitattributes` and `.compact-repo.yml`. `unit/test_repository_root_layout.py` (tier 1) fails when the
+root grows again.
+
+Removed (4 files):
+
+- `.compact-repo/manifest.json` and `.compact-repo/report.md`, the report that compact-repo wrote into the
+  branch. The profile now sets `embed_report: false`, so the report stays next to the plan.
+- `meta/graphify/.gitignore`. The graph that `environment_setup/graphify/generate.py` writes to
+  `meta/graphify/` by default is generated and never committed; the root `.gitignore` now ignores it.
+- `__init__.py` at the root, an empty file. No folder at the root is a Python package, so no import
+  resolves through it.
+
+### Moved paths
+
+| Old path | New path | Files | Who names the old path |
+|---|---|---:|---|
+| `esml-v2/` | `usecase_code/esml-v2/` | 71 | This repository: updated (build backend, pytest path, the ML Model Factory examples and notebooks, the churn agent's requirements, v2 docs). Links to `main` keep the old path, where it still exists. No consumer hit in the earlier scan. |
+| `mcp/` | `usecase_code/mcp/` | 60 | This repository: updated. Pink names `mcp` in one file: follow-up, not changed here. |
+| `healthmodel/` | `usecase_code/healthmodel/` | 80 | This repository: updated, including the two health model pipeline templates in `copy_to_local_settings`. Orange names `healthmodel/` once: follow-up, not changed here. |
+| `copy_my_subfolders_to_my_grandparent/` | `usecase_code/copy_my_subfolders_to_my_grandparent/` | 23 | This repository: updated (ML Model Factory tests, template defaults, v2 docs). Consumers copy its subfolders; no consumer hit in the earlier scan. |
+| `esml/images/` | `documentation/images/esml/` | 16 | `README.md` and two v2 pages: updated. `esml/` is gone. |
+| `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md` | `.github/<same name>` | 4 | GitHub reads them in `.github/`. The architecture vault: updated. |
+| `RELEASE_120.md`, `RELEASE_123.md`, `RELEASE_124.md`, `RELEASE_125.md`, `ROADMAP_MAIN.md` | `documentation/releases/<same name>` | 5 | The Agent Factory knowledge corpus (`config.example.json`, `mcp_gateway.py`) and the architecture vault: updated. The documentation site links them on `main`, where they still are. |
+| | | **259** | |
+
+Follow-ups for the consumers (not done here): orange's one `healthmodel/` path and pink's one `mcp` path
+must gain the `usecase_code/` prefix when they move to v1.26. The consumer hits come from the scan before
+this round (14 November 2026); the consumer repositories were not read again.
 
 ## What got faster
 
@@ -162,7 +211,7 @@ Azure DevOps tasks 62, 63, 69a and 69b.
 | Bicep: all 25 entry points compiled, 696 flag cases | Passed on both, same 208 reachable templates. |
 | Syntax phase (pipelines, workflows, scripts) | Passed on both. |
 | 16 component test suites (CLI, ESML v2, ML Model Factory, Agent Factory and its agents, MCP, health model, lifecycle function, API examples and more), Ubuntu | Same result on both for every suite. In total 8,206 passed, 133 failed and 49 errors, the same tests on both. Most failures and errors are packages that the plain environment of this check does not install (for example `skops`, `nbformat` and, for the churn agent, `azure_esml`). |
-| Azure DevOps consumer repository: 81 files and 10 folders it names inside this repository | All present. |
+| Azure DevOps consumer repository: 81 files and 10 folders it names inside this repository | All present before round 4. Round 4 moved `healthmodel/`, which it names once (see "Round 4: the root"). |
 | Round 3, default tiers, Ubuntu and Windows | Green. |
 | Round 3, all five tiers, before and after | 9,631 tests on both. Ubuntu: 9,439 passed and 166 failed. Windows: 9,446 passed and 166 failed. The same tests before and after. |
 | Round 3, the 16 component suites, before and after | Same result for every suite, with one exception that is not caused by the round: the ESML v2 test `test_example_notebook_executes_actual_in2silver_merge_and_mlflow_inference` depends on row order and fails about every second run. The same job on the same commit passed when run again. |
@@ -188,7 +237,7 @@ v1.26 should contain.
    by a test, a document or a script, and some belong to parts with their own deployment. The list is in
    the appendix.
 3. **What is left of ESML v1.** v1 was removed in round 3. Two things remain: the 16 images under
-   `esml/images/`, and four v2 pages that still describe v1 steps (24 legacy setup, 32, 33 and 35).
+   `documentation/images/esml/`, and four v2 pages that still describe v1 steps (24 legacy setup, 32, 33 and 35).
    The pages can be dropped, or rewritten to send the reader to `release/v1.24`.
 4. **The four named components stay whole:** Agent Factory, ML Model Factory, ESML v2 and the CLI. Their
    entry points do not reach every file in them.
@@ -238,7 +287,7 @@ project automation, the simple application gateway), so this is a list to review
 - `bootstrap/lib/all-factories-dashboard.bicep`
 - `bootstrap/lib/simple-app-gateway-network.bicep`
 - `bootstrap/lib/simple-app-gateway.bicep`
-- `copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/main.bicep`
+- `usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/main.bicep`
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep`
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/actionGroup.bicep`
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/budget.resourcegroup.bicep`
@@ -310,14 +359,14 @@ project automation, the simple application gateway), so this is a list to review
 - `environment_setup/aifactory/bicep/modules/rbacRGlevelAml.bicep`
 - `environment_setup/aifactory/bicep/modules/virtualMachinePublic.bicep`
 - `environment_setup/aifactory/bicep/personas/custom-roles.bicep`
-- `healthmodel/bicep/main.bicep`
-- `healthmodel/bicep/modules/action-group.bicep`
-- `healthmodel/bicep/modules/reader-role.bicep`
-- `mcp/infra/main.bicep`
-- `mcp/infra/modules/application.bicep`
-- `mcp/infra/modules/identity.bicep`
-- `mcp/infra/modules/registry-pull.bicep`
-- `mcp/infra/modules/role-assignments.bicep`
+- `usecase_code/healthmodel/bicep/main.bicep`
+- `usecase_code/healthmodel/bicep/modules/action-group.bicep`
+- `usecase_code/healthmodel/bicep/modules/reader-role.bicep`
+- `usecase_code/mcp/infra/main.bicep`
+- `usecase_code/mcp/infra/modules/application.bicep`
+- `usecase_code/mcp/infra/modules/identity.bicep`
+- `usecase_code/mcp/infra/modules/registry-pull.bicep`
+- `usecase_code/mcp/infra/modules/role-assignments.bicep`
 - `usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/function-app.bicep`
 - `usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/roles.bicep`
 - `usecase_code/40-agent-factory/40-aifactory-agent/infra/application.bicep`
