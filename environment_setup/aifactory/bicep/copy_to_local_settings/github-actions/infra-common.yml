@@ -904,7 +904,7 @@ jobs:
             --parameters common_subnet_scoring_cidr="${{ env.common_subnet_scoring_cidr }}" \
             --parameters common_pbi_subnet_name="${{ env.common_pbi_subnet_name }}" \
             --parameters common_pbi_subnet_cidr="${{ env.common_pbi_subnet_cidr }}" \
-            --parameters common_bastion_subnet_name="AzureBastionSubnet" \ 
+            --parameters common_bastion_subnet_name="AzureBastionSubnet" \
             --parameters common_bastion_subnet_cidr="${{ env.common_bastion_subnet_cidr }}" \
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
