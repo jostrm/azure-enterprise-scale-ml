@@ -220,13 +220,13 @@ steps:
       currentCapacity="$(az rest --method get --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --query sku.capacity --output tsv)"
       if [[ "$currentSku" != "$(apimGatewaySku)" || "$currentCapacity" != "$(apimGatewaySkuCapacity)" ]]; then
         az rest --method patch --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --headers 'If-Match=*' --body "{\"sku\":{\"name\":\"$(apimGatewaySku)\",\"capacity\":$(apimGatewaySkuCapacity)}}"
-        for attempt in {1..180}; do
+        for attempt in {1..540}; do  # 540 x 10s = 90 min, the old 180 x 30s
           state="$(az rest --method get --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --query properties.provisioningState --output tsv)"
           case "$state" in
             Succeeded) break ;;
             Failed|Canceled) echo "##vso[task.logissue type=error]APIM SKU update ended in state $state."; exit 1 ;;
           esac
-          sleep 30
+          sleep 10
         done
         if [[ "$state" != "Succeeded" ]]; then
           echo "##vso[task.logissue type=error]Timed out waiting for the APIM SKU update."

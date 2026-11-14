@@ -5184,7 +5184,7 @@ steps:
      # actually unblocks the project caphost in 69b.
      list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-04-01-preview"
 
-     max_attempts=60   # 60 x 20s = 20 min
+     max_attempts=240  # 240 x 5s = 20 min (same budget as the old 60 x 20s)
      prov_state="NotFound"
      for i in $(seq 1 $max_attempts); do
        caphost_list=$(az rest --method GET --url "$list_url" -o json 2>/dev/null || echo "")
@@ -5192,7 +5192,7 @@ steps:
 
        if [ "$caphost_count" = "0" ] || [ -z "$caphost_list" ]; then
          echo "  [$i/$max_attempts] No account caphosts present yet — platform may still be provisioning..."
-         sleep 20
+         sleep 5
          continue
        fi
 
@@ -5215,7 +5215,7 @@ steps:
        fi
 
        prov_state=$(echo "$caphost_list" | jq -r '.value[0].properties.provisioningState')
-       sleep 20
+       sleep 5
      done
 
      echo "##[warning]Account capability host did not reach Succeeded within 20 min (last state: $prov_state)."

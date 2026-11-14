@@ -3861,12 +3861,12 @@ jobs:
             caphost_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-04-01-preview"
             echo "Account caphost: $caphost_display_name"
 
-            max_attempts=45   # 45 x 20s = 15 min
+            max_attempts=180  # 180 x 5s = 15 min (same budget as the old 45 x 20s)
             for i in $(seq 1 $max_attempts); do
               caphost_json=$(az rest --method GET --url "$caphost_url" -o json 2>/dev/null || echo "")
               if [ -z "$caphost_json" ]; then
                 echo "  [$i/$max_attempts] Account caphost not found yet — platform may still be provisioning..."
-                sleep 20
+                sleep 5
                 continue
               fi
 
@@ -3881,7 +3881,7 @@ jobs:
                 exit 1
               fi
 
-              sleep 20
+              sleep 5
             done
 
             echo "::warning::Account capability host did not reach Succeeded within 15 min (last state: $prov_state)."

@@ -3898,7 +3898,8 @@ aif_deploy_simple_application_gateway() {
     hostname="$AIF_APP_GATEWAY_HOSTNAME" backendFqdn="$AIF_APP_GATEWAY_BACKEND_FQDN" \
     certificateSecretId="$AIF_APP_GATEWAY_CERT_SECRET_ID" costCenter="$AIF_COST_CENTER" --output none
   local attempt
-  for attempt in {1..20}; do
+  # 60 x 10s = 10 min, the same budget as the old 20 x 30s.
+  for attempt in {1..60}; do
     if az network application-gateway show-backend-health --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
         --resource-group "$common_rg" --name "$gateway_name" --output json \
         > "$AIF_STATE_DIR/appgw-health.json" 2>/dev/null &&
@@ -3908,7 +3909,7 @@ aif_deploy_simple_application_gateway() {
       aif_success "Private HTTPS Application Gateway is provisioned and its backend probe is healthy."
       return 0
     fi
-    sleep 30
+    sleep 10
   done
   aif_error "Application Gateway is provisioned but not healthy. Check private DNS/routing, trusted HTTPS backend certificate and unauthenticated GET / returning 200-399. No public fallback was enabled; the scale set is not marked complete." >&2
   return 1
