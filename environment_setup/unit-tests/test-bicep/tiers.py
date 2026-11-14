@@ -240,6 +240,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_subnet_purpose_churn.py",
         "unit/test_time_budgets.py",
         "unit/test_vnet_embedded_subnet_backlinks.py",
+        "unit/test_vm_managed_disk_ownership.py",
         "unit/test_vnet_etag_churn.py",
     )),
     Tier(5, "capacity", "Preflight and capacity: capacity preflight, regional and SKU fallback, "
