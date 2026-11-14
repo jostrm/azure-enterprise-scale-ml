@@ -3,8 +3,8 @@
 **Release notes** &nbsp; | &nbsp; **14 November 2026** &nbsp; | &nbsp; branch `release/v1.26`
 
 v1.26 is v1.25 made small. It has the same features as `main` on 14 November 2026 (commit `ebd300db`),
-with everything removed that nothing uses, and with fixed waits in the pipelines replaced by checks of
-the real condition. It adds no feature and changes no Bicep template, variable or API version.
+with what nothing uses removed, and with fixed waits in the pipelines replaced by checks of the real
+condition. It adds no feature. No deployed Bicep template, no variable and no API version was changed.
 
 Use it when you want the AI Factory as a submodule that clones in seconds:
 
@@ -18,7 +18,7 @@ git submodule add -b release/v1.26 --depth 1 https://github.com/jostrm/azure-ent
 
 | | `main` (`ebd300db`) | `release/v1.26` | Change |
 |---|---:|---:|---:|
-| Files | 3,235 | 3,031 | 210 removed, 7 added |
+| Files | 3,234 | 3,031 | 210 removed, 7 added |
 | Tree size | 1,553 MB | 309 MB | 80% smaller |
 | Shallow clone (`--depth 1 --single-branch`), time | 158 s | 19 s | 8 times faster |
 | Shallow clone, download | 1,147 MB | 218 MB | 5 times smaller |
@@ -40,7 +40,8 @@ A file stays when one of these reaches it, directly or through other files:
 - the Factory API and the configuration wizards, which read files from this repository;
 - the Azure DevOps consumer repository that the release was checked against.
 
-Tests and documents follow what they belong to. They never keep code alive on their own.
+Tests follow what they belong to. They never keep code alive on their own. Documents that the rules
+keep by name still keep what they link to; that is one reason for the open decisions below.
 
 The rules are in [`.compact-repo.yml`](.compact-repo.yml). The file-by-file result of the last round is
 in [`.compact-repo/report.md`](.compact-repo/report.md).
@@ -93,8 +94,9 @@ and stays.
 
 | Check | Result |
 |---|---|
-| Main test suite, all five tiers, Ubuntu: `main` state against v1.26 | 9,616 tests on both. 9,424 passed and 166 failed on both, the same tests. The 166 failures are in tiers 4 and 5 and exist on `main`. |
-| Main test suite, all five tiers, Windows | 9,616 tests on both. 9,431 passed and 166 failed on both, the same tests. |
+| Main test suite, all five tiers, Ubuntu | Before: 9,616 tests, 9,424 passed, 166 failed. After round 1: the same, test by test. After round 2 and two of the three performance changes: 9,625 tests, 9,433 passed, 166 failed. No test that passed before fails. Three test cases left with the three removed Key Vault secret modules, and 12 are new. The 166 failures are in tiers 4 and 5 and exist on `main`. |
+| Main test suite, all five tiers, Windows | Before and after round 1: 9,616 tests, 9,431 passed, 166 failed, the same tests. After round 2 and two of the three performance changes: 9,625 tests, 9,440 passed, 166 failed. No test that passed before fails. |
+| Main test suite, default tiers, on the final commits | Green on Ubuntu and Windows after round 1, after round 2 and after the performance changes. |
 | Bicep: all 25 entry points compiled, 696 flag cases | Passed on both, same 208 reachable templates. |
 | Syntax phase (pipelines, workflows, scripts) | Passed on both. |
 | 16 component test suites (CLI, ESML v2, ML Model Factory, Agent Factory and its agents, MCP, health model, lifecycle function, API examples and more), Ubuntu | Same result on both for every suite. In total 8,206 passed, 133 failed and 49 errors, the same tests on both. Most failures and errors are packages that the plain environment of this check does not install (for example `skops`, `nbformat` and, for the churn agent, `azure_esml`). |
@@ -117,8 +119,8 @@ v1.26 should contain.
    by a test, a document or a script, and some belong to parts with their own deployment. The list is in
    the appendix.
 3. **ESML v1.** The notebook templates in `copy_my_subfolders_to_my_grandparent/` stay whole, and with them
-   61 files of the `esml/` and `esmlrt/` packages and the Azure ML SDK install folders. v1 is either kept
-   whole or removed whole.
+   57 files of the `esml/` and `esmlrt/` packages and the Azure ML SDK install folders. The rest of those
+   packages is already gone, so v1 should be either restored whole or removed whole.
 4. **The four named components stay whole:** Agent Factory, ML Model Factory, ESML v2 and the CLI. Their
    entry points do not reach every file in them.
 5. **The documentation site source,** `documentation/gh-io/` (35 MB). The site is published from `main`.
