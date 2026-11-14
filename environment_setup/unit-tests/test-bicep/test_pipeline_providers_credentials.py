@@ -245,6 +245,8 @@ def test_oversize_env_file_is_rejected_before_subprocess_or_read(tmp_path):
 
 
 def test_dispatch_loads_only_explicit_env_before_download(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("TF_BUILD", raising=False)
     monkeypatch.setattr(credentials.subprocess, "run", untracked)
     path = tmp_path / ".env"
     path.write_text("GH_TOKEN=" + TOKEN)
@@ -261,12 +263,31 @@ def test_dispatch_loads_only_explicit_env_before_download(tmp_path, monkeypatch,
     assert TOKEN not in str(capsys.readouterr())
 
 
-def test_pipeline_job_cannot_load_a_local_env_file(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("provider,environment", [
+    ("gha", {}),
+    ("ado", {}),
+    (None, {"GITHUB_ACTIONS": "true"}),
+    (None, {"TF_BUILD": "true"}),
+    (None, {"TF_BUILD": "True"}),
+], ids=["gha-argument", "ado-argument", "gha-runner", "ado-runner", "ado-runner-mixed-case"])
+def test_pipeline_job_cannot_load_a_local_env_file(tmp_path, monkeypatch, capsys, provider, environment):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("TF_BUILD", raising=False)
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(dispatch, "load_dispatch_env",
+                        lambda *_a, **_k: pytest.fail("Provider job must not read a local env file"))
+    monkeypatch.setattr(dispatch, "download_input",
+                        lambda *_a, **_k: pytest.fail("Provider job must refuse before downloading input"))
     path = tmp_path / ".env"
     path.write_text("GH_TOKEN=" + TOKEN)
-    assert dispatch.main(["--request", "request.json", "--job-provider", "gha",
-                          "--download-input", "--env-file", str(path)]) == 2
-    assert "local-dispatch-env-file-only" in capsys.readouterr().err
+    arguments = ["--request", "request.json", "--download-input", "--env-file", str(path)]
+    if provider is not None:
+        arguments.extend(["--job-provider", provider])
+    assert dispatch.main(arguments) == 2
+    captured = capsys.readouterr()
+    assert "local-dispatch-env-file-only" in captured.err
+    assert TOKEN not in captured.out + captured.err
 
 
 @pytest.mark.parametrize("name", [".env", ".env.local", "configs/private.env", ".env/variables.json"])
