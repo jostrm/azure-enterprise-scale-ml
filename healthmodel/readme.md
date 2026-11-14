@@ -337,7 +337,7 @@ health history and annotations).
 | --- | --- |
 | [Retry](https://learn.microsoft.com/azure/architecture/patterns/retry) | `RetryingTransport`: only transient faults (408, 429, 5xx); non-idempotent POST actions only on 429 |
 | [Circuit Breaker](https://learn.microsoft.com/azure/architecture/patterns/circuit-breaker) | `CircuitBreakerTransport`: opens after 5 consecutive transient faults for 30 s; retries stop when it opens |
-| [Health Endpoint Monitoring](https://learn.microsoft.com/azure/architecture/patterns/health-endpoint-monitoring) | The health models, and external probes reported as signals ([`03_external_signals.py`](usecase_code/03_external_signals.py)) |
+| [Health Endpoint Monitoring](https://learn.microsoft.com/azure/architecture/patterns/health-endpoint-monitoring) | The health models, and external probes reported as signals ([`03_external_signals.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/03_external_signals.py)) |
 | [External Configuration Store](https://learn.microsoft.com/azure/architecture/patterns/external-configuration-store) | Model definitions and the catalog live outside the code; consumer folders override built-ins |
 | [Anti-Corruption Layer](https://learn.microsoft.com/azure/architecture/patterns/anti-corruption-layer) | Ports and adapters isolate the preview `Microsoft.CloudHealth` API and the Azure CLI |
 | [Deployment Stamps](https://learn.microsoft.com/azure/architecture/patterns/deployment-stamp) | One model per project stamp, rolled up by the common model |
@@ -749,12 +749,12 @@ transient ARM faults. Every deploy also annotates the root timeline (`event=aifa
 
 | Script | Shows |
 | --- | --- |
-| [`01_read_health.py`](usecase_code/01_read_health.py) | Workload and layer state, drill-down to failing signals, transitions, signal history, annotations |
-| [`02_alerts.py`](usecase_code/02_alerts.py) | List alerts, acknowledge or close, configure alerts on an entity (`--apply` to change) |
-| [`03_external_signals.py`](usecase_code/03_external_signals.py) | Synthetic HTTP probe reported as an expiring external signal; release annotations |
-| [`04_ai_triage.py`](usecase_code/04_ai_triage.py) | Triage note from a Foundry deployment (validated with `gpt-6.1-sol` over the private endpoint) built only from health data; advisory, changes nothing |
-| [`05_mcp_tools.py`](usecase_code/05_mcp_tools.py) | `tools/list` and `tools/call` the way an MCP server uses [`tools.py`](src/aifactory_healthmodel/tools.py) |
-| [`06_multiple_models.py`](usecase_code/06_multiple_models.py) | Several models in one run: composition root, an in-code definition next to the built-in ones, event subscribers, the facade; `--demo` runs offline on the anonymized test factory |
+| [`01_read_health.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/01_read_health.py) | Workload and layer state, drill-down to failing signals, transitions, signal history, annotations |
+| [`02_alerts.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/02_alerts.py) | List alerts, acknowledge or close, configure alerts on an entity (`--apply` to change) |
+| [`03_external_signals.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/03_external_signals.py) | Synthetic HTTP probe reported as an expiring external signal; release annotations |
+| [`04_ai_triage.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/04_ai_triage.py) | Triage note from a Foundry deployment (validated with `gpt-6.1-sol` over the private endpoint) built only from health data; advisory, changes nothing |
+| [`05_mcp_tools.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/05_mcp_tools.py) | `tools/list` and `tools/call` the way an MCP server uses [`tools.py`](src/aifactory_healthmodel/tools.py) |
+| [`06_multiple_models.py`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/usecase_code/06_multiple_models.py) | Several models in one run: composition root, an in-code definition next to the built-in ones, event subscribers, the facade; `--demo` runs offline on the anonymized test factory |
 
 All scripts accept `--model-id` or `--subscription --resource-group --name`, and `--auth cli|identity`
 (06 takes the factory configuration instead). Read-only examples use a read-only transport; write
@@ -941,6 +941,6 @@ healthmodel/
     infrastructure/             azure_cli, identity, resilience, proxies, offline
     bootstrap.py, container.py  composition root and DI container
     naming, catalog, client, cli, deploy, tools, triage
-  usecase_code/                 01-06 examples
+  usecase_code/                 01-06 examples (on main; not part of release/v1.26)
   tests/                        unit, contract, golden-master and opt-in live tests; fixtures
 ```

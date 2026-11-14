@@ -220,6 +220,22 @@ roots:
   - path: "copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/**"
     reason: "ML Model Factory MLOps template for Azure DevOps and GitHub; accelerator/tests/test_orchestration_matrix.py reads it."
 
+  # --- Restored after the independent proof run (2026-11-14): kept files need these by relative path --------
+  - path: "environment_setup/aigateway/kong/scripts/restart-kong.ps1"
+    reason: "Operator script named in a kept doc (R5): environment_setup/aigateway/readme.md, 'Updating Kong Configuration', runs .\\kong\\scripts\\restart-kong.ps1 after an upload. The analyzer does not read backslash paths in fenced blocks."
+  - path: "environment_setup/install_tutorial_guide/scripts/Publish-TutorialApp.ps1"
+    reason: "Subject of the kept test install_tutorial_guide/tests/Test-Distribution.ps1 (R8), required there by relative path."
+  - path: "environment_setup/install_tutorial_guide/scripts/Validate-VideoCatalog.ps1"
+    reason: "Subject of the kept test install_tutorial_guide/tests/Test-Distribution.ps1 (R8), required there by relative path."
+  - path: "environment_setup/install_tutorial_guide/installer/ESAIF.TutorialApp.iss"
+    reason: "Read by Test-Distribution.ps1 and compiled by Publish-TutorialApp.ps1."
+  - path: "environment_setup/install_tutorial_guide/installer/licenses/Apache-2.0.txt"
+    reason: "Copied into the payload by Publish-TutorialApp.ps1; Test-Distribution.ps1 checks the copy."
+  - path: "environment_setup/install_tutorial_guide/installer/licenses/OpenSans-NOTICES.txt"
+    reason: "Copied into the payload by Publish-TutorialApp.ps1."
+  - path: "environment_setup/install_tutorial_guide/SUPPORT.txt"
+    reason: "Required by Test-Distribution.ps1 and copied into the payload by Publish-TutorialApp.ps1."
+
 externals:
   # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule
   # checkout (bootstrap/lib/factory_lifecycle.py and siblings), copies workflows out of it, compiles its

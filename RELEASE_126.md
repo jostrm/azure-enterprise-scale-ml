@@ -12,8 +12,35 @@ ESML v1, the first-generation SDK with its notebook templates, is not part of th
 Use it when you want the AI Factory as a submodule that clones in seconds:
 
 ```bash
-git submodule add -b release/v1.26 --depth 1 https://github.com/jostrm/azure-enterprise-scale-ml azure-enterprise-scale-ml
+git clone --depth 1 --single-branch --branch release/v1.26 https://github.com/jostrm/azure-enterprise-scale-ml azure-enterprise-scale-ml
+git submodule add -b release/v1.26 https://github.com/jostrm/azure-enterprise-scale-ml azure-enterprise-scale-ml
+git submodule absorbgitdirs azure-enterprise-scale-ml
 ```
+
+Run them in the root of your own repository, then commit. They download 218 MB.
+
+It takes three commands because the short form, `git submodule add -b release/v1.26 --depth 1 <url>`,
+works only for a repository's default branch. For any other branch git first downloads the default
+branch (`main`, 1,147 MB) and then stops with "is not a commit and a branch cannot be created from it"
+(seen with git 2.43).
+
+A colleague's fresh clone of your repository, and every pipeline job, gets the submodule with
+`git submodule update --init --depth 1`. That works, but for the same reason it downloads `main` first:
+1,151 MB in 63 s, measured on 14 November 2026. To get only the commit your repository pins (218 MB in
+15 s), fetch that commit directly:
+
+```bash
+sha=$(git ls-tree HEAD azure-enterprise-scale-ml | awk '{print $3}')
+git submodule init azure-enterprise-scale-ml
+git init --quiet azure-enterprise-scale-ml
+git -C azure-enterprise-scale-ml fetch --quiet --depth 1 https://github.com/jostrm/azure-enterprise-scale-ml "$sha"
+git -C azure-enterprise-scale-ml checkout --quiet --detach FETCH_HEAD
+git submodule absorbgitdirs azure-enterprise-scale-ml
+```
+
+`unit/test_release_consume_recipe.py` runs both blocks against a local repository and fails if they stop
+working. The pipeline templates still use the standard checkout; see "Not done" for the change that
+would give every job the 218 MB.
 
 `--aifactory-version 126` selects this branch in the launchers.
 

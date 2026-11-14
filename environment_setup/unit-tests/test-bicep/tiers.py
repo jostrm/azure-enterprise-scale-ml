@@ -72,6 +72,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_readiness_poll_intervals.py",
         "unit/test_release_branch_checkout.py",
         "unit/test_release_branch_names.py",
+        "unit/test_release_consume_recipe.py",
         "unit/test_release_version.py",
         "unit/test_repository_gitlinks.py",
         "unit/test_shared_acr_update.py",

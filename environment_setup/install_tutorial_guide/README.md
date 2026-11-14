@@ -57,12 +57,12 @@ security boundary. The code is requested on every launch; there is no remembered
 
 Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab)
-- [SHA256SUMS.txt](SHA256SUMS.txt)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab)
+- [SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_tutorial_guide/SHA256SUMS.txt)
 - [Build receipt](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi.json)
 
 Paste the **whole block** into PowerShell, then press **Enter** after the final `}`.
