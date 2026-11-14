@@ -269,9 +269,13 @@ limits:
 
 verify:
   # Run with Python 3.12, environment_setup/unit-tests/test-bicep/requirements.txt installed, and the
-  # pinned Bicep compiler from ci/install-bicep.sh plus PowerShell 7 on PATH. Offline: LIVE_AZURE=0.
+  # pinned Bicep compiler from ci/install-bicep.sh, PowerShell 7 and the Azure CLI on PATH. Offline: LIVE_AZURE=0.
+  # The unit command uses tiers 1-3, the selection GitHub CI runs on every push and the one that passes on
+  # the base. `--tiers all` has 167 known failures on the base (tiers 4 and 5; the nightly CI run has been red
+  # since 2026-11-08), so it cannot tell a missed dependency from an old failure. The release run executes
+  # `--tiers all` on both trees itself and compares the two JUnit files test by test.
   - name: iac-unit
-    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --tiers all
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --tiers 1-3
     timeout_minutes: 45
   - name: iac-syntax
     run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase syntax
