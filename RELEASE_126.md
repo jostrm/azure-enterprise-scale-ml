@@ -6,6 +6,9 @@ v1.26 is v1.25 made small. It has the same features as `main` on 14 November 202
 with what nothing uses removed, and with fixed waits in the pipelines replaced by checks of the real
 condition. It adds no feature. No deployed Bicep template, no variable and no API version was changed.
 
+ESML v1, the first-generation SDK with its notebook templates, is not part of this branch. It lives on
+`main` and on `release/v1.24`. ESML v2 and the ML Model Factory are here.
+
 Use it when you want the AI Factory as a submodule that clones in seconds:
 
 ```bash
@@ -18,14 +21,15 @@ git submodule add -b release/v1.26 --depth 1 https://github.com/jostrm/azure-ent
 
 | | `main` (`ebd300db`) | `release/v1.26` | Change |
 |---|---:|---:|---:|
-| Files | 3,234 | 3,031 | 210 removed, 7 added |
-| Tree size | 1,553 MB | 309 MB | 80% smaller |
+| Files | 3,234 | 2,694 | 547 removed, 7 added |
+| Tree size | 1,553 MB | 295 MB | 81% smaller |
 | Shallow clone (`--depth 1 --single-branch`), time | 158 s | 19 s | 8 times faster |
 | Shallow clone, download | 1,147 MB | 218 MB | 5 times smaller |
 | Bicep files | 320 | 297 | 23 unused modules removed |
 | Sleeps of 20 s or longer in the five pipeline and script files that changed | 16 | 4 | see "What got faster" |
 
-The clone was measured once on a laptop on 14 November 2026, before the second removal round.
+The clone was measured once on a laptop on 14 November 2026, after the first of the three removal rounds.
+The branch is smaller now.
 `main` has moved on since `ebd300db`; later commits on `main` are not in this branch.
 
 ## What "used" means here
@@ -55,8 +59,15 @@ Nothing is lost: every removed file is still on `main`.
 | 1 | Installer binaries: the MAUI Config Wizard and the tutorial guide (current and older sets). The docs link them on `main`. | 56 | 1,226 MB |
 | 1 | Files nothing reaches: parts of the ESML v1 SDK and its images, health model examples, one workspace file | 79 | 17 MB |
 | 2 | Code that no pipeline, workflow, script, test or document names: 23 Bicep modules, 27 operator scripts in `esml-util`, 7 other scripts, 4 old dashboards, 4 ESML v1 pipeline definitions and 9 other files | 75 | 0.3 MB |
+| 3 | ESML v1, by decision: the v1 SDK packages (`esml`, `esmlrt`, `esmlfac`), its notebook, pipeline, Data Factory, Databricks and settings templates, the Azure ML SDK install scripts for v1 developer machines, and the v1 documentation | 337 | 14 MB |
 
-Per top-level folder: `environment_setup/` 142 files (1,227 MB), `esml/` 54 (17 MB), `healthmodel/` 7, `esmlrt/` 6, repository root 1. In total 210 files and 1,244 MB.
+Per top-level folder: `environment_setup/` 226 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, repository root 1. In total 547 files and 1,258 MB.
+
+What stays of the two folders that held ESML v1:
+
+- `copy_my_subfolders_to_my_grandparent/` keeps the 23 files that are current: the ML Model Factory
+  templates in `dataops/azure-datafactory/` and `mlops/03_mlops_2026-09/`, and four readme files.
+- `esml/images/` keeps the 16 images that `README.md` and two v2 documents show.
 
 ## What got faster
 
@@ -101,7 +112,10 @@ and stays.
 | Syntax phase (pipelines, workflows, scripts) | Passed on both. |
 | 16 component test suites (CLI, ESML v2, ML Model Factory, Agent Factory and its agents, MCP, health model, lifecycle function, API examples and more), Ubuntu | Same result on both for every suite. In total 8,206 passed, 133 failed and 49 errors, the same tests on both. Most failures and errors are packages that the plain environment of this check does not install (for example `skops`, `nbformat` and, for the churn agent, `azure_esml`). |
 | Azure DevOps consumer repository: 81 files and 10 folders it names inside this repository | All present. |
-| Kept files that name a removed file | None. |
+| Round 3, default tiers, Ubuntu and Windows | Green. |
+| Round 3, all five tiers, before and after | 9,631 tests on both. Ubuntu: 9,439 passed and 166 failed. Windows: 9,446 passed and 166 failed. The same tests before and after. |
+| Round 3, the 16 component suites, before and after | Same result for every suite, with one exception that is not caused by the round: the ESML v2 test `test_example_notebook_executes_actual_in2silver_merge_and_mlflow_inference` depends on row order and fails about every second run. The same job on the same commit passed when run again. |
+| Kept files that name a removed file | 14 references, none of them a link that worked before. 11 are path mentions and consumer-side links in four v2 pages that still describe ESML v1 steps (pages 24, 32, 33 and 35), 2 are mentions in the architecture notes, and 1 is a false match in a test. Three links that did work were changed to point at `release/v1.24`. |
 
 Not checked: no deployment to Azure was run from this branch. The checks are static analysis, compilation
 and the offline test suites.
@@ -111,16 +125,16 @@ and the offline test suites.
 These would make the branch smaller still. They are not applied, because each is a choice about what
 v1.26 should contain.
 
-1. **Three Config Wizard archives, 145 MB of the remaining size.** `install_config_wizard/` for Linux,
+1. **Three Config Wizard archives, 145 MB of the remaining 295 MB.** `install_config_wizard/` for Linux,
    Windows and macOS. The release manifest and the lifecycle function's install script read them from the
    checkout.
 2. **89 more Bicep files outside the 25 main entry points.** The Bicep compile matrix reaches 208 of the
    320 files from its 25 entry points. Round 2 removed the 23 that nothing names. The other 89 are named
    by a test, a document or a script, and some belong to parts with their own deployment. The list is in
    the appendix.
-3. **ESML v1.** The notebook templates in `copy_my_subfolders_to_my_grandparent/` stay whole, and with them
-   57 files of the `esml/` and `esmlrt/` packages and the Azure ML SDK install folders. The rest of those
-   packages is already gone, so v1 should be either restored whole or removed whole.
+3. **What is left of ESML v1.** v1 was removed in round 3. Two things remain: the 16 images under
+   `esml/images/`, and four v2 pages that still describe v1 steps (24 legacy setup, 32, 33 and 35).
+   The pages can be dropped, or rewritten to send the reader to `release/v1.24`.
 4. **The four named components stay whole:** Agent Factory, ML Model Factory, ESML v2 and the CLI. Their
    entry points do not reach every file in them.
 5. **The documentation site source,** `documentation/gh-io/` (35 MB). The site is published from `main`.
