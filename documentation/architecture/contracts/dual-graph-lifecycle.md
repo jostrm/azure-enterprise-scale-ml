@@ -6,7 +6,7 @@ sources:
   - documentation/architecture/contracts/Packaging-and-Release.md
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/dual_graph.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py
-  - mcp/src/aifactory_mcp/graph.py
+  - usecase_code/mcp/src/aifactory_mcp/graph.py
   - environment_setup/graphify/generate.py
   - environment_setup/graphify/static_runner.py
   - environment_setup/graphify/requirements.txt
@@ -17,13 +17,13 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_dual_graph.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_integration.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_packaging.py
-  - mcp/tests/test_dual_graph.py
-  - mcp/tests/test_graph_protocol.py
-  - mcp/tests/test_graph_release.py
+  - usecase_code/mcp/tests/test_dual_graph.py
+  - usecase_code/mcp/tests/test_graph_protocol.py
+  - usecase_code/mcp/tests/test_graph_release.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/dual_graph.py::class:DualGraphStore
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
-  - mcp/src/aifactory_mcp/graph.py::function:call
+  - usecase_code/mcp/src/aifactory_mcp/graph.py::function:call
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---
 # Dual-graph lifecycle

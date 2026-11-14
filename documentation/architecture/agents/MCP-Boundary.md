@@ -2,16 +2,16 @@
 id: mcp-boundary
 status: observed
 sources:
-  - mcp/src/aifactory_mcp/server.py
-  - mcp/src/aifactory_mcp/backend.py
-  - mcp/src/aifactory_mcp/runtime.py
-  - mcp/src/aifactory_mcp/auth.py
-  - mcp/src/aifactory_mcp/access.py
-  - mcp/src/aifactory_mcp/health.py
-  - mcp/src/aifactory_mcp/host.py
-  - mcp/readme.md
-  - mcp/src/aifactory_mcp/graph.py
-  - mcp/src/aifactory_mcp/policy.py
+  - usecase_code/mcp/src/aifactory_mcp/server.py
+  - usecase_code/mcp/src/aifactory_mcp/backend.py
+  - usecase_code/mcp/src/aifactory_mcp/runtime.py
+  - usecase_code/mcp/src/aifactory_mcp/auth.py
+  - usecase_code/mcp/src/aifactory_mcp/access.py
+  - usecase_code/mcp/src/aifactory_mcp/health.py
+  - usecase_code/mcp/src/aifactory_mcp/host.py
+  - usecase_code/mcp/readme.md
+  - usecase_code/mcp/src/aifactory_mcp/graph.py
+  - usecase_code/mcp/src/aifactory_mcp/policy.py
   - usecase_code/40-agent-factory/agent_factory/mcp_gateway.py
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-policy-fragments.bicep
@@ -30,24 +30,24 @@ sources:
   - environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh
   - documentation/v2/20-29/29-factory-MCP.md
 tests:
-  - mcp/tests/test_server.py
-  - mcp/tests/test_auth.py
-  - mcp/tests/test_application_runtime.py
-  - mcp/tests/test_backend.py
-  - mcp/tests/test_host.py
-  - mcp/tests/test_health.py
-  - mcp/tests/test_dual_graph.py
-  - mcp/tests/test_graph_protocol.py
-  - mcp/tests/test_graph_release.py
+  - usecase_code/mcp/tests/test_server.py
+  - usecase_code/mcp/tests/test_auth.py
+  - usecase_code/mcp/tests/test_application_runtime.py
+  - usecase_code/mcp/tests/test_backend.py
+  - usecase_code/mcp/tests/test_host.py
+  - usecase_code/mcp/tests/test_health.py
+  - usecase_code/mcp/tests/test_dual_graph.py
+  - usecase_code/mcp/tests/test_graph_protocol.py
+  - usecase_code/mcp/tests/test_graph_release.py
   - usecase_code/40-agent-factory/tests/test_mcp_gateway.py
   - usecase_code/40-agent-factory/tests/test_apim_gateway_policies.py
   - environment_setup/unit-tests/test-bicep/unit/test_mcp_ai_gateway_flags.py
   - environment_setup/unit-tests/test-bicep/unit/test_mcp_api_sp_script.py
 graph_symbols:
-  - mcp/src/aifactory_mcp/server.py::function:create_server
-  - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
-  - mcp/src/aifactory_mcp/backend.py::function:AgentBackend.call_tool
-  - mcp/src/aifactory_mcp/graph.py::function:call
+  - usecase_code/mcp/src/aifactory_mcp/server.py::function:create_server
+  - usecase_code/mcp/src/aifactory_mcp/backend.py::class:AgentBackend
+  - usecase_code/mcp/src/aifactory_mcp/backend.py::function:AgentBackend.call_tool
+  - usecase_code/mcp/src/aifactory_mcp/graph.py::function:call
 reviewed_source: '1f76c0a0 + managed APIM provisioning working tree; observed 2026-10-21'
 ---
 # MCP boundary
@@ -123,7 +123,7 @@ When the AI gateway pipeline runs APIM through the opt-in reviewed runner
 a run whose apply reached the runner's `configuration` phase (`gatewayConfigured`). With the switch
 off (default) its gate is unchanged.
 
-An MCP app deployed outside the step (the `mcp/deploy/rollout.py` pilot in Spider) is adopted by
+An MCP app deployed outside the step (the `usecase_code/mcp/deploy/rollout.py` pilot in Spider) is adopted by
 `aifactoryMcpContainerAppResourceId`. Adoption is ownership-safe by construction: the app must be in
 the project resource group, must not carry the step's owner tags, and must accept the configured
 audience; the step then only appends missing callers and `factory.read` grants (one template PATCH,
@@ -156,4 +156,4 @@ The adapter validates closed bounded arguments and calls shared `DualGraphStore.
 
 See [[Factory-API-and-SDK]], [[Agent-Factory]], [[Health-Models]], [[Reviewed-Operations]], [[Trust-and-Authorization]], [[ADR-001-Dual-Graph]] and [[Index]].
 
-Authority: [repository MCP contracts and deployment caveats](../../../mcp/readme.md), [private Azure MCP example](../../../usecase_code/40-agent-factory/44-azure-mcp/readme.md).
+Authority: [repository MCP contracts and deployment caveats](../../../usecase_code/mcp/readme.md), [private Azure MCP example](../../../usecase_code/40-agent-factory/44-azure-mcp/readme.md).

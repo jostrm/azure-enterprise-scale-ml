@@ -12,7 +12,7 @@ The documentation follows the layers of the factory, from the bottom up:
 | 2. ADO / GHA pipelines | The pipelines that deploy the Bicep and run the late project steps | [Setup (ADO)](../10-19/13-setup-aifactory.md), [Setup (GHA)](../10-19/13-setup-aifactory-gha.md) |
 | 3. Factory API | The shared Python API behind the Config Wizards (Tkinter and MAUI) | [CLI, API and usage](../10-19/17-cli-and-api-and-usage.md), [API usage examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md) |
 | 4. CLI / Python SDK | `azurefactory` CLI and `AzureFactoryClient`, thin clients over the API | [Get started](../10-19/18-cli-and-api-and-usage.md), [CLI readme](../../../environment_setup/azurefactory-cli/readme.md) |
-| 5. **AI Factory MCP** | **This page**: the factory tools for agents | [MCP readme (developer depth)](../../../mcp/readme.md) |
+| 5. **AI Factory MCP** | **This page**: the factory tools for agents | [MCP readme (developer depth)](../../../usecase_code/mcp/readme.md) |
 | 6. ESAIF Chat Agent | The chat and voice agent for people, on the same governed core | [29. ESAIF Chat Agent](./29-ESAIF-Chat-Agent.md) |
 | Knowledge | The dual knowledge graphs that the MCP and the agent can cite | [29. Dual knowledge graphs](./29-dual-knowledge-graphs.md) |
 | Gateways | Native AI Gateway SKU, classic APIM, Kong | [29. AI Gateways](./29-factory-AI-Gateways.md) |
@@ -72,7 +72,7 @@ The pipeline-hosted MCP exposes the read-only tools, under the namespace `aifact
 | `factory_capabilities` | Which operations, versions and features this factory supports |
 | `factory_skills` | The skills, their argument schemas, required permissions and current blockers |
 
-The full MCP server (the operator or local mode in the [MCP readme](../../../mcp/readme.md)) also has catalog,
+The full MCP server (the operator or local mode in the [MCP readme](../../../usecase_code/mcp/readme.md)) also has catalog,
 settings, cost and operation tools: `factory_catalog`, `factory_settings`, `cost_default_project_idle`,
 `cost_common_idle`, `cost_monthly_project_forecast`, `factory_operations`, `factory_operation`,
 `factory_operation_status`, and the **prepare** tools `factory_prepare_create`, `factory_prepare_add_project`,
@@ -103,7 +103,7 @@ curl -s https://<apim>.azure-api.net/enterprise-scale-ai-factory/mcp \
 ```
 
 **Locally, for development** (stdio, no Azure needed): see
-[Local stdio server and client](../../../mcp/readme.md#local-stdio-server-and-client).
+[Local stdio server and client](../../../usecase_code/mcp/readme.md#local-stdio-server-and-client).
 
 **Plan the pipeline step without writing anything** (GET only):
 

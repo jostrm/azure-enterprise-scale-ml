@@ -138,12 +138,12 @@ Python 3.11 or later is required. Run from this folder in PowerShell:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-  -r ..\usecase_code\40-agent-factory\40-aifactory-agent\requirements.txt `
-  -e ..\environment_setup\azurefactory-cli `
+  -r ..\40-agent-factory\40-aifactory-agent\requirements.txt `
+  -e ..\..\environment_setup\azurefactory-cli `
   -e ".[dev]"
 
 $Python = (Resolve-Path .\.venv\Scripts\python.exe).Path
-$Config = (Resolve-Path ..\usecase_code\40-agent-factory\40-aifactory-agent\config.example.json).Path
+$Config = (Resolve-Path ..\40-agent-factory\40-aifactory-agent\config.example.json).Path
 $Scope = "project001-dev"
 $ObjectId = "<your explicitly authorized Entra object UUID>"
 ```
@@ -189,7 +189,7 @@ Standard MCP host configuration shape (replace paths and identity):
 {
   "mcpServers": {
     "enterprise-scale-ai-factory": {
-      "command": "C:\\path\\to\\purple\\mcp\\.venv\\Scripts\\python.exe",
+      "command": "C:\\path\\to\\purple\\usecase_code\\mcp\\.venv\\Scripts\\python.exe",
       "args": [
         "-m", "aifactory_mcp", "serve",
         "--config", "C:\\private\\agent-config.json",

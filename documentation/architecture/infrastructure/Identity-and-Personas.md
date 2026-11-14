@@ -123,7 +123,7 @@ bridge), and the service grants keep their original conditions, so groups-v1 fac
 already RBAC, change nothing. The deployment identity needs `Microsoft.Authorization/roleAssignments/write`
 on the vaults: the bootstrap gives it Contributor and User Access Administrator on each subscription, which
 also covers switching an existing vault's permission model. Readers outside Bicep already used RBAC: the
-MCP (`mcp/infra/modules/role-assignments.bicep`), the lifecycle Function (`infra/roles.bicep`) and the
+MCP (`usecase_code/mcp/infra/modules/role-assignments.bicep`), the lifecycle Function (`infra/roles.bicep`) and the
 seeding vault (created with `--enable-rbac-authorization true`; a BYO access-policy seeding vault keeps
 its policies).
 

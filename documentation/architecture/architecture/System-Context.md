@@ -7,10 +7,10 @@ sources:
   - bootstrap/lib/factory_lifecycle.py
   - environment_setup/azurefactory-cli/src/azurefactory/client.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/tools.py
-  - mcp/src/aifactory_mcp/backend.py
+  - usecase_code/mcp/src/aifactory_mcp/backend.py
 tests:
   - environment_setup/azurefactory-cli/tests/test_client.py
-  - mcp/tests/test_backend.py
+  - usecase_code/mcp/tests/test_backend.py
 graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/client.py::class:AzureFactoryClient
   - bootstrap/lib/factory_lifecycle.py::function:validate_manifest

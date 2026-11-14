@@ -5,12 +5,12 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/ports.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/knowledge.py
-  - mcp/src/aifactory_mcp/runtime.py
+  - usecase_code/mcp/src/aifactory_mcp/runtime.py
   - documentation/architecture/Index.md
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_services.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
-  - mcp/tests/test_runtime.py
+  - usecase_code/mcp/tests/test_runtime.py
 graph_symbols: []
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---

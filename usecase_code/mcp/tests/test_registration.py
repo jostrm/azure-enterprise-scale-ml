@@ -295,7 +295,7 @@ def test_generated_config_matches_application_auth_and_real_agent_grant(target, 
     from aifactory_mcp.auth import ApplicationAuthSettings, READ_ONLY_APPLICATION_TOOLS
 
     agent_root = (
-        Path(__file__).resolve().parents[2] / "usecase_code" / "40-agent-factory" / "40-aifactory-agent"
+        Path(__file__).resolve().parents[3] / "usecase_code" / "40-agent-factory" / "40-aifactory-agent"
     )
     monkeypatch.syspath_prepend(str(agent_root))
     from aifactory_agent.config import Grant

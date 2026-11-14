@@ -6,16 +6,16 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
-  - mcp/src/aifactory_mcp/auth.py
-  - mcp/src/aifactory_mcp/server.py
-  - mcp/src/aifactory_mcp/access.py
+  - usecase_code/mcp/src/aifactory_mcp/auth.py
+  - usecase_code/mcp/src/aifactory_mcp/server.py
+  - usecase_code/mcp/src/aifactory_mcp/access.py
   - bootstrap/lib/factory_lifecycle_contract.txt
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
-  - mcp/tests/test_auth.py
+  - usecase_code/mcp/tests/test_auth.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:principal_from_token
@@ -51,4 +51,4 @@ This vault contains safe source descriptions and relative evidence references, n
 
 See [[Reviewed-Operations]], [[Identity-and-Personas]], [[MCP-Boundary]], [[Chat-and-Grounding]], [[Retrieval-Provenance]], [[ADR-001-Dual-Graph]] and [[Index]].
 
-Authority: [agent security boundary](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md), [MCP identity boundary](../../../mcp/readme.md), [lifecycle trust and coordination](../../../bootstrap/lib/factory_lifecycle_contract.txt).
+Authority: [agent security boundary](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md), [MCP identity boundary](../../../usecase_code/mcp/readme.md), [lifecycle trust and coordination](../../../bootstrap/lib/factory_lifecycle_contract.txt).

@@ -44,7 +44,7 @@ not exist or does not list the APIM identity yet. Stage/Prod runs skip it (the M
 
 ## Adopt an MCP app deployed outside the pipeline (`aifactoryMcpContainerAppResourceId`)
 
-An MCP app that was deployed another way (for example the pilot rollout `mcp/deploy/rollout.py`,
+An MCP app that was deployed another way (for example the pilot rollout `usecase_code/mcp/deploy/rollout.py`,
 which made `aifactory-mcp-project001-dev` in Spider) can be adopted instead of creating
 `aifactory-mcp-p001-dev` next to it. Set `aifactoryMcpContainerAppResourceId` to its resource ID
 (requires `enableAIFactoryMCP` and `enableAIFoundry`; `enableContainerApps`, `aifactoryMcpImage` and `aifactoryMcpApiImage` are then not needed, because the app keeps its own environment and images).

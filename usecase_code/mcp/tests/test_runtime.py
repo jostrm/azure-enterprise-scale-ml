@@ -11,8 +11,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 
-ROOT = Path(__file__).resolve().parents[2]
-MCP = ROOT / "mcp"
+ROOT = Path(__file__).resolve().parents[3]
+MCP = ROOT / "usecase_code" / "mcp"
 AGENT = ROOT / "usecase_code" / "40-agent-factory" / "40-aifactory-agent"
 SDK = ROOT / "environment_setup" / "azurefactory-cli" / "src"
 for source in (SDK, AGENT):

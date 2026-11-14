@@ -183,7 +183,7 @@ def identity_entry(object_id, client_id):
 
 
 def with_adopted_app(arm, callers=((guid(1), guid(2)),), audience=APP_REG, tags=None, containers=None):
-    """A Container App deployed outside this integration (for example by mcp/deploy/rollout.py)."""
+    """A Container App deployed outside this integration (for example by usecase_code/mcp/deploy/rollout.py)."""
     settings = {"scopes": {gw.SCOPE_KEY: {}}, "factory": {"writes_enabled": False},
                 "auth": {"client_id": audience, "audience": audience, "grants": [
                     {"object_id": object_id, "scopes": [gw.SCOPE_KEY], "permissions": ["factory.read"]}

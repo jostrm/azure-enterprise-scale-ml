@@ -10,7 +10,7 @@ Flags (exact names) drive one late project-pipeline step:
 - addAIFactoryMCP2APIM adds the AI gateway pipeline's APIM (apimGateway* variables) to those callers, and
   apim_parameters() gives that pipeline the apim-mcp-server.bicep parameters that publish the MCP on it.
 - aifactoryMcpContainerAppResourceId (optional) adopts an MCP app deployed outside this step (for example
-  by mcp/deploy/rollout.py): only its caller lists grow; images, identity, secrets and ingress stay.
+  by usecase_code/mcp/deploy/rollout.py): only its caller lists grow; images, identity, secrets and ingress stay.
 
 False never deletes or detaches anything. Resources are only created or updated when this integration
 owns them (tags or a description marker); foreign resources with the derived names are refused. Every

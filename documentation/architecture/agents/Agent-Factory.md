@@ -127,7 +127,7 @@ The model can propose or explain; backend authorization determines scope. Platfo
 
 The application has a compatibility speech shell and an opt-in native Voice Live realtime engine. Both reuse the common prepared-turn grounding/read-tool policy; native streaming is not another privileged agent or an external full-text answer chain. Language profiles and voice mode are operator-owned configuration, not deployment intent from a spoken request. Voice-only failure must not invalidate authenticated text chat. Native streamed speech is provisional until final citation checks (see [[Chat-and-Grounding]]); local tests do not establish the installed live revision.
 
-Private Azure MCP in `44-azure-mcp` is a separate narrow Azure resource-read integration from this repository's `mcp` Factory API adapter. Neither name implies arbitrary shell access or unrestricted Azure writes.
+Private Azure MCP in `44-azure-mcp` is a separate narrow Azure resource-read integration from this repository's `usecase_code/mcp` Factory API adapter. Neither name implies arbitrary shell access or unrestricted Azure writes.
 
 ## Split-table sales example
 

@@ -55,7 +55,7 @@ ARM = {
 
 def bicep_sources():
     """Purple's own Bicep: the accelerator templates (not debug copies), the MCP and the use-case infra."""
-    paths = [*BICEP.rglob("*.bicep"), *(ROOT / "mcp/infra").rglob("*.bicep"),
+    paths = [*BICEP.rglob("*.bicep"), *(ROOT / "usecase_code/mcp/infra").rglob("*.bicep"),
              *(ROOT / "usecase_code").rglob("*.bicep")]
     return sorted(path for path in paths if "debug" not in path.relative_to(ROOT).parts
                   and ".build" not in path.relative_to(ROOT).parts)
@@ -362,7 +362,7 @@ def test_script_expiry_is_one_year_ahead_in_utc(tmp_path):
 
 
 def rollout_one_year_from_now():
-    source = (ROOT / "mcp/deploy/rollout.py").read_text(encoding="utf-8")
+    source = (ROOT / "usecase_code/mcp/deploy/rollout.py").read_text(encoding="utf-8")
     function = next(node for node in ast.parse(source).body
                     if isinstance(node, ast.FunctionDef) and node.name == "one_year_from_now")
     namespace = {"datetime": datetime, "timezone": timezone}

@@ -27,7 +27,7 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 | `copy_my_subfolders_to_my_grandparent` | Maintained distributable DataOps/MLOps/GenAIOps, settings and notebook templates; copied destinations become consumer-owned. Not merely disposable generated output. |
 | `esml`, `esmlfac`, `esmlrt` | Retained SDK-v1-era implementation and contracts. `ESMLFactory` imports controllers/comparison/scoring from `esmlrt`; these are real code, not empty folders, but not the new v2 API. |
 | `usecase_code/esml-v2` | Maintained `azure-esml-sdk` / `azure_esml` pipeline factory. Bundles canonical model-factory engines when building, not a second maintained implementation. |
-| `healthmodel`, `mcp` | Active working source for health modeling and repository MCP. Unpublished code is not installed-service evidence. |
+| `healthmodel`, `usecase_code/mcp` | Active working source for health modeling and repository MCP. Unpublished code is not installed-service evidence. |
 | `usecase_code/40-agent-factory` | Shared operator plus separately configured runtime/examples; `40-aifactory-agent` is the current grounded Factory application reviewed here. |
 | `usecase_code/50-ml-model-factory/accelerator` | Maintainer-owned engines, scripts, schemas and tests in the **current relocated layout**. Former root `src` and `tests` paths must not be cited as current. |
 | Model-factory `user-config`, project copies | User-editable scenarios, storage and backend choices; examples are not customer authorization. |

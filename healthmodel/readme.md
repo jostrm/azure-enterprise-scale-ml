@@ -101,7 +101,7 @@ golden masters captured from the procedural planner before the change are reprod
 and a live what-if against the deployed models shows no configuration change
 ([section 15](#15-validation-in-the-test-environment)).
 
-Not treated as defects: the `mcp/` package and `usecase_code/40-agent-factory` were being changed by
+Not treated as defects: the `usecase_code/mcp/` package and `usecase_code/40-agent-factory` were being changed by
 separate in-flight work during this session and were left untouched. The repository tests that failed
 before this work are fixed, see [section 14](#14-tests-and-test-driven-design).
 
