@@ -42,7 +42,8 @@ roots:
     reason: "Purple CI: manual placeholder; reaches no repo file."
   - path: ".github/workflows/verify-aifactory-prod.yml"
     reason: "Purple CI: manual placeholder; reaches no repo file."
-  # Not a root: .github/workflows/deploy-docs.yml publishes the docs site from main only (see drop).
+  # Not a root: .github/workflows/deploy-docs.yml publishes the docs site from main only. It stays as a
+  # test dependency (see the note under drop).
 
   # --- Start and bootstrap -----------------------------------------------------------------------
   - path: "00-start.sh"
@@ -190,6 +191,29 @@ roots:
   - path: "environment_setup/graphify/generate.py"
     reason: "Graph maintenance entry point named in AGENTS.md."
 
+  # --- Test framework: pytest loads these and the tests import them ------------------------------------
+  # Tests follow what they test and never keep code alive, so the test framework itself has to be named.
+  - path: "environment_setup/unit-tests/test-bicep/app/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/base/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/domain/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/unit/__init__.py"
+    reason: "Package marker: the unit tests import each other's helpers through it."
+  - path: "environment_setup/unit-tests/test-bicep/pytest.ini"
+    reason: "pytest configuration that run_ci.py relies on."
+  - path: "environment_setup/unit-tests/test-bicep/conftest.py"
+    reason: "pytest fixtures for every test in the folder."
+  - path: "environment_setup/unit-tests/test-bicep/requirements.txt"
+    reason: "What CI installs before run_ci.py."
+  - path: "mcp/usecase_code/**"
+    reason: "Examples that mcp/tests import (test_health.py, test_registration.py)."
+  - path: "environment_setup/install_config_wizard/SHA256SUMS.txt"
+    reason: "Read by unit/test_install_config_wizard_downloads.py."
+  - path: "environment_setup/install_config_wizard/windows/SHA256SUMS.txt"
+    reason: "Read by unit/test_install_config_wizard_downloads.py."
+
 externals:
   # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule
   # checkout (bootstrap/lib/factory_lifecycle.py and siblings), copies workflows out of it, compiles its
@@ -251,7 +275,9 @@ drop:
   - "environment_setup/install_tutorial_guide/*.cab"          # current TutorialApp set: docs link it on main by URL
   - "environment_setup/install_tutorial_guide/*.msi"
   # --- Docs site: published from main only ----------------------------------------------------------------
-  - ".github/workflows/deploy-docs.yml"
+  # .github/workflows/deploy-docs.yml is NOT dropped: two kept CLI tests read it
+  # (azurefactory-cli/tests/test_documentation_site.py and test_documentation_tabs.py), and it only
+  # triggers on main.
 
 followers:
   tests:
