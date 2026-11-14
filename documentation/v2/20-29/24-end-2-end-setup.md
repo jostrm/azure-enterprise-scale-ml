@@ -52,11 +52,11 @@ The four tools below remain clients of the same Factory API. See the
 
 ### Execution routes
 
-| Route | Responsibility |
-|---|---|
-| **API-2-Pipelines** | The Factory API prepares/orchestrates execution; provider pipelines perform the selected work. |
-| **API-2-ARM** | The Factory API or its host-side worker performs Azure operations. |
-| **Pipelines-only** | The additional opt-in route: pipelines must own preparation, approval handling, execution, persistence, observation and recovery, without the Factory API. |
+| Route | Responsibility | Recommended
+|---|---|---|
+| **API-2-Pipelines** | The Factory API prepares/orchestrates execution; provider pipelines perform the selected work. | Recommended:Yes
+| **API-2-ARM** | The Factory API or its host-side worker performs Azure operations. | Recommended:No. Only advanced users
+| **Pipelines-only** | The additional opt-in route: pipelines must own preparation, approval handling, execution, persistence, observation and recovery, without the Factory API. | Recommended:No. Only advanced users
 
 These are execution owners, not interchangeable CLI aliases. An API-prepared envelope
 executed by a pipeline is still **API-2-Pipelines**, not API-independent. Calls from
