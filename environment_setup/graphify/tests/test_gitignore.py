@@ -12,10 +12,12 @@ IGNORED = (
     ".graph-work-20271231/anything.json",
     "environment_setup/graphify/graphify-out/cache/ast/v0.9.72-s4/0a91.json",
     "graphify-out/graph.json",
+    "meta/graphify/graph.json",
+    "meta/graphify/current.json",
+    "meta/graphify/snapshots/0a91/graph.json",
 )
 KEPT = (
     "environment_setup/graphify/generate.py",
-    "meta/graphify/.gitignore",
     "documentation/architecture/Index.md",
 )
 

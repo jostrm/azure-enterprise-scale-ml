@@ -29,8 +29,9 @@ bundle instructions are in
 `documentation/architecture/contracts/dual-graph-lifecycle.md`.
 
 If MCP tools are unavailable, use the shared local query CLI against the
-operator-approved `meta/graphify` root. Do not load the entire graph or vault into
-the prompt. If snapshots are absent/stale/incomplete, report that explicitly and
+operator-approved graph root. By default that is `meta/graphify`: a local folder
+that the generator writes and Git ignores, so it is not part of this repository.
+Do not load the entire graph or vault into the prompt. If snapshots are absent/stale/incomplete, report that explicitly and
 inspect source directly where authorized. A deployed agent without source access
 must report that limitation, not pretend to inspect a workstation.
 

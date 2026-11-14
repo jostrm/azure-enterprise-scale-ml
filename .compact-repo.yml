@@ -282,7 +282,6 @@ keep:
   # --- Knowledge graph (R9) ------------------------------------------------------------------------------
   - "documentation/architecture/**"
   - "environment_setup/graphify/**"
-  - "meta/graphify/.gitignore"
   # --- Named components (R2): whole until Joakim has decided on their unreached files ------------------
   - "usecase_code/40-agent-factory/**"          # Agent Factory            (decision D5)
   - "usecase_code/50-ml-model-factory/**"       # ML Model Factory         (decision D5)
@@ -457,4 +456,5 @@ verify:
 self_heal:
   max_rounds: 5
 
-embed_report: true             # writes .compact-repo/manifest.json and report.md into the branch
+embed_report: false            # true would write .compact-repo/manifest.json and report.md into the branch;
+                               # the root holds no other dot-folder than .github and .claude (round 4)

@@ -77,8 +77,9 @@ A file stays when one of these reaches it, directly or through other files:
 Tests follow what they belong to. They never keep code alive on their own. Documents that the rules
 keep by name still keep what they link to; that is one reason for the open decisions below.
 
-The rules are in [`.compact-repo.yml`](.compact-repo.yml). The file-by-file result of the last round is
-in [`.compact-repo/report.md`](.compact-repo/report.md).
+The rules are in [`.compact-repo.yml`](.compact-repo.yml). The file-by-file report of a round is written
+next to the plan, outside the branch: the profile sets `embed_report: false` since round 4, so the tool
+no longer adds a `.compact-repo` folder to the root.
 
 ## What was removed
 

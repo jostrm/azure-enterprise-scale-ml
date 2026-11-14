@@ -62,6 +62,9 @@ coverage.xml
 # Graphify generation scratch (source copies, graphify-out/ and its AST cache); graphs ship as snapshots
 /.graph-work-*/
 graphify-out/
+# The generated graph corpus (default output of environment_setup/graphify/generate.py) is delivered
+# through verified, explicitly pinned bundles and is never committed
+/meta/graphify/
 
 # Translations
 *.mo
