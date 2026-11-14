@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "provider": "gha",
+  "repository": "https://github.com/REPLACE_OWNER/REPLACE_REPOSITORY",
+  "consumer_ref": "refs/heads/main"
+}

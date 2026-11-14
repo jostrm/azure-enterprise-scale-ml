@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import ipaddress
+from itertools import islice
 import json
 import os
 import re
@@ -848,7 +849,7 @@ def subnet_plan(cidr: str) -> dict[str, str]:
     if network.prefixlen > 20:
         raise ValueError("The AI Factory vNet must be /20 or larger; /16 is recommended")
 
-    subnets = list(network.subnets(new_prefix=26))
+    subnets = list(islice(network.subnets(new_prefix=26), 4))
     if len(subnets) < 4:
         raise ValueError(f"{cidr} does not contain the four required /26 common subnets")
     return {

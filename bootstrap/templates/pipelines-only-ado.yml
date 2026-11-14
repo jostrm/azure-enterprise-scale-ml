@@ -1,0 +1,357 @@
+# Copy to pipelines-only-ado.yml in the consumer repository.
+# The fixed service connection must use workload identity federation; environments
+# must enforce approval/checks. The external Linux pool must survive all teardown.
+# This file is a complete pipeline, not a steps template.
+# Bundle source: committed <request_path>.artifact.json; UI does not upload files.
+# Optional protected variables: ESAF_PROVIDER_CREDENTIAL_SOURCE=keyvault and
+# ESAF_PROVIDER_TOKEN_SECRET_ID=https://<vault>.vault.azure.net/secrets/<name>[/<version>].
+# A human/script seeds the external vault first; grant WIF identity secret-get on
+# that reference and private network reachability. Vault, identity and runner must
+# survive teardown. ADO native credentials are OAuth bearer tokens, NOT PATs.
+# Without opt-in, optional protected ESAF_PROVIDER_TOKEN overrides System.AccessToken.
+# Verified continuations queue this pinned pipeline with a new ManualValidation.
+# Child preparation waits for the exact predecessor mutating finalizer to succeed.
+# Hosted Complete observes finalized intended outcomes before pipeline success.
+# Parent UUID/hash selects finalized continuation;
+# recovery UUID/hash selects retained-claim reconciliation with a NEW reviewed
+# operation. The selectors are mutually exclusive; neither rebinds prior origin.
+trigger: none
+pr: none
+parameters:
+  - name: request_path
+    type: string
+  - name: correlation_id
+    type: string
+    default: ''
+  - name: request_digest
+    type: string
+    default: ''
+  - name: consumer_commit
+    type: string
+    default: ''
+  - name: source_commit
+    type: string
+    default: ''
+  - name: parent_operation_id
+    type: string
+    default: ''
+  - name: parent_plan_hash
+    type: string
+    default: ''
+  - name: recovery_operation_id
+    type: string
+    default: ''
+  - name: recovery_plan_hash
+    type: string
+    default: ''
+pool:
+  name: esaf-lifecycle-external
+  demands:
+    - Agent.OS -equals Linux
+stages:
+  - stage: Prepare
+    jobs:
+      - deployment: PrepareOperation
+        environment: esaf-pipelines-prepare
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  submodules: true
+                  persistCredentials: false
+                  clean: true
+                - bash: |
+                    set -euo pipefail
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --download-input --job-provider ado
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --validate-only \
+                      --job-provider ado --output-context .esaf/context.json
+                  displayName: Verify canonical request, repository and pinned source
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    ESAF_CORRELATION_ID: ${{ parameters.correlation_id }}
+                    ESAF_REQUEST_DIGEST: ${{ parameters.request_digest }}
+                    ESAF_CONSUMER_COMMIT: ${{ parameters.consumer_commit }}
+                    ESAF_SOURCE_COMMIT: ${{ parameters.source_commit }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                - task: AzureCLI@2
+                  displayName: Prepare durable governed operation with workload identity
+                  inputs:
+                    azureSubscription: esaf-pipelines-workload-identity
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    visibleAzLogin: false
+                    useGlobalConfig: false
+                    addSpnToEnvironment: false
+                    inlineScript: |
+                      set -euo pipefail
+                      python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider ado -- \
+                        python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py prepare \
+                        --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+                        --provider-context .esaf/context.json --output .esaf/prepared.json \
+                        --parent-operation-id "$PARENT_OPERATION_ID" --parent-plan-hash "$PARENT_PLAN_HASH" \
+                        --recovery-operation-id "$RECOVERY_OPERATION_ID" --recovery-plan-hash "$RECOVERY_PLAN_HASH"
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    PARENT_OPERATION_ID: ${{ parameters.parent_operation_id }}
+                    PARENT_PLAN_HASH: ${{ parameters.parent_plan_hash }}
+                    RECOVERY_OPERATION_ID: ${{ parameters.recovery_operation_id }}
+                    RECOVERY_PLAN_HASH: ${{ parameters.recovery_plan_hash }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                    ESAF_PROVIDER_TOKEN: $(ESAF_PROVIDER_TOKEN)
+                    ESAF_PROVIDER_CREDENTIAL_SOURCE: $(ESAF_PROVIDER_CREDENTIAL_SOURCE)
+                    ESAF_PROVIDER_TOKEN_SECRET_ID: $(ESAF_PROVIDER_TOKEN_SECRET_ID)
+                    AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+                - bash: |
+                    python3 - <<'PY'
+                    import json, re, shutil
+                    from pathlib import Path
+                    context = json.loads(Path(".esaf/context.json").read_text())
+                    prepared = json.loads(Path(".esaf/prepared.json").read_text())
+                    print("Review operation", prepared["operation_id"], "plan", prepared["plan_hash"])
+                    print("##vso[task.setvariable variable=esafCorrelation]" + context["correlation_id"])
+                    for name in ("operation_id", "plan_hash"):
+                        if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", prepared[name]):
+                            raise SystemExit("Invalid prepared operation")
+                        print("##vso[task.setvariable variable=" + name + ";isOutput=true]" + prepared[name])
+                    Path(".esaf/review.txt").write_text(json.dumps(prepared, indent=2))
+                    print("##vso[task.uploadsummary].esaf/review.txt")
+                    destination = Path(".esaf/prepared-artifact")
+                    destination.mkdir()
+                    for name in ("context.json", "prepared.json"):
+                        shutil.copyfile(Path(".esaf") / name, destination / name)
+                    PY
+                  name: review
+                  displayName: Present actual operation and plan for approval
+                - task: PublishPipelineArtifact@1
+                  inputs:
+                    targetPath: .esaf/prepared-artifact
+                    artifact: esaf-prepared-$(esafCorrelation)-1
+                  displayName: Publish only nonsecret context and prepared-operation review
+  - stage: Review
+    dependsOn: Prepare
+    condition: succeeded()
+    variables:
+      operation_id: $[ stageDependencies.Prepare.PrepareOperation.outputs['PrepareOperation.review.operation_id'] ]
+      plan_hash: $[ stageDependencies.Prepare.PrepareOperation.outputs['PrepareOperation.review.plan_hash'] ]
+    jobs:
+      - job: ReviewPipelinesLifecycle
+        displayName: Review $(operation_id) / $(plan_hash)
+        pool: server
+        timeoutInMinutes: 1440
+        steps:
+          - task: ManualValidation@1
+            name: ReviewPipelinesLifecycle
+            displayName: ReviewPipelinesLifecycle
+            timeoutInMinutes: 1380
+            inputs:
+              notifyUsers: ''
+              approvers: '[$(System.TeamProject)]\esaf-pipelines-reviewers'
+              allowApproversToApproveTheirOwnRuns: false
+              instructions: |
+                Review the prepared-operation artifact and summary from THIS run.
+                Operation: $(operation_id)
+                Plan SHA256: $(plan_hash)
+                Reject if either identifier is missing or differs from the prepared artifact.
+                Approval authorizes only this immutable operation and plan, not future requests.
+              onTimeout: reject
+  - stage: Execute
+    dependsOn: Review
+    condition: succeeded()
+    jobs:
+      - deployment: ExecuteReviewedOperation
+        environment: esaf-pipelines-execute
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none
+                - checkout: self
+                  submodules: true
+                  persistCredentials: false
+                  clean: true
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    buildType: current
+                    targetPath: $(Build.SourcesDirectory)/.esaf/download
+                  displayName: Download prepared-operation handoff from this exact run
+                - bash: |
+                    python3 - <<'PY'
+                    import json, os, shutil
+                    from pathlib import Path
+                    artifacts = list(Path(".esaf/download").glob("esaf-prepared-*-1"))
+                    if len(artifacts) != 1:
+                        raise SystemExit("Expected one prepared operation")
+                    context = json.loads((artifacts[0] / "context.json").read_text())
+                    Path(".esaf/handoff").mkdir()
+                    for name in ("context.json", "prepared.json"):
+                        shutil.copyfile(artifacts[0] / name, Path(".esaf/handoff") / name)
+                    print("##vso[task.setvariable variable=esafCorrelation]" + context["correlation_id"])
+                    PY
+                  displayName: Select exact nonsecret operation handoff
+                - bash: |
+                    set -euo pipefail
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --download-input --job-provider ado
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --validate-only \
+                      --job-provider ado --output-context .esaf/context.json
+                    python3 - <<'PY'
+                    import json
+                    from pathlib import Path
+                    if json.loads(Path(".esaf/context.json").read_text()) != json.loads(Path(".esaf/handoff/context.json").read_text()):
+                        raise SystemExit("Prepared context changed")
+                    PY
+                  displayName: Revalidate exact prepared context
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    ESAF_CORRELATION_ID: $(esafCorrelation)
+                    ESAF_REQUEST_DIGEST: ${{ parameters.request_digest }}
+                    ESAF_CONSUMER_COMMIT: ${{ parameters.consumer_commit }}
+                    ESAF_SOURCE_COMMIT: ${{ parameters.source_commit }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                - task: AzureCLI@2
+                  displayName: Execute protected reviewed operation
+                  inputs:
+                    azureSubscription: esaf-pipelines-workload-identity
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    visibleAzLogin: false
+                    useGlobalConfig: false
+                    addSpnToEnvironment: false
+                    inlineScript: |
+                      python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider ado -- \
+                        python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py execute \
+                        --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+                        --provider-context .esaf/context.json --prepared .esaf/handoff/prepared.json \
+                        --output .esaf/execution.json
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                    ESAF_PROVIDER_TOKEN: $(ESAF_PROVIDER_TOKEN)
+                    ESAF_PROVIDER_CREDENTIAL_SOURCE: $(ESAF_PROVIDER_CREDENTIAL_SOURCE)
+                    ESAF_PROVIDER_TOKEN_SECRET_ID: $(ESAF_PROVIDER_TOKEN_SECRET_ID)
+                    AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+  - stage: Finalize
+    dependsOn: [Prepare, Execute]
+    condition: and(always(), eq(dependencies.Prepare.result, 'Succeeded'), ne(dependencies.Execute.result, 'Skipped'))
+    jobs:
+      - deployment: FinalizeReviewedOperation
+        environment: esaf-pipelines-execute
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none
+                - checkout: self
+                  submodules: true
+                  persistCredentials: false
+                  clean: true
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    buildType: current
+                    targetPath: $(Build.SourcesDirectory)/.esaf/download
+                  displayName: Download exact prepared operation on surviving finalizer
+                - bash: |
+                    python3 - <<'PY'
+                    import json, shutil
+                    from pathlib import Path
+                    artifacts = list(Path(".esaf/download").glob("esaf-prepared-*-1"))
+                    if len(artifacts) != 1:
+                        raise SystemExit("Expected one prepared operation")
+                    context = json.loads((artifacts[0] / "context.json").read_text())
+                    Path(".esaf/handoff").mkdir()
+                    for name in ("context.json", "prepared.json"):
+                        shutil.copyfile(artifacts[0] / name, Path(".esaf/handoff") / name)
+                    print("##vso[task.setvariable variable=esafCorrelation]" + context["correlation_id"])
+                    PY
+                  displayName: Bind exact nonsecret operation handoff
+                - bash: |
+                    set -euo pipefail
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --download-input --job-provider ado
+                    python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+                      --repo-root . --request "$REQUEST_PATH" --validate-only \
+                      --job-provider ado --output-context .esaf/context.json
+                    python3 - <<'PY'
+                    import json
+                    from pathlib import Path
+                    if json.loads(Path(".esaf/context.json").read_text()) != json.loads(Path(".esaf/handoff/context.json").read_text()):
+                        raise SystemExit("Prepared context changed")
+                    PY
+                  displayName: Revalidate exact prepared context
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    ESAF_CORRELATION_ID: $(esafCorrelation)
+                    ESAF_REQUEST_DIGEST: ${{ parameters.request_digest }}
+                    ESAF_CONSUMER_COMMIT: ${{ parameters.consumer_commit }}
+                    ESAF_SOURCE_COMMIT: ${{ parameters.source_commit }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                - task: AzureCLI@2
+                  displayName: Observe, reconcile and release after the mutating job is terminal
+                  inputs:
+                    azureSubscription: esaf-pipelines-workload-identity
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    visibleAzLogin: false
+                    useGlobalConfig: false
+                    addSpnToEnvironment: false
+                    inlineScript: |
+                      python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider ado -- \
+                        python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py finalize \
+                        --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+                        --provider-context .esaf/context.json --prepared .esaf/handoff/prepared.json \
+                        --output .esaf/final/receipt.json
+                  env:
+                    REQUEST_PATH: ${{ parameters.request_path }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                    ESAF_PROVIDER_TOKEN: $(ESAF_PROVIDER_TOKEN)
+                    ESAF_PROVIDER_CREDENTIAL_SOURCE: $(ESAF_PROVIDER_CREDENTIAL_SOURCE)
+                    ESAF_PROVIDER_TOKEN_SECRET_ID: $(ESAF_PROVIDER_TOKEN_SECRET_ID)
+                    AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+                - task: PublishPipelineArtifact@1
+                  inputs:
+                    targetPath: .esaf/final
+                    artifact: esaf-receipt-$(esafCorrelation)-1
+                  displayName: Publish finalized durable lifecycle receipt only
+  - stage: Complete
+    dependsOn: [Prepare, Finalize]
+    condition: and(always(), eq(dependencies.Prepare.result, 'Succeeded'), eq(dependencies.Finalize.result, 'Succeeded'))
+    jobs:
+      - job: ObserveScenarioCompletion
+        displayName: ObserveScenarioCompletion
+        pool:
+          vmImage: ubuntu-latest
+        timeoutInMinutes: 360
+        steps:
+          - checkout: self
+            submodules: true
+            persistCredentials: false
+            clean: true
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              targetPath: $(Build.SourcesDirectory)/.esaf/download
+            displayName: Read this run's nonsecret prepared operation
+          - bash: |
+              set -euo pipefail
+              python3 - <<'PY'
+              import shutil
+              from pathlib import Path
+              artifacts = list(Path(".esaf/download").glob("esaf-prepared-*-1"))
+              if len(artifacts) != 1:
+                  raise SystemExit("Expected one prepared operation")
+              Path(".esaf/handoff").mkdir()
+              for name in ("context.json", "prepared.json"):
+                  shutil.copyfile(artifacts[0] / name, Path(".esaf/handoff") / name)
+              PY
+              python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py complete \
+                --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+                --provider-context .esaf/handoff/context.json --prepared .esaf/handoff/prepared.json \
+                --output .esaf/completed.json
+            displayName: Read verified scenario completion without Azure credentials
+            env:
+              REQUEST_PATH: ${{ parameters.request_path }}
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)

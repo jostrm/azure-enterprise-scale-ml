@@ -7,6 +7,9 @@ sources:
   - bootstrap/lib/factory_lifecycle_contract.txt
   - bootstrap/lib/factory_enrollment.py
   - bootstrap/lib/provider_repository_state.py
+  - bootstrap/lib/pipeline_lifecycle_adapters.py
+  - bootstrap/lib/pipeline_lifecycle_bootstrap_recovery.py
+  - bootstrap/lib/pipeline_lifecycle_reconciliation.py
   - environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh
@@ -25,6 +28,9 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_project_deletion_pipelines.py
   - environment_setup/unit-tests/test-bicep/unit/test_resource_closure_parallel_reads.py
   - environment_setup/unit-tests/test-bicep/unit/test_cloud_keepalive_reads.py
+  - environment_setup/unit-tests/test-bicep/unit/test_pipeline_lifecycle_bootstrap.py
+  - environment_setup/unit-tests/test-bicep/unit/test_pipeline_lifecycle_recovery.py
+  - environment_setup/unit-tests/test-bicep/test_pipeline_providers_native.py
   - environment_setup/unit-tests/test-bicep/unit/test_resource_fingerprint_churn.py
 graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:execute
@@ -41,6 +47,33 @@ graph_symbols:
 reviewed_source: '01f06fa1 + connectivity-retention port (main's factory-owned hub wins); observed 2026-10-21; throttled reads 4130c8bf, 2026-10-23; volatile-field fingerprints 2026-10-23; consent ancestors 2026-10-24; teardown connectivity guard and throttle event host 2026-10-25; teardown absent groups 2026-10-25'
 ---
 # Lifecycle and recovery
+
+## Additional Pipelines-only route
+
+The lifecycle primitives below are reusable, but their existence does not move
+API-host preparation, configuration persistence, authorization or reconciliation
+into a pipeline. The optional route must use durable coordination shared with
+API-driven operations, retain uncertain claims, reconcile actual resources before
+retrying and persist its result outside the ephemeral runner. Its final execution
+identity, runner, private path and evidence store must survive factory teardown.
+
+Source/offline coverage and live deployment evidence remain distinct. The
+[Pipelines-only source trace and contract](../../v2/reference/maintainers/automation-and-review-flow.md#pipelines-only)
+records the additional boundary; this note does not certify a complete new route
+or an installed PINK adapter.
+
+The implemented reviewed recovery distinguishes incomplete effects from completed
+native outcomes. `BootstrapReconciliation` retires only an exactly captured
+enrollment attempt after fresh terminal-run, identity, ownership and inventory
+proof, then requires a new bootstrap review for missing effects. No attempt
+provenance means no automatic claim adoption. `RetainedClaimReconciliation`
+promotes canonical configuration from verified completed children without native
+replay, while residual or identity-only work requires a fresh continuation.
+`observe_foundry_runtime` calls the native readiness verifiers through a GET-only
+observer rather than claiming possession of the old worker's lease. It rechecks
+the configured identity/grants/account/capability-host/network gates, not general
+effective permissions. Native resource observations consistently use
+`resource_digest`; raw agent/account/grant instance proofs remain strict.
 
 ## Observed execution boundary
 

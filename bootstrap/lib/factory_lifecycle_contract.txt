@@ -1,6 +1,24 @@
 AIFACTORY_LIFECYCLE_CONTRACT=1
 ============================
 
+Opt-in ARM Key Vault parameter references
+----------------------------------------
+arm_parameter_transport = arm-keyvault-reference-v1 advertises the additive
+deployment.parameter_transport contract. A secureString/secureObject parameter
+may contain {"reference":{"keyVault":{"id":EXACT_VAULT_ARM_ID},
+"secretName":LITERAL_NAME,"secretVersion":OPTIONAL_32_HEX_VERSION}}.
+The pinned pipeline_lifecycle_keyvault.py helper validates this metadata and
+emits a real ARM parameter reference. Combined deployments lift references out
+of per-step secureObject values into outer secure parameters and forward them
+to the nested template. Python never requests or materializes a secret value.
+The vault must already permit the authenticated deployment's ARM retrieval.
+An omitted secretVersion uses ARM's authorized latest-version resolution.
+Literal credential fallbacks, references for nonsecure parameters and template-link lifting
+are rejected. Canonical project variables use scalar <parameter>SecretId aliases;
+the pipeline derives these ARM objects rather than changing the shared API catalog schema.
+Without the opt-in field,
+existing API/worker parameter encoding is unchanged.
+
 Factory teardown pipelines (ordered-project-pipelines-v1)
 ---------------------------------------------------------
 factory_deletion_pipeline advertises this separate, Blob-only contract.

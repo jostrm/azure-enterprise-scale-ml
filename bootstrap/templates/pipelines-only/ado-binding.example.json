@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "provider": "ado",
+  "repository": "https://dev.azure.com/REPLACE_ORGANIZATION/REPLACE_PROJECT/_git/REPLACE_REPOSITORY",
+  "consumer_ref": "refs/heads/main",
+  "pipeline_id": 1
+}

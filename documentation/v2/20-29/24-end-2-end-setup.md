@@ -40,7 +40,7 @@ flowchart LR
 
 ## Choose your tool
 
-Every tool is a client of the same Factory API, so the result is the same whichever you pick. See the
+The four tools below remain clients of the same Factory API. See the
 [onion architecture](../10-19/10-factory-onion-architecture-v2.md).
 
 | Tool | Choose it when |
@@ -49,6 +49,23 @@ Every tool is a client of the same Factory API, so the result is the same whiche
 | CLI | You work in PowerShell or Bash, on Windows, Linux or macOS: `azurefactory esaf init-factory`. |
 | Python SDK | You script the setup: `from azurefactory import esaf`. |
 | REST | You call from another system: `POST /api/v1/esaf/init-factory`. |
+
+### Execution routes
+
+| Route | Responsibility |
+|---|---|
+| **API-2-Pipelines** | The Factory API prepares/orchestrates execution; provider pipelines perform the selected work. |
+| **API-2-ARM** | The Factory API or its host-side worker performs Azure operations. |
+| **Pipelines-only** | The additional opt-in route: pipelines must own preparation, approval handling, execution, persistence, observation and recovery, without the Factory API. |
+
+These are execution owners, not interchangeable CLI aliases. An API-prepared envelope
+executed by a pipeline is still **API-2-Pipelines**, not API-independent. Calls from
+pipeline runners to ARM, Microsoft Graph and provider APIs are compatible with
+Pipelines-only. Existing API commands and defaults do not change.
+
+Read the [Pipelines-only input and implementation contract](../reference/maintainers/automation-and-review-flow.md#pipelines-only)
+before using the new entry point. Its source/offline coverage must not be confused
+with the historical Azure runs below or in the quickstarts.
 
 The [six scenarios](../reference/scenarios.md) lists every call. Before you create a Factory, pick a
 [hub mode and a networking mode](../concepts/hub-and-network-modes.md).

@@ -11,6 +11,526 @@ it no longer describes an own-hub limitation: the scenarios run in every hub mod
 shared-hub coordination guards now states the guards' exact scope. Existing single-factory (`aifactory`)
 repositories: see [legacy setup](../../20-29/24-legacy-v124-setup.md).
 
+## Pipelines-only
+
+> [!WARNING]
+> Source implementation with offline integration coverage, not live production
+> acceptance. Cold enrollment, fresh-review continuations, canonical configuration
+> transitions, deletion authorization/recovery, cross-route admission and protected
+> finalization are connected. The coverage matrix below identifies the real and
+> simulated test boundaries. No empty-subscription Azure deployment, installed
+> writer governance or private-network reachability is certified by these tests.
+
+This is an additional, explicitly selected entry point. Existing API commands,
+API-2-Pipelines and API-2-ARM remain available; no existing source pin or legacy
+consumer is migrated. API-independent means independent of the **Factory API**,
+not independent of ARM, Microsoft Graph or GitHub/Azure DevOps APIs.
+
+The implementation must not be described as complete lifecycle automation merely
+because a workflow dispatched successfully. Preparation, protected approval,
+execution, durable configuration/ownership state, observation and recovery must
+all finish without the Factory API. Offline tests do not establish live Azure
+deployment, resource health, private connectivity or installed PINK capabilities.
+
+### Source trace and reuse
+
+The following is a source trace, not a new live deployment measurement. The
+architecture graph consulted for the implementation was stale: snapshot
+`2c06972d26fdb2360fd3932a0aea6ab0509e54365b8b019ca581d6df9e69b999`
+covered dirty source at `7808bb6f`, while the PURPLE baseline was `3b89bbc7`.
+PINK's 2026-10-24 structural index was also stale; current source was inspected
+instead. Architecture notes describe constraints, not evidence that code ran.
+
+| Scenario | Stages and existing owner | Reusable PURPLE implementation | Existing Factory API responsibility |
+|---|---|---|---|
+| 1. Initialize | Configure, foundation, prerequisites, enrollment, common, runner/private connection, first project | `registered_prerequisites.py`, `factory_enrollment.py`, `runner_bootstrap.py`, `factory_lifecycle.py`, existing common/project Bicep | Catalog creation, bootstrap stage transitions, reviews, ownership and recovery |
+| 2. Add scale set | Register scope, prerequisites, enroll, common deployment | Enrollment, network allocator, scoped lifecycle creation worker | Scope preparation, binding persistence and common plan |
+| 3. Upsert project | Register placement/settings, enroll scope, promotion checks, deploy, observe | `project_deployment.py`, `project_environment.py`, scoped worker and project templates | Authoritative settings, reviewed projection, dispatch and outcome persistence |
+| 4. Delete project | Authorize, inventory/retention review, services or full delete, optional subnets, observe | `freeze_project_deletion`, project deletion scripts and provider templates | Deletion permission, review, post-pipeline reconciliation and catalog changes |
+| 5. Delete scale set | Projects first, common closure, own spoke-link cleanup, observe | `freeze_deletion_inventory`, `execute_cohort`, ownership/dependency checks | Exact cohort selection, deletion authorization and durable job/recovery ownership |
+| 6. Delete factory | All placements/environments, common teardown, retained shared hubs, final configuration update | `factory_deletion_pipeline.py`, cohort execution, retained connectivity checks | Whole-factory planning, recorded ownership proofs, host-side teardown and recovery |
+
+Both GHA and ADO have scoped worker/enrollment/provider-state building blocks.
+That is **not** evidence that both have complete API-free bootstrap or recovery.
+The existing `factory-lifecycle-gha.yml` and `factory-lifecycle-ado.yml` consume
+pre-prepared protected manifests; they are retained, not relabeled Pipelines-only.
+PINK's `catalog_runtime.py` and `catalog_protocol.py` showed why a shared admission
+adapter is necessary: a live claim read followed by a local-job check and dispatch
+is not an atomic cross-route claim.
+
+### One configuration source
+
+`azurefactory/register.json` is the canonical configuration model, including its embedded
+`configurations[factory_id].variables[project_id]`. The named factory, scale-set,
+project and pipeline files are projections. The resolver
+[`pipeline_inputs.py`](../../../../bootstrap/lib/pipeline_inputs.py) checks extant
+projections against that source. An explicitly supplied variables file must agree;
+there is no silent overlay. Change settings in a separately reviewed configuration
+draft, update the register and projections together, then invoke a scenario.
+Projection generation drift is warning evidence; a conflicting identity or setting
+is an invalid execution request, not merely a different checksum.
+
+After admission is installed, the provider-state record holds the authoritative
+committed register snapshot; the repository-relative input is a proposed revision
+of that same model, not an independent configuration store. Preparation compares
+the proposal with that baseline and includes the exact bounded changes in the
+protected review. A project update cannot edit another project, factory settings,
+another environment, bindings or ownership evidence. Adding a scale set cannot
+silently change existing project settings. Shared `stage_prod` settings cannot be
+changed for only one of two existing Stage/Prod placements. Generation-only drift
+is evidence, not a blocking identity change.
+
+[`pipeline_lifecycle_configuration.py`](../../../../bootstrap/lib/pipeline_lifecycle_configuration.py)
+derives promotion/removal from verified native receipts. Configuration publication
+is compare-and-swap under the same cross-route admission claim; a lost response is
+reconciled by reading the actual committed document, not blindly repeating a write.
+Service-only project deletion retains its definition. A project placement is
+removed only after its resource group is proven absent. Retained owned resources
+keep their scale/factory inventory instead of being forgotten. Unrelated factories,
+placements and provider records are preserved.
+
+| Input | Applicability |
+|---|---|
+| `schema: 1`, `scenario: 1..6`, `provider: gha\|ado` | Every request; exact types, no unknown request fields |
+| `azurefactory_root` | Repository-relative registered root; defaults to `azurefactory` |
+| `factory` | Exact readable registered factory key |
+| `environment` | `dev`, `stage` or `prod` for 1-5; explicit `all` for 6 |
+| `scale_set` | Three-digit string for 1-5; omitted for 6 |
+| `project` | Three-digit string for 1, 3 and 4; omitted for 2, 5 and 6 |
+| `source_ref`, `source_commit` | Explicit `refs/heads/...` or `refs/tags/...` and exact source commit; no implicit upgrade |
+| `variables` | Optional repository-relative full variables document for 1, 3 or 4; must agree with the register |
+| `provider_binding` | Optional repository-relative nonsecret operational binding; cannot override canonical identities/bindings |
+| `include_project_subnets` | Scenario 4 only, boolean, default `false` |
+| `include_keyvault_and_resource_group` | Scenario 4 only, boolean, default `true`; `false` requests service-only deletion |
+| `bundle` | Optional repository-relative ZIP containing the identical registered tree and referenced input files |
+
+ZIP input uses the same resolver and canonical model. It is read without
+extraction: traversal, absolute/device/alternate-stream paths, links, duplicate
+or case-colliding entries, multiple register roots, encryption and non-JSON files
+are rejected. Limits are 2,048 entries, 16 MiB per JSON file and 64 MiB total
+compressed/uncompressed input, with a compression-ratio bound. `.git` and
+`.azurefactory` host state cannot enter a bundle. Manual GHA/ADO Run pages do not
+upload local ZIP files; a provider artifact must be explicitly retrieved to the
+declared repository-relative `bundle` path before resolution.
+
+### Create configuration without an API
+
+The following creates a **local draft only** from the existing PURPLE variables
+template. Choose real tenant/subscription IDs and a reviewed, non-overlapping CIDR.
+Use a new destination; existing roots are never overwritten.
+
+```bash
+SOURCE=azure-enterprise-scale-ml
+python3 "$SOURCE/bootstrap/lib/pipeline_configuration.py" \
+  --repository-root . --azurefactory-root azurefactory \
+  --factory acme-ai --prefix acme- --region swedencentral --region-short sdc \
+  --tenant "$TENANT_ID" --subscription "$SUBSCRIPTION_ID" \
+  --provider gha --environment dev --scale-set 001 --project 001 \
+  --cidr 10.140.0.0/18 --max-projects 7 --version main --network-mode private
+```
+
+For ADO, change only `--provider ado`. Supply `--variables path/to/variables.json`
+to use an already completed settings document; its identities must match the
+explicit selectors. Generated drafts remain `status: draft`, with no invented
+bindings, enrollment or ownership receipts. Review service defaults, topology,
+identities and permissions before execution. Private mode does not turn on public
+access to accommodate a hosted runner.
+
+Prepare additions or settings changes in a **different** root for review:
+
+```bash
+mkdir -p proposed
+python3 "$SOURCE/bootstrap/lib/pipeline_configuration.py" --operation add-scale \
+  --from-root azurefactory --azurefactory-root proposed/azurefactory --factory acme-ai \
+  --environment dev --scale-set 002 --tenant "$TENANT_ID" --subscription "$SUBSCRIPTION_ID" \
+  --provider gha --cidr 10.141.0.0/18 --max-projects 7
+
+# After adopting that reviewed configuration, use another new draft destination.
+mkdir -p proposed-project
+python3 "$SOURCE/bootstrap/lib/pipeline_configuration.py" --operation upsert-project \
+  --from-root azurefactory --azurefactory-root proposed-project/azurefactory --factory acme-ai \
+  --environment dev --scale-set 002 --project 002
+```
+
+Updating an existing project requires an explicit `--variables` document; omission
+never resets settings to defaults. Adopting a draft is a reviewed consumer
+configuration change, not authorization to deploy or delete. Canonical configuration
+and its projections must travel together. Do not copy host SQLite, DPAPI, credentials,
+tokens or live session files into Git, ZIPs, logs or ordinary artifacts.
+
+Manually completing `variables.json` is supported: pass the file to the draft
+generator so the register and projections remain consistent. A platform
+administrator may also populate the external seeding Key Vault manually or with
+an authorized script. Those secrets remain in Key Vault; public configuration
+contains only their references. Neither manually supplied values nor a seeded
+credential replaces pipeline review, workload-identity trust or scope permissions.
+
+Secure Bicep inputs use scalar aliases in the raw project variables sections, for
+example `adminPasswordVMSecretId=https://platform-vault.vault.azure.net/secrets/vm-password`,
+plus the existing `inputKeyvault`, `inputKeyvaultResourcegroup` and
+`inputKeyvaultSubscription` coordinates (or their environment-specific aliases).
+A secret version is optional. The pipeline derives ARM reference objects; do not
+put nested ARM reference objects or plaintext passwords into the canonical
+register, because the unchanged API catalog uses the scalar `SecretId` contract.
+
+### Consumer entry-point installation
+
+Use an explicitly approved source commit containing these additions. Existing
+consumer submodule pins are not automatically changed. Copy the chosen template
+unchanged; its executable definition is part of the approval trust boundary:
+
+| Provider | Source in the pinned accelerator | Consumer destination |
+|---|---|---|
+| GHA | `bootstrap/templates/pipelines-only-gha.yml` | `.github/workflows/pipelines-only-gha.yml` |
+| ADO | `bootstrap/templates/pipelines-only-ado.yml` | `pipelines-only-ado.yml` |
+
+The ADO file is a complete pipeline; register that consumer YAML in Azure Pipelines.
+Its operational binding contains the resulting pipeline ID. Examples are
+[`gha-binding.example.json`](../../../../bootstrap/templates/pipelines-only/gha-binding.example.json)
+and [`ado-binding.example.json`](../../../../bootstrap/templates/pipelines-only/ado-binding.example.json).
+Replace their repository placeholders and store the result at
+`bindings/gha.json` or `bindings/ado.json`. `consumer_ref` selects the consumer
+branch; it is **not** the accelerator's `source_ref`. Canonical native bindings,
+scopes and identities cannot be replaced by an operational binding.
+
+Dispatch uses only the routing fields of that binding. `bootstrap` and `admission`
+remain in the canonical input reviewed by lifecycle preparation; they are not
+discarded from the operation or forwarded as dispatch-routing overrides.
+
+For a cold target, use
+[`gha-bootstrap-binding.example.json`](../../../../bootstrap/templates/pipelines-only/gha-bootstrap-binding.example.json)
+or
+[`ado-bootstrap-binding.example.json`](../../../../bootstrap/templates/pipelines-only/ado-bootstrap-binding.example.json).
+Replace all repository, subscription, tenant, identity and pipeline placeholders.
+The external managed identity's subscription must be outside the factory cohort.
+`bootstrap` is provider-operation metadata, not nested factory settings.
+Its explicit role-definition list is reviewed before native enrollment adds
+scoped grants; the example requests Contributor and RBAC Administrator, not an
+implicit subscription-wide permission grant.
+
+The explicit `admission.writer_governance=exclusive-upgraded-writers-v1` setting
+requests a **separate protected initial-admission review**. It is not consent.
+That review identifies the repository, exact scopes and external writer-governance
+prerequisites. After authenticated approval, one provider CAS stores canonical
+configuration, policy, audit and the initial claim. A fresh continuation then
+reviews native enrollment, followed by common/project execution.
+
+No PINK installation is needed for a factory with **no API writers**. Where API,
+sidecar or desktop writers already exist, upgrade and opt in **every writer host**
+before approving initial admission; fence older bypass credentials externally.
+Install the reviewed `bootstrap/lib/lifecycle_admission.py` through PINK's
+`python -m src.lifecycle_admission_install --source <file> --sha256 <reviewed-digest>`
+operator command, and set `AIFACTORY_LIFECYCLE_ADMISSION_REQUIRED=1` plus
+`AIFACTORY_LIFECYCLE_ADMISSION_CONFIG=<absolute trusted JSON file>`. The trusted
+configuration maps the existing absolute `azurefactory` root and factory UUID to
+the exact provider repository, tenant/subscription and provider discovery settings.
+PINK reads and hydrates the same remote canonical register; missing policy blocks
+coordinated writes. No Factory API installation/provisioning **call** is required.
+See PINK `docs/API.md`, **Optional cross-route lifecycle admission**, for the
+closed operator configuration. The default unconfigured API route remains unchanged.
+
+The execution/finalizer runner is outside the factory being managed. GHA labels
+are `self-hosted`, `linux`, `esaf-lifecycle-external`; ADO uses the Linux pool
+`esaf-lifecycle-external`. Keep that runner's identity, network path and evidence
+store outside every deletion cohort. Runners need Git, Bash, Python, Azure CLI,
+Bicep and the `cryptography` package used for OIDC signature verification.
+These templates never open public network access to make a hosted runner work.
+
+GHA uses Azure OIDC with `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+`AZURE_SUBSCRIPTION_ID`, and protected environments `esaf-pipelines-prepare` and
+`esaf-pipelines-execute`. Execution requires native required reviewers,
+prevention of self-review and disabled administrator bypass. Existing native
+worker dispatch also needs a token with the required provider permissions; `github.token`
+alone cannot satisfy the legacy worker's user/environment-secret operations.
+The default keeps the pre-existing, environment-protected `ESAF_PROVIDER_TOKEN`
+path. Alternatively, set the protected environment variables
+`ESAF_PROVIDER_CREDENTIAL_SOURCE=keyvault` and
+`ESAF_PROVIDER_TOKEN_SECRET_ID=https://<vault>.vault.azure.net/secrets/<name>`
+(an explicit secret version may follow the name). A human or an authorized script
+can populate the seeding vault beforehand.
+
+After fresh OIDC/WIF login, the shared
+[`pipeline_credentials.py`](../../../../bootstrap/lib/pipeline_credentials.py)
+wrapper reads that secret and places the token only in the trusted child process's
+environment. It verifies the returned vault/secret identity; version metadata
+drift is a sanitized warning, not authorization. A failed Key Vault read fails
+without silently falling back to another credential. No secret is written to
+job outputs, configuration, ordinary artifacts or Git. Preflight and artifact
+steps retain their separate least-privileged credentials.
+
+The seeding vault, federated identity and private runner must survive the target
+factory's teardown. Grant secret-get access and private network reachability
+externally; these templates neither create initial trust nor enable public access.
+
+ADO uses the WIF service connection `esaf-pipelines-workload-identity`, an
+authorized `System.AccessToken`, protected environments and the reviewer group
+`[<project>]\esaf-pipelines-reviewers`. A server-side `ManualValidation@1` displays
+the prepared operation and digest, forbids self-approval and rejects timeout.
+Provider-native review evidence is fetched and checked; a JSON flag is never
+consent. Bootstrap trust and permissions must be granted by an authorized platform
+administrator before any pipeline can assume them; the pipeline cannot create
+its own initial trust.
+
+The same optional Key Vault wrapper supports ADO **OAuth bearer** credentials,
+not PATs, for native provider-state operations. The default uses the job's
+`System.AccessToken`. Local dispatch can still use `AZURE_DEVOPS_EXT_PAT`; that is
+a separate client authentication path, not a credential embedded in the pipeline.
+
+### Exact scenario invocation
+
+Generate the six request files from the same contract. This command only writes
+local, nonsecret request JSON. It does not dispatch anything. The selected source
+must actually contain the new entry point before attempting execution.
+
+```bash
+PROVIDER=gha                         # or ado
+SOURCE=azure-enterprise-scale-ml
+SOURCE_COMMIT="$(git -C "$SOURCE" rev-parse HEAD)"
+SOURCE_REF=refs/heads/main           # explicitly select the accelerator ref
+python3 - "$PROVIDER" "$SOURCE_COMMIT" "$SOURCE_REF" <<'PY'
+import json, pathlib, sys
+provider, commit, source_ref = sys.argv[1:]
+root = pathlib.Path("requests")
+root.mkdir(exist_ok=True)
+for scenario in range(1, 7):
+    request = {
+        "schema": 1, "scenario": scenario, "provider": provider,
+        "azurefactory_root": "azurefactory", "factory": "acme-ai",
+        "environment": "all" if scenario == 6 else "dev",
+        "source_ref": source_ref, "source_commit": commit,
+        "provider_binding": "bindings/" + provider + ".json"
+    }
+    if scenario != 6:
+        request["scale_set"] = "001" if scenario == 1 else "002"
+    if scenario in (1, 3, 4):
+        request["project"] = "001" if scenario == 1 else "002"
+    if scenario == 4:
+        request.update(include_project_subnets=False, include_keyvault_and_resource_group=True)
+    with (root / f"{scenario:02d}.json").open("x", encoding="utf-8") as stream:
+        json.dump(request, stream, indent=2)
+        stream.write("\n")
+PY
+```
+
+Review and commit the selected request, configuration and unchanged provider
+template in the consumer repository before dispatch. Scenarios 2 and 3 require
+their exact proposed scale/project definitions; use the draft commands above.
+Do not run the deletion examples merely to test installation.
+
+| Scenario | Command from the consumer repository |
+|---|---|
+| 1. Initialize | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/01.json --max-polls 240` |
+| 2. Add scale set | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/02.json --max-polls 240` |
+| 3. Upsert project | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/03.json --max-polls 240` |
+| 4. Delete project | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/04.json --max-polls 240` |
+| 5. Delete scale set | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/05.json --max-polls 240` |
+| 6. Delete factory | `bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh --request requests/06.json --max-polls 240` |
+
+For service-only scenario 4 set `include_keyvault_and_resource_group` to `false`;
+to include project subnets set `include_project_subnets` to `true`. These are
+requested retention semantics, not deletion permission.
+
+The Bash client validates, dispatches once and follows the exact correlated run.
+It uses provider credentials (`GH_TOKEN`/`GITHUB_TOKEN` or
+`SYSTEM_ACCESSTOKEN`/`AZURE_DEVOPS_EXT_PAT`), not Factory API credentials.
+An explicit `--repo-root <consumer-directory>` permits invocation from outside
+the consumer checkout; otherwise the caller's Git root is used.
+It must not authenticate to ARM to complete a deployment from the laptop.
+Polling timeout, cancellation, provider failure, a missing final receipt or an
+unreleased operation is not success.
+
+An optional local file can supply dispatch credentials:
+
+```bash
+bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh \
+  --request requests/03.json --env-file "$HOME/.esaf-dispatch.env" --max-polls 240
+```
+
+Only `GH_TOKEN`, `GITHUB_TOKEN`, `SYSTEM_ACCESSTOKEN` and
+`AZURE_DEVOPS_EXT_PAT` assignments are accepted. Values are parsed literally;
+shell commands, interpolation and `source`/`eval` are never used. Exported
+credentials take precedence across each provider's aliases. The file must be
+untracked and is never uploaded. Keep it outside the repository or explicitly
+Git-ignored; it is local dispatch input, not a pipeline artifact or a second
+configuration model. Provider jobs reject `--env-file`.
+
+### Continuation, recovery and canonical export
+
+The shared provider driver interprets `continuation-required` as an incomplete
+scenario, not deployment success. Initial admission, cold enrollment, deletion
+authorization and Foundry identity-only work may each require a new protected
+review. The next run uses the durable verified configuration and the original
+immutable input/source identity; it never reuses the predecessor's approval.
+The Bash client follows the correlated chain using provider reads, without doing
+ARM work on the caller's machine.
+
+Continuation waits for the predecessor's exact authenticated finalizer job and
+durable admission release, not its enclosing workflow. The parent workflow may
+still be running only its fixed read-only completion job: GHA `complete` or ADO
+`Complete/ObserveScenarioCompletion`. These hosted jobs have provider read access
+but no Azure login, OIDC or Key Vault credentials. Ancestor validation checks the
+complete native job inventory, finalizer proof, release history and child linkage.
+Failed, cancelled, partially successful or unidentified predecessor runs cannot
+be treated as successful merely because a child or dispatch succeeded.
+
+For an interrupted bootstrap, retained failed native run, or completed native
+effects whose canonical publication/finalization was interrupted, start a
+separate recovery review:
+
+```bash
+bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh \
+  --request requests/03.json \
+  --recovery-operation-id "$FAILED_OPERATION_ID" \
+  --recovery-plan-hash "$FAILED_PLAN_HASH" --max-polls 240
+```
+
+Recovery and continuation selectors are mutually exclusive. Recovery authenticates
+the exact stopped predecessor and its native workers, re-reads live resources,
+ownership, dependencies and permissions, then atomically reconciles the exact
+native claim and transfers outer admission to the newly reviewed operation.
+It preserves the failed receipts and audit history. Residual work is freshly
+planned and separately approved; it is not replay of the failed manifest.
+Missing dispatch acknowledgement, missing worker proof, a still-active deployment
+or an unproven asynchronous delete remain blocked for investigation. Never edit
+the provider state branch to clear those claims.
+
+Bootstrap recovery uses
+[`pipeline_lifecycle_bootstrap_recovery.py`](../../../../bootstrap/lib/pipeline_lifecycle_bootstrap_recovery.py).
+The guarded native writer captures the exact enrollment attempt in provider state
+before its first cloud effect. A separately reviewed `bootstrap-reconciliation`
+checks the stopped run, identity, ownership, permissions, typed resource-group
+absence and deployment inventory. It retires only that captured native claim and
+transfers outer admission without Azure writes. Finalization then permits a fresh
+bootstrap review that creates only missing effects. Missing attempt provenance,
+including older or pre-effect interruptions without a captured attempt, remains
+blocked; an arbitrary claim is never adopted from similar resource names.
+
+Completed-operation recovery reobserves exact successful native receipts and
+current effects, including retained resources and configured Foundry readiness.
+It publishes the resulting canonical configuration from those verified children
+without replaying native execution. Identity-only Foundry results still require a
+new review and continuation. Full readiness requires the native agent identity,
+grants, account, capability host and applicable network observations; ARM
+provisioning success alone is insufficient.
+
+Recovery also accepts this same operation's verified outcome when canonical
+publication succeeded but finalization did not. It retains the original input
+identity, tolerates generation-only baseline drift already accepted at admission,
+and rejects unrelated semantic changes. A completed identity-only continuation
+uses the verified promoted ownership; an incomplete recovery keeps the originally
+reviewed intended settings. Deployment finalization reobserves resource groups
+and expected effects; historical worker success cannot stand in for missing live
+resources.
+
+The consumer checkout is not silently rewritten. After completed execution, export
+the **current canonical** register and every projection to a new directory before
+drafting the next change:
+
+```bash
+mkdir -p updated
+bash azure-enterprise-scale-ml/bootstrap/ESAF-pipelines.sh \
+  --request requests/03.json --export-configuration \
+  --operation-id "$COMPLETED_OPERATION_ID" --output-root updated/azurefactory
+```
+
+Export uses authenticated provider GETs only, follows the completed chain and
+refuses an active claim, mismatched provenance, credentials or an existing
+destination. After a recovered run, use the new recovery root's operation ID.
+Review/adopt the exported register and projections together; do not reconstruct
+authority from local scratch or an old input ZIP.
+
+### Provider-hosted ZIP inputs and finalization
+
+For a bundled request, commit a sidecar named `<request_path>.artifact.json`
+outside the bundle. Start with
+[`gha-artifact-source.example.json`](../../../../bootstrap/templates/pipelines-only/gha-artifact-source.example.json)
+or [`ado-artifact-source.example.json`](../../../../bootstrap/templates/pipelines-only/ado-artifact-source.example.json).
+It selects the same provider/repository, producer run/build ID, producer commit,
+artifact name and exact ZIP member. The downloader rejects a different/failed
+producer, unsafe destination, overwrite, escaping member or oversized content.
+It reads the archive member without extracting arbitrary files. Its expected
+SHA-256 is drift evidence, not permission; the actual prepared content is reviewed.
+The Bash launcher and provider jobs perform retrieval through the same adapter.
+
+Both templates separate the mutating job from a protected finalizer. The finalizer
+gets fresh credentials on the surviving runner after the exact mutating job has
+terminated. Its contract is:
+
+```bash
+python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_lifecycle.py finalize \
+  --repo-root . --source-root azure-enterprise-scale-ml \
+  --request requests/03.json --operation-id "$OPERATION_ID" \
+  --expected-plan-hash "$PLAN_HASH" --provider-context .esaf/context.json \
+  --output .esaf/receipt.json
+```
+
+Only the finalizer may publish `esaf-receipt-<correlation_id>-1`. The context binds
+the request path/digest, correlation ID, consumer and accelerator commits,
+provider, repository, run ID/attempt and scenario. An exact reviewed-operation
+digest and executable workflow identity are necessary integrity bindings:
+changing the approved operation or executable after approval would change what
+was authorized. They are not substitutes for native review, fresh resource checks
+or authenticated permissions.
+
+### Acceptance boundary of this implementation
+
+The shared native matrix exercises real `NativePlanner` preparation, existing
+GHA/ADO dispatch helpers, the native worker, ownership receipts and fresh
+observation with intercepted compiler/ARM/provider/storage transports.
+Factory API HTTP is rejected. Separate tests exercise native provider review,
+cross-route CAS contention, failed/uncertain operations, retained resources,
+ZIP equivalence and the provider-only client boundary. This is stronger than
+returning a successful mock dispatch, but is still **offline evidence**.
+
+| Scenario | GHA source/offline coverage | ADO source/offline coverage | Live Azure acceptance |
+|---|---|---|---|
+| 1. Initialize | Initial admission, cold enrollment/binding persistence, fresh continuation, native common + first project, interrupted-bootstrap recovery | Same | Not performed |
+| 2. Add scale set | Reviewed scope/binding extension, enrollment continuation, native common creation and canonical promotion | Same | Not performed |
+| 3. Upsert project | Native deployment/observation, canonical promotion, separate identity-only and full Foundry continuations | Same | Not performed |
+| 4. Delete project | Separate authorization, exact-scope deletion/retention, canonical placement removal and reviewed recovery | Same | Not performed |
+| 5. Delete scale set | Authorization, ordered native cohort, retained-resource checks, canonical removal and reviewed recovery | Same | Not performed |
+| 6. Delete factory | Complete selected cohort ordering, external execution-resource retention, authorization, canonical removal and reviewed recovery | Same | Not performed |
+
+`pipeline_lifecycle_bootstrap.py` returns **continuation-required**, never completed
+deployment. Its operational bootstrap settings remain under `binding.bootstrap`,
+separate from the unchanged scalar register settings contract; verified native
+bindings are persisted into that canonical register. Versioned ARM Key Vault references are supported through an
+opt-in native parameter-transport contract; no plaintext credential or DPAPI
+profile is required by that adapter. Absence of the opt-in field preserves
+existing native payload behavior.
+
+Coverage is complementary, not one fully live end-to-end run. Native scenario and
+Foundry tests execute the real workers against intercepted cloud/provider APIs.
+Bootstrap recovery tests use real lifecycle/admission/enrollment/CAS with injected
+cloud/provider transport and mocked review callbacks. The provider-native suite
+uses real dispatch, HTTP wrappers, native review/finalizer verifiers, shared
+admission, canonical persistence and receipt readers, but simulates workload
+stage outcomes. None proves an installed customer's identity, connectivity or
+resource health.
+
+The pipeline-owned `finalize` command now verifies the same-run terminal mutating
+job, observes actual native outcomes with fresh credentials, and records release
+before the client can report completion. The Bash receipt reader performs provider
+GETs only; it cannot complete Azure observation or release claims from the laptop.
+Input-artifact hash drift is included in the prepared review.
+
+Durable operation snapshots/checkpoints are provider-repository CAS records
+`pipeline-lifecycle/<operation_id>.json`; native `runs/` receipts and the separate
+`lifecycle_admission_v1` admission record remain intact. Local `.esaf` and
+`.pipeline-lifecycle` files are scratch, not authority. A failed/uncertain write
+retains its claim and is never automatically replayed. `status` and `reconcile`
+observe existing effects; the separately approved recovery path retires proven
+claims and creates fresh residual plans, or promotes proven completed effects
+without execution. Do not clear the state branch or claims by hand.
+
+The shared admission protocol currently serializes one enrolled repository.
+Cross-repository/shared-hub admission and mixed-provider factory cohorts remain unsupported rather than being
+silently treated as safe. Compatible PINK participation and governed enrollment
+are required; a policy string does not prove that old direct writers have lost
+their bypass credentials. No installed backend, live Azure deployment, private
+connectivity, permissions change or external publication was validated by this
+implementation. Do not call this route “100%” or production-ready.
+
 ## Step-by-step review flow: configure, then review deployment
 
 For a new registered factory on **`main` (unstable)**, follow this sequence.

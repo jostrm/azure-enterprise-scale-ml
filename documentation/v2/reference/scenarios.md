@@ -2,8 +2,14 @@
 
 # The six ESAF scenarios
 
-Every tool runs the same six scenarios, and each scenario is one call. The app, the `azurefactory` CLI, the
+The existing API tools run the same six scenarios, and each scenario is one call. The app, the `azurefactory` CLI, the
 Python SDK and REST are clients of the same Factory API, so the outcome is the same.
+
+The optional **Pipelines-only** entry point is separate: it consumes registered
+configuration directly. It does not call `azurefactory esaf` and does not change
+the commands below. See its [coverage, inputs and commands](maintainers/automation-and-review-flow.md#pipelines-only).
+**API-2-Pipelines** retains API preparation/orchestration; **API-2-ARM** retains
+Azure execution by the API or its host worker.
 
 | Scenario | Python SDK | Outcome |
 |---|---|---|

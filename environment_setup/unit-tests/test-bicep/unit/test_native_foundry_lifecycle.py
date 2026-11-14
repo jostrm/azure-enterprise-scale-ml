@@ -53,6 +53,8 @@ def test_convergence_completion_revalidates_instances_and_authorization(monkeypa
                     if key not in cloud.bodies:
                         cloud.bodies[key] = {**copy.deepcopy(cloud.identity), "id": key}
                     cloud.bodies[key]["etag"] = '"replacement"'
+                    if defect == "nsg":
+                        cloud.bodies[key]["properties"]["securityRules"] = [{"name": "unreviewed"}]
         return original(*args, **kwargs)
     monkeypatch.setattr(fl, "collect_resource_closure", closure)
     result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
@@ -79,7 +81,10 @@ def test_convergence_inventory_follows_last_readiness_get(monkeypatch, boundary,
         result = original_request(method, url, *args, **kwargs)
         if active and method == "GET" and "/capabilityhosts/" in url.lower() and not changed:
             changed.append(len(cloud.executed))
-            cloud.bodies[UAMI if instance == "uami" else NSG]["etag"] = '"replacement"'
+            replacement = cloud.bodies[UAMI if instance == "uami" else NSG]
+            replacement["etag"] = '"replacement"'
+            if instance == "nsg":
+                replacement["properties"]["securityRules"] = [{"name": "unreviewed"}]
         return result
     monkeypatch.setattr(fl, "verify_foundry_live_readiness", readiness)
     monkeypatch.setattr(cloud, "request", request)
@@ -163,6 +168,8 @@ def test_convergence_pending_intent_cannot_authorize_another_phase_put(monkeypat
             else:
                 key = UAMI if revocation == "uami" else NSG
                 cloud.bodies[key]["etag"] = '"replacement"'
+                if revocation == "nsg":
+                    cloud.bodies[key]["properties"]["securityRules"] = [{"name": "unreviewed"}]
         return result
     monkeypatch.setattr(cloud, "request", request)
     result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
@@ -722,6 +729,7 @@ def continued_native_worker(monkeypatch, *, omit_cognitive=False, repinned=False
     cloud = FoundryCloud(document, producer.templates)
     cloud.runs = copy.deepcopy(producer.runs)
     cloud.bodies = copy.deepcopy(producer.bodies)
+    monkeypatch.setattr(fl, "collect_resource_closure", native_closure)
     cloud.planned[UAMI] = copy.deepcopy(cloud.bodies[UAMI])
     if not omit_cognitive:
         definition = GROUP.lower() + "/providers/microsoft.authorization/roledefinitions/5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
@@ -1101,8 +1109,8 @@ class FoundryCloud(PlanCloud):
                  if identifier not in self.bodies else self.planned[identifier] for identifier in resources}
         changes = sorted([{
             "resource_id": identifier, "change_type": "NoChange" if identifier in self.bodies else "Create",
-            "before_hash": fl.digest(self.bodies[identifier]) if identifier in self.bodies else None,
-            "after_hash": fl.digest(after[identifier]),
+            "before_hash": fl.resource_digest(self.bodies[identifier]) if identifier in self.bodies else None,
+            "after_hash": fl.resource_digest(after[identifier]),
         } for identifier in resources], key=lambda row: row["resource_id"])
         if resource_payloads is not None:
             resource_payloads.update(copy.deepcopy(after))
@@ -1116,10 +1124,10 @@ class FoundryCloud(PlanCloud):
 def native_closure(cloud, scopes, resource_versions=None):
     selected = {scope.lower() for scope in scopes}
     bodies = {key: copy.deepcopy(body) for key, body in cloud.bodies.items() if fl.arm_scope(key) in selected}
-    groups = {key: {"body_hash": fl.digest(body), "etag": body.get("etag")}
+    groups = {key: {"body_hash": fl.resource_digest(body), "etag": body.get("etag")}
               for key, body in bodies.items() if fl.RG_ID.fullmatch(key)}
     closure = {"providers": {}, "collections": {}, "groups": groups,
-               "resources": {key: {"body_hash": fl.digest(body), "etag": body.get("etag"),
+               "resources": {key: {"body_hash": fl.resource_digest(body), "etag": fl.resource_etag(body, {}),
                                    "api_version": "2024-05-01"} for key, body in bodies.items() if key not in groups}}
     for identifier, row in closure["resources"].items():
         row["type"] = fl.resource_type_from_id(identifier)
@@ -1528,7 +1536,9 @@ def preserved_network_case(monkeypatch, *, grant_exists):
         result, bodies = simple_plan_closure(cloud, scopes, versions)
         for identifier, row in result["resources"].items():
             row.update(type=fl.resource_type_from_id(identifier),
-                       api_version=(versions or {}).get(identifier, row["api_version"]))
+                       api_version=(versions or {}).get(identifier, row["api_version"]),
+                       body_hash=fl.resource_digest(bodies[identifier]),
+                       etag=fl.resource_etag(bodies[identifier], {}))
         for identifier, row in result["groups"].items():
             row.update(body_hash=fl.digest(bodies[identifier]), etag=bodies[identifier].get("etag"))
         return result, bodies

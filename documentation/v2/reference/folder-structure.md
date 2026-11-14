@@ -3,7 +3,8 @@
 # Folder structure
 
 ESAF keeps your configuration in one `azurefactory` folder in your consumer repository. One folder can hold
-several AI Factories. The Factory API writes these files; you change them through a tool, not by hand.
+several AI Factories. The Factory API writes these files for the existing API routes.
+The optional Pipelines-only route uses the same registered layout, not a legacy copy.
 
 ## The azurefactory folder
 
@@ -26,14 +27,21 @@ azurefactory\
 
 | Item | What it holds |
 |---|---|
-| `register.json` | Commits the identity and configuration of every Factory together. |
+| `register.json` | Sole authoritative commit point: embeds identities, configuration, per-project variables and bindings together. |
 | `factories\<key>\` | Holds one Factory. The key is the name you gave it, for example `acme-ai`. |
 | `scalesets\<suffix>\` | Holds one scale set. The suffix is three digits, for example `001`. |
 | `projects\projectNNN\` | Holds one project, for example `project001`. Every project lives under its scale set. |
-| `variables.json` | Holds the project's settings, with a `dev` and a `stage_prod` section. |
+| `variables.json` | Human-readable projection of the register's project settings, with `dev` and `stage_prod` sections. |
 
 Dev, Stage and Prod are sections in `variables.json`, not extra folders. Keep credentials in a key vault,
 never in these files.
+
+For Pipelines-only, an explicit variables path must agree with the corresponding
+embedded register object. It is not a silent override. The API-free
+`bootstrap/lib/pipeline_configuration.py` generates new drafts, including their
+projections; it never changes an existing root or grants deployment permission.
+Configuration edits are reviewed before adoption. See the
+[input, ZIP and persistence contract](maintainers/automation-and-review-flow.md#pipelines-only).
 
 ## Your consumer repository after setup
 

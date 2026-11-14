@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "provider": "gha",
+  "repository": "https://github.com/REPLACE_OWNER/REPLACE_REPOSITORY",
+  "run_id": 123456789,
+  "artifact_name": "esaf-inputs",
+  "archive_path": "azurefactory-inputs.zip",
+  "archive_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "producer_commit": "0000000000000000000000000000000000000000"
+}

@@ -26,6 +26,21 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Credential-free 
 ---
 # Orchestration and updates
 
+## Execution-owner terminology
+
+- **API-2-Pipelines:** the Factory API prepares/orchestrates pipeline execution.
+- **API-2-ARM:** the Factory API or its host-side worker performs Azure operations.
+- **Pipelines-only:** the additional opt-in route must own preparation, protected
+  approval, execution, persistence, observation and recovery in pipelines, with no
+  Factory API dependency. ARM, Microsoft Graph and provider API calls are valid.
+
+The existing scoped GHA/ADO workers consume protected prepared manifests; the
+presence of those templates is not proof of API-free preparation or recovery.
+Historical PROJECT measurements remain measurements of API-orchestrated runs.
+Read the [source trace and current contract](../../v2/reference/maintainers/automation-and-review-flow.md#pipelines-only)
+before making a coverage claim. Existing entry points, defaults and source pins
+are not replaced by the additional route.
+
 ## Observed
 
 ADO/GHA templates orchestrate common and selected project infrastructure. Project dispatch carries reviewed environment, project identity, configuration hash and correlation ID; `project_deployment.py` validates provider repository and run correlation rather than treating any successful workflow as this deployment.

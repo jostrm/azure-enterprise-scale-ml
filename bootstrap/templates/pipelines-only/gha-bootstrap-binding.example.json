@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "provider": "gha",
+  "repository": "https://github.com/REPLACE_OWNER/REPLACE_REPOSITORY",
+  "consumer_ref": "refs/heads/main",
+  "admission": {
+    "writer_governance": "exclusive-upgraded-writers-v1"
+  },
+  "bootstrap": {
+    "identity_id": "/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/platform-survives/providers/Microsoft.ManagedIdentity/userAssignedIdentities/esaf-platform",
+    "writer_id": "platform-writer",
+    "auth_namespace": "esaf-pipelines-execute",
+    "runner": {
+      "kind": "self-hosted",
+      "os": "linux",
+      "labels": ["self-hosted", "linux", "esaf-lifecycle-external"]
+    },
+    "deployment_role_definition_ids": [
+      "b24988ac-6180-42a0-ab88-20f7382dd24c",
+      "f58310d9-a9f6-439a-9e8d-f62e7b41a168"
+    ]
+  }
+}

@@ -12,17 +12,43 @@ sources:
   - bootstrap/lib/registered_creation.py
   - bootstrap/lib/runner_bootstrap.py
   - bootstrap/lib/runner-prerequisites.sh
+  - bootstrap/lib/pipeline_inputs.py
+  - bootstrap/lib/pipeline_configuration.py
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_azurefactory_starter.py
   - environment_setup/unit-tests/test-bicep/unit/test_registered_creation.py
   - environment_setup/unit-tests/test-bicep/unit/test_registered_prerequisites.py
   - environment_setup/unit-tests/test-bicep/unit/test_runner_bootstrap.py
   - environment_setup/unit-tests/test-bicep/unit/test_bootstrap_scoped_creation_guard.py
+  - environment_setup/unit-tests/test-bicep/unit/test_pipeline_inputs.py
+  - environment_setup/unit-tests/test-bicep/unit/test_pipeline_configuration.py
 graph_symbols:
   - bootstrap/lib/registered_creation.py::function:prepare
 reviewed_source: '4a2e0973 + Graph read-back in registered_prerequisites; observed 2026-10-22; governance-compliant runner patch settings 2026-10-23; .azurefactory/ ignore rule in registered_setup and 00-start --no-delete (registered roots) 2026-10-24; concurrent private DNS writes in registered_prerequisites 2026-10-24'
 ---
 # Bootstrap and layouts
+
+## Optional Pipelines-only input boundary
+
+Observed in the local implementation based on `3b89bbc7`, 2026-11-12:
+`pipeline_inputs.resolve_request` reads the existing schema-2 register as the sole
+configuration authority. Explicit variables and extant named projections must
+agree semantically; generation drift is warning evidence only. Repository-relative
+paths and bounded virtual ZIP input use one resolver. ZIPs are never extracted.
+Neither configuration, a checksum nor a provider-binding file grants authorization.
+
+`pipeline_configuration` can create initial configuration without the Factory API,
+and construct add-scale/upsert-project drafts. It uses the existing variables
+template and subnet allocator and writes only a new root. Generated GHA/ADO
+documents were also accepted by PINK's unchanged canonical validator during the
+implementation; that does not prove deployment readiness. No enrollment, ownership,
+Azure resource, identity, repository or pipeline is created by drafting.
+
+Existing API/registered/legacy launchers are retained. The new route does not use
+legacy configuration as a fallback and does not change consumer source pins.
+See the [Pipelines-only contract](../../v2/reference/maintainers/automation-and-review-flow.md#pipelines-only)
+for implementation/acceptance boundaries rather than inferring complete bootstrap
+from an offline configuration test.
 
 ## Observed entry points
 

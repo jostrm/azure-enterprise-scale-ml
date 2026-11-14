@@ -31,6 +31,21 @@ reviewed_source: 'effdb843 + d03bc189 deletion review; f6fa41f5 retained run-cla
 ---
 # Reviewed operations
 
+## Pipelines-only coexistence constraint
+
+The optional route must not reinterpret a JSON approval flag, receipt checksum or
+successful dispatch as authorization. Provider-native protected review must bind
+the operation actually prepared, with authenticated run/job/source evidence and
+fresh identity, ownership, permissions and dependency checks.
+
+The 2026-11-12 PINK source trace found that the API-2-Pipelines confirmation paths
+read provider enrollment/active state and check local jobs before dispatch; those
+reads alone do not acquire a distributed claim. Shared admission participation is
+therefore a genuine cross-repository requirement, not something GHA concurrency or
+an ADO exclusive check independently solves. Opted-out API behavior must remain
+unchanged. An older installed API is not made safe merely by adding new PURPLE
+files or changing a JSON field. See the [implementation contract](../../v2/reference/maintainers/automation-and-review-flow.md#pipelines-only).
+
 ## Observed layers
 
 SDK review receipts bind canonical API URL, purpose, folder, operation/mode, confirmation ID, request/preview hashes and expiry. Validation requires `can_execute: true`, an empty blocker list and consistent scope/revision bindings. Receipt creation refuses overwrite. Hashes detect content changes; possession of a checksum is not human authorization.

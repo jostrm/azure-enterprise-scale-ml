@@ -1,5 +1,30 @@
 # 10) AI Factory onion V2: API-2-Pipelines (CoreTeam)
 
+## Three execution routes
+
+**API-2-Pipelines** means the Factory API prepares/orchestrates pipeline execution.
+**API-2-ARM** means the API or its host-side worker performs Azure operations.
+**Pipelines-only** is the additional opt-in route in which pipelines own the complete
+operation, including preparation, approvals, persistence, observation and recovery.
+It is independent of the Factory API, not of ARM, Microsoft Graph or GHA/ADO APIs.
+Existing API behavior and consumer entry points are retained.
+
+```text
+API-2-Pipelines: client -> Factory API -> provider pipeline -> shared scripts/Bicep -> Azure
+API-2-ARM:       client -> Factory API / host-side worker -> shared scripts/Bicep -> Azure
+Pipelines-only:  registered consumer configuration -> provider pipeline -> shared lifecycle services -> Azure
+```
+
+The [Pipelines-only contract](../reference/maintainers/automation-and-review-flow.md#pipelines-only)
+separates implemented source, offline evidence and outstanding acceptance boundaries.
+No new Azure measurements were made for that route. The generated images and
+measurements on this page describe the recorded **API-orchestrated** runs only.
+Their historical word *worker* does not establish an execution owner: a pipeline
+worker consuming an API-prepared plan is API-2-Pipelines; a worker performing ARM
+operations on the API host is API-2-ARM.
+
+## Recorded API-orchestrated architecture
+
 The onion has the same five layers as in [the onion architecture](./10-factory-onion-architecture.md). What changed is
 who does the work for a project. In PROJECT mode (`onion-deployment-mode` `project=API-2-Pipelines`, the default for
 PROJECT) the Factory API no longer freezes and deploys an ARM plan itself. It writes the reviewed configuration and
@@ -22,7 +47,7 @@ The pictures and the tables on this page are generated from one data file,
 
 ## What changed in one minute
 
-| | Before: the API deploys (API-2-ARM, worker route) | Now: API-2-Pipelines (PROJECT) |
+| | Before: API-orchestrated frozen-plan route | Now: API-2-Pipelines (PROJECT) |
 |---|---|---|
 | What the API does | Reads the live inventory, freezes a deployment plan, starts the factory-lifecycle worker that deploys the plan | Writes the reviewed configuration and starts the consumer's `infra-project.yml` |
 | API time before the pipeline | 2 min 18 s (scale-set enroll, 2026-10-31) | 13-24 s (four PROJECT runs, 2026-10-31) |

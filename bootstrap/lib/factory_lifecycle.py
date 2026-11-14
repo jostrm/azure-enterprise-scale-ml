@@ -781,6 +781,8 @@ def validate_deployment_plan(document):
     plan, target, route = document["deployment"], document["target"], document["route"]
     require(isinstance(plan, dict) and plan.get("contract") == 1
             and plan.get("configuration_hash") == digest(document["config"]), "frozen-deployment-plan-required")
+    require(plan.get("parameter_transport") in (None, "arm-keyvault-reference-v1"),
+            "unsupported-arm-parameter-transport")
     require(guid(document["identity"].get("deployment_object_id")), "bound-deployment-principal-required")
     require(route.get("scoped_contract") == 1 and isinstance(route.get("auth_namespace"), str)
             and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", route["auth_namespace"]), "namespaced-route-required")
@@ -1033,6 +1035,7 @@ def capabilities():
     return {
         "contract": CONTRACT, "manifest_schema": CONTRACT,
         "protected_inputs": ["stdin", "windows-current-user-dpapi"],
+        "arm_parameter_transport": "arm-keyvault-reference-v1",
         "local_preview": True, "distributed_lock": "azure-blob-infinite-lease-v1",
         "coordination_modes": ["blob", "single-writer"],
         "single_writer": "provider-repository-cas-v1",
@@ -3935,9 +3938,13 @@ def compiled_plan_step(cloud, document, step, source_root):
             "compiled-template-scope-mismatch")
     verify_preserved_network(cloud, document, step, source_root, template=template)
     template = bind_foundry_identity_template(cloud, document, step, source_root, template)
-    return {"location": document["target"]["region"],
-            "properties": {"mode": "Incremental", "template": template,
-                           "parameters": {key: {"value": value} for key, value in step["parameters"].items()}}}
+    payload = {"location": document["target"]["region"],
+               "properties": {"mode": "Incremental", "template": template,
+                              "parameters": {key: {"value": value} for key, value in step["parameters"].items()}}}
+    if document["deployment"].get("parameter_transport") == "arm-keyvault-reference-v1":
+        from pipeline_lifecycle_keyvault import encode_step_payload
+        return encode_step_payload(payload)
+    return payload
 
 
 def resolve_template_parameters(compiled_template, selected_values, parameter_sources):
@@ -4104,7 +4111,12 @@ def combined_plan_payload(cloud, document, source_root, step_ids=None):
             nested["resourceGroup"] = RG_ID.fullmatch(step["resource_group"])[2]
         outer["resources"].append(nested)
     require(len(canonical(outer)) <= 4 * 1024 * 1024, "combined-template-too-large-use-reviewed-template-specs")
-    return {"location": target["region"], "properties": {"mode": "Incremental", "template": outer, "parameters": parameters}}
+    payload = {"location": target["region"],
+               "properties": {"mode": "Incremental", "template": outer, "parameters": parameters}}
+    if document["deployment"].get("parameter_transport") == "arm-keyvault-reference-v1":
+        from pipeline_lifecycle_keyvault import lift_combined_payload
+        return lift_combined_payload(payload)
+    return payload
 
 
 FOUNDRY_TEMPLATE = "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep"
@@ -5223,7 +5235,7 @@ def verify_foundry_observation_context(cloud, document, receipt, observations):
     for identifier, proof in observations.items():
         status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
         require(status == 200 and str(body.get("id", "")).lower() == identifier
-                and digest(body) == proof["body_hash"], "native-foundry-phase-instance-changed")
+                and resource_digest(body) == proof["body_hash"], "native-foundry-phase-instance-changed")
 
 
 def verify_foundry_observation_history(document, receipt):
@@ -5308,7 +5320,7 @@ def verify_foundry_live_inventory(cloud, locks, document, observations, *, closu
         status, _, body = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
         proof = observations.get(scope.lower())
         require((proof is None and status == 404) or
-                (proof is not None and status == 200 and digest(body) == proof["body_hash"]),
+                (proof is not None and status == 200 and resource_digest(body) == proof["body_hash"]),
                 "native-foundry-phase-instance-changed")
         if proof is not None:
             scopes.append(scope)
@@ -5478,8 +5490,8 @@ def foundry_agent_readiness(cloud, locks, document, receipt, persist, observatio
                 or str(network.get("location", "")).lower() == document["target"]["region"].lower(),
                 "native-foundry-agent-network-region-mismatch")
         expected_hash = observations.get(scope, {}).get("body_hash")
-        require(not expected_hash or digest(network) == expected_hash, "native-foundry-agent-network-instance-changed")
-        proof["network_resources"].append({"id": scope, "body_hash": digest(network), "api_version": api,
+        require(not expected_hash or resource_digest(network) == expected_hash, "native-foundry-agent-network-instance-changed")
+        proof["network_resources"].append({"id": scope, "body_hash": resource_digest(network), "api_version": api,
                                            "provisioning_state": "Succeeded"})
     for candidate in agent["candidate_grants"]:
         expected_principal = candidate["intent"].get("properties", {}).get("principalId")
@@ -5546,19 +5558,25 @@ def verify_foundry_agent_receipt(document, receipt):
                     for row in network), "native-foundry-agent-network-receipt-incomplete")
 
 
-def verify_foundry_agent_current(cloud, locks, document, receipt, sleep):
+def read_foundry_evidence(cloud, locks, document, identifier, api_version, sleep, observe=None):
+    if observe is not None:
+        require(locks is None and callable(observe), "native-foundry-read-only-observer-required")
+        return observe(identifier, api_version)
+    return wait_foundry_resource(cloud, locks, identifier, lambda body: True, sleep,
+                                api_version=api_version, attempts=1, document=document)
+
+
+def verify_foundry_agent_current(cloud, locks, document, receipt, sleep, *, observe=None):
     verify_foundry_agent_receipt(document, receipt)
     if not document["deployment"]["foundry_lifecycle"]["agent_identity_binding"]:
         return
     proof = receipt["foundry_agent_readiness"]
-    identity = wait_foundry_resource(cloud, locks, proof["resource_id"], lambda body: True, sleep,
-                                    api_version=FOUNDRY_MI_API, attempts=1, document=document)
+    identity = read_foundry_evidence(cloud, locks, document, proof["resource_id"], FOUNDRY_MI_API, sleep, observe)
     metadata = foundry_uami_metadata(document, identity)
     require(all(metadata[key] == proof[key] for key in ("principal_id", "client_id", "tenant_id"))
             and digest(identity) == proof["identity_body_hash"], "native-foundry-agent-identity-changed")
     for grant in proof["grants"]:
-        body = wait_foundry_resource(cloud, locks, grant["id"], lambda body: True, sleep,
-                                    api_version="2022-04-01", attempts=1, document=document)
+        body = read_foundry_evidence(cloud, locks, document, grant["id"], "2022-04-01", sleep, observe)
         require(digest(body) == grant["body_hash"], "native-foundry-agent-grant-instance-changed")
 
 
@@ -5641,21 +5659,19 @@ def foundry_readiness(cloud, locks, document, receipt, persist, account_result, 
     persist()
 
 
-def verify_foundry_live_readiness(cloud, locks, document, receipt, sleep):
+def verify_foundry_live_readiness(cloud, locks, document, receipt, sleep, *, observe=None):
     verify_foundry_readiness_receipt(document, receipt)
-    verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+    verify_foundry_agent_current(cloud, locks, document, receipt, sleep, observe=observe)
     proof = receipt["foundry_readiness"]
-    account = wait_foundry_resource(cloud, locks, proof["account_resource_id"],
-        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
-        sleep, attempts=1, document=document)
-    require(digest(account) == proof["account_body_hash"], "native-foundry-account-instance-changed")
+    account = read_foundry_evidence(cloud, locks, document, proof["account_resource_id"], FOUNDRY_API, sleep, observe)
+    require(account.get("properties", {}).get("provisioningState") == "Succeeded"
+            and digest(account) == proof["account_body_hash"], "native-foundry-account-instance-changed")
     verify_foundry_account_agent(document, account, receipt)
     if "capability_host" in proof:
         host = proof["capability_host"]
-        body = wait_foundry_resource(cloud, locks, host["id"],
-            lambda value: value.get("properties", {}).get("provisioningState") == "Succeeded",
-            sleep, attempts=1, document=document)
-        require(digest(body) == host["body_hash"], "native-foundry-capability-host-changed")
+        body = read_foundry_evidence(cloud, locks, document, host["id"], FOUNDRY_API, sleep, observe)
+        require(body.get("properties", {}).get("provisioningState") == "Succeeded"
+                and digest(body) == host["body_hash"], "native-foundry-capability-host-changed")
 
 
 def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep):
@@ -5698,7 +5714,7 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         payload = combined_plan_payload(cloud, document, source_root, phase["step_ids"])
         for identifier, proof in observations.items():
             status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
-            require(status == 200 and digest(body) == proof["body_hash"],
+            require(status == 200 and resource_digest(body) == proof["body_hash"],
                     "native-foundry-phase-instance-changed")
         source_changes = {}
         current = evaluate_what_if(cloud, document, root_step, payload, sleep,

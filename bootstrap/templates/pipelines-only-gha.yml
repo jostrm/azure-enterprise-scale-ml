@@ -1,0 +1,365 @@
+# Copy to .github/workflows/pipelines-only-gha.yml in the consumer repository.
+# Configure protected environments/reviewers and an external surviving runner.
+# The checked-in submodule pin is authoritative; never update it in this workflow.
+# Bundle source: committed <request_path>.artifact.json; UI does not upload files.
+# Native workers require an existing user-backed ESAF_PROVIDER_TOKEN in the
+# protected environments; the ordinary job token is insufficient for secret writes.
+# Alternatively set protected environment variables ESAF_PROVIDER_CREDENTIAL_SOURCE
+# to keyvault and ESAF_PROVIDER_TOKEN_SECRET_ID to an Azure Key Vault secret URI
+# (an explicit version is optional). A human/script must seed it first. Vault, OIDC identity
+# and runner must survive teardown; grant only secret-get on that reference and
+# provide private network reachability. No secret is read until after OIDC login.
+# Each verified continuation queues this same pinned workflow with a fresh review.
+# Child preparation waits for the exact predecessor mutating finalizer to succeed.
+# Hosted complete waits for finalized intended outcomes; dispatch alone is never
+# workflow success. Continuation selects a finalized parent UUID/plan hash.
+# Explicit recovery selects a terminal predecessor retaining its claim, prepares a
+# NEW operation and requires fresh protected review; neither mode rebinds origin.
+name: pipelines-only
+run-name: pipelines-only [${{ inputs.correlation_id }}]
+on:
+  workflow_dispatch:
+    inputs:
+      request_path:
+        description: Committed repository-relative request JSON (not a local file upload)
+        required: true
+        type: string
+      correlation_id:
+        description: Set by ESAF-pipelines.sh; leave blank for a manual run
+        default: ''
+        type: string
+      request_digest:
+        default: ''
+        type: string
+      consumer_commit:
+        default: ''
+        type: string
+      source_commit:
+        default: ''
+        type: string
+      parent_operation_id:
+        description: Finalized continuation parent (mutually exclusive with recovery)
+        default: ''
+        type: string
+      parent_plan_hash:
+        description: Exact parent plan SHA256; never an approval
+        default: ''
+        type: string
+      recovery_operation_id:
+        description: Terminal prior run's retained-claim operation; new protected recovery review required
+        default: ''
+        type: string
+      recovery_plan_hash:
+        description: Exact prior plan SHA256; mutually exclusive with parent continuation
+        default: ''
+        type: string
+permissions: {}
+jobs:
+  prepare:
+    runs-on: [self-hosted, linux, esaf-lifecycle-external]
+    environment: esaf-pipelines-prepare
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      id-token: write
+    outputs:
+      correlation_id: ${{ steps.context.outputs.correlation_id }}
+      plan_hash: ${{ steps.review.outputs.plan_hash }}
+      operation_id: ${{ steps.review.outputs.operation_id }}
+    env:
+      AZURE_CONFIG_DIR: ${{ github.workspace }}/.esaf-azure-${{ github.run_id }}-${{ github.run_attempt }}-prepare
+      AZURE_LOGIN_POST_CLEANUP: 'false'
+      AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Validate provider, canonical inputs and immutable checkout
+        id: context
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          ESAF_CORRELATION_ID: ${{ inputs.correlation_id }}
+          ESAF_REQUEST_DIGEST: ${{ inputs.request_digest }}
+          ESAF_CONSUMER_COMMIT: ${{ inputs.consumer_commit }}
+          ESAF_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --download-input --job-provider gha
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --validate-only \
+            --job-provider gha --output-context .esaf/context.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          context = json.loads(Path(".esaf/context.json").read_text())
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("correlation_id=" + context["correlation_id"] + "\n")
+          Path(os.environ["AZURE_CONFIG_DIR"]).mkdir(mode=0o700)
+          PY
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Prepare the governed operation and durable journal
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          PARENT_OPERATION_ID: ${{ inputs.parent_operation_id }}
+          PARENT_PLAN_HASH: ${{ inputs.parent_plan_hash }}
+          RECOVERY_OPERATION_ID: ${{ inputs.recovery_operation_id }}
+          RECOVERY_PLAN_HASH: ${{ inputs.recovery_plan_hash }}
+          GH_TOKEN: ${{ secrets.ESAF_PROVIDER_TOKEN }}
+          ESAF_PROVIDER_CREDENTIAL_SOURCE: ${{ vars.ESAF_PROVIDER_CREDENTIAL_SOURCE }}
+          ESAF_PROVIDER_TOKEN_SECRET_ID: ${{ vars.ESAF_PROVIDER_TOKEN_SECRET_ID }}
+        run: |
+          set -euo pipefail
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider gha -- \
+            python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py prepare \
+            --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+            --provider-context .esaf/context.json --output .esaf/prepared.json \
+            --parent-operation-id "$PARENT_OPERATION_ID" --parent-plan-hash "$PARENT_PLAN_HASH" \
+            --recovery-operation-id "$RECOVERY_OPERATION_ID" --recovery-plan-hash "$RECOVERY_PLAN_HASH"
+      - name: Present the actual operation for protected-environment review
+        id: review
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          prepared = json.loads(Path(".esaf/prepared.json").read_text())
+          for name in ("operation_id", "plan_hash"):
+              if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", prepared[name]):
+                  raise SystemExit("Invalid prepared operation")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              for name in ("operation_id", "plan_hash"):
+                  out.write(name + "=" + prepared[name] + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write("## Review the prepared ESAF operation\n\n")
+              out.write("The execute environment approval authorizes ONLY this operation and plan.\n\n")
+              out.write("```json\n" + json.dumps(prepared, indent=2) + "\n```\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esaf-prepared-${{ steps.context.outputs.correlation_id }}-1
+          path: |
+            .esaf/context.json
+            .esaf/prepared.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove this job's Azure credential profile
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, shutil
+          from pathlib import Path
+          path = Path(os.environ["AZURE_CONFIG_DIR"])
+          if path.parent.resolve() != Path(os.environ["GITHUB_WORKSPACE"]).resolve():
+              raise SystemExit("Unsafe profile path")
+          if path.is_symlink():
+              path.unlink()
+          elif path.exists():
+              shutil.rmtree(path)
+          PY
+  execute:
+    needs: prepare
+    name: Execute reviewed ${{ needs.prepare.outputs.operation_id }} / ${{ needs.prepare.outputs.plan_hash }}
+    runs-on: [self-hosted, linux, esaf-lifecycle-external]
+    environment: esaf-pipelines-execute
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      id-token: write
+    env:
+      AZURE_CONFIG_DIR: ${{ github.workspace }}/.esaf-azure-${{ github.run_id }}-${{ github.run_attempt }}-execute
+      AZURE_LOGIN_POST_CLEANUP: 'false'
+      AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: esaf-prepared-${{ needs.prepare.outputs.correlation_id }}-1
+          path: .esaf/handoff
+      # Download the exact same input ZIP again; never transfer Azure credentials
+      # or unlocked local state in the prepared-operation artifact.
+      - name: Revalidate checkout and request before authentication
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          ESAF_CORRELATION_ID: ${{ needs.prepare.outputs.correlation_id }}
+          ESAF_REQUEST_DIGEST: ${{ inputs.request_digest }}
+          ESAF_CONSUMER_COMMIT: ${{ inputs.consumer_commit }}
+          ESAF_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --download-input --job-provider gha
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --validate-only \
+            --job-provider gha --output-context .esaf/context.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          if json.loads(Path(".esaf/context.json").read_text()) != json.loads(Path(".esaf/handoff/context.json").read_text()):
+              raise SystemExit("Prepared context changed")
+          Path(os.environ["AZURE_CONFIG_DIR"]).mkdir(mode=0o700)
+          PY
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Execute only the reviewed operation
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          GH_TOKEN: ${{ secrets.ESAF_PROVIDER_TOKEN }}
+          ESAF_PROVIDER_CREDENTIAL_SOURCE: ${{ vars.ESAF_PROVIDER_CREDENTIAL_SOURCE }}
+          ESAF_PROVIDER_TOKEN_SECRET_ID: ${{ vars.ESAF_PROVIDER_TOKEN_SECRET_ID }}
+        run: |
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider gha -- \
+            python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py execute \
+            --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+            --provider-context .esaf/context.json --prepared .esaf/handoff/prepared.json \
+            --output .esaf/execution.json
+      - name: Remove this job's Azure credential profile
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, shutil
+          from pathlib import Path
+          path = Path(os.environ["AZURE_CONFIG_DIR"])
+          if path.parent.resolve() != Path(os.environ["GITHUB_WORKSPACE"]).resolve():
+              raise SystemExit("Unsafe profile path")
+          if path.is_symlink():
+              path.unlink()
+          elif path.exists():
+              shutil.rmtree(path)
+          PY
+  finalize:
+    needs: [prepare, execute]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.execute.result != 'skipped' }}
+    name: Finalize reviewed ${{ needs.prepare.outputs.operation_id }} / ${{ needs.prepare.outputs.plan_hash }}
+    runs-on: [self-hosted, linux, esaf-lifecycle-external]
+    environment: esaf-pipelines-execute
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      id-token: write
+    env:
+      AZURE_CONFIG_DIR: ${{ github.workspace }}/.esaf-azure-${{ github.run_id }}-${{ github.run_attempt }}-finalize
+      AZURE_LOGIN_POST_CLEANUP: 'false'
+      AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: esaf-prepared-${{ needs.prepare.outputs.correlation_id }}-1
+          path: .esaf/handoff
+      - name: Revalidate exact prepared context on the surviving finalizer
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          ESAF_CORRELATION_ID: ${{ needs.prepare.outputs.correlation_id }}
+          ESAF_REQUEST_DIGEST: ${{ inputs.request_digest }}
+          ESAF_CONSUMER_COMMIT: ${{ inputs.consumer_commit }}
+          ESAF_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --download-input --job-provider gha
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_dispatch.py \
+            --repo-root . --request "$REQUEST_PATH" --validate-only \
+            --job-provider gha --output-context .esaf/context.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          if json.loads(Path(".esaf/context.json").read_text()) != json.loads(Path(".esaf/handoff/context.json").read_text()):
+              raise SystemExit("Prepared context changed")
+          Path(os.environ["AZURE_CONFIG_DIR"]).mkdir(mode=0o700)
+          PY
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Observe, reconcile and release only after the mutating job is terminal
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+          GH_TOKEN: ${{ secrets.ESAF_PROVIDER_TOKEN }}
+          ESAF_PROVIDER_CREDENTIAL_SOURCE: ${{ vars.ESAF_PROVIDER_CREDENTIAL_SOURCE }}
+          ESAF_PROVIDER_TOKEN_SECRET_ID: ${{ vars.ESAF_PROVIDER_TOKEN_SECRET_ID }}
+        run: |
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_credentials.py --provider gha -- \
+            python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py finalize \
+            --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+            --provider-context .esaf/context.json --prepared .esaf/handoff/prepared.json \
+            --output .esaf/receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esaf-receipt-${{ needs.prepare.outputs.correlation_id }}-1
+          path: .esaf/receipt.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove this job's Azure credential profile
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, shutil
+          from pathlib import Path
+          path = Path(os.environ["AZURE_CONFIG_DIR"])
+          if path.parent.resolve() != Path(os.environ["GITHUB_WORKSPACE"]).resolve():
+              raise SystemExit("Unsafe profile path")
+          if path.is_symlink():
+              path.unlink()
+          elif path.exists():
+              shutil.rmtree(path)
+          PY
+  complete:
+    name: complete
+    needs: [prepare, finalize]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.finalize.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: esaf-prepared-${{ needs.prepare.outputs.correlation_id }}-1
+          path: .esaf/handoff
+      - name: Read verified scenario completion without Azure credentials
+        shell: bash
+        env:
+          REQUEST_PATH: ${{ inputs.request_path }}
+        run: |
+          python3 azure-enterprise-scale-ml/bootstrap/lib/pipeline_provider.py complete \
+            --repo-root . --source-root azure-enterprise-scale-ml --request "$REQUEST_PATH" \
+            --provider-context .esaf/handoff/context.json --prepared .esaf/handoff/prepared.json \
+            --output .esaf/completed.json
