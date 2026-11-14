@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Launcher for pipelines and local use without installing the package.
 
-    python azure-enterprise-scale-ml/healthmodel/aif_healthmodel.py plan --variables-json aifactory/variables.json --environment dev --project 001
+    python azure-enterprise-scale-ml/usecase_code/healthmodel/aif_healthmodel.py plan --variables-json aifactory/variables.json --environment dev --project 001
 """
 import sys
 from pathlib import Path

@@ -21,7 +21,7 @@ import yaml
 ROOTS = (
     "00-start.sh", "01-start-v125-and-above.sh",
     ".github", "bootstrap", "environment_setup", "copy_my_subfolders_to_my_grandparent",
-    "esml", "esmlfac", "esmlrt", "healthmodel", "usecase_code",
+    "esml", "esmlfac", "esmlrt", "usecase_code",
 )
 EXTENSIONS = {".py", ".sh", ".ps1", ".bicep", ".bicepparam", ".yml", ".yaml", ".json", ".ipynb", ".toml", ".txt"}
 EXCLUDED_DIRS = {

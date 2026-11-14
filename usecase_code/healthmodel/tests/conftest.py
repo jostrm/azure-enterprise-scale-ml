@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 HEALTHMODEL = Path(__file__).resolve().parents[1]
-REPO = HEALTHMODEL.parent
+REPO = HEALTHMODEL.parents[1]
 sys.path.insert(0, str(HEALTHMODEL / "src"))
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"

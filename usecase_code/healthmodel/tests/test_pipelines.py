@@ -12,7 +12,7 @@ from conftest import HEALTHMODEL, REPO
 SETTINGS = REPO / "environment_setup/aifactory/bicep/copy_to_local_settings"
 ADO = SETTINGS / "azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-healthmodel.yaml"
 GHA = SETTINGS / "github-actions/infra-project-healthmodel.yml"
-TOOL = "azure-enterprise-scale-ml/healthmodel/aif_healthmodel.py"
+TOOL = "azure-enterprise-scale-ml/usecase_code/healthmodel/aif_healthmodel.py"
 
 
 def load(path):

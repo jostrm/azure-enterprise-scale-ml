@@ -2,19 +2,19 @@
 id: health-models
 status: observed
 sources:
-  - healthmodel/readme.md
-  - healthmodel/src/aifactory_healthmodel/bootstrap.py
-  - healthmodel/src/aifactory_healthmodel/application/service.py
-  - healthmodel/src/aifactory_healthmodel/domain/definitions.py
-  - healthmodel/src/aifactory_healthmodel/infrastructure/proxies.py
-  - healthmodel/bicep/main.bicep
+  - usecase_code/healthmodel/readme.md
+  - usecase_code/healthmodel/src/aifactory_healthmodel/bootstrap.py
+  - usecase_code/healthmodel/src/aifactory_healthmodel/application/service.py
+  - usecase_code/healthmodel/src/aifactory_healthmodel/domain/definitions.py
+  - usecase_code/healthmodel/src/aifactory_healthmodel/infrastructure/proxies.py
+  - usecase_code/healthmodel/bicep/main.bicep
 tests:
-  - healthmodel/tests/test_application.py
-  - healthmodel/tests/test_definitions.py
-  - healthmodel/tests/test_infrastructure.py
+  - usecase_code/healthmodel/tests/test_application.py
+  - usecase_code/healthmodel/tests/test_definitions.py
+  - usecase_code/healthmodel/tests/test_infrastructure.py
 graph_symbols:
-  - healthmodel/src/aifactory_healthmodel/application/service.py::class:HealthModelService
-  - healthmodel/src/aifactory_healthmodel/infrastructure/proxies.py::class:ReadOnlyTransport
+  - usecase_code/healthmodel/src/aifactory_healthmodel/application/service.py::class:HealthModelService
+  - usecase_code/healthmodel/src/aifactory_healthmodel/infrastructure/proxies.py::class:ReadOnlyTransport
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---
 # Health models
@@ -43,4 +43,4 @@ These are related observability surfaces, not interchangeable proofs of deployme
 
 See [[Dependency-Injection]], [[Monitoring-and-Retraining]], [[MCP-Boundary]], [[IaC-and-Private-Networking]] and [[Index]].
 
-Authority: [health-model design, definitions, limitations and use cases](../../../healthmodel/readme.md).
+Authority: [health-model design, definitions, limitations and use cases](../../../usecase_code/healthmodel/readme.md).

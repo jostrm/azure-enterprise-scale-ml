@@ -5,21 +5,21 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/ports.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
-  - healthmodel/src/aifactory_healthmodel/bootstrap.py
-  - healthmodel/src/aifactory_healthmodel/application/ports.py
+  - usecase_code/healthmodel/src/aifactory_healthmodel/bootstrap.py
+  - usecase_code/healthmodel/src/aifactory_healthmodel/application/ports.py
   - usecase_code/mcp/src/aifactory_mcp/health.py
   - usecase_code/mcp/src/aifactory_mcp/runtime.py
   - usecase_code/esml-v2/azure_esml/base_layer/contracts.py
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_services.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
-  - healthmodel/tests/test_bootstrap.py
-  - healthmodel/tests/test_container.py
+  - usecase_code/healthmodel/tests/test_bootstrap.py
+  - usecase_code/healthmodel/tests/test_container.py
   - usecase_code/mcp/tests/test_health.py
   - usecase_code/esml-v2/tests/test_esml_backends.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py::class:AgentServiceFactory
-  - healthmodel/src/aifactory_healthmodel/application/service.py::class:HealthModelService
+  - usecase_code/healthmodel/src/aifactory_healthmodel/application/service.py::class:HealthModelService
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---
 # Dependency injection
@@ -41,4 +41,4 @@ The locally implemented shared graph runtime follows this composition style: Cha
 
 See [[Agent-Factory]], [[Chat-and-Grounding]], [[Health-Models]], [[MCP-Boundary]], [[Engines-and-Pipelines]], [[ADR-001-Dual-Graph]] and [[Index]].
 
-Authority: [health-model OO design](../../../healthmodel/readme.md), [MCP strategy and probe contracts](../../../usecase_code/mcp/readme.md).
+Authority: [health-model OO design](../../../usecase_code/healthmodel/readme.md), [MCP strategy and probe contracts](../../../usecase_code/mcp/readme.md).

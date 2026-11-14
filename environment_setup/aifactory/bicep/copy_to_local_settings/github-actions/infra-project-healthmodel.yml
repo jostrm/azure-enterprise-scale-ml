@@ -152,7 +152,7 @@ jobs:
           if ($env:HM_SCOPE -notin @('project', 'common', 'all')) { throw 'scope must be project, common or all' }
           $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
           if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
-          $tool = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/healthmodel/aif_healthmodel.py'
+          $tool = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/usecase_code/healthmodel/aif_healthmodel.py'
           $extra = @()
           if ($env:HM_MODE -eq 'deploy') {
             if ($env:HM_REGISTER_PROVIDER -ieq 'true') { $extra += '--register-provider' }

@@ -53,7 +53,7 @@ test factory.
 
 | Area | Confirmed baseline | Gap closed here |
 | --- | --- | --- |
-| `healthmodel/` | Empty `readme.md` | Complete solution in this folder |
+| `usecase_code/healthmodel/` (`healthmodel/` before v1.26) | Empty `readme.md` | Complete solution in this folder |
 | Purple Bicep (`esml-genai-1`, `esml-common`, modules) | No health model and no workload alert rules; the only action group is in the FinOps automation sample | `bicep/main.bicep` with default health-state alerts |
 | Python API / Tkinter, MAUI, DomainLayer, CLI | No `CloudHealth` or health-model references | Not changed; integration points listed in [section 16](#16-limitations-and-follow-ups) |
 | Project and common pipelines | No health model step | Optional standalone pipelines for ADO and GitHub Actions |
@@ -423,7 +423,7 @@ Adding a model:
    `--definitions-dir DIR` (repeat) adds more folders and `--model path/to/<key>.json` a single file;
    later folders override earlier keys, including built-in ones. The `$schema` reference gives editor
    validation.
-2. **Validate** before running: `python aif_healthmodel.py models --definitions-dir ..\..\aifactory\healthmodels`
+2. **Validate** before running: `python aif_healthmodel.py models --definitions-dir ..\..\..\aifactory\healthmodels`
    lists every definition with its layer selectors and exits 1 on the first invalid file (unknown
    fields, profiles, layers or definitions, invalid or inverted override thresholds, duplicate tokens,
    nesting cycles, health models selected without `nestedModel`).
@@ -561,25 +561,25 @@ common resource groups, deploy to the target resource group and create role assi
 (`Microsoft.Authorization/roleAssignments/write`). Registering the provider needs `*/register/action`.
 
 ```powershell
-cd azure-enterprise-scale-ml/healthmodel
+cd azure-enterprise-scale-ml/usecase_code/healthmodel
 
 # Read-only plan from the persistent factory configuration (project + common models)
-python aif_healthmodel.py plan --consumer-root ..\.. --variables-json aifactory/variables.json `
+python aif_healthmodel.py plan --consumer-root ..\..\.. --variables-json aifactory/variables.json `
   --environment dev --project 001 --scope all --what-if
 
 # Deploy (registers Microsoft.CloudHealth once if needed) and e-mail health alerts
-python aif_healthmodel.py deploy --consumer-root ..\.. --variables-json aifactory/variables.json `
+python aif_healthmodel.py deploy --consumer-root ..\..\.. --variables-json aifactory/variables.json `
   --environment dev --project 001 --scope all --register-provider --alert-email ops@contoso.com
 
 # Add the agents model (or any definition) to the same run
-python aif_healthmodel.py deploy --consumer-root ..\.. --variables-json aifactory/variables.json `
+python aif_healthmodel.py deploy --consumer-root ..\..\.. --variables-json aifactory/variables.json `
   --environment dev --project 001 --scope all --model agents
 
 # List the model definitions
 python aif_healthmodel.py models
 
 # Current health (--scope selects the definition: project, common, agents, ...)
-python aif_healthmodel.py status --consumer-root ..\.. --variables-json aifactory/variables.json `
+python aif_healthmodel.py status --consumer-root ..\..\.. --variables-json aifactory/variables.json `
   --environment dev --project 001 --scope agents
 ```
 
@@ -787,7 +787,7 @@ The AI Factory MCP package (`../mcp`) was not modified; adding these tools there
 ## 14. Tests and test-driven design
 
 ```powershell
-cd azure-enterprise-scale-ml/healthmodel
+cd azure-enterprise-scale-ml/usecase_code/healthmodel
 python -m pytest            # 551 passed, 4 skipped (live)
 ```
 
