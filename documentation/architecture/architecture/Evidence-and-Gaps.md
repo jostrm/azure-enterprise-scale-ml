@@ -10,7 +10,7 @@ sources:
   - usecase_code/30-machine-learning/README.md
 tests:
   - environment_setup/unit-tests/test-bicep/README.md
-  - esml-v2/tests/test_esml_packaging.py
+  - usecase_code/esml-v2/tests/test_esml_packaging.py
 graph_symbols: []
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---

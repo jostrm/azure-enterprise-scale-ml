@@ -9,14 +9,14 @@ sources:
   - healthmodel/src/aifactory_healthmodel/application/ports.py
   - mcp/src/aifactory_mcp/health.py
   - mcp/src/aifactory_mcp/runtime.py
-  - esml-v2/azure_esml/base_layer/contracts.py
+  - usecase_code/esml-v2/azure_esml/base_layer/contracts.py
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_services.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - healthmodel/tests/test_bootstrap.py
   - healthmodel/tests/test_container.py
   - mcp/tests/test_health.py
-  - esml-v2/tests/test_esml_backends.py
+  - usecase_code/esml-v2/tests/test_esml_backends.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py::class:AgentServiceFactory
   - healthmodel/src/aifactory_healthmodel/application/service.py::class:HealthModelService

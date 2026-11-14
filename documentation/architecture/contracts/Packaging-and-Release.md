@@ -5,19 +5,19 @@ sources:
   - RELEASE_125.md
   - environment_setup/install_config_wizard/readme.md
   - environment_setup/azurefactory-cli/setup.py
-  - esml-v2/esml_build.py
+  - usecase_code/esml-v2/esml_build.py
   - usecase_code/40-agent-factory/40-aifactory-agent/deploy.py
   - usecase_code/40-agent-factory/40-aifactory-agent/readme.md
   - usecase_code/40-agent-factory/40-aifactory-agent/infra/voice-roles.bicep
   - usecase_code/40-agent-factory/40-aifactory-agent/infra/application.bicep
 tests:
   - environment_setup/azurefactory-cli/tests/test_enrollment_packaging.py
-  - esml-v2/tests/test_esml_packaging.py
+  - usecase_code/esml-v2/tests/test_esml_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_skill_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_application_revisions.py
 graph_symbols:
-  - esml-v2/esml_build.py::function:_source
+  - usecase_code/esml-v2/esml_build.py::function:_source
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
 ---
 # Packaging and release

@@ -62,7 +62,7 @@ def test_build_stages_shared_engines_without_changing_cwd_or_maintaining_duplica
         assert "include esml_build.py LICENSE pyproject.toml MANIFEST.in" in manifest
         assert "recursive-include ml_model_factory *.py" in manifest
         assert "recursive-include azure_esml *.py *.json py.typed" in manifest
-        policy = ROOT.parent / "usecase_code" / "50-ml-model-factory" / "user-config" / "model" / "model-selection.json"
+        policy = ROOT.parent / "50-ml-model-factory" / "user-config" / "model" / "model-selection.json"
         assert (staging / "azure_esml" / "resources" / policy.name).read_bytes() == policy.read_bytes()
         assert not list(staging.rglob("*.pyc"))
     assert Path.cwd() == previous

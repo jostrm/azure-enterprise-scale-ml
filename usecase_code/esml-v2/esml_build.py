@@ -18,7 +18,7 @@ def _source():
     engines = ROOT / "ml_model_factory"
     policy = ROOT / "azure_esml" / "resources" / "model-selection.json"
     if not engines.is_dir():
-        factory = ROOT.parent / "usecase_code" / "50-ml-model-factory"
+        factory = ROOT.parent / "50-ml-model-factory"
         engines = factory / "accelerator" / "src" / "ml_model_factory"
         policy = factory / "user-config" / "model" / "model-selection.json"
     if not (engines / "__init__.py").is_file():

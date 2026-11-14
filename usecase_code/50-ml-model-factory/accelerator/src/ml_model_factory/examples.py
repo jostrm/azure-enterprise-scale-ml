@@ -508,7 +508,8 @@ def esml_rollout(cloud=False):
     try:
         import azure_esml  # noqa: F401
     except ModuleNotFoundError:
-        for candidate in (ROOT.parents[1] / "esml-v2", ROOT.parents[1] / "azure-enterprise-scale-ml" / "esml-v2"):
+        for candidate in (ROOT.parents[1] / "usecase_code" / "esml-v2",
+                          ROOT.parents[1] / "azure-enterprise-scale-ml" / "usecase_code" / "esml-v2"):
             if (candidate / "azure_esml" / "__init__.py").is_file():
                 sys.path.insert(0, str(candidate))
                 break

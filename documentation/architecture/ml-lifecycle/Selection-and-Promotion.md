@@ -5,13 +5,13 @@ sources:
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/selection.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/tags.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/evaluation.py
-  - esml-v2/azure_esml/domain_layer/rollout.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/rollout.py
   - copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md
 tests:
   - usecase_code/50-ml-model-factory/accelerator/tests/test_selection.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_tags.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_evaluation_metrics.py
-  - esml-v2/tests/test_azureml_rollout.py
+  - usecase_code/esml-v2/tests/test_azureml_rollout.py
 graph_symbols:
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/selection.py::function:build_evidence
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/selection.py::function:compare

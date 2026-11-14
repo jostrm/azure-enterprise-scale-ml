@@ -95,7 +95,7 @@ def test_inference_deployment_is_not_implicit_in_training(tmp_path, mode):
     assert project.settings.model(11).options.get("inference_mode") == original_mode
 
 
-FACTORY = ROOT.parent / "usecase_code" / "50-ml-model-factory"
+FACTORY = ROOT.parent / "50-ml-model-factory"
 SCENARIOS = FACTORY / "user-config" / "model" / "scenarios"
 
 

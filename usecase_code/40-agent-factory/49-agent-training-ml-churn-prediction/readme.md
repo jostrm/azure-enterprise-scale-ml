@@ -79,11 +79,11 @@ a job twice.
 ```powershell
 cd usecase_code\40-agent-factory\49-agent-training-ml-churn-prediction   # or the orange copy
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt "..\..\..\esml-v2[train,storage,dev]"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt "..\..\esml-v2[train,storage,dev]"
 .\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-In an orange repository, install the ESML SDK from `<orange>\azure-enterprise-scale-ml\esml-v2`.
+In an orange repository, install the ESML SDK from `<orange>\azure-enterprise-scale-ml\usecase_code\esml-v2`.
 The ESML build has no editable mode, so reinstall the SDK after you change `esml-v2` or the
 model-factory engines.
 
@@ -296,4 +296,4 @@ Live evidence is stored as redacted receipts and transcripts in the consumer sta
 Azure ML receipts are stored in the ML factory's `ml-environment\outputs`. Retraining an unchanged
 seasonal-naive model on unchanged data normally keeps the champion.
 
-[Agent Factory](../readme.md) | [ML model factory](../../50-ml-model-factory/readme.md) | [ESML v2](../../../esml-v2)
+[Agent Factory](../readme.md) | [ML model factory](../../50-ml-model-factory/readme.md) | [ESML v2](../../esml-v2)

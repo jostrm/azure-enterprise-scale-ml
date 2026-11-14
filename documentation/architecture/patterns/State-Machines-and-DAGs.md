@@ -5,16 +5,16 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - bootstrap/lib/factory_lifecycle.py
   - bootstrap/lib/factory_lifecycle_contract.txt
-  - esml-v2/azure_esml/domain_layer/pipeline.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/pipeline.py
   - healthmodel/src/aifactory_healthmodel/domain/definitions.py
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle.py
-  - esml-v2/tests/test_esml_pipeline.py
+  - usecase_code/esml-v2/tests/test_esml_pipeline.py
   - healthmodel/tests/test_definitions.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::function:OperationStore.continue_operation
-  - esml-v2/azure_esml/domain_layer/pipeline.py::class:ESMLPipelineFactory
+  - usecase_code/esml-v2/azure_esml/domain_layer/pipeline.py::class:ESMLPipelineFactory
 reviewed_source: '3e9102ee + d03bc189 deletion ordering; observed 2026-10-19'
 ---
 # State machines and DAGs

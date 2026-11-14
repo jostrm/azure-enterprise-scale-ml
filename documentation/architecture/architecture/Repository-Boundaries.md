@@ -6,16 +6,16 @@ sources:
   - 01-start-v125-and-above.sh
   - bootstrap/01-aif-copy-aifactory-templates.sh
   - esmlfac/adapter.py
-  - esml-v2/esml_build.py
+  - usecase_code/esml-v2/esml_build.py
   - documentation/v2/30-39/37-mlops.md
   - usecase_code/50-ml-model-factory/readme.md
   - usecase_code/20-agent-foundry/_legacy/README.md
 tests:
-  - esml-v2/tests/test_esml_packaging.py
+  - usecase_code/esml-v2/tests/test_esml_packaging.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_layout.py
 graph_symbols:
   - esmlfac/adapter.py::class:ESMLFactory
-  - esml-v2/esml_build.py::function:_source
+  - usecase_code/esml-v2/esml_build.py::function:_source
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---
 # Repository boundaries
@@ -26,7 +26,7 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 | `environment_setup/aifactory` | Maintained canonical configuration, Bicep, provider pipeline templates and infrastructure scripts. `copy_to_local_settings` is template source, not an installed consumer instance. |
 | `copy_my_subfolders_to_my_grandparent` | Maintained distributable DataOps/MLOps/GenAIOps, settings and notebook templates; copied destinations become consumer-owned. Not merely disposable generated output. |
 | `esml`, `esmlfac`, `esmlrt` | Retained SDK-v1-era implementation and contracts. `ESMLFactory` imports controllers/comparison/scoring from `esmlrt`; these are real code, not empty folders, but not the new v2 API. |
-| `esml-v2` | Maintained `azure-esml-sdk` / `azure_esml` pipeline factory. Bundles canonical model-factory engines when building, not a second maintained implementation. |
+| `usecase_code/esml-v2` | Maintained `azure-esml-sdk` / `azure_esml` pipeline factory. Bundles canonical model-factory engines when building, not a second maintained implementation. |
 | `healthmodel`, `mcp` | Active working source for health modeling and repository MCP. Unpublished code is not installed-service evidence. |
 | `usecase_code/40-agent-factory` | Shared operator plus separately configured runtime/examples; `40-aifactory-agent` is the current grounded Factory application reviewed here. |
 | `usecase_code/50-ml-model-factory/accelerator` | Maintainer-owned engines, scripts, schemas and tests in the **current relocated layout**. Former root `src` and `tests` paths must not be cited as current. |

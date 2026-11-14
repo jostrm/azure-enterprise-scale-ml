@@ -141,8 +141,8 @@ esml resolve-silver --root mounted-lake --settings shared_lake_settings.json `
   --request consumer-selection.json --output resolved-silver.json
 ```
 
-Use the [shareback request](../../../esml-v2/examples/app_layer/silver_shareback.json)
-and [AppLayer composition](../../../esml-v2/examples/app_layer/silver_shareback.py)
+Use the [shareback request](../../../usecase_code/esml-v2/examples/app_layer/silver_shareback.json)
+and [AppLayer composition](../../../usecase_code/esml-v2/examples/app_layer/silver_shareback.py)
 as templates. A consumer selection contains `dataset`, `producer_project`,
 `variation`, `version`, and `consumer_project`. Metadata-only references still
 require retention of the **committed source release**; do not append or delete
@@ -159,7 +159,7 @@ committed Azure release or claim a live Fabric/ADF/AutoML compatibility run.
 The common HNS-enabled account and a project's Blob account are both supported
 storage targets. They are not interchangeable names: bind an explicit datastore
 to the intended account/container. `SharedLake` and `SharedLakeIngestion` in
-[`esml-v2`](../../../esml-v2) add the shared organization layer without moving or
+[`esml-v2`](../../../usecase_code/esml-v2) add the shared organization layer without moving or
 overwriting old `projects/` data.
 
 ```text
@@ -285,7 +285,7 @@ vector indexes and fine-tuning remain unactivated. The `mrvel` account was untou
 
 ## ESML v2 DataOps request contract
 
-The new [`esml-v2`](../../../esml-v2) SDK rebuilds the lake-mapped graph from
+The new [`esml-v2`](../../../usecase_code/esml-v2) SDK rebuilds the lake-mapped graph from
 customer `lake_settings.json`; ADF callers do not need to know how many datasets
 feed the gold merge. Its server-side `DataOpsAdapter` accepts:
 
@@ -315,7 +315,7 @@ inference to finish. ADF must poll within a bounded Until/Wait loop and only
 accept `Completed`/`Succeeded`; failed, cancelled or unknown statuses are not
 success. A `202 Accepted` response is only submission acceptance.
 
-The [AppLayer HTTP example](../../../esml-v2/examples/app_layer/dataops_adapter.py)
+The [AppLayer HTTP example](../../../usecase_code/esml-v2/examples/app_layer/dataops_adapter.py)
 provides routes for one fixed project. Host authentication, private connectivity,
 managed identity permissions and deployment are customer configuration, not
 created by importing the SDK. Entra-protected Function ingress uses the Function

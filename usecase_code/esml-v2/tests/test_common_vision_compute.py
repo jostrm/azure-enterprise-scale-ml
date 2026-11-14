@@ -7,7 +7,7 @@ from ml_model_factory.azureml import render
 from ml_model_factory.config import load_json
 
 
-ROOT = Path(__file__).resolve().parents[2] / "usecase_code" / "50-ml-model-factory"
+ROOT = Path(__file__).resolve().parents[2] / "50-ml-model-factory"
 
 
 def test_explicit_custom_cpu_images_can_use_common_lake_without_fictitious_gpu(tmp_path):

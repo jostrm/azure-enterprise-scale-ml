@@ -2,22 +2,22 @@
 id: lake-and-data-lineage
 status: observed
 sources:
-  - esml-v2/azure_esml/domain_layer/shared_lake.py
-  - esml-v2/azure_esml/domain_layer/shareback.py
-  - esml-v2/azure_esml/domain_layer/lake_publication.py
-  - esml-v2/azure_esml/domain_layer/runtime.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/shared_lake.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/shareback.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/lake_publication.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/runtime.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/lake_flow.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/storage_selection.py
   - documentation/v2/30-39/34-datalake-onboard-data.md
 tests:
-  - esml-v2/tests/test_silver_shareback.py
-  - esml-v2/tests/test_delta_shareback_flow.py
-  - esml-v2/tests/test_lake_publication.py
+  - usecase_code/esml-v2/tests/test_silver_shareback.py
+  - usecase_code/esml-v2/tests/test_delta_shareback_flow.py
+  - usecase_code/esml-v2/tests/test_lake_publication.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_lifecycle_e2e.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_snapshot_contract.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_storage_selection.py
 graph_symbols:
-  - esml-v2/azure_esml/domain_layer/shareback.py::class:SilverShareback
+  - usecase_code/esml-v2/azure_esml/domain_layer/shareback.py::class:SilverShareback
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/lake_flow.py::function:prepare_snapshot
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---

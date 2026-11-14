@@ -11,7 +11,7 @@ from ml_model_factory.synthetic import generate
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = load_json(ROOT.parent / "usecase_code" / "50-ml-model-factory" / "user-config" / "model" / "scenarios" / "churn.json")
+TEMPLATE = load_json(ROOT.parent / "50-ml-model-factory" / "user-config" / "model" / "scenarios" / "churn.json")
 NAME = "49-synthetic-churn"
 VERSION = "aif49-synth-v1"
 

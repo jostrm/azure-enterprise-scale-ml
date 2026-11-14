@@ -12,7 +12,7 @@ Start with [data onboarding and lake design](34-datalake-onboard-data.md) and
 
 ## ESML v2: the pip-installable pipeline factory
 
-The rebuilt SDK lives in [`esml-v2`](../../../esml-v2), with distribution name
+The rebuilt SDK lives in [`esml-v2`](../../../usecase_code/esml-v2), with distribution name
 **`azure-esml-sdk`** and Python import **`azure_esml`**. It uses only
 `azure.ai.ml` (Azure ML SDK v2) and `az ml` CLI v2. The Python SDK distribution
 itself uses `1.x` version numbers; that does not mean it is the retired SDK v1
@@ -20,18 +20,18 @@ package `azureml-core`.
 
 The legacy `esml`, `esmlrt`, `esmlfac`, and quickstart notebooks remain untouched.
 This is a new API, not an import-compatible v1 shim. Start with the new
-[pipeline notebook](../../../esml-v2/examples/app_layer/01_pipeline_factory.ipynb)
-and [data/inference notebook](../../../esml-v2/examples/app_layer/02_data_assets_and_inference.ipynb).
+[pipeline notebook](../../../usecase_code/esml-v2/examples/app_layer/01_pipeline_factory.ipynb)
+and [data/inference notebook](../../../usecase_code/esml-v2/examples/app_layer/02_data_assets_and_inference.ipynb).
 
 ### Installation and package boundary
 
 From the repository root:
 
 ```powershell
-pip install ".\esml-v2[train,storage]"
+pip install ".\usecase_code\esml-v2[train,storage]"
 ```
 
-Or install the built wheel from `esml-v2\dist`. The intended public-index command
+Or install the built wheel from `usecase_code\esml-v2\dist`. The intended public-index command
 is `pip install azure-esml-sdk`, but **PyPI publication is a separate release
 action**: building a wheel or pushing GitHub does not make that command available.
 Do not claim an index release until it has actually been published.
@@ -93,7 +93,7 @@ filesystem rename semantics before upload. Raw and Parquet outputs retain their
 existing mount mode. A successful refinement step does not mean model training
 or deployment has completed.
 
-The [explicit rollout example](../../../esml-v2/examples/app_layer/azureml_rollout.py)
+The [explicit rollout example](../../../usecase_code/esml-v2/examples/app_layer/azureml_rollout.py)
 separates offline preparation, registering source assets/components, running
 training, and batch deployment/invocation. `AzureMLRollout` saves actual Azure
 job IDs and registration/inference receipts. Registration follows completed-job,
@@ -172,7 +172,7 @@ by the ML use-case runtime and the agent factory. See
 Changing it requires re-rendering and existing data/permissions at the selected
 location; it is not a migration operation.
 
-The [AppLayer lake_settings.json](../../../esml-v2/examples/app_layer/lake_settings.json)
+The [AppLayer lake_settings.json](../../../usecase_code/esml-v2/examples/app_layer/lake_settings.json)
 retains the recognizable `project_number`, `project_folder_name`, `active_model`,
 `models`, `model_number`, `model_folder_name`, `model_short_alias`,
 `dataset_folder_names`, `label`, `ml_type`, and `ml_metric` fields.
@@ -239,7 +239,7 @@ keys. Its bridge uploads the actual named input files to a project-scoped
 transfer prefix, invokes the job with managed identity, waits within a bound,
 verifies the notebook's exact output receipt and downloads real output files into
 AML output mounts. Downstream nodes receive data, not a JSON file masquerading
-as a dataset. The [Databricks AppLayer example](../../../esml-v2/examples/app_layer/databricks_notebook.py)
+as a dataset. The [Databricks AppLayer example](../../../usecase_code/esml-v2/examples/app_layer/databricks_notebook.py)
 implements driver-sized conversion, merge and MLflow inference; distributed Spark
 processing and Databricks training replacements remain explicit customer notebooks.
 The Azure ML and Databricks environments must install the SDK and their required

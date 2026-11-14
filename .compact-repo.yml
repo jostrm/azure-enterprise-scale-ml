@@ -102,13 +102,13 @@ roots:
     reason: "API usage examples (Python, PowerShell, Node, raw requests) and scenarios.json."
 
   # --- ESML v2 ------------------------------------------------------------------------------------------
-  - path: "esml-v2/pyproject.toml"
+  - path: "usecase_code/esml-v2/pyproject.toml"
     reason: "ESML v2 package `azure_esml`; console script esml = azure_esml.cli:main."
-  - path: "esml-v2/esml_build.py"
+  - path: "usecase_code/esml-v2/esml_build.py"
     reason: "ESML v2 build backend (bundles the shared ML Model Factory engine)."
-  - path: "esml-v2/azure_esml/**"
+  - path: "usecase_code/esml-v2/azure_esml/**"
     reason: "The ESML v2 package."
-  - path: "esml-v2/examples/**"
+  - path: "usecase_code/esml-v2/examples/**"
     reason: "Documented ESML v2 app-layer examples."
 
   # --- ML Model Factory: documented entry points -------------------------------------------------------
@@ -285,7 +285,7 @@ keep:
   # --- Named components (R2): whole until Joakim has decided on their unreached files ------------------
   - "usecase_code/40-agent-factory/**"          # Agent Factory            (decision D5)
   - "usecase_code/50-ml-model-factory/**"       # ML Model Factory         (decision D5)
-  - "esml-v2/**"                                # ESML v2                  (decision D5)
+  - "usecase_code/esml-v2/**"                   # ESML v2                  (decision D5)
   - "environment_setup/azurefactory-cli/**"     # CLI and SDK              (decision D5)
   # --- Copied folders (R4): whole until Joakim has decided on the files nothing uses -------------------
   - "environment_setup/aifactory/bicep/copy_to_local_settings/**"   # decision D6
@@ -406,7 +406,7 @@ drop:
   # The v1 SDK (esml, esmlrt, esmlfac), its notebook, pipeline and settings templates, the Azure ML SDK
   # install scripts for its developer machines, and the v1 documentation. Nothing outside these folders
   # imports the v1 packages, and the Azure DevOps consumer repository names none of these paths.
-  # ESML v2 (esml-v2/) and the ML Model Factory are not part of this and stay.
+  # ESML v2 (usecase_code/esml-v2/) and the ML Model Factory are not part of this and stay.
   - "esml/**"
   - "esmlrt/**"
   - "esmlfac/**"

@@ -2,23 +2,23 @@
 id: engines-and-pipelines
 status: observed
 sources:
-  - esml-v2/azure_esml/base_layer/contracts.py
-  - esml-v2/azure_esml/domain_layer/pipeline.py
-  - esml-v2/azure_esml/domain_layer/runtime.py
-  - esml-v2/azure_esml/domain_layer/rollout.py
+  - usecase_code/esml-v2/azure_esml/base_layer/contracts.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/pipeline.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/runtime.py
+  - usecase_code/esml-v2/azure_esml/domain_layer/rollout.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/training.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/serving.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/streaming.py
   - esmlfac/adapter.py
 tests:
-  - esml-v2/tests/test_esml_pipeline.py
-  - esml-v2/tests/test_esml_runtime.py
-  - esml-v2/tests/test_azureml_rollout.py
+  - usecase_code/esml-v2/tests/test_esml_pipeline.py
+  - usecase_code/esml-v2/tests/test_esml_runtime.py
+  - usecase_code/esml-v2/tests/test_azureml_rollout.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_lifecycle_e2e.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_orchestration_matrix.py
 graph_symbols:
-  - esml-v2/azure_esml/domain_layer/pipeline.py::class:ESMLPipelineFactory
-  - esml-v2/azure_esml/domain_layer/runtime.py::class:FactoryModelSteps
+  - usecase_code/esml-v2/azure_esml/domain_layer/pipeline.py::class:ESMLPipelineFactory
+  - usecase_code/esml-v2/azure_esml/domain_layer/runtime.py::class:FactoryModelSteps
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ---
 # Engines and pipelines
