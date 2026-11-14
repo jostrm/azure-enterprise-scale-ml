@@ -1,4 +1,9 @@
-# Enterprise Scale Azure Factory (ESAF) - submodule 
+# Enterprise Scale Azure Factory (ESAF) - submodule
+- "Dare to delete" | "Project based"  | "Ops: Dev,Stage,Prod" |"Secure from day 1/private" |"Battle tested since 20119 | Only GA:No AVD,AZD
+- "Result & Value" - Get AI to Production, accelerated: 147 templats with Ops, such as below "Live voice AI chat" created in <1h
+
+![](./documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png)
+<br>
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 > [!NOTE]
