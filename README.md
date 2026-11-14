@@ -1,4 +1,10 @@
 # Enterprise Scale Azure Factory (ESAF) - submodule 
+- "Dare to delete"
+- "Project based" 
+- "Dev,Stage,Prod - same Ops for all"
+- "Secure from day 1, since we work with producion data for ML, and GenAI RAG"
+<br>
+/Joakim
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fportal-125%2Fportal%2Fform.json)
 > [!NOTE]
