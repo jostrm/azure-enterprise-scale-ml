@@ -2,7 +2,11 @@
 - "Dare to delete"
 - "Project based" 
 - "Dev,Stage,Prod - same Ops for all"
-- "Secure from day 1, since we work with producion data for ML, and GenAI RAG"
+- "Secure from day 1, since we work with production data for ML, and GenAI RAG"
+- "Battle tested, since 2019. Only GA tech - No AVD. No AZD.
+- Resul & Value: Get AI to Production, accelerated: 147 templats with Ops.
+
+![](./documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png)
 <br>
 /Joakim
 
