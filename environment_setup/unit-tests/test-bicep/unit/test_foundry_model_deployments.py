@@ -18,7 +18,6 @@ BICEP = ROOT / "environment_setup/aifactory/bicep"
 FOUNDRY_MODULE = BICEP / "modules/csFoundry/aiFoundry2025AvmOffApim.bicep"
 ACCOUNT_MODULE = BICEP / "modules/csFoundry/aiFoundry2025AvmOffApimAccount.bicep"
 FOUNDRY_TEMPLATES = (
-    BICEP / "esml-genai-1/09-ai-foundry-2025-v3.bicep",
     BICEP / "esml-genai-1/09-ai-foundry-2025-v4.bicep",
 )
 GPTX_DEFAULTS = {
@@ -144,17 +143,6 @@ class TestFoundryModelDeployments(unittest.TestCase):
         for path in GPTX_TEMPLATES:
             with self.subTest(template=path.name):
                 self.assertIn("param default_model_sku string = 'DataZoneStandard'", path.read_text(encoding="utf-8"))
-
-    def test_apim_route_cannot_default_to_global_standard(self) -> None:
-        path = BICEP / "modules/csFoundry/foundry-apim"
-        self.assertIn(
-            "param modelSkuName string = 'DataZoneStandard'",
-            (path / "main.bicep").read_text(encoding="utf-8"),
-        )
-        for name in ("main.json", "azuredeploy.json"):
-            with self.subTest(template=name):
-                arm = json.loads((path / name).read_text(encoding="utf-8"))
-                self.assertEqual("DataZoneStandard", arm["parameters"]["modelSkuName"]["defaultValue"])
 
     def test_explicit_gpt_4o_selection_is_preserved(self) -> None:
         for path in FOUNDRY_TEMPLATES:

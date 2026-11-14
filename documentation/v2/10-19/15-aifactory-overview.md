@@ -58,7 +58,7 @@ List of services provisioned using AIFactory to add AIFactory projects:
     - **Azure Datafactory(1)**: To be used by the ESML Core teams's data ingetion team.
     - **Log Analytics workspace(1)**: To be to centralize the monitoring to one workspace from all projects, per environment.
     - **Private endpoints (7)**: [See BICEP for definition](../../../environment_setup/aifactory/bicep/esml-common/modules-common/nsgCommon.bicep)
-    - **Private DNS Zones (7)**: [See BICEP for definition](../../../environment_setup/aifactory/bicep/esml-project/22-main.bicep)
+    - **Private DNS Zones (7)**: [See BICEP for definition](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/esml-project/22-main.bicep)
         - Storage account
             - privatelink.blob.${environment().suffixes.storage
             - privatelink.file.${environment().suffixes.storage

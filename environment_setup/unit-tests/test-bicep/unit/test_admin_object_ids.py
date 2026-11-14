@@ -4,8 +4,8 @@ The preflight gate (scripts/kv_principal_object_ids.py) accepts "a , B"; the Bic
 value normalizes it with the one rule in modules/common/objectIds.bicep. Role-assignment names are seeded
 with the object ID, so spacing or case must not change them (RoleAssignmentExists 409 on redeploy), and
 already-normalized input must keep the names existing factories were deployed with. Classic-ARM templates
-inline the rule, because importing a function would switch them to languageVersion 2.0; esml-project/22-main,
-already 2.0, inlines it too. The last tests pin every copy to objectIds.bicep.
+inline the rule, because importing a function would switch them to languageVersion 2.0. The last tests pin
+every copy to objectIds.bicep.
 """
 from pathlib import Path
 import re
@@ -127,7 +127,7 @@ def test_common_rg_vm_admin_login_gets_the_same_normalized_ids(raw):
     assert common_rg_admin_ids(template, raw, module="VMAdminLoginPermissions") == [A, B]
 
 
-# --- contributorRbac.bicep on its own (11-rgCommon and esml-project/22-main) --------------------------------
+# --- contributorRbac.bicep on its own (11-rgCommon) ---------------------------------------------------------
 
 def test_contributor_rbac_falls_back_to_the_object_id_when_an_email_is_missing():
     assignments = contributor_module([A, B], ["a@contoso.com"])
@@ -169,11 +169,10 @@ def test_naming_team_lead_array_is_normalized(raw, expected):
     assert arm_value(output, {"technicalAdminsObjectID": raw}, template) == expected
 
 
-# --- one rule: imported by CmnAIfactoryNaming, inlined verbatim by classic templates and esml-project/22-main ---
+# --- one rule: imported by CmnAIfactoryNaming, inlined verbatim by classic templates ---------------------------
 
 CSV = "split(technicalAdminsObjectID, ',')"
 INLINED = {"esml-common/main/11-rgCommon.bicep": CSV, "esml-common/main/13-rgLevel.bicep": CSV,
-           "esml-project/22-main.bicep": CSV,
            "modules/kvRbacPrincipals.bicep": "union(main_principal_2_array, additionalPrincipalIds)"}
 IMPORTED = {"modules/common/CmnAIfactoryNaming.bicep": f"normalizedObjectIds({CSV})"}
 

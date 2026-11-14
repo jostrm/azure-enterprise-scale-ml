@@ -59,9 +59,6 @@ SSD_DISKS = {"Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS",
 # Every non-debug Bicep file that declares a VM (not an `existing` reference) -> its OS.
 VM_MODULES = {
     "modules/virtualMachinePrivate.bicep": "Windows",
-    "modules/virtualMachinePublic.bicep": "Windows",
-    "esml-common/modules-common/avdSessionHost.bicep": "Windows",
-    "esml-common/modules-common/cloudflareTunnelVm.bicep": "Linux",
 }
 GUEST_CONFIGURATION = {
     "Windows": ("AzurePolicyforWindows", "ConfigurationforWindows"),

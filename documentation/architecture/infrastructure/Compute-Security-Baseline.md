@@ -6,9 +6,6 @@ sources:
   - environment_setup/aifactory/bicep/modules/vmSecurityExtensions.bicep
   - environment_setup/aifactory/bicep/modules/vmBackup.bicep
   - environment_setup/aifactory/bicep/modules/virtualMachinePrivate.bicep
-  - environment_setup/aifactory/bicep/modules/virtualMachinePublic.bicep
-  - environment_setup/aifactory/bicep/esml-common/modules-common/avdSessionHost.bicep
-  - environment_setup/aifactory/bicep/esml-common/modules-common/cloudflareTunnelVm.bicep
   - environment_setup/aifactory/bicep/modules/aksCluster.bicep
   - environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep
   - environment_setup/aifactory/bicep/esml-genai-1/02-core-infrastructure.bicep
@@ -113,8 +110,6 @@ Defender for Servers extension: an upgrade is not a changed reviewed resource.
   runner OS disks to Standard HDD (observed 2026-10-15..23, see [[Lifecycle-and-Recovery]]).
 - Extensions are not retried on an existing VM: if Guest Attestation or Guest Configuration fails on the
   first run, later runs skip the VM (`vmExists`); install them by hand or redeploy the VM.
-- Legacy and manual entrypoints (`esml-project/22-main.bicep`, `23-add-dsvm`, `24-add-aks`,
-  `modules/machineLearning.bicep`) pass no `vmExists`/`aksExists`: they create new resources only.
 - The backup vault keeps platform defaults (geo-redundant storage, public network access setting).
 - ADO consumers whose `variables.yaml` lacks the two new keys get an unexpanded `$(...)` macro, as for
   every other flag; merge the template keys.

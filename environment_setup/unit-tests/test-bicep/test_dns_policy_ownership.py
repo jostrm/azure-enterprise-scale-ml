@@ -21,7 +21,6 @@ ADO_DIR = BICEP / "copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-
 GHA = BICEP / "copy_to_local_settings/github-actions/infra-project-phase.yml"
 KV_HELPER = BICEP / "scripts/prepareSeedingKeyVaultPrivateDns.ps1"
 FOUNDRY_PE = BICEP / "modules/csFoundry/aiFoundry2025pend.bicep"
-APIM_PE = BICEP / "modules/csFoundry/foundry-apim/modules-network-secured/private-endpoint-and-dns.bicep"
 
 
 def task(path: Path, name: str) -> dict:
@@ -372,10 +371,6 @@ class BicepDnsOwnershipTests(unittest.TestCase):
                 "privateEndpointDns": "!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay",
                 "privateEndpointDnsAPIM": "!centralDnsZoneByPolicyInHub && apiManagementProvided && createPrivateEndpointsAIFactoryWay",
             },
-            APIM_PE: {
-                "privateEndpointDnsGroupAIF": "!centralDnsZoneByPolicyInHub",
-                "privateEndpointDnsGroupAPIM": "!centralDnsZoneByPolicyInHub && !empty(apiManagementName)",
-            },
         }
         for path, resources in expectations.items():
             content = path.read_text(encoding="utf-8")
@@ -389,7 +384,7 @@ class BicepDnsOwnershipTests(unittest.TestCase):
                 self.assertNotIn("centralDnsZoneByPolicyInHub", declaration)
 
     def test_foundry_routes_forward_dns_flag_and_foundation_does_not_create_policy_zones(self):
-        for name in ("09-ai-foundry-2025-v2", "09-ai-foundry-2025-v3", "09-ai-foundry-2025-v4"):
+        for name in ("09-ai-foundry-2025-v4",):
             content = (BICEP / f"esml-genai-1/{name}.bicep").read_text(encoding="utf-8")
             self.assertIn("centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub", content)
         foundation = (BICEP / "esml-genai-1/01-foundation.bicep").read_text(encoding="utf-8")

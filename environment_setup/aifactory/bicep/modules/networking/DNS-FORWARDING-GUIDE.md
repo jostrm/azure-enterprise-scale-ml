@@ -96,10 +96,11 @@ Based on your AI Factory setup, you already have:
 
 ### Recommended Integration Points
 
-1. **Update VNet Configuration**:
+1. **Update VNet Configuration**. The `dnsForwarding.bicep` module is not part of the slim
+   `release/v1.26`; copy it from [`main`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/modules/networking/dnsForwarding.bicep) first:
    ```bicep
    // In your foundation bicep files
-   module dnsForwarding '../modules/networking/dnsForwarding.bicep' = {
+   module dnsForwarding '<path-to-modules>/networking/dnsForwarding.bicep' = {
      name: 'dns-forwarding-config'
      params: {
        vnetName: vnetNameFull

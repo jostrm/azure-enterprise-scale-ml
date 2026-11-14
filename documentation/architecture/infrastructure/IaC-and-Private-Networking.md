@@ -37,8 +37,6 @@ sources:
   - environment_setup/aifactory/bicep/scripts/region_report.py
   - environment_setup/aifactory/bicep/esml-genai-1/03b-ai-search.bicep
   - environment_setup/aifactory/bicep/modules/services/aiSearchDeployment.bicep
-  - environment_setup/aifactory/bicep/esml-project/22-main.bicep
-  - environment_setup/aifactory/bicep/modules/machineLearning.bicep
   - environment_setup/aifactory/bicep/modules/aksCluster.bicep
   - environment_setup/aifactory/bicep/modules/aiSearch.bicep
   - environment_setup/aifactory/bicep/modules/storageAccount.bicep
@@ -409,10 +407,9 @@ Defender scan of a deployed factory):
   consumer in the repository uses a Search key: the agent knowledge index, Foundry, hub and project
   connections (`authType: 'AAD'`), indexers and ADF (managed identity `ResourceId=`), the ACL RAG demo,
   pipelines (control plane only) and the MCP (no Search calls). Unverified: the external azd notebook
-  `create-azure-search.ipynb` that `bootstrap/20-genai-agentic-post-bicep.sh` runs is not in the
-  repository. The legacy `foundry-apim` v2 path (`standard-dependent-resources.bicep`, used by
-  `09-ai-foundry-2025-v2.bicep`) also creates its Search service Entra-only; its project connections are
-  `authType: 'AAD'`. `test_defender_service_defaults.py` fails if any non-debug Bicep file creates a
+  `create-azure-search.ipynb` that the post-Bicep agentic bootstrap script on `main` runs is not in the
+  repository (the script itself is not part of `release/v1.26`).
+  `test_defender_service_defaults.py` fails if any non-debug Bicep file creates a
   Search service without `disableLocalAuth` or with it set to `false`.
 - Storage network rules: the private project storage path already uses `defaultAction: 'Deny'`, VNet
   rules, private endpoints and `bypass: 'AzureServices'`, and the common lake is Deny. Only
@@ -421,8 +418,7 @@ Defender scan of a deployed factory):
 - Databricks private link: `07` injects the workspace into the VNet by default (premium SKU), and with
   `enablePublicAccessWithPerimeter` false it sets `publicNetworkAccess: 'Disabled'`,
   `NoAzureDatabricksRules` and creates the `databricks_ui_api` and `browser_authentication` private
-  endpoints. The template default perimeter=true leaves it public. The legacy `esml-project` path uses the
-  deprecated standard SKU, and `databricksPrivate.bicep` hardcodes `requiredNsgRules: 'AllRules'`.
+  endpoints. The template default perimeter=true leaves it public.
 - APIM backends: the AI gateway backends (`apim-configuration.bicep`) authenticate in API policy with
   the APIM system identity (`authentication-managed-identity`, audience cognitiveservices). The ARM
   backend `credentials` contract, through api-version 2025-09-01-preview, has no managed-identity

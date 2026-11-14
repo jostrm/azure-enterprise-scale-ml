@@ -38,11 +38,6 @@ PRIVATE_DNS_POLICY_SET = (
 PRIVATE_DNS_INITIATIVE = (
     ROOT / "environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep"
 )
-FOUNDRY_PRIVATE_DNS = (
-    ROOT
-    / "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim"
-    / "modules-network-secured/private-endpoint-and-dns.bicep"
-)
 
 SPEC = importlib.util.spec_from_file_location("aifactory_scaleset_config", CONFIG_HELPER)
 assert SPEC and SPEC.loader
@@ -821,21 +816,14 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
         )
         self.assertIn("aif_ensure_dns_private_resolver", shared)
 
-    def test_central_dns_policy_and_foundry_contracts(self) -> None:
+    def test_central_dns_policy_initiative_contract(self) -> None:
         initiative = PRIVATE_DNS_INITIATIVE.read_text(encoding="utf-8")
-        foundry_dns = FOUNDRY_PRIVATE_DNS.read_text(encoding="utf-8")
         self.assertIn("param scope string = subscription().id", initiative)
         self.assertIn("param includeCostOptimization bool = false", initiative)
         self.assertIn(
             "replace(replace(content, templateVars.scope, scope), "
             "templateVars.defaultDeploymentLocation, deploymentLocation)",
             initiative,
-        )
-        self.assertIn(
-            "resource privateEndpointDnsGroupAIF "
-            "'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' "
-            "= if (!centralDnsZoneByPolicyInHub) {",
-            foundry_dns,
         )
 
 

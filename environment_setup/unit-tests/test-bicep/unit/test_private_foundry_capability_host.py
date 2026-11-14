@@ -34,7 +34,6 @@ BASELINE_JSON = ROOT / "environment_setup/aifactory/variables.json"
 FOUNDRY_TEMPLATES = (
     BICEP / "esml-genai-1/03-cognitive-services.bicep",
     BICEP / "esml-genai-1/04-databases.bicep",
-    BICEP / "esml-genai-1/09-ai-foundry-2025-v3.bicep",
     BICEP / "esml-genai-1/09-ai-foundry-2025-v4.bicep",
 )
 
@@ -135,7 +134,7 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         self.assertIn("storageConnections", capability_host)
 
     def test_v4_reconciles_capability_hosts_for_existing_projects(self) -> None:
-        content = FOUNDRY_TEMPLATES[3].read_text(encoding="utf-8")
+        content = FOUNDRY_TEMPLATES[2].read_text(encoding="utf-8")
         project_line = next(
             line for line in content.splitlines()
             if line.startswith("module addProjectCapabilityHost ")

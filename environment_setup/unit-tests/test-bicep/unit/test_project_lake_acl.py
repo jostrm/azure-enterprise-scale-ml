@@ -107,7 +107,7 @@ def test_cli_json_transport_forces_utf8_for_non_ascii_display_names(monkeypatch)
     assert ACCESS.cli("ad", "signed-in-user", "show")["displayName"] == "\u00c5"
 
 
-@pytest.mark.parametrize("name", ["machineLearning.bicep", "machineLearningv2.bicep"])
+@pytest.mark.parametrize("name", ["machineLearningv2.bicep"])
 def test_image_build_compute_uses_cluster_name_not_workspace_qualified_name(name):
     template = (ROOT / "environment_setup" / "aifactory" / "bicep" / "modules" / name).read_text()
     assert "imageBuildCompute: '${name}/" not in template

@@ -21,7 +21,6 @@ sources:
   - environment_setup/aifactory/bicep/modules/common/CmnAIfactoryNaming.bicep
   - environment_setup/aifactory/bicep/esml-common/main/11-rgCommon.bicep
   - environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep
-  - environment_setup/aifactory/bicep/esml-project/22-main.bicep
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_persona_policy.py
   - environment_setup/unit-tests/test-bicep/unit/test_persona_lake.py
@@ -140,9 +139,8 @@ also sets a rotation policy: Key Vault creates a new version 30 days before expi
 which services that use the versionless key URI pick up (AKS disk encryption sets need automatic key
 rotation enabled for that). The scripts that run `az keyvault secret set` (`29`, `29b`, `32`,
 `create-new-aifactory-scaleset.sh`) pass `--expires` one year ahead in UTC (`AIF_KV_SECRET_EXPIRES`
-overrides), and the MCP rollout sets `expires_on` the same way. The VM modules
-(`virtualMachinePrivate.bicep`, `virtualMachinePublic.bicep`, `avdSessionHost.bicep`) still carry their
-own fixed, already past expiry and are not yet migrated.
+overrides), and the MCP rollout sets `expires_on` the same way. The VM module
+`virtualMachinePrivate.bicep` still carries its own fixed, already past expiry and is not yet migrated.
 
 Migration of an existing access-policy vault (common, common-admin, legacy project vaults). Switching
 `enableRbacAuthorization` makes Key Vault ignore every access policy at once, and in the template the role

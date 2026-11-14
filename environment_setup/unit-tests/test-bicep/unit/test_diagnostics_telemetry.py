@@ -31,7 +31,6 @@ GOLD_ENTRYPOINTS = (
     "05-compute-services.bicep",
     "05b-container-apps.bicep",
     "07-ml-data-platform.bicep",
-    "09-ai-foundry-2025-v3.bicep",
     "09-ai-foundry-2025-v4.bicep",
     "11-integration.bicep",
 )

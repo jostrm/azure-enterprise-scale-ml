@@ -39,8 +39,7 @@ ROLES = {
     "certificatesOfficer": "a4417e6f-fecd-4de8-b567-7b0420556985",
 }
 # Owned by the session that changes the VM modules in parallel; their secrets get the expiry there.
-VM_MODULES = {"modules/virtualMachinePrivate.bicep", "modules/virtualMachinePublic.bicep",
-              "esml-common/modules-common/avdSessionHost.bicep"}
+VM_MODULES = {"modules/virtualMachinePrivate.bicep"}
 REMOVED_MODULES = ("kvCmnAccessPolicys.bicep", "kvAccessPolicy.bicep", "kvRbacKeyVault.bicep")
 
 DATABRICKS = "24ad8636-1b2c-4d5e-8f90-a1b2c3d4e5f6"
@@ -172,23 +171,6 @@ GRANTS = {
         ("kvNameCommon", "externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)", "secretsUser",
          "ServicePrincipal"),
     },
-    "esml-project/22-main.bicep": {
-        ("kv1.outputs.keyvaultName", "technicalContactId", "secretsOfficer", ""),
-        ("kv2.outputs.keyvaultName", "technicalContactId", "secretsOfficer", ""),
-        ("kvNameCommon", "technicalContactId", "secretsUser", ""),
-        ("kv1.outputs.keyvaultName", "externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)",
-         "secretsUser", "ServicePrincipal"),
-        ("kv1.outputs.keyvaultName", "adf.outputs.principalId", "secretsUser", "ServicePrincipal"),
-        ("kv1.outputs.keyvaultName", "databricksOID", "secretsUser", "ServicePrincipal"),
-        ("kvNameCommon", "externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)", "secretsUser",
-         "ServicePrincipal"),
-        # The classic AML workspace got an implicit access policy on its vault; RBAC needs the role explicitly.
-        ("kv1.outputs.keyvaultName", "aml!.outputs.principalId", "administrator", "ServicePrincipal"),
-        ("kv2!.outputs.keyvaultName", "aml!.outputs.principalIdManaged", "administrator", "ServicePrincipal"),
-    },
-    "esml-util/25-add-user-to-bastion.bicep": {
-        ("cmndevKeyvault", "users_and_serviceprincipals[0]", "secretsUser", ""),
-    },
 }
 
 
@@ -240,7 +222,7 @@ SECRET_MODULES = ("keyVault", "kvSecretsPrj", "kvSecretsCmn", "keyVaultKey", "cs
 ENTRY_TEMPLATES = ("esml-common/main/13-rgLevel.bicep", "esml-genai-1/02-core-infrastructure.bicep",
                    "esml-genai-1/03-cognitive-services.bicep", "esml-genai-1/04-databases.bicep",
                    "esml-genai-1/04b-postgresql.bicep", "esml-genai-1/06-ai-platform.bicep",
-                   "esml-project/22-main.bicep", "modules/services/postgresqlDeployment.bicep")
+                   "modules/services/postgresqlDeployment.bicep")
 
 
 def secret_modules():
@@ -257,7 +239,7 @@ def secret_modules():
 
 def test_secret_inventory_is_complete():
     assert {"modules/keyVault.bicep", "modules/kvSecretsPrj.bicep", "esml-common/modules-common/kvSecretsCmn.bicep",
-            "modules/keyVaultExport.bicep", "modules/keyVaultKey.bicep", "modules/databases/sqldatabase/sqldatabase.bicep",
+            "modules/keyVaultKey.bicep", "modules/databases/sqldatabase/sqldatabase.bicep",
             "modules/machineLearningAIHub.bicep"} <= secret_modules().keys()
 
 
