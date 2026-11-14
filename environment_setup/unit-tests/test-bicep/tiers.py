@@ -55,6 +55,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_byo_common_subnet.py",
         "unit/test_common_deployment_contract.py",
         "unit/test_factory_chat_agent_flag.py",
+        "unit/test_foundry_69a_poll_from_start.py",
         "unit/test_foundry_publishing_wiring.py",
         "unit/test_foundry_publishing_wrappers.py",
         "unit/test_gha_passes_access_hub_params.py",

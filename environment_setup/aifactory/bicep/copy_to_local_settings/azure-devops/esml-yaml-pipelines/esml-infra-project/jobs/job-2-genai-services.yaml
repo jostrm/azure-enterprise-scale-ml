@@ -4989,55 +4989,70 @@ steps:
         # even after the Foundry ACCOUNT resource itself has finished (Microsoft-managed
         # agent infra finalizes asynchronously), so if it is still 'Running' at the cap we
         # ASSUME SUCCESS and let '69-wait-account-caphost-succeeded' gate on real readiness.
-        initial_wait_minutes=15  # Wait 15 minutes before first check (account creation ~17-20 min)
-        max_poll_attempts=5      # After initial wait: 5 attempts x 60s = 5 min -> cap total at 20 min
+        initial_wait_minutes=15  # Old blind wait (account creation ~17-20 min): Failed/Canceled is acted on from here
         total_max_minutes=20
         echo "ℹ️  Agent network injection ENABLED: account creation takes ~17-20 min."
         echo "   Polling is capped at 20 min; a still-'Running' status at the cap is treated as SUCCESS."
       else
         # Without agent network injection: standard timeout
-        initial_wait_minutes=10  # Wait 10 minutes before first check
-        max_poll_attempts=20     # After initial wait: 20 attempts x 60s = 20 minutes additional polling
+        initial_wait_minutes=10  # Old blind wait: Failed/Canceled is acted on from here
         total_max_minutes=30
         echo "ℹ️  Agent network injection DISABLED: Using standard timeout (up to 30 minutes)"
       fi
       
       echo "=== Polling AI Foundry deployment status ==="
       echo "Deployment name: $deployment_name"
-      echo "Initial wait: $initial_wait_minutes minutes"
-      echo "Then polling every 60 seconds for up to $max_poll_attempts minutes"
+      echo "Polling every 10 seconds from the start (no blind initial wait)"
+      echo "Failed/Canceled is acted on after $initial_wait_minutes minutes, as before"
       echo "Total max wait time: $total_max_minutes minutes"
       echo ""
-      
-      # Initial wait - Foundry account creation typically takes 15-17 minutes.
-      # Break the wait into 1-minute heartbeats so the hosted agent keeps receiving
-      # log output. A single long silent sleep can make the agent drop the job with
+
+      # One poll loop from the start. The deployment state is the real condition, so the task no
+      # longer sleeps $initial_wait_minutes minutes before its first look at it.
+      # - Succeeded: return once it has been Succeeded for settle_seconds (the rehydration time the
+      #   GitHub twin gives the account in '69-Rehydrate'), and never later than the old first check.
+      # - Failed/Canceled: acted on only after the old initial wait, so the self-heal purge and retry
+      #   that follow keep the time the Microsoft-managed infrastructure had to stabilise.
+      # - Cap: total_max_minutes, which is never shorter than the old last check.
+      # A status line is printed at least once a minute so the hosted agent keeps receiving log
+      # output. A long silent wait can make the agent drop the job with
       # "logs may have not finished uploading / This job was abandoned".
-      echo "⏳ Waiting $initial_wait_minutes minutes before first status check..."
-      for ((m = 1; m <= initial_wait_minutes; m++)); do
-        sleep 60
-        echo "   ...initial wait $m/$initial_wait_minutes min"
-      done
-      echo ""
-      
-      # Now start polling
-      attempt=0
-      while [ $attempt -lt $max_poll_attempts ]; do
-        attempt=$((attempt + 1))
-        elapsed_minutes=$((initial_wait_minutes + attempt))
-        
+      poll_seconds=10
+      settle_seconds=300
+      initial_wait_seconds=$((initial_wait_minutes * 60))
+      total_max_seconds=$((total_max_minutes * 60))
+      poll_start=$SECONDS
+      succeeded_since=""
+      last_logged_status=""
+      last_logged_at=-60
+      while :; do
         status=$(az deployment sub show \
           --name "$deployment_name" \
           --subscription "$(dev_test_prod_sub_id)" \
           --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
-        
-        echo "[$elapsed_minutes min] Deployment status: $status"
-        
+        elapsed_seconds=$((SECONDS - poll_start))
+        elapsed_minutes=$((elapsed_seconds / 60))
+
+        if [ "$status" != "$last_logged_status" ] || [ $((elapsed_seconds - last_logged_at)) -ge 60 ]; then
+          echo "[$elapsed_minutes min] Deployment status: $status"
+          last_logged_status="$status"
+          last_logged_at=$elapsed_seconds
+        fi
         if [ "$status" = "Succeeded" ]; then
+          [ -n "$succeeded_since" ] || succeeded_since=$elapsed_seconds
+        else
+          succeeded_since=""
+        fi
+
+        if [ "$status" = "Succeeded" ] && [ $elapsed_seconds -lt $initial_wait_seconds ] && [ $((elapsed_seconds - succeeded_since)) -lt $settle_seconds ]; then
+          : # Succeeded early: keep polling until the account has had its rehydration time.
+        elif [ "$status" = "Succeeded" ]; then
           echo "##vso[task.setvariable variable=foundry_69a_deployment_succeeded]true"
           echo ""
           echo "✅ Deployment succeeded after $elapsed_minutes minutes!"
           exit 0
+        elif [ $elapsed_seconds -lt $initial_wait_seconds ]; then
+          : # Not Succeeded yet: nothing else is acted on before the old initial wait has passed.
         elif [ "$status" = "Failed" ]; then
           echo ""
           echo "##[error]❌ Deployment failed after $elapsed_minutes minutes!"
@@ -5094,18 +5109,12 @@ steps:
           echo "##[warning]⚠️ Deployment was canceled after $elapsed_minutes minutes!"
           echo "##[warning]Not failing this task; downstream self-heal + retry will handle recovery."
           exit 0
-        elif [ "$status" = "Running" ] || [ "$status" = "Accepted" ]; then
-          # Deployment is in progress, continue polling
-          if [ $attempt -lt $max_poll_attempts ]; then
-            sleep 60
-          fi
-        else
-          # Unknown status, continue polling
-          echo "⏳ Status: $status (waiting...)"
-          if [ $attempt -lt $max_poll_attempts ]; then
-            sleep 60
-          fi
         fi
+
+        if [ $elapsed_seconds -ge $total_max_seconds ]; then
+          break
+        fi
+        sleep $poll_seconds
       done
       
       # If we get here, we've exceeded max attempts. The outer ARM sub-deployment can stay
