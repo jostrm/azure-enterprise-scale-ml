@@ -3758,11 +3758,11 @@ with both lines.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">411</td>
+<td style="text-align: right;">413</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">409</td>
+<td style="text-align: right;">411</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -3778,15 +3778,15 @@ with both lines.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">419</td>
+<td style="text-align: right;">421</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 159, 435; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 160, 436; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 437, 461; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 159, 437; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 160, 438; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 439, 463; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings, fallbacks and reviewed template counterparts. A GHA name can be a fallback rather than an equal of the YAML key, so read the workflow before you swap one for the other.</p>
@@ -4699,11 +4699,25 @@ with both lines.</p>
 <td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:aifactoryAgentFactoryId --><!-- parameter json.dev:aifactoryAgentFactoryId --><code>aifactoryAgentFactoryId</code></td>
+<td><code>AIFACTORY_AGENT_FACTORY_ID</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Registered AI Factory catalog factory id stamped on the agent chat usage events (aifactory.chat) for My Project Usage &amp; outcomes keep-as-is: Set together with aifactoryAgentScaleSetId (azurefactory catalog). Empty sends no usage events: dimensions are never guessed. Only read when enableAIFactoryAgentLiveVoice:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:aifactoryAgentReaderObjectIds --><!-- parameter json.dev:aifactoryAgentReaderObjectIds --><code>aifactoryAgentReaderObjectIds</code></td>
 <td><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>
 <td>C</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentScaleSetId --><!-- parameter json.dev:aifactoryAgentScaleSetId --><code>aifactoryAgentScaleSetId</code></td>
+<td><code>AIFACTORY_AGENT_SCALE_SET_ID</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Registered AI Factory catalog scale set id stamped on the agent chat usage events (aifactory.chat) for My Project Usage &amp; outcomes keep-as-is: Set together with aifactoryAgentFactoryId. Empty sends no usage events. Only read when enableAIFactoryAgentLiveVoice:'true'.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages --><code>aifactoryAgentVoiceLanguages</code></td>
@@ -6934,11 +6948,25 @@ with both lines.</p>
 <td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
+<td><!-- parameter env:AIFACTORY_AGENT_FACTORY_ID --><code>AIFACTORY_AGENT_FACTORY_ID</code></td>
+<td><code>aifactoryAgentFactoryId</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>aifactoryAgentFactoryId: registered AI Factory catalog factory id stamped on the agent chat usage events (aifactory.chat) for My Project Usage &amp; outcomes keep-as-is: Set together with AIFACTORY_AGENT_SCALE_SET_ID (azurefactory catalog). Empty sends no usage events: dimensions are never guessed. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter env:AIFACTORY_AGENT_READER_OBJECT_IDS --><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>
 <td><code>aifactoryAgentReaderObjectIds</code></td>
 <td>C</td>
 <td><code>""</code></td>
 <td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_SCALE_SET_ID --><code>AIFACTORY_AGENT_SCALE_SET_ID</code></td>
+<td><code>aifactoryAgentScaleSetId</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>aifactoryAgentScaleSetId: registered AI Factory catalog scale set id stamped on the agent chat usage events (aifactory.chat) for My Project Usage &amp; outcomes keep-as-is: Set together with AIFACTORY_AGENT_FACTORY_ID. Empty sends no usage events. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
 </tr>
 <tr>
 <td><!-- parameter env:AIFACTORY_AGENT_VOICE_LANGUAGES --><code>AIFACTORY_AGENT_VOICE_LANGUAGES</code></td>
