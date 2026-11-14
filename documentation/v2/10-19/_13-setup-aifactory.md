@@ -73,7 +73,7 @@ This _aifactory-infra-001_ will be your repo, where you have your configuration 
     > git submodule update --init --recursive
 
 ## 3) Copy template files (pipelines, workflows, parameter templates) locally
-- Open the notebook [01_init_templates_ALL.ipynb](../../../copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
+- Open the notebook [01_init_templates_ALL.ipynb](https://github.com/jostrm/azure-enterprise-scale-ml/blob/release/v1.24/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
 - Run all cells. 
     - Note: When you run the first cell, VS code will ask you to choose a _kernel_ - choose _Python environment. Recommended Python version is _3.12.5_ but any Python version above 3.7 should work.
 - After you executed all cells in the notebook, you will have a new folder called _ai factory_ with sub-folders, that includes templates.

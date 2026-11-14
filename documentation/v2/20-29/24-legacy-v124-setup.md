@@ -407,7 +407,7 @@ installations.
 
 This is done by ESML Core team, before creating 1st AIFactory project.
 
-1) Copy all configuration files, by running [this Notebook](../../../copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb)
+1) Copy all configuration files, by running [this Notebook](https://github.com/jostrm/azure-enterprise-scale-ml/blob/release/v1.24/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb)
     - This will copy folders and settings from ESML AIFactory GITHUB repo, to your local root path. 
         - `aifactory` folder - local configuration for IaC
         - `mlops` folder - mlops templates
@@ -424,7 +424,7 @@ This is done by ESML Core team, before creating 1st AIFactory project.
 
 This is ususally done by ESML Core team, before onboarding project team
 
-1) Copy all configuration files, by running [this Notebook](../../../copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb)
+1) Copy all configuration files, by running [this Notebook](https://github.com/jostrm/azure-enterprise-scale-ml/blob/release/v1.24/copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb)
 2) Configure enteprise scale settings
     - settings\enterprise_specific\dev_test_prod_settings.json
 3) Configure security_config
