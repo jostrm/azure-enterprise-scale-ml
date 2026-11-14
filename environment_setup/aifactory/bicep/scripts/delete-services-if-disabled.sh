@@ -1020,50 +1020,26 @@ if [ "$enableContainerApps" = "false" ] && aif_service_may_exist "$containerApps
 
   acaEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
 
-  acaenv_name=$(az containerapp env list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${acaEnvName}')].name" \
-    -o tsv | head -n1)
+  acaenv_names=$(aif_delete names --resource-type "Microsoft.App/managedEnvironments" --prefix "$acaEnvName")
 
-  if [ -n "$acaenv_name" ]; then
-    echo "Found Container Apps Environment: $acaenv_name"
+  if [ -n "$acaenv_names" ]; then
+    while IFS= read -r acaenv_name; do
+      [ -n "$acaenv_name" ] || continue
+      echo "Found Container Apps Environment: $acaenv_name"
 
-    # Before deleting the env, delete ALL container apps inside it.
-    # Azure refuses to delete a managed environment that still has container apps.
-    echo "Checking for any remaining container apps in the environment..."
-    remaining_apps=$(az containerapp list \
-      --resource-group "$projectResourceGroup" \
-      --query "[].name" \
-      -o tsv 2>/dev/null || echo "")
-    if [ -n "$remaining_apps" ]; then
-      while IFS= read -r app_name; do
-        if [ -n "$app_name" ]; then
-          echo "  Deleting remaining container app: $app_name"
-          az containerapp delete \
-            --resource-group "$projectResourceGroup" \
-            --name "$app_name" \
-            --yes 2>&1 && echo "  ✅ Deleted: $app_name" || echo "  ⚠️  Could not delete: $app_name (continuing)"
-        fi
-      done <<< "$remaining_apps"
-    else
-      echo "  No remaining container apps found."
-    fi
+      # ARM refuses to delete a managed environment that still holds Container Apps jobs or apps
+      # (aif-160, 2026-11-14: ManagedEnvironmentHasContainerAppsJobs for the AI Factory Agent knowledge
+      # refresh job). Delete the project group's jobs, then apps, bound to it, each confirmed gone.
+      aif_delete aca-environment-children --name "$acaenv_name"
 
-    # Delete private endpoints before the environment
-    delete_private_endpoints "$acaenv_name" "Container Apps Environment"
+      # Delete private endpoints before the environment
+      delete_private_endpoints "$acaenv_name" "Container Apps Environment"
 
-    echo "Deleting Container Apps Environment: $acaenv_name"
-    az containerapp env delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$acaenv_name" \
-      --yes 2>&1
-
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Container Apps Environment"
-      echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
-    else
-      echo "❌ Failed to delete Container Apps Environment"
-    fi
+      echo "Deleting Container Apps Environment: $acaenv_name"
+      aif_delete resource --resource-type "Microsoft.App/managedEnvironments" --name "$acaenv_name"
+      echo "✅ Confirmed deleted Container Apps Environment: $acaenv_name"
+    done <<< "$acaenv_names"
+    echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
   else
     echo "⚠️  Container Apps Environment not found with prefix: $acaEnvName"
   fi

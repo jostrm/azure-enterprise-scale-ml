@@ -29,6 +29,9 @@ API_VERSIONS = {
     "microsoft.search/searchservices": "2023-11-01",
     "microsoft.network/privateendpoints": "2024-05-01",
     "microsoft.network/networkinterfaces": "2024-05-01",
+    "microsoft.app/managedenvironments": "2024-03-01",
+    "microsoft.app/jobs": "2024-03-01",
+    "microsoft.app/containerapps": "2024-03-01",
 }
 GROUP_API = "2021-04-01"
 NETWORK_API = "2024-05-01"
@@ -46,6 +49,10 @@ FOUNDRY_TYPE = "Microsoft.CognitiveServices/accounts"
 FOUNDRY_CHILD_API = "2026-01-15-preview"
 # Nested Foundry deletes are short asynchronous operations: confirm them at ~1 s, bounded by the deadline.
 CHILD_POLL_SECONDS = 1.0
+ACA_ENVIRONMENT_TYPE = "Microsoft.App/managedEnvironments"
+# ARM refuses a managed environment DELETE while jobs or apps are bound to it (aif-160, 2026-11-14:
+# ManagedEnvironmentHasContainerAppsJobs for the AI Factory Agent knowledge refresh job). Jobs first: the live blocker.
+ACA_BOUND_TYPES = ("Microsoft.App/jobs", "Microsoft.App/containerApps")
 
 
 class DeletionError(Exception):
@@ -644,6 +651,40 @@ class Deletion:
         finally:
             self.poll_cap = previous
 
+    def aca_bound(self, environment_id):
+        """Jobs and apps in the project group whose environment is this managed environment."""
+        bound = []
+        for kind in ACA_BOUND_TYPES:
+            try:
+                items = self.collection(f"{self.group_id}/providers/{kind}", API_VERSIONS[kind.lower()], self.group_id)
+            except DeletionError as error:
+                if error.code in ABSENT_CODES:
+                    continue
+                raise
+            for item in items:
+                properties = item.get("properties") or {}
+                links = {properties.get(key) for key in ("environmentId", "managedEnvironmentId")}
+                if any(isinstance(link, str) and link.lower() == environment_id.lower() for link in links):
+                    bound.append((kind, item["id"]))
+        return bound
+
+    def aca_environment_children(self):
+        """Delete the project group's Container Apps jobs and apps bound to a managed environment, each confirmed gone."""
+        environment_id = f"{self.group_id}/providers/{ACA_ENVIRONMENT_TYPE}/{self.args.name}"
+        environment = self.get(environment_id, API_VERSIONS[ACA_ENVIRONMENT_TYPE.lower()])
+        if environment is None or self.state(environment) == "deleting":
+            return
+        assert_group_allowed(self.args.subscription, environment_id, self.protected_patterns, environment)
+        for kind, resource_id in self.aca_bound(environment_id):
+            self.delete_resource(resource_id, API_VERSIONS[kind.lower()])
+        left = self.aca_bound(environment_id)
+        if left:
+            raise DeletionError(
+                "NestedResourcesRemain",
+                "Container Apps jobs or apps are still bound; the managed environment cannot be deleted yet.",
+                left[0][1],
+            )
+
     def query_state(self):
         resource_id = f"{self.group_id}/providers/{self.args.resource_type}/{self.args.name}"
         item = self.get(resource_id, API_VERSIONS[self.args.resource_type.lower()])
@@ -797,6 +838,10 @@ def arguments(argv):
     children = commands.add_parser(
         "foundry-children", help="Delete a Foundry V2 account's capability hosts and projects and confirm absence.")
     children.add_argument("--name", required=True)
+    environment = commands.add_parser(
+        "aca-environment-children",
+        help="Delete the Container Apps jobs and apps bound to a managed environment and confirm absence.")
+    environment.add_argument("--name", required=True)
     state = commands.add_parser("state", help="Read one resource's lowercase provisioning state or confirmed absence.")
     state.add_argument("--resource-type", required=True)
     state.add_argument("--name", required=True)
@@ -814,7 +859,7 @@ def validate_arguments(args):
     if not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.subscription):
         raise DeletionError("InvalidArgument", "--subscription must be a subscription GUID.")
     valid_name(args.resource_group, "resource group", 90)
-    if args.action in {"resource", "group", "guard", "foundry-children"}:
+    if args.action in {"resource", "group", "guard", "foundry-children", "aca-environment-children"}:
         assert_group_allowed(args.subscription, resource_group_id(args.subscription, args.resource_group),
                              protected_group_patterns())
     if args.action == "guard":
@@ -832,6 +877,8 @@ def validate_arguments(args):
         valid_resource_name(args.resource_type, args.name)
     if args.action == "foundry-children":
         valid_name(args.name, "Foundry account name", 64)
+    if args.action == "aca-environment-children":
+        valid_name(args.name, "Container Apps environment name", 60)
     if args.action == "group" and args.confirm_resource_group != args.resource_group:
         raise DeletionError("ConfirmationMismatch", "--confirm-resource-group must exactly equal --resource-group.")
     if args.action == "verify-network":
