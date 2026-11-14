@@ -86,6 +86,16 @@
       "tags": ["multi-agent", "prompt-agent", "rag", "foundry-iq", "fabric", "mcp"]
     },
     {
+      "id": "data-fabric-sharepoint",
+      "title": "Agent data sources: SharePoint, Foundry IQ, Fabric IQ and uploads",
+      "summary": "A settings-driven prompt agent with one tool per enabled source: SharePoint, Foundry IQ, Fabric IQ and a separate knowledge base for documents uploaded to project storage.",
+      "path": "usecase_code/40-agent-factory/43-data-fabric-sharepoint",
+      "readme": "usecase_code/40-agent-factory/43-data-fabric-sharepoint/readme.md",
+      "factory": "Agent Factory",
+      "services": ["Microsoft Foundry", "Azure AI Search", "Fabric", "SharePoint", "Storage"],
+      "tags": ["prompt-agent", "rag", "foundry-iq", "fabric", "sharepoint", "data-preparation", "mcp"]
+    },
+    {
       "id": "rag-split-tables-acl",
       "number": 5,
       "place": "sharepoint",
