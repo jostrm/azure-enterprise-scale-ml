@@ -511,3 +511,40 @@ def test_object_oriented_store_matches_module_api(workdir):
     metadata = store.write_table(pd.DataFrame({"x": [1]}), workdir / "table")
     assert store.table_info(workdir / "table") == metadata
     assert store.read_table(workdir / "table")[1] == metadata
+
+
+def _two_inputs_merged():
+    # What the merge step hands to write_table: two inputs, concatenated. Arrow-backed text columns
+    # (the pandas 3 default) keep one chunk per input after a concat.
+    text = pd.ArrowDtype(pa.string())
+    first = pd.DataFrame({"x": [1, 2], "request_id": ["id-1", "id-2"]}).astype({"request_id": text})
+    second = pd.DataFrame({"x": [3, 4], "request_id": ["id-3", "id-4"]}).astype({"request_id": text})
+    return pd.concat([first, second], ignore_index=True)
+
+
+@pytest.mark.parametrize("format", ["delta", "parquet"])
+def test_rows_keep_their_order_when_the_frame_was_concatenated_from_several_inputs(workdir, format):
+    frame = _two_inputs_merged()
+    for attempt in range(20):  # the Delta writer stored the two chunks in either order, about every second time
+        destination = workdir / f"{format}-{attempt}"
+        write_table(frame, destination, format=format)
+        result, _ = read_table(destination)
+        assert result["x"].tolist() == [1, 2, 3, 4]
+        assert result["request_id"].tolist() == ["id-1", "id-2", "id-3", "id-4"]
+
+
+def test_the_delta_writer_gets_one_chunk_per_column(monkeypatch, workdir):
+    # A Delta writer handles the record batches of a table concurrently and does not keep their order.
+    # One batch has no order to lose.
+    seen = []
+    delta_table, real_writer = tables._delta()
+
+    def writer(uri, arrow, **options):
+        seen.append([column.num_chunks for column in arrow.columns])
+        return real_writer(uri, arrow, **options)
+
+    monkeypatch.setattr(tables, "_delta", lambda: (delta_table, writer))
+    frame = _two_inputs_merged()
+    assert pa.Table.from_pandas(frame, preserve_index=False).column("request_id").num_chunks == 2
+    write_table(frame, workdir / "table")
+    assert seen == [[1, 1]]

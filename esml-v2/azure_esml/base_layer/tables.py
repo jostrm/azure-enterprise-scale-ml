@@ -207,7 +207,11 @@ def _from_frame(frame: DataFrame, format: str):
             )
         fields.append(pa.field(field.name, dtype, nullable=True))
     try:
-        return table.cast(pa.schema(fields), safe=True)
+        # One chunk per column. A frame concatenated from several inputs arrives with one chunk per input
+        # (Arrow-backed text columns keep them), and a Delta writer handles the record batches of a table
+        # concurrently: it stored them in either order, so the rows of a merged table came back in an
+        # order that differed from run to run.
+        return table.cast(pa.schema(fields), safe=True).combine_chunks()
     except pa.ArrowException as exc:
         raise ValueError(
             "Table values cannot be safely represented; timestamps require exact "
