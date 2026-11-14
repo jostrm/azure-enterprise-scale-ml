@@ -2582,8 +2582,13 @@
 
 
 <h1 id="the-six-esaf-scenarios">The six ESAF scenarios<a class="headerlink" href="#the-six-esaf-scenarios" title="Permanent link">&para;</a></h1>
-<p>Every tool runs the same six scenarios, and each scenario is one call. The app, the <code>azurefactory</code> CLI, the
+<p>The existing API tools run the same six scenarios, and each scenario is one call. The app, the <code>azurefactory</code> CLI, the
 Python SDK and REST are clients of the same Factory API, so the outcome is the same.</p>
+<p>The optional <strong>Pipelines-only</strong> entry point is separate: it consumes registered
+configuration directly. It does not call <code>azurefactory esaf</code> and does not change
+the commands below. See its <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/reference/maintainers/automation-and-review-flow.md#pipelines-only">coverage, inputs and commands</a>.
+<strong>API-2-Pipelines</strong> retains API preparation/orchestration; <strong>API-2-ARM</strong> retains
+Azure execution by the API or its host worker.</p>
 <table>
 <thead>
 <tr>

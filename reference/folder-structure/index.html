@@ -2539,7 +2539,8 @@
 
 <h1 id="folder-structure">Folder structure<a class="headerlink" href="#folder-structure" title="Permanent link">&para;</a></h1>
 <p>ESAF keeps your configuration in one <code>azurefactory</code> folder in your consumer repository. One folder can hold
-several AI Factories. The Factory API writes these files; you change them through a tool, not by hand.</p>
+several AI Factories. The Factory API writes these files for the existing API routes.
+The optional Pipelines-only route uses the same registered layout, not a legacy copy.</p>
 <h2 id="the-azurefactory-folder">The azurefactory folder<a class="headerlink" href="#the-azurefactory-folder" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>azurefactory\
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  register.json                       The register: every Factory in this folder
@@ -2566,7 +2567,7 @@ several AI Factories. The Factory API writes these files; you change them throug
 <tbody>
 <tr>
 <td><code>register.json</code></td>
-<td>Commits the identity and configuration of every Factory together.</td>
+<td>Sole authoritative commit point: embeds identities, configuration, per-project variables and bindings together.</td>
 </tr>
 <tr>
 <td><code>factories\&lt;key&gt;\</code></td>
@@ -2582,12 +2583,18 @@ several AI Factories. The Factory API writes these files; you change them throug
 </tr>
 <tr>
 <td><code>variables.json</code></td>
-<td>Holds the project's settings, with a <code>dev</code> and a <code>stage_prod</code> section.</td>
+<td>Human-readable projection of the register's project settings, with <code>dev</code> and <code>stage_prod</code> sections.</td>
 </tr>
 </tbody>
 </table>
 <p>Dev, Stage and Prod are sections in <code>variables.json</code>, not extra folders. Keep credentials in a key vault,
 never in these files.</p>
+<p>For Pipelines-only, an explicit variables path must agree with the corresponding
+embedded register object. It is not a silent override. The API-free
+<code>bootstrap/lib/pipeline_configuration.py</code> generates new drafts, including their
+projections; it never changes an existing root or grants deployment permission.
+Configuration edits are reviewed before adoption. See the
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/reference/maintainers/automation-and-review-flow.md#pipelines-only">input, ZIP and persistence contract</a>.</p>
 <h2 id="your-consumer-repository-after-setup">Your consumer repository after setup<a class="headerlink" href="#your-consumer-repository-after-setup" title="Permanent link">&para;</a></h2>
 <p><code>01-start-v125-and-above.sh</code> adds the tools and an empty register to your consumer repository:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>consumer-repository\
