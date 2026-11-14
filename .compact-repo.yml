@@ -1,0 +1,398 @@
+# compact-repo profile for purple (jostrm/azure-enterprise-scale-ml), contract version 1.
+# Tool: https://github.com/jostrm/compact-repo (private). Format: docs/prompt-A-build-brief.md there.
+#
+# Purpose: compact `main` into `release/v1.26`, the "mini" AI Factory v1.25: only what the six ESAF
+# scenarios, the ML Model Factory, the Agent Factory, ESML v2, the GitHub Actions workflows, the Azure
+# DevOps pipelines and the API, SDK and CLI depend on.
+#
+# How this run used it (release/v1.26 existed before the compaction, so the plan is made from its tip):
+#   compact-repo analyze . --base release/v1.26 --profile .compact-repo.yml --out <dir>
+#   compact-repo verify  . --plan <dir>/plan.json --base-worktree <path>
+#   compact-repo apply   . --plan <dir>/plan.json --target release/v1.26 --update --push
+#
+# Rules behind the lists (from the release brief, 2026-11-14):
+#   R1 strict:   environment_setup/aifactory/**, bootstrap/** and every folder that is not a named
+#                component stay only when a root reaches them. They get no `keep` entry.
+#   R2 named:    Agent Factory, ML Model Factory, ESML v2 and the CLI stay whole until Joakim has decided
+#                on their unreached files (see "Named components" under keep).
+#   R3 installers: previous-release/ and old/ are dropped. A current installer stays only when a kept
+#                script or test reads it from the checkout by relative path.
+#   R4 copied folders: copy_to_local_settings/ and copy_my_subfolders_to_my_grandparent/ are copied
+#                wholesale into the consumer repo; files nothing uses there are on the decision list and
+#                stay until Joakim has decided.
+#   R5 failure paths are used: retry, recovery, clean-up and self-heal code stays; operator recovery
+#                scripts named in kept docs are roots.
+#   R6 v1.24 layout support (variables.yaml, .env.template, the legacy paths of 00-start.sh) stays.
+#   R7 docs follow: documentation/v2, RELEASE_125.md and the root docs stay; they never keep code alive.
+#   R8 tests follow what they test.
+#   R9 knowledge graph: documentation/architecture, environment_setup/graphify and what AGENTS.md names.
+#
+# Patterns use only `*` and `**` (no brace or character-class expansion), so every root is one path or one glob.
+version: 1
+base: main
+target: release/v1.26
+
+roots:
+  # --- Repo CI (decided per workflow) ------------------------------------------------------------
+  - path: ".github/workflows/infrastructure-tests.yml"
+    reason: "Purple CI: runs on every push to any branch (unit on Ubuntu and Windows, syntax, bicep)."
+  - path: ".github/workflows/verify-aifactory-dev.yml"
+    reason: "Purple CI: offline unit tests on pushes that touch copy_to_local_settings/** or unit-tests/**."
+  - path: ".github/workflows/verify-aifactory-stage.yml"
+    reason: "Purple CI: manual placeholder; reaches no repo file."
+  - path: ".github/workflows/verify-aifactory-prod.yml"
+    reason: "Purple CI: manual placeholder; reaches no repo file."
+  # Not a root: .github/workflows/deploy-docs.yml publishes the docs site from main only. It stays as a
+  # test dependency (see the note under drop).
+
+  # --- Start and bootstrap -----------------------------------------------------------------------
+  - path: "00-start.sh"
+    reason: "Consumer entry point, all layouts (v1.24 legacy paths included, R6)."
+  - path: "01-start-v125-and-above.sh"
+    reason: "Consumer entry point, registered layout (v1.25 and above)."
+  - path: "bootstrap/ADO-azurefactory.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/ADO-create-new-aifactory-scaleset.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/ADO-update-aifactory-and-run-project.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/AIFactory-lifecycle.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/ALL-create-new-aifactory-scaleset.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/GH-update-aifactory-and-run-project.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/GHA-azurefactory.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/GHA-create-new-aifactory-scaleset.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/GHA-update-aifactory-and-run-project.sh"
+    reason: "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+  - path: "bootstrap/azurefactory.sh"
+    reason: "Registered-layout launcher that registered_setup.py installs into the consumer root (with AIFactory-lifecycle.sh and the provider wrappers)."
+  - path: "bootstrap/.gitignore.template"
+    reason: "Merged into the consumer's .gitignore by registered_setup.py and copied by 01-aif-copy-aifactory-templates.sh."
+  - path: "bootstrap/lib/**"
+    reason: "01-start-v125-and-above.sh (bootstrap/lib/registered_setup.py) copies this whole folder into the consumer's lib/, and 00-start.sh installs AIF_DUAL_LAYOUT_LIBRARIES from it by bare name (layout_router.sh). The Factory API runs factory_lifecycle.py and its siblings from the submodule and vendors most of the folder byte for byte."
+  - path: "bootstrap/ui/**"
+    reason: "Sourced by every launcher; registered_setup.py copies the folder into the consumer's ui/."
+  - path: "environment_setup/aifactory/bicep/personas/**"
+    reason: "registered_setup.py copies every .py and .json of the persona engine into the consumer (.azurefactory-tools/persona-engine); the pipelines run personas/pipeline.py in every scenario."
+  - path: "environment_setup/aifactory/bicep/esml-util/project_lake_access.py"
+    reason: "Copied into the consumer by registered_setup.py with the persona engine; the project pipelines call it for lake access."
+  - path: "bootstrap/templates/**"
+    reason: "The Factory API commits factory-lifecycle-*.yml into the consumer repo (.github/workflows/factory-lifecycle.yml or aifactory/pipelines/factory-lifecycle.yml) and hub_private_probe.py into .azurefactory/; it requires them in purple's GitHub tree (pink registered_repository.py)."
+
+  # --- GitHub Actions and Azure DevOps (all of them) -----------------------------------------------
+  - path: "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/**"
+    reason: "GitHub Actions workflows, .env.template and the variable script copied into the consumer repo; scenarios 1 to 6 on GitHub run infra-common.yml and infra-project.yml (which calls infra-project-phase.yml)."
+  - path: "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/**"
+    reason: "Azure DevOps pipelines, job templates and variables.yaml copied into the consumer repo; the Factory API reads variables.yaml from the submodule in every scenario."
+  - path: "environment_setup/aifactory/variables.json"
+    reason: "Canonical v1.25 configuration template: the variable contract shared with pink and MAUI."
+
+  # --- CLI, SDK and the API seen from purple ---------------------------------------------------------
+  - path: "environment_setup/azurefactory-cli/pyproject.toml"
+    reason: "CLI and SDK package `azurefactory`; console script azurefactory = azurefactory.cli:main."
+  - path: "environment_setup/azurefactory-cli/setup.py"
+    reason: "Builds the CLI wheel and vendors bootstrap/lib/factory_enrollment.py and provider_repository_state.py."
+  - path: "environment_setup/azurefactory-cli/src/azurefactory/**"
+    reason: "The package: cli.py, client.py, esaf.py (the six scenarios) and their modules."
+  - path: "environment_setup/install_config_wizard/api-usage-examples/**"
+    reason: "API usage examples (Python, PowerShell, Node, raw requests) and scenarios.json."
+
+  # --- ESML v2 ------------------------------------------------------------------------------------------
+  - path: "esml-v2/pyproject.toml"
+    reason: "ESML v2 package `azure_esml`; console script esml = azure_esml.cli:main."
+  - path: "esml-v2/esml_build.py"
+    reason: "ESML v2 build backend (bundles the shared ML Model Factory engine)."
+  - path: "esml-v2/azure_esml/**"
+    reason: "The ESML v2 package."
+  - path: "esml-v2/examples/**"
+    reason: "Documented ESML v2 app-layer examples."
+
+  # --- ML Model Factory: documented entry points -------------------------------------------------------
+  - path: "usecase_code/50-ml-model-factory/pyproject.toml"
+    reason: "ML Model Factory package; console script ml-model-factory = ml_model_factory.cli:main."
+  - path: "usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/**"
+    reason: "The ML Model Factory package (python -m ml_model_factory)."
+  - path: "usecase_code/50-ml-model-factory/accelerator/scripts/**"
+    reason: "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+  - path: "usecase_code/50-ml-model-factory/accelerator/databricks/**"
+    reason: "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+  - path: "usecase_code/50-ml-model-factory/accelerator/environments/**"
+    reason: "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+  - path: "usecase_code/50-ml-model-factory/accelerator/schemas/**"
+    reason: "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+  - path: "usecase_code/50-ml-model-factory/usecase-type/**"
+    reason: "Generated use-case notebooks and pipelines; the Factory API's project-team catalog links each of them."
+  - path: "usecase_code/50-ml-model-factory/user-config/**"
+    reason: "Documented user configuration (model, storage selection, lake) the package reads."
+
+  # --- Agent Factory: documented entry points -----------------------------------------------------------
+  - path: "usecase_code/40-agent-factory/agent_factory/**"
+    reason: "Shared operator package (python -m agent_factory); the project workflows and pipelines call it."
+  - path: "usecase_code/40-agent-factory/40-aifactory-agent/deploy.py"
+    reason: "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+  - path: "usecase_code/40-agent-factory/40-aifactory-agent/probe_factory.py"
+    reason: "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+  - path: "usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/**"
+    reason: "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+  - path: "usecase_code/40-agent-factory/40-aifactory-agent/infra/**"
+    reason: "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+  - path: "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/Start-FoundryVoiceSales.ps1"
+    reason: "Voice sales agent: documented start script and package."
+  - path: "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/sales_agent/**"
+    reason: "Voice sales agent: documented start script and package."
+  - path: "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/scripts/**"
+    reason: "Voice sales agent: documented start script and package."
+  - path: "usecase_code/40-agent-factory/41-single-agent/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/42-multi-agent/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/42-multi-agent-fabric-iq/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/43-data/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/45-rag-agent/**/*.py"
+    reason: "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+  - path: "usecase_code/40-agent-factory/44-azure-mcp/deploy.py"
+    reason: "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+  - path: "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py"
+    reason: "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+  - path: "usecase_code/40-agent-factory/46-factory-chat-agent/deploy.py"
+    reason: "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+  - path: "usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py"
+    reason: "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/main.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sync.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/webhook.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/preview.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/retrieval_only.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/check_sum.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/acl_scenario.py"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/**"
+    reason: "RAG with split tables and ACL: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/main.py"
+    reason: "Agent that trains an ML churn model: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/hosted_main.py"
+    reason: "Agent that trains an ML churn model: documented entry scripts and package."
+  - path: "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/**"
+    reason: "Agent that trains an ML churn model: documented entry scripts and package."
+
+  # --- Knowledge graph (R9) ----------------------------------------------------------------------------
+  - path: "environment_setup/graphify/generate.py"
+    reason: "Graph maintenance entry point named in AGENTS.md."
+
+  # --- Test framework: pytest loads these and the tests import them ------------------------------------
+  # Tests follow what they test and never keep code alive, so the test framework itself has to be named.
+  - path: "environment_setup/unit-tests/test-bicep/app/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/base/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/domain/**"
+    reason: "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+  - path: "environment_setup/unit-tests/test-bicep/unit/__init__.py"
+    reason: "Package marker: the unit tests import each other's helpers through it."
+  - path: "environment_setup/unit-tests/test-bicep/pytest.ini"
+    reason: "pytest configuration that run_ci.py relies on."
+  - path: "environment_setup/unit-tests/test-bicep/conftest.py"
+    reason: "pytest fixtures for every test in the folder."
+  - path: "environment_setup/unit-tests/test-bicep/requirements.txt"
+    reason: "What CI installs before run_ci.py."
+  - path: "mcp/usecase_code/**"
+    reason: "Examples that mcp/tests import (test_health.py, test_registration.py)."
+  - path: "environment_setup/install_config_wizard/SHA256SUMS.txt"
+    reason: "Read by unit/test_install_config_wizard_downloads.py."
+  - path: "environment_setup/install_config_wizard/windows/SHA256SUMS.txt"
+    reason: "Read by unit/test_install_config_wizard_downloads.py."
+
+externals:
+  # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule
+  # checkout (bootstrap/lib/factory_lifecycle.py and siblings), copies workflows out of it, compiles its
+  # Bicep, and bundles the whole bootstrap/ and environment_setup/aifactory/ trees at a pinned commit.
+  - repo: jostrm/azure-aifactory-config
+    ref: main
+    path_prefix: "azure-enterprise-scale-ml/"
+    include: ["src/**", "template-files/**", "scripts/**", "sync-creation-source.py"]
+  # MAUI ConfigWizard and TutorialApp: build from a pinned purple commit (bootstrap/, environment_setup/aifactory/,
+  # LICENSE) and name tutorial paths.
+  - repo: jostrm/maui-apps
+    ref: main
+    path_prefix: "azure-enterprise-scale-ml/"
+    include: ["ESAIF.*/**", ".github/workflows/**"]
+
+keep:
+  # --- Root files and agent instructions ------------------------------------------------------------
+  - "LICENSE"
+  - ".gitignore"
+  - ".gitattributes"
+  - "__init__.py"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - ".claude/**"
+  - ".github/copilot-instructions.md"
+  - ".compact-repo.yml"
+  # --- Docs (R7): they follow, they never keep code alive ---------------------------------------------
+  - "README.md"
+  - "RELEASE_120.md"
+  - "RELEASE_123.md"
+  - "RELEASE_124.md"
+  - "RELEASE_125.md"
+  - "RELEASE_126.md"
+  - "ROADMAP_MAIN.md"
+  - "SECURITY.md"
+  - "SUPPORT.md"
+  - "CODE_OF_CONDUCT.md"
+  - "CONTRIBUTING.md"
+  - "documentation/readme.md"
+  - "documentation/v2/**"
+  # --- Knowledge graph (R9) ------------------------------------------------------------------------------
+  - "documentation/architecture/**"
+  - "environment_setup/graphify/**"
+  - "meta/graphify/.gitignore"
+  # --- Named components (R2): whole until Joakim has decided on their unreached files ------------------
+  - "usecase_code/40-agent-factory/**"          # Agent Factory            (decision D5)
+  - "usecase_code/50-ml-model-factory/**"       # ML Model Factory         (decision D5)
+  - "esml-v2/**"                                # ESML v2                  (decision D5)
+  - "environment_setup/azurefactory-cli/**"     # CLI and SDK              (decision D5)
+  # --- Azure ML SDK install set that the v2 docs describe (documentation/v2/30-39/33-install-azureml-sdk-v1+v2.md)
+  - "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/**"
+  # --- Copied folders (R4): whole until Joakim has decided on the files nothing uses -------------------
+  - "environment_setup/aifactory/bicep/copy_to_local_settings/**"   # decision D6
+  - "copy_my_subfolders_to_my_grandparent/**"                       # decision D7 (ESML v1 templates)
+
+drop:
+  # --- Installers (R3) -----------------------------------------------------------------------------------
+  - "**/previous-release/**"                                  # 589 MB, older MAUI ConfigWizard installers
+  - "environment_setup/install_tutorial_guide/old/**"         # 349 MB, older TutorialApp installers
+  - "environment_setup/install_config_wizard/maui/*.cab"      # current MAUI ConfigWizard set: docs link it on main by URL
+  - "environment_setup/install_config_wizard/maui/*.msi"
+  - "environment_setup/install_tutorial_guide/*.cab"          # current TutorialApp set: docs link it on main by URL
+  - "environment_setup/install_tutorial_guide/*.msi"
+  # --- Docs site: published from main only ----------------------------------------------------------------
+  # .github/workflows/deploy-docs.yml is NOT dropped: two kept CLI tests read it
+  # (azurefactory-cli/tests/test_documentation_site.py and test_documentation_tabs.py), and it only
+  # triggers on main.
+  # --- Round 2 (2026-11-14): code that nothing names -------------------------------------------------------
+  # Files under environment_setup/aifactory and esml/azure_provisioning that no pipeline, workflow, script,
+  # test or document names anywhere in the tree, and that the Azure DevOps consumer repository does not
+  # name either. Round 1 kept them only because bootstrap/01-aif-copy-aifactory-templates.sh copies their
+  # folder as a whole. They stay on main.
+  - "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-1.json"
+  - "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-DEV.json"
+  - "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-Dev-v2.json"
+  - "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-v2.json"
+  - "environment_setup/aifactory/bicep/cleanup-role-assignments.ps1"
+  - "environment_setup/aifactory/bicep/esml-common/modules-common/nsgCommonScoring.json"
+  - "environment_setup/aifactory/bicep/esml-genai-1/21-sample-app.bicep"
+  - "environment_setup/aifactory/bicep/esml-project/21-network.bicep"
+  - "environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-rg.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-sub.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-assigned-roles-del-on-rg.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-cost-from-rg-tag.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-create-compute-instance-in-vnet.sh"
+  - "environment_setup/aifactory/bicep/esml-util/000-delete-subnets-for-project.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-deleteCapHost.sh"
+  - "environment_setup/aifactory/bicep/esml-util/000-get_your_own_object_id.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-list-rbac-for-user-on-rg.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-load-env-file.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/000-update-az-add-ml-extension.sh"
+  - "environment_setup/aifactory/bicep/esml-util/000-update-storage-account-access.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/001-set-owner-on-sub.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/001-set-privateDnsZoneContrib-on-RG.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/002-set-accesspolicy-for-sp.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/003-set-BlobDataOwner-to-sp.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/10-generate-pwd-4-ado.sh"
+  - "environment_setup/aifactory/bicep/esml-util/100-aml-rbac.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/12-GENAI-update-ip-rule-cmd.sh"
+  - "environment_setup/aifactory/bicep/esml-util/23-add-dsvm.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/23-install-sdks-on-win11.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/26-remove-esml-coreteam-member.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/26-remove-esml-project-member.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/30-vpn-gateway-certificates.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/31-create-priv-dns-zones-if-not-exists.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/_24-add-aks.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/_25-add-users-to-bastion.ps1"
+  - "environment_setup/aifactory/bicep/modules/applicationInsights.bicep"
+  - "environment_setup/aifactory/bicep/modules/common/CmnRoleAssignments.bicep"
+  - "environment_setup/aifactory/bicep/modules/csDocIntelligence-kvSecret.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/aiFoundry2025.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/azuredeploy.parameters.json"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteAllCapHosts.ps1"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteCapHost.sh"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.ps1"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.sh"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-project-identity.json"
+  - "environment_setup/aifactory/bicep/modules/csSpeech-kvSecret.bicep"
+  - "environment_setup/aifactory/bicep/modules/csVision-kvSecret.bicep"
+  - "environment_setup/aifactory/bicep/modules/dataLakeVnetRules.bicep"
+  - "environment_setup/aifactory/bicep/modules/databases/cosmosdb/cosmosCustomRole.bicep"
+  - "environment_setup/aifactory/bicep/modules/databases/elasticsearch/elasticsearch-rbac-example.bicep"
+  - "environment_setup/aifactory/bicep/modules/databricksAssets.bicep"
+  - "environment_setup/aifactory/bicep/modules/diagnosticSettingCognitive.bicep"
+  - "environment_setup/aifactory/bicep/modules/diagnostics/eventHubDiagnostics.bicep"
+  - "environment_setup/aifactory/bicep/modules/diagnostics/logAnalyticsWorkspaceDiagnostics.bicep"
+  - "environment_setup/aifactory/bicep/modules/monitoring/Get-AmplsResources.ps1"
+  - "environment_setup/aifactory/bicep/modules/monitoring/amplsApplicationInsightsManager.bicep"
+  - "environment_setup/aifactory/bicep/modules/monitoring/amplsHub.bicep"
+  - "environment_setup/aifactory/bicep/modules/monitoring/getAmplsApplicationInsights.bicep"
+  - "environment_setup/aifactory/bicep/modules/policyExcemptions/policy-exempt-foundry-subnets.bicep"
+  - "environment_setup/aifactory/bicep/modules/privateDnsZone.bicep"
+  - "environment_setup/aifactory/bicep/modules/readerRbac.bicep"
+  - "environment_setup/aifactory/bicep/modules/resourcegroupManaged.bicep"
+  - "environment_setup/aifactory/bicep/modules/verify-acr-rbac.bicep"
+  - "environment_setup/aifactory/bicep/scripts/databricks/deployment/_pre_cluster_create.sh"
+  - "environment_setup/aifactory/bicep/scripts/databricks/deployment/create_cluster.sh"
+  - "environment_setup/aifactory/bicep/scripts/databricks/deployment/create_secret_scope.sh"
+  - "environment_setup/aifactory/bicep/scripts/databricks/deployment/post_cluster_create.sh"
+  - "environment_setup/aifactory/bicep/scripts/enableADDloginPostDeploy.ps1"
+  - "environment_setup/aifactory/bicep/scripts/test-git-functionality.ps1"
+  - "environment_setup/aifactory/bicep/scripts/test-submodule-detection.ps1"
+  - "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Dev/ESML-project002_M03-Dev.json"
+  - "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.json"
+  - "esml/azure_provisioning/azure_devops_pipelines/Release/Dev/Release-Online-Dev.json"
+  - "esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json"
+
+followers:
+  tests:
+    - "**/test_*.py"
+    - "**/conftest.py"
+    - "**/tests/**"
+    - "**/*.test.js"
+    - "environment_setup/unit-tests/test-bicep/integration/**"
+  docs:
+    - "**/*.md"
+    - "documentation/**"
+
+limits:
+  max_text_blob_mb: 2          # larger files are leaves: never downloaded, never parsed
+
+verify:
+  # Run with Python 3.12, environment_setup/unit-tests/test-bicep/requirements.txt installed, and the
+  # pinned Bicep compiler from ci/install-bicep.sh, PowerShell 7 and the Azure CLI on PATH. Offline: LIVE_AZURE=0.
+  # The unit command uses tiers 1-3, the selection GitHub CI runs on every push and the one that passes on
+  # the base. `--tiers all` has 167 known failures on the base (tiers 4 and 5; the nightly CI run has been red
+  # since 2026-11-08), so it cannot tell a missed dependency from an old failure. The release run executes
+  # `--tiers all` on both trees itself and compares the two JUnit files test by test.
+  - name: iac-unit
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --tiers 1-3
+    timeout_minutes: 45
+  - name: iac-syntax
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase syntax
+    timeout_minutes: 45
+  - name: iac-bicep
+    run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase bicep --bicep bicep
+    timeout_minutes: 45
+
+self_heal:
+  max_rounds: 5
+
+embed_report: true             # writes .compact-repo/manifest.json and report.md into the branch
