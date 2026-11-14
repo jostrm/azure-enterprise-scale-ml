@@ -3,8 +3,9 @@
 **Release notes** &nbsp; | &nbsp; **14 November 2026** &nbsp; | &nbsp; branch `release/v1.26`
 
 v1.26 is v1.25 made small. It has the same features as `main` on 14 November 2026 (commit `ebd300db`),
-with what nothing uses removed, and with fixed waits in the pipelines replaced by checks of the real
-condition. It adds no feature. No deployed Bicep template, no variable and no API version was changed.
+with what nothing uses removed, with fixed waits in the pipelines replaced by checks of the real
+condition, and with deployment steps that try again after a transient Azure error. It adds no feature.
+No deployed Bicep template, no variable and no API version was changed.
 
 ESML v1, the first-generation SDK with its notebook templates, is not part of this branch. It lives on
 `main` and on `release/v1.24`. ESML v2 and the ML Model Factory are here.
@@ -17,7 +18,7 @@ git submodule add -b release/v1.26 https://github.com/jostrm/azure-enterprise-sc
 git submodule absorbgitdirs azure-enterprise-scale-ml
 ```
 
-Run them in the root of your own repository, then commit. They download 218 MB.
+Run them in the root of your own repository, then commit. They download 208 MB.
 
 It takes three commands because the short form, `git submodule add -b release/v1.26 --depth 1 <url>`,
 works only for a repository's default branch. For any other branch git first downloads the default
@@ -26,7 +27,7 @@ branch (`main`, 1,147 MB) and then stops with "is not a commit and a branch cann
 
 A colleague's fresh clone of your repository, and every pipeline job, gets the submodule with
 `git submodule update --init --depth 1`. That works, but for the same reason it downloads `main` first:
-1,151 MB in 63 s, measured on 14 November 2026. To get only the commit your repository pins (218 MB in
+1,151 MB in 63 s, measured on 14 November 2026. To get only the commit your repository pins (208 MB in
 15 s), fetch that commit directly:
 
 ```bash
@@ -40,7 +41,7 @@ git submodule absorbgitdirs azure-enterprise-scale-ml
 
 `unit/test_release_consume_recipe.py` runs both blocks against a local repository and fails if they stop
 working. The pipeline templates still use the standard checkout; see "Not done" for the change that
-would give every job the 218 MB.
+would give every job the 208 MB.
 
 `--aifactory-version 126` selects this branch in the launchers.
 
@@ -48,15 +49,17 @@ would give every job the 218 MB.
 
 | | `main` (`ebd300db`) | `release/v1.26` | Change |
 |---|---:|---:|---:|
-| Files | 3,234 | 2,694 | 547 removed, 7 added |
+| Files | 3,234 | 2,708 | 540 removed, 14 added |
 | Tree size | 1,553 MB | 295 MB | 81% smaller |
-| Shallow clone (`--depth 1 --single-branch`), time | 158 s | 19 s | 8 times faster |
-| Shallow clone, download | 1,147 MB | 218 MB | 5 times smaller |
+| Shallow clone (`--depth 1 --single-branch`), time | 128 s | 15 s | 8 times faster |
+| Shallow clone, download | 1,147 MB | 208 MB | 5.5 times smaller |
+| "Check out code" in this repository's own CI, per job | about 110 s | 13 to 20 s | 4 jobs per push |
+| Azure DevOps job checkout of the submodule | 2,407 MB in 143 s | 1,151 MB in 63 s | see "What got faster" |
 | Bicep files | 320 | 297 | 23 unused modules removed |
 | Sleeps of 20 s or longer in the five pipeline and script files that changed | 16 | 4 | see "What got faster" |
 
-The clone was measured once on a laptop on 14 November 2026, after the first of the three removal rounds.
-The branch is smaller now.
+The clones and the checkouts were measured on one cloud machine on 14 November 2026, the clone on commit
+`2f15e6eb`. The CI checkout times are from the GitHub Actions runs of `main` and of this branch.
 `main` has moved on since `ebd300db`; later commits on `main` are not in this branch.
 
 ## What "used" means here
@@ -87,8 +90,9 @@ Nothing is lost: every removed file is still on `main`.
 | 1 | Files nothing reaches: parts of the ESML v1 SDK and its images, health model examples, one workspace file | 79 | 17 MB |
 | 2 | Code that no pipeline, workflow, script, test or document names: 23 Bicep modules, 27 operator scripts in `esml-util`, 7 other scripts, 4 old dashboards, 4 ESML v1 pipeline definitions and 9 other files | 75 | 0.3 MB |
 | 3 | ESML v1, by decision: the v1 SDK packages (`esml`, `esmlrt`, `esmlfac`), its notebook, pipeline, Data Factory, Databricks and settings templates, the Azure ML SDK install scripts for v1 developer machines, and the v1 documentation | 337 | 14 MB |
+| Fix-up | Put back, because a kept document or test needs them: one Kong operator script and six tutorial packaging files | -7 | -0.06 MB |
 
-Per top-level folder: `environment_setup/` 226 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, repository root 1. In total 547 files and 1,258 MB.
+Per top-level folder: `environment_setup/` 219 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, repository root 1. In total 540 files and 1,258 MB.
 
 What stays of the two folders that held ESML v1:
 
@@ -98,8 +102,9 @@ What stays of the two folders that held ESML v1:
 
 ## What got faster
 
-Three changes, each with a test that fails without it. They replace a wait of a fixed length with a check of
-the real condition, or make an existing check look more often. Every time limit is the same as before.
+Four changes, each with a test that fails without it. Three replace a wait of a fixed length with a check
+of the real condition, or make an existing check look more often; every time limit is the same as before.
+The fourth makes 13 Azure DevOps jobs download one commit instead of all history.
 
 | Where | Before | After |
 |---|---|---|
@@ -108,6 +113,7 @@ the real condition, or make an existing check look more often. Every time limit 
 | Capability host wait, Azure DevOps and GitHub | One look every 20 s | Every 5 s |
 | API Management SKU update, Azure DevOps and GitHub | One look every 30 s | Every 10 s |
 | Application Gateway health in the scale-set bootstrap | One look every 30 s | Every 10 s |
+| Checkout in 13 Azure DevOps jobs (project, cross-charging, private MCP) | All history of the consumer repository and of this submodule: 2,407 MB in 143 s for the submodule | One commit of each: 1,151 MB in 63 s |
 
 Sleeps of 20 seconds or longer in the five changed files: 16 before, 4 after.
 
@@ -125,8 +131,25 @@ The largest candidates:
 - `azurefactory --help` takes 1.4 s against 0.2 s for a bare interpreter; lazy imports would save about
   0.4 s per call.
 
-Retry, backoff, recovery and self-heal code was not touched. A wait that follows a failure is a backoff
-and stays.
+Existing retry, backoff, recovery and self-heal code was not removed or weakened. A wait that follows a
+failure is a backoff and stays. What was added is under "What got more robust".
+
+## What got more robust
+
+Each change has a test that fails without it. None was run against Azure.
+
+| What | Before | After |
+|---|---|---|
+| A transient Azure error in a deployment step: throttling, a 5xx, a timeout, "another operation is in progress", an identity that has not replicated yet | The step failed and the run was lost. In GitHub only step 69b tried again; in Azure DevOps five tasks retried on any failure | 31 more deployment steps of the common and project runs try again: at most 4 attempts, waits of 15 to 120 s, the same deployment name and inputs. Any other error still fails at the first attempt |
+| A deployment that a cancelled or timed-out run left running | The next run was refused with `DeploymentActive` | The step waits for the earlier deployment to end (it looks every 10 s, for at most 20 minutes) and then deploys |
+| The stage job of the GitHub common workflow, networking step | A space after a line-continuation backslash cut the command short: five parameters were not passed and the step could not succeed. The same line is on `main` | Fixed, with a test over every workflow and pipeline template |
+| The command to add this branch as a submodule | The one-line form in this note failed with "is not a commit" after downloading `main` | Three commands that work, and a test that runs them |
+| One Kong operator script and the tutorial guide's packaging scripts | Removed in round 1, although a kept document and a kept test need them | Put back |
+
+The retry is one shared helper, `environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh`. It decides
+"transient" from error codes and phrases, never from bare numbers: "capacity 500" in a quota message is not
+an HTTP 500. Steps that already had their own retry keep it: 68 (Logic Apps plan capacity), 69b, and the
+Azure DevOps tasks 62, 63, 69a and 69b.
 
 ## How it was checked
 
@@ -143,6 +166,10 @@ and stays.
 | Round 3, all five tiers, before and after | 9,631 tests on both. Ubuntu: 9,439 passed and 166 failed. Windows: 9,446 passed and 166 failed. The same tests before and after. |
 | Round 3, the 16 component suites, before and after | Same result for every suite, with one exception that is not caused by the round: the ESML v2 test `test_example_notebook_executes_actual_in2silver_merge_and_mlflow_inference` depends on row order and fails about every second run. The same job on the same commit passed when run again. |
 | Kept files that name a removed file | 14 references, none of them a link that worked before. 11 are path mentions and consumer-side links in four v2 pages that still describe ESML v1 steps (pages 24, 32, 33 and 35), 2 are mentions in the architecture notes, and 1 is a false match in a test. Three links that did work were changed to point at `release/v1.24`. |
+| The same check a second time, against the base file list | Found what the first check missed after rounds 1 and 2: 13 links in two readme files (health model examples, tutorial installers) and 7 files that a kept document or a kept test still needs. Fixed: the 7 files are back, the 13 links point at `main`. Two image links in `documentation/v2/30-39` were already broken on `main` and stay as they are. |
+| Second, independent check of rounds 1 and 2 on `049b9d74` (cloud, Ubuntu) | All five tiers: none of the 9,424 tests that passed on the base fails; the same 166 fail on both; 3 cases left with their removed modules. All 25 Bicep entry files compile to the same ARM JSON as on the base, ignoring generator metadata and template hash. All 1,782 file references in 41 workflow and pipeline files resolve. A scratch repository with this branch as its submodule runs `01-start-v125-and-above.sh` offline, twice. |
+| The same checks on `2f15e6eb`, which has round 3 and the changes under "What got more robust" (cloud, Ubuntu) | All five tiers: 9,872 tests, 9,680 passed, 166 failed. None of the tests that passed on the base fails; the same 166 fail on both; 3 cases left with their removed modules and 259 are new. The 25 Bicep entry files still compile to the same ARM JSON as on the base. The 19 component suites give the same result as on the base, test by test: 8,953 tests, 8,674 passed, 94 failed, 70 errors. The scratch repository check passes with the three commands above. |
+| GitHub Actions on `2f15e6eb` | Green on Ubuntu and Windows (run 43579595936). |
 
 Not checked: no deployment to Azure was run from this branch. The checks are static analysis, compilation
 and the offline test suites.
@@ -165,8 +192,26 @@ v1.26 should contain.
 4. **The four named components stay whole:** Agent Factory, ML Model Factory, ESML v2 and the CLI. Their
    entry points do not reach every file in them.
 5. **The documentation site source,** `documentation/gh-io/` (35 MB). The site is published from `main`.
-6. **The tutorial guide's leftover files.** Its installers are removed; its manifest and distribution test
-   still name them.
+6. **The tutorial guide.** Its installers are removed and linked on `main`. The packaging scripts that its
+   distribution test checks were put back (6 files, 56 KB). If the tutorial guide should not be built from
+   this branch, remove the scripts, the test and the manifest together.
+
+## Not done
+
+No deployment to Azure was run from this branch. Beyond that:
+
+1. **Pipeline jobs still download `main` with the submodule,** 1,151 MB per job. Fetching only the pinned
+   commit is 208 MB in 15 s. It changes how every template checks out, so it needs a live run first.
+2. **The fixed waits under "Left alone on purpose".** Each needs a live proof of the condition to wait for.
+3. **Retries outside the common and project runs.** The gateway, dashboard and health model workflows are
+   not wired, and PowerShell and Python have no shared retry helper yet.
+4. **A soft-deleted Key Vault that blocks a project's vault name.** No step recovers or purges it.
+5. **Repeated `az account set`:** 43 times in a GitHub project job, 38 in the Azure DevOps one, about 30 s
+   per job. Left in, because each one protects a step against a subscription that an earlier step selected.
+6. **CLI start-up.** Lazy imports would save about 15 ms of 95 ms on Linux, and only for commands that
+   make no request.
+7. **The stage networking fix on `main`.** `infra-common.yml` line 907 there still has the space.
+8. **Wiring.** The Factory API and the configuration wizards do not offer 1.26 yet.
 
 ## How this branch was made
 
