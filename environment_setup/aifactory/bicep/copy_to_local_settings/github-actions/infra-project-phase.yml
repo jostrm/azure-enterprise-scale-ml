@@ -348,6 +348,8 @@ jobs:
       aifactoryAgentVoiceLanguages: ${{ vars.AIFACTORY_AGENT_VOICE_LANGUAGES || '' }}
       aifactoryAgentConfigFile: ${{ vars.AIFACTORY_AGENT_CONFIG_FILE || '' }}
       aifactoryAgentModelDeployment: ${{ vars.AIFACTORY_AGENT_MODEL_DEPLOYMENT || '' }}
+      aifactoryAgentFactoryId: ${{ vars.AIFACTORY_AGENT_FACTORY_ID || '' }}
+      aifactoryAgentScaleSetId: ${{ vars.AIFACTORY_AGENT_SCALE_SET_ID || '' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
       enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}

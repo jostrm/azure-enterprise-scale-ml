@@ -359,6 +359,14 @@ def test_agent_configuration_file_and_model_options_map_to_exact_variable_names(
     assert cli.configuration_changes(args) == {
         "aifactoryAgentConfigFile": "aifactory/agent/project012-dev.json", "aifactoryAgentModelDeployment": "agent-model"}
 
+
+def test_agent_usage_catalog_id_options_map_to_exact_variable_names():
+    factory, scale_set = "0b6f1c9e-8d0a-4e8f-9d43-1f2a3b4c5d6e", "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f"
+    args = cli.build_parser().parse_args([
+        "config", "review", *MCP_SCOPE, "--aifactory-agent-factory-id", factory,
+        "--aifactory-agent-scale-set-id", scale_set])
+    assert cli.configuration_changes(args) == {"aifactoryAgentFactoryId": factory, "aifactoryAgentScaleSetId": scale_set}
+
 def test_live_voice_options_sit_next_to_the_chat_agent_option_and_share_no_destination():
     args = cli.build_parser().parse_args([
         "config", "review", *MCP_SCOPE, "--enable-factory-chat-agent", "true",

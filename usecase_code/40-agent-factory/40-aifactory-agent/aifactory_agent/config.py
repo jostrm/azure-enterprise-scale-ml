@@ -111,6 +111,31 @@ class FactorySettings(ClosedModel):
     allowed_write_environments: list[Literal["dev", "stage", "prod"]] = Field(default_factory=lambda: ["dev"])
 
 
+CATALOG_ID = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+RESERVED_DIMENSIONS = {"all", "unknown", "unavailable"}
+
+
+class TelemetrySettings(ClosedModel):
+    """AI Factory catalog placement stamped on every aifactory.chat event (My Project "Usage & outcomes").
+
+    factory_id/scale_set_id are the registered catalog ids (default: factory.factory_id/scale_set_id),
+    project_number the 1-3 digit project number. Without all four, no chat event is emitted.
+    """
+
+    factory_id: str | None = Field(default=None, pattern=CATALOG_ID)
+    scale_set_id: str | None = Field(default=None, pattern=CATALOG_ID)
+    project_number: str | None = Field(default=None, pattern=r"^[0-9]{1,3}$")
+    environment: Literal["dev", "stage", "prod"] | None = None
+    store: str | None = Field(default=None, pattern=CATALOG_ID)
+
+    @field_validator("factory_id", "scale_set_id", "store")
+    @classmethod
+    def concrete_identity(cls, value):
+        if value is not None and value.lower() in RESERVED_DIMENSIONS:
+            raise ValueError("Telemetry dimensions must be concrete catalog identities.")
+        return value
+
+
 AZURE_CLI_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
 # Reviewed public clients that may call this API for the same user, audience and delegated scope.
 # Adding an entry is a security review decision: it also needs Entra pre-authorization (browser_auth.py).
@@ -150,6 +175,7 @@ class Settings(ClosedModel):
     costs: CostSettings = Field(default_factory=CostSettings)
     workloads: WorkloadSettings = Field(default_factory=WorkloadSettings)
     voice: VoiceSettings = Field(default_factory=VoiceSettings)
+    telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
     agent_name: str = Field(default="enterprise-scale-ai-factory", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,62}$")
     agent_version: str | None = None
     agent_invocation: Literal["project_reference", "agent_endpoint"] = "project_reference"

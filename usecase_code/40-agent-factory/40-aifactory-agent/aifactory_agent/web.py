@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from azure.core.exceptions import AzureError
 from fastapi import Depends, FastAPI, Query, Request
@@ -17,6 +17,7 @@ from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from . import security
+from .chat_events import ChatEvents
 from .config import Settings
 from .foundry import Conversation
 from .knowledge import IndexingError, Knowledge, OwnershipError
@@ -40,6 +41,9 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=8000)
     audience: Literal["platform", "project"]
     scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    # Random per-browser-session id (crypto.randomUUID) for aifactory.chat events; never derived from the user.
+    conversation_id: str | None = Field(
+        default=None, pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
     @field_validator("question")
     @classmethod
@@ -146,10 +150,12 @@ def get_readiness_knowledge(
     return services.knowledge() if _auth_configured(settings) else None
 
 
-def create_app(settings: Settings, *, services: AgentServices | None = None) -> FastAPI:
+def create_app(settings: Settings, *, services: AgentServices | None = None,
+               chat_events: ChatEvents | None = None) -> FastAPI:
     app = FastAPI(title="Enterprise Scale AI Factory Agent", docs_url=None, redoc_url=None,
                   openapi_url=None, debug=False)
     app.state.settings = settings
+    app.state.chat_events = chat_events if chat_events is not None else ChatEvents.from_settings(settings)
     if services is not None and services.settings != settings:
         raise ValueError("Injected agent services must match this application's settings.")
     if services is None:
@@ -334,12 +340,14 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
     @app.post("/api/chat")
     def chat(
         body: ChatRequest,
+        request: Request,
         principal: Annotated[Principal, Depends(get_principal)],
         current: Annotated[Settings, Depends(get_settings)],
         knowledge: Annotated[Knowledge, Depends(get_knowledge)],
         services: Annotated[AgentServices, Depends(get_services)],
     ):
         authorize(current, principal, body.scope_key, "knowledge.read")
+        request.app.state.chat_events.question(UUID(body.conversation_id).hex if body.conversation_id else uuid4().hex)
         return services.conversation(knowledge).answer(body.question, body.audience, principal, body.scope_key)
 
     @app.get("/api/knowledge/status")

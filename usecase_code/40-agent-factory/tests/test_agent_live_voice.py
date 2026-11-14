@@ -43,7 +43,10 @@ VALUES = {
     "modelGPTXName": MODEL, "aifactoryAgentEntraAppId": APP, "aifactoryAgentReaderObjectIds": f"{READER_A}, {READER_B}",
     "aifactoryAgentContainerAppsEnvironment": "", "aifactoryAgentVoiceName": "", "aifactoryAgentVoiceLanguages": "",
     "aifactoryAgentConfigFile": "", "aifactoryAgentModelDeployment": "",
+    "aifactoryAgentFactoryId": "", "aifactoryAgentScaleSetId": "",
 }
+FACTORY_ID = "0b6f1c9e-8d0a-4e8f-9d43-1f2a3b4c5d6e"
+SCALE_SET_ID = "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f"
 # A customer's own agent configuration (what an operator would otherwise pass to 40-aifactory-agent/deploy.py).
 OVERLAY = {
     "max_tool_rounds": 6,
@@ -230,6 +233,11 @@ def test_dependencies_are_validated_not_ignored(missing):
     ({"modelGPTXName": "bad name!"}, "modelGPTXName"),
     ({"aifactoryAgentVoiceName": "bad;voice"}, "aifactoryAgentVoiceName"),
     ({"aifactoryAgentVoiceLanguages": "not a locale"}, "aifactoryAgentVoiceLanguages"),
+    ({"aifactoryAgentFactoryId": "all"}, "aifactoryAgentFactoryId"),
+    ({"aifactoryAgentFactoryId": "has space"}, "aifactoryAgentFactoryId"),
+    ({"aifactoryAgentScaleSetId": "Unknown"}, "aifactoryAgentScaleSetId"),
+    ({"aifactoryAgentFactoryId": FACTORY_ID}, "aifactoryAgentScaleSetId"),
+    ({"aifactoryAgentScaleSetId": SCALE_SET_ID}, "aifactoryAgentFactoryId"),
     ({"dev_test_prod_sub_id": "x"}, "dev_test_prod_sub_id"),
     ({"tenantId": ""}, "tenantId"),
     ({"admin_location": ""}, "admin_location"),
@@ -347,6 +355,8 @@ def test_the_customer_configuration_overlays_the_generated_baseline():
     ({"knowledge": {"repository_root": "/x"}}, "knowledge.repository_root"),
     ({"workloads": {"repository_root": "/x"}}, "workloads.repository_root"),
     ({"voice": {"enabled": False}}, "voice.enabled"), ([], "JSON object"),
+    ({"telemetry": {"project_number": "002"}}, "telemetry.project_number"),
+    ({"telemetry": {"environment": "prod"}}, "telemetry.environment"),
 ])
 def test_the_customer_configuration_cannot_replace_identity_scope_or_discovered_resources(overlay, key):
     with pytest.raises(ValueError, match=key.replace(".", r"\.")):
@@ -405,6 +415,25 @@ def test_the_voice_block_follows_the_optional_overrides():
     assert render()["voice"] == {"enabled": True, "voice_name": "en-US-Ava:DragonHDLatestNeural", "input_languages": ["en-US"]}
     swedish = render(aifactoryAgentVoiceName="sv-SE-SofieNeural", aifactoryAgentVoiceLanguages="sv-SE, en-US")["voice"]
     assert swedish["voice_name"] == "sv-SE-SofieNeural" and swedish["input_languages"] == ["sv-SE", "en-US"]
+
+
+def test_chat_usage_events_carry_the_catalog_placement_only_when_the_catalog_ids_are_given():
+    pytest.importorskip("pydantic")
+    from aifactory_agent.config import Settings
+    assert render()["telemetry"] == {"project_number": "001", "environment": "dev"}, "no guessed catalog ids"
+    config = render(aifactoryAgentFactoryId=FACTORY_ID, aifactoryAgentScaleSetId=SCALE_SET_ID)
+    assert config["telemetry"] == {"factory_id": FACTORY_ID, "scale_set_id": SCALE_SET_ID,
+                                   "project_number": "001", "environment": "dev"}
+    assert Settings.model_validate(config).telemetry.factory_id == FACTORY_ID
+    target = live.discover(FakeArm(), request())
+    twelve = live.render_config(request(project_number_000="012"), target, repository_root=Path("/work/checkout"))
+    assert twelve["telemetry"]["project_number"] == "012"
+    customer = replace(request(), config_overlay={"telemetry": {"factory_id": FACTORY_ID, "scale_set_id": SCALE_SET_ID,
+                                                                "store": "store-a"}})
+    live.decide(customer)
+    overlaid = live.render_config(customer, target, repository_root=Path("/work/checkout"))
+    assert Settings.model_validate(overlaid).telemetry.store == "store-a"
+    assert overlaid["telemetry"]["project_number"] == "001"
 
 
 # ---- orchestration ---------------------------------------------------------------------------------------------

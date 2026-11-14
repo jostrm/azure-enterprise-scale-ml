@@ -187,6 +187,12 @@ Report/export outputs contain aggregates, not raw device or conversation IDs.
 Exact distinct/funnel reporting requires unsampled business events. Sampled
 events cannot be repaired by multiplying distinct counts by `ItemCount`.
 
+The **AI Factory Agent chat** (`usecase_code/40-agent-factory/40-aifactory-agent`) emits this contract itself:
+one `kind: "question"` per authorized text or spoken question, with `factory`/`scaleset` set to the registered
+catalog IDs, `project` to the project number and `environment` from its `telemetry` settings
+(`aifactoryAgentFactoryId` / `aifactoryAgentScaleSetId` in the live voice pipeline). Without those IDs it sends
+nothing. It sends no feedback events (its thumbs are local only) and no `device_id`.
+
 ### API and CLI
 
 The existing authenticated Python API exposes:

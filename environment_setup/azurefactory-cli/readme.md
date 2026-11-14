@@ -805,6 +805,8 @@ is merged with `--changes-json`, and a disagreeing value in that file is a
 | `--aifactory-agent-voice-languages` | `aifactoryAgentVoiceLanguages` | comma-separated BCP-47 input languages such as `sv-SE,en-US`, or empty (`en-US`) |
 | `--aifactory-agent-config-file` | `aifactoryAgentConfigFile` | your agent configuration JSON relative to the repository root, or empty |
 | `--aifactory-agent-model-deployment` | `aifactoryAgentModelDeployment` | the agent's own Foundry model deployment, or empty (`modelGPTXName`) |
+| `--aifactory-agent-factory-id` | `aifactoryAgentFactoryId` | registered catalog factory id for chat usage events (`aifactory.chat`), or empty (no events) |
+| `--aifactory-agent-scale-set-id` | `aifactoryAgentScaleSetId` | registered catalog scale set id for chat usage events, set with the factory id, or empty |
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `

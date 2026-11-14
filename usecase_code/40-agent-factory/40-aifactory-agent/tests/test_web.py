@@ -579,6 +579,55 @@ def test_unexpected_error_is_generic_500_without_exception_body(authenticated, m
         assert response.headers["referrer-policy"] == "no-referrer"
 
 
+PLACEMENT = {"factory_id": "0b6f1c9e-8d0a-4e8f-9d43-1f2a3b4c5d6e", "scale_set_id": "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+             "project_number": "001", "environment": "dev"}
+
+
+def test_each_authorized_question_emits_one_pseudonymous_chat_event(authenticated, monkeypatch):
+    from aifactory_agent.chat_events import ChatEvents
+
+    app, _, _ = authenticated
+    sink = []
+    current = app.state.settings.model_copy(update={"telemetry": app.state.settings.telemetry.model_copy(update=PLACEMENT)})
+    app.state.chat_events = ChatEvents.from_settings(current, sink=sink.append)
+    monkeypatch.setattr(web, "Conversation", Mock(return_value=Mock(answer=Mock(return_value={"answer": "Mocked"}))))
+    conversation = "8a6e0804-2bd0-4672-b79d-d97027f9071b"
+    question = "Why is jane.doe@contoso.com blocked on 10.0.0.1?"
+    with TestClient(app) as client:
+        assert client.post("/api/chat", json={
+            "question": question, "audience": "project", "scope_key": "project001-dev", "conversation_id": conversation,
+        }).status_code == 200
+        assert client.post("/api/chat", json={
+            "question": question, "audience": "project", "scope_key": "project002-dev", "conversation_id": conversation,
+        }).status_code == 403
+        for invalid in ("jane.doe@contoso.com", "conversation-1", "", 7):
+            assert client.post("/api/chat", json={
+                "question": question, "audience": "project", "scope_key": "project001-dev", "conversation_id": invalid,
+            }).status_code == 422
+        assert client.post("/api/chat", json={
+            "question": question, "audience": "project", "scope_key": "project001-dev",
+        }).status_code == 200
+    assert len(sink) == 2
+    first, second = sink
+    assert first["kind"] == "question" and first["conversation_id"] == UUID(conversation).hex
+    assert (first["factory"], first["scaleset"], first["project"], first["environment"]) == tuple(PLACEMENT.values())
+    assert re.fullmatch(r"[0-9a-f]{32}", second["conversation_id"]) and second["conversation_id"] != first["conversation_id"]
+    for event in sink:
+        assert not any(part in value for value in event.values() for part in ("jane", "contoso", "10.0.0.1", OBJECT_ID))
+        assert "question" not in event and "device_id" not in event
+
+
+def test_the_app_builds_its_chat_events_from_settings(settings):
+    from aifactory_agent.chat_events import ChatEvents
+
+    app = web.create_app(settings)
+    assert isinstance(app.state.chat_events, ChatEvents) and app.state.chat_events.enabled is False
+    placed = settings.model_copy(update={"telemetry": settings.telemetry.model_copy(update=PLACEMENT)})
+    assert web.create_app(placed).state.chat_events.enabled is True
+    injected = ChatEvents(None)
+    assert web.create_app(settings, chat_events=injected).state.chat_events is injected
+
+
 def test_security_headers_csp_and_frontend_assets(isolated):
     app, _, _ = isolated
     with TestClient(app) as client:
@@ -1298,6 +1347,9 @@ async function consent() {
         assert(ui("citations").textContent.includes("HISTORICAL RELEASE NOTE"));
         assert(!descendants(ui("citations")).some(child => child.tagName === "a"));
         assert.equal(ui("source-S1").tagName, "li");
+        const chatBody = JSON.parse(calls.find(call => call.url === "/api/chat").body);
+        assert.deepEqual(Object.keys(chatBody).sort(), ["audience", "conversation_id", "question", "scope_key"]);
+        assert.match(chatBody.conversation_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
         if (mode.startsWith("voice-")) {
           const submitted = calls.find(call => call.url === "/api/chat");
           assert.equal(submitted.options.headers.Authorization,

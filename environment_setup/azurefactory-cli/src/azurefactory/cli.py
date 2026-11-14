@@ -132,6 +132,10 @@ LIVE_VOICE_OPTIONS = (
      "Your own agent configuration (JSON, relative to the repository root) merged over the generated one; empty uses none."),
     ("--aifactory-agent-model-deployment", "aifactoryAgentModelDeployment", None,
      "Foundry model deployment used by the agent; empty uses modelGPTXName."),
+    ("--aifactory-agent-factory-id", "aifactoryAgentFactoryId", None,
+     "Registered catalog factory id for the agent chat usage events (aifactory.chat); empty sends none."),
+    ("--aifactory-agent-scale-set-id", "aifactoryAgentScaleSetId", None,
+     "Registered catalog scale set id for the agent chat usage events (aifactory.chat); empty sends none."),
 )
 DEDICATED_OPTIONS = (("mcp_gateway", MCP_GATEWAY_OPTIONS), ("live_voice", LIVE_VOICE_OPTIONS))
 

@@ -24,6 +24,8 @@ INPUTS = {
     "aifactoryAgentVoiceLanguages": "AIFACTORY_AGENT_VOICE_LANGUAGES",
     "aifactoryAgentConfigFile": "AIFACTORY_AGENT_CONFIG_FILE",
     "aifactoryAgentModelDeployment": "AIFACTORY_AGENT_MODEL_DEPLOYMENT",
+    "aifactoryAgentFactoryId": "AIFACTORY_AGENT_FACTORY_ID",
+    "aifactoryAgentScaleSetId": "AIFACTORY_AGENT_SCALE_SET_ID",
 }
 VARIABLES_JSON = REPO_ROOT / "environment_setup/aifactory/variables.json"
 

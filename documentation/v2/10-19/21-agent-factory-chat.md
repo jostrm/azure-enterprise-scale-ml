@@ -143,7 +143,7 @@ as options. They save but never deploy, and they do not work on a v1.25 `azurefa
 [CLI options](../../../environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-any-project-dev).
 
 Where the settings live in the wizards (Simple Mode and the exported `variables.json`, `variables.yaml` and `.env`
-carry the same nine settings side by side):
+carry the same eleven settings side by side):
 
 - **ESAIF ConfigWizard (MAUI app):** step 6, **AI Factory Agent chat & live voice**, right after *MCP & AI Gateway*,
   and the same section in the Simple Mode card. A flag without its prerequisites stops the review with a plain reason;

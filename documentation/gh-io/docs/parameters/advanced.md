@@ -397,18 +397,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 411 |
-| `env` | 409 |
+| `yaml` | 413 |
+| `env` | 411 |
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 419 |
+| `json.dev` | 421 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 159, 435; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 160, 436; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 437, 461; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 159, 437; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 160, 438; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 439, 463; one reference row.
 
 ## YAML and variables.json reference
 
@@ -549,7 +549,9 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aifactoryAgentConfigFile --><!-- parameter json.dev:aifactoryAgentConfigFile -->`aifactoryAgentConfigFile` | `AIFACTORY_AGENT_CONFIG_FILE` | O | Y: `""`<br>J.dev: `""` | Your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryAgentContainerAppsEnvironment --><!-- parameter json.dev:aifactoryAgentContainerAppsEnvironment -->`aifactoryAgentContainerAppsEnvironment` | `AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter yaml:aifactoryAgentEntraAppId --><!-- parameter json.dev:aifactoryAgentEntraAppId -->`aifactoryAgentEntraAppId` | `AIFACTORY_AGENT_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph. |
+| <!-- parameter yaml:aifactoryAgentFactoryId --><!-- parameter json.dev:aifactoryAgentFactoryId -->`aifactoryAgentFactoryId` | `AIFACTORY_AGENT_FACTORY_ID` | O | Y: `""`<br>J.dev: `""` | Registered AI Factory catalog factory id stamped on the agent chat usage events (aifactory.chat) for My Project Usage & outcomes keep-as-is: Set together with aifactoryAgentScaleSetId (azurefactory catalog). Empty sends no usage events: dimensions are never guessed. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryAgentReaderObjectIds --><!-- parameter json.dev:aifactoryAgentReaderObjectIds -->`aifactoryAgentReaderObjectIds` | `AIFACTORY_AGENT_READER_OBJECT_IDS` | C | Y: `""`<br>J.dev: `""` | Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline. |
+| <!-- parameter yaml:aifactoryAgentScaleSetId --><!-- parameter json.dev:aifactoryAgentScaleSetId -->`aifactoryAgentScaleSetId` | `AIFACTORY_AGENT_SCALE_SET_ID` | O | Y: `""`<br>J.dev: `""` | Registered AI Factory catalog scale set id stamped on the agent chat usage events (aifactory.chat) for My Project Usage & outcomes keep-as-is: Set together with aifactoryAgentFactoryId. Empty sends no usage events. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages -->`aifactoryAgentVoiceLanguages` | `AIFACTORY_AGENT_VOICE_LANGUAGES` | O | Y: `""`<br>J.dev: `""` | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryAgentVoiceName --><!-- parameter json.dev:aifactoryAgentVoiceName -->`aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | O | Y: `""`<br>J.dev: `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage -->`aifactoryMcpApiImage` | `AIFACTORY_MCP_API_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
@@ -890,7 +892,9 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AIFACTORY_AGENT_CONFIG_FILE -->`AIFACTORY_AGENT_CONFIG_FILE` | `aifactoryAgentConfigFile` | O | `""` | aifactoryAgentConfigFile: your own AI Factory Agent configuration (JSON, relative to the repository root, e.g. aifactory/agent/project001-dev.json) merged over the generated one keep-as-is: Tunes voice (realtime mode, languages), grants, costs and limits; never scopes, azure, location or the Entra client. Required to let the pipeline manage an app first deployed with 40-aifactory-agent/deploy.py. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT -->`AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | `aifactoryAgentContainerAppsEnvironment` | O | `""` | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter env:AIFACTORY_AGENT_ENTRA_APP_ID -->`AIFACTORY_AGENT_ENTRA_APP_ID` | `aifactoryAgentEntraAppId` | C | `""` | Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph. |
+| <!-- parameter env:AIFACTORY_AGENT_FACTORY_ID -->`AIFACTORY_AGENT_FACTORY_ID` | `aifactoryAgentFactoryId` | O | `""` | aifactoryAgentFactoryId: registered AI Factory catalog factory id stamped on the agent chat usage events (aifactory.chat) for My Project Usage & outcomes keep-as-is: Set together with AIFACTORY_AGENT_SCALE_SET_ID (azurefactory catalog). Empty sends no usage events: dimensions are never guessed. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_AGENT_READER_OBJECT_IDS -->`AIFACTORY_AGENT_READER_OBJECT_IDS` | `aifactoryAgentReaderObjectIds` | C | `""` | Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in this project's Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline. |
+| <!-- parameter env:AIFACTORY_AGENT_SCALE_SET_ID -->`AIFACTORY_AGENT_SCALE_SET_ID` | `aifactoryAgentScaleSetId` | O | `""` | aifactoryAgentScaleSetId: registered AI Factory catalog scale set id stamped on the agent chat usage events (aifactory.chat) for My Project Usage & outcomes keep-as-is: Set together with AIFACTORY_AGENT_FACTORY_ID. Empty sends no usage events. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_AGENT_VOICE_LANGUAGES -->`AIFACTORY_AGENT_VOICE_LANGUAGES` | `aifactoryAgentVoiceLanguages` | O | `""` | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_AGENT_VOICE_NAME -->`AIFACTORY_AGENT_VOICE_NAME` | `aifactoryAgentVoiceName` | O | `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_BRANCH_CHOSEN -->`AIFACTORY_BRANCH_CHOSEN` | `aifactory_branch_chosen` | O | `"release/v1.24"` | Submodule release branch |

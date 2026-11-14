@@ -26,6 +26,8 @@ INPUTS = {
     "aifactoryAgentVoiceLanguages": "AIFACTORY_AGENT_VOICE_LANGUAGES",
     "aifactoryAgentConfigFile": "AIFACTORY_AGENT_CONFIG_FILE",
     "aifactoryAgentModelDeployment": "AIFACTORY_AGENT_MODEL_DEPLOYMENT",
+    "aifactoryAgentFactoryId": "AIFACTORY_AGENT_FACTORY_ID",
+    "aifactoryAgentScaleSetId": "AIFACTORY_AGENT_SCALE_SET_ID",
 }
 JOB = ADO_ROOT / "esml-infra-project" / "jobs" / "job-aifactory-agent-live-voice.yaml"
 LAUNCHER = REPO_ROOT / "usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py"

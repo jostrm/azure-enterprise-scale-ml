@@ -1211,6 +1211,21 @@ Closing a progress feed does not cancel a job.
   `azure.application_insights_connection_string`. Capture health, retrieval/tool
   errors, latency and model token usage without prompt bodies or credentials.
   Container Apps startup/application logs remain available in Azure.
+- **Chat usage events (`aifactory.chat`)** feed the My Project **Usage & outcomes** report. With
+  `azure.application_insights_connection_string` set (deploy.py resolves it from `azure.application_insights_name`),
+  the app sends one Application Insights custom event per authorized question (text chat and each spoken turn),
+  emitted in one place: `aifactory_agent/chat_events.py`. Properties are strings only:
+  `event_id`, `factory`, `scaleset`, `project`, `environment`, `kind`, optional `store`, and for
+  `kind=question` `conversation_id` and `question_id` (optional pseudonymous `device_id`, not sent today).
+  `kind=feedback` (`conversation_id`, `question_id`, `rating` = `up`/`down`) is supported by the emitter but not
+  sent: the chat's thumbs are local only. IDs are random 32-hex values; question/answer text, names, emails, IPs
+  and Entra object IDs are never sent. The placement comes from the `telemetry` settings section:
+  `factory_id` and `scale_set_id` (registered catalog IDs; default `factory.factory_id`/`factory.scale_set_id`),
+  `project_number` (1-3 digits), `environment` (`dev`/`stage`/`prod`) and optional `store`. The live voice pipeline
+  writes `project_number` and `environment`, and the catalog IDs from `aifactoryAgentFactoryId` /
+  `aifactoryAgentScaleSetId`. If any of the four is missing, no event is sent and one warning is logged.
+  Events are never sampled (log records carry no sample rate; `enable_trace_based_sampling_for_logs=False`), so
+  each row has `ItemCount` 1. Keep ingestion sampling off on the Application Insights resource.
 - For access failures, inspect the exact requesting user grant, token audience,
   service-role propagation, private DNS and the active scope. Do not enable
   public access or grant Contributor as a shortcut.

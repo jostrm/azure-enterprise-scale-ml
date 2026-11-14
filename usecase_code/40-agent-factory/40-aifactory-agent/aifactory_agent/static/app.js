@@ -38,6 +38,8 @@
     hostAccount: "",
     hostIssuanceId: "",
     hostRejected: false,
+    // Random id per signed-in browser session for aifactory.chat usage events; never derived from the user.
+    conversationId: "",
     hostRenewal: null,
     hostNextRenewalAt: 0,
   };
@@ -376,6 +378,7 @@
     state.expiresAt = 0;
     state.context = null;
     state.hostIssuanceId = "";
+    state.conversationId = "";
     state.operations = [];
     state.skills = [];
     state.skillBusy = false;
@@ -864,8 +867,10 @@
     updateControls();
     ui("request-status").textContent = "Retrieving scoped evidence and waiting for a completed answer…";
     try {
+      if (!state.conversationId && globalThis.crypto?.randomUUID) state.conversationId = globalThis.crypto.randomUUID();
       const result = await api("/api/chat", {method: "POST", body: {
         question, audience: submittedView, scope_key: submittedScope,
+        ...(state.conversationId ? {conversation_id: state.conversationId} : {}),
       }});
       showAnswer(result);
       await refresh();

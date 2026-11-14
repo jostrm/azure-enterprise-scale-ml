@@ -44,7 +44,8 @@ OWNER_TAG = "enterprise-scale-ai-factory-agent"
 PROJECT_NUMBER = re.compile(r"^(?!000)\d{3}$")
 # Customer configuration may tune the application but never its identity, scope, discovered resources or voice switch.
 RESERVED_OVERLAY_KEYS = ("scopes", "azure", "location", "auth.client_id", "auth.audience",
-                         "knowledge.repository_root", "workloads.repository_root", "voice.enabled")
+                         "knowledge.repository_root", "workloads.repository_root", "voice.enabled",
+                         "telemetry.project_number", "telemetry.environment")
 DEFAULT_VOICE = "en-US-Ava:DragonHDLatestNeural"
 DEFAULT_LANGUAGE = "en-US"
 READ_ONLY_PERMISSIONS = ["knowledge.read", "factory.read"]
@@ -54,6 +55,9 @@ COGNITIVE_API = "2025-06-01"
 APPS_API = "2025-01-01"
 VOICE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
 LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+# AI Factory catalog ids (registered factory / scale set) stamped on aifactory.chat usage events.
+CATALOG_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+RESERVED_DIMENSIONS = {"all", "unknown", "unavailable"}
 
 STORAGE_CONTAINER = "aifactory-agent"  # the agent's own container (knowledge state, deployment bundles)
 
@@ -121,6 +125,8 @@ class LiveVoiceRequest:
     voice_name: str = ""
     voice_languages: tuple[str, ...] = ()
     config_file: str = ""
+    factory_id: str = ""
+    scale_set_id: str = ""
     config_overlay: object = field(default_factory=dict, compare=False)
 
     @classmethod
@@ -152,6 +158,8 @@ class LiveVoiceRequest:
             voice_name=_text(get("aifactoryAgentVoiceName")),
             voice_languages=_list(get("aifactoryAgentVoiceLanguages"), fold=False),
             config_file=_text(get("aifactoryAgentConfigFile")),
+            factory_id=_text(get("aifactoryAgentFactoryId")),
+            scale_set_id=_text(get("aifactoryAgentScaleSetId")),
         )
 
 
@@ -231,6 +239,13 @@ def decide(request: LiveVoiceRequest) -> Decision:
         problems.append("aifactoryAgentVoiceName must be an Azure Speech voice name such as en-US-Ava:DragonHDLatestNeural")
     if len(request.voice_languages) > 10 or not all(LANGUAGE.fullmatch(item) for item in request.voice_languages):
         problems.append("aifactoryAgentVoiceLanguages must be up to 10 comma-separated BCP-47 codes such as sv-SE,en-US")
+    catalog = (("aifactoryAgentFactoryId", request.factory_id), ("aifactoryAgentScaleSetId", request.scale_set_id))
+    for name, value in catalog:
+        if value and (not CATALOG_ID.fullmatch(value) or value.lower() in RESERVED_DIMENSIONS):
+            problems.append(f"{name} must be the registered AI Factory catalog id (for example a GUID)")
+    if bool(request.factory_id) != bool(request.scale_set_id):
+        missing = next(name for name, value in catalog if not value)
+        problems.append(f"{missing} is required together with the other catalog id (chat usage events need both)")
     for name, value in (("dev_test_prod_sub_id", request.subscription_id), ("tenantId", request.tenant_id)):
         if not GUID.fullmatch(value):
             problems.append(f"{name} must be a GUID")
@@ -415,6 +430,10 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
                             for object_id in request.reader_object_ids]},
         "voice": {"enabled": True, "voice_name": request.voice_name or DEFAULT_VOICE,
                   "input_languages": list(request.voice_languages) or [DEFAULT_LANGUAGE]},
+        # aifactory.chat placement; without both catalog ids (variables or customer overlay) no usage event is sent.
+        "telemetry": {**({"factory_id": request.factory_id, "scale_set_id": request.scale_set_id}
+                         if request.factory_id and request.scale_set_id else {}),
+                      "project_number": request.project_number, "environment": ENVIRONMENT},
     }
     problems = _overlay_problems(request.config_overlay)
     if problems:

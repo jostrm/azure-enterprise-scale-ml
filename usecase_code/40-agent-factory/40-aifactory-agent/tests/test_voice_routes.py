@@ -343,6 +343,50 @@ def test_a_governed_spoken_turn_uses_the_token_principal_the_hello_scope_and_the
     assert spoken["response"]["pre_generated_assistant_message"]["content"][0]["text"] == "Open the wizard."
 
 
+def test_each_spoken_question_emits_one_chat_event_in_the_voice_session_conversation(app, conversation):
+    from aifactory_agent.chat_events import ChatEvents
+
+    sink = []
+    current = app.state.settings
+    placement = {"factory_id": "0b6f1c9e-8d0a-4e8f-9d43-1f2a3b4c5d6e", "scale_set_id": "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+                 "project_number": "001", "environment": "dev"}
+    placed = current.model_copy(update={
+        "telemetry": current.telemetry.model_copy(update=placement),
+        "azure": current.azure.model_copy(update={"application_insights_connection_string": "InstrumentationKey=x"}),
+    })
+    app.state.chat_events = ChatEvents.from_settings(placed, sink=sink.append)
+    with TestClient(app) as client, client.websocket_connect("/api/voice/ws") as socket:
+        socket.send_text(hello())
+        collect(socket, got("ready"))
+        socket.send_bytes(PCM)
+        collect(socket, lambda seen: states(seen)[-2:] == ["speaking", "listening"])
+        socket.send_text(json.dumps({"type": "end"}))
+        collect(socket, ended)
+    assert len(conversation.calls) == 1 and len(sink) == 1
+    event = sink[0]
+    assert event["kind"] == "question" and event["project"] == "001"
+    assert len(event["conversation_id"]) == 32 and int(event["conversation_id"], 16) >= 0
+    assert not {OBJECT_ID, OBJECT_ID.replace("-", ""), "How do I add a project?"} & set(event.values())
+
+
+def test_native_voice_questions_share_the_session_conversation():
+    from aifactory_agent.chat_events import ChatEvents
+    from test_conversation import caller, injected
+
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini")
+    harness = injected(settings)
+    app = build(settings, harness.conversation, FakeGateway())
+    sink = []
+    app.state.chat_events = ChatEvents({"factory": "f", "scaleset": "s", "project": "001", "environment": "dev"},
+                                       sink=sink.append)
+    session = "0123456789abcdef0123456789abcdef"
+    prepare, _ = voice_routes._native_handlers(app, caller(settings), "project001-dev", "project", conversation_id=session)
+    anyio.run(prepare, "Explain setup")
+    anyio.run(prepare, "And the network?")
+    assert [event["conversation_id"] for event in sink] == [session, session]
+    assert sink[0]["question_id"] != sink[1]["question_id"]
+
+
 @pytest.mark.parametrize("refresh_status", ["blocked", "failed", "refreshing", "ready"])
 def test_spoken_answer_preserves_last_successful_knowledge_warning(app, conversation, refresh_status):
     answer = conversation.answer

@@ -109,6 +109,8 @@ and then deploys them.
 | `aifactoryAgentVoiceName` | Sets the voice. Empty uses `en-US-Ava:DragonHDLatestNeural`. |
 | `aifactoryAgentVoiceLanguages` | Lists the input languages. Empty uses `en-US`; Swedish needs `sv-SE,en-US`. |
 | `aifactoryAgentConfigFile` | Points to your own agent configuration file in your repository. It's merged over the generated one. |
+| `aifactoryAgentFactoryId` | Sets the registered catalog factory ID for chat usage events (`aifactory.chat`, My Project **Usage & outcomes**). Empty sends no events. |
+| `aifactoryAgentScaleSetId` | Sets the registered catalog scale set ID for chat usage events. Set it together with `aifactoryAgentFactoryId`. |
 
 </details>
 

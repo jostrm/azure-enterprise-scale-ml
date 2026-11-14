@@ -27,6 +27,7 @@ with a GPT realtime model such as `gpt-realtime-mini`) is explained in
 | `aifactoryAgentVoiceName` | Speech voice; empty uses `en-US-Ava:DragonHDLatestNeural`. |
 | `aifactoryAgentVoiceLanguages` | Comma-separated BCP-47 input languages; empty uses `en-US`. Swedish needs `sv-SE,en-US`. |
 | `aifactoryAgentConfigFile` | Optional: your own agent configuration, a JSON file relative to the repository root (for example `aifactory/agent/project001-dev.json`), merged over the generated one. See below. |
+| `aifactoryAgentFactoryId`, `aifactoryAgentScaleSetId` | Optional, set both: the registered AI Factory catalog factory and scale set IDs for the chat usage events (`aifactory.chat`, My Project **Usage & outcomes**). The step writes them with the project number and `dev` to the app's `telemetry` settings. Empty sends no usage events (dimensions are never guessed); a customer configuration may set `telemetry.factory_id`, `telemetry.scale_set_id` and `telemetry.store` instead. |
 
 ## Rules
 

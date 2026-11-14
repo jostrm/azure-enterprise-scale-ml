@@ -47,3 +47,5 @@ steps:
       aifactoryAgentVoiceLanguages: '$(aifactoryAgentVoiceLanguages)'
       aifactoryAgentConfigFile: '$(aifactoryAgentConfigFile)'
       aifactoryAgentModelDeployment: '$(aifactoryAgentModelDeployment)'
+      aifactoryAgentFactoryId: '$(aifactoryAgentFactoryId)'
+      aifactoryAgentScaleSetId: '$(aifactoryAgentScaleSetId)'

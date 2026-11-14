@@ -23,6 +23,8 @@ def configure(settings):
         configure_azure_monitor(
             connection_string=connection, logger_name="aifactory_agent",
             disable_offline_storage=True,
+            # aifactory.chat custom events are counted 1:1 by My Project "Usage & outcomes": never sample logs.
+            enable_trace_based_sampling_for_logs=False,
             instrumentation_options={
                 "azure_sdk": {"enabled": False}, "httpx": {"enabled": False},
                 "requests": {"enabled": False}, "urllib": {"enabled": False},

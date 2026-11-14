@@ -296,6 +296,8 @@
     "aifactoryAgentVoiceLanguages": "",
     "aifactoryAgentConfigFile": "",
     "aifactoryAgentModelDeployment": "",
+    "aifactoryAgentFactoryId": "",
+    "aifactoryAgentScaleSetId": "",
     "enableAppInsightsDashboard": "false",
     "enableApplicationInsights": "true",
     "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",

@@ -36,6 +36,7 @@ INPUTS = (
     "projectSuffix", "projectResourceGroup", "modelGPTXName", "aifactoryAgentEntraAppId",
     "aifactoryAgentContainerAppsEnvironment", "aifactoryAgentReaderObjectIds", "aifactoryAgentVoiceName",
     "aifactoryAgentVoiceLanguages", "aifactoryAgentConfigFile", "aifactoryAgentModelDeployment",
+    "aifactoryAgentFactoryId", "aifactoryAgentScaleSetId",
 )
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
