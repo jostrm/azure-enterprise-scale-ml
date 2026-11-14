@@ -297,10 +297,6 @@ jobs:
           set -euo pipefail
           # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
-          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
-          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
-          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
-          echo "::add-mask::$admin_password"
           subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
           {
             # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
@@ -317,8 +313,6 @@ jobs:
             echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
             echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
             echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
-            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
-            echo "TF_VAR_admin_password=$admin_password"
             echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
             # Provider and backend authentication: the same identity azure/login used.
             echo "ARM_SUBSCRIPTION_ID=$subscription"
@@ -343,8 +337,9 @@ jobs:
           for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
             if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
           done
-          # One state per factory and environment: the common resource group name is unique per factory,
-          # scale set and environment (13-rgLevel commonResourceGroupName).
+          # One state per factory and environment: subscription, common resource group (13-rgLevel
+          # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
+          # still gives each environment its own state.
           common_rg="${commonResourceGroup_param:-}"
           if [ -z "$common_rg" ]; then
             common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
@@ -354,7 +349,7 @@ jobs:
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
             -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
             -backend-config="container_name=$TFSTATE_CONTAINER"
-            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="key=aifactory/${ARM_SUBSCRIPTION_ID}/$common_rg/${{ env.dev_test_prod }}/esml-common.tfstate"
             -backend-config="use_azuread_auth=true"
           )
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
@@ -365,10 +360,24 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
+          # "existing": that would plan its destroy.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          managed="$(terraform -chdir="$TF_ROOT" state list 2>/dev/null || true)"
+          if grep -qxF 'module.stage_13.module.vmPrivate[0].azapi_resource.virtual_machine[0]' <<< "$managed"; then
+            admin_vm_exists=false
+          fi
+          export TF_VAR_admin_vm_exists="$admin_vm_exists"
+          # The local admin password exists only in this step (write-only in the VM request, never in state).
+          TF_VAR_admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$TF_VAR_admin_password"
+          export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
           aif_tf_plan_apply() {
-            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            rm -f "$TF_ROOT/tfplan"
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
           trap 'rm -f "$TF_ROOT/tfplan"' EXIT
@@ -650,10 +659,6 @@ jobs:
           set -euo pipefail
           # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
-          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
-          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
-          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
-          echo "::add-mask::$admin_password"
           subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
           {
             # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
@@ -670,8 +675,6 @@ jobs:
             echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
             echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
             echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
-            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
-            echo "TF_VAR_admin_password=$admin_password"
             echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
             # Provider and backend authentication: the same identity azure/login used.
             echo "ARM_SUBSCRIPTION_ID=$subscription"
@@ -696,8 +699,9 @@ jobs:
           for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
             if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
           done
-          # One state per factory and environment: the common resource group name is unique per factory,
-          # scale set and environment (13-rgLevel commonResourceGroupName).
+          # One state per factory and environment: subscription, common resource group (13-rgLevel
+          # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
+          # still gives each environment its own state.
           common_rg="${commonResourceGroup_param:-}"
           if [ -z "$common_rg" ]; then
             common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
@@ -707,7 +711,7 @@ jobs:
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
             -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
             -backend-config="container_name=$TFSTATE_CONTAINER"
-            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="key=aifactory/${ARM_SUBSCRIPTION_ID}/$common_rg/${{ env.dev_test_prod }}/esml-common.tfstate"
             -backend-config="use_azuread_auth=true"
           )
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
@@ -718,10 +722,24 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
+          # "existing": that would plan its destroy.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          managed="$(terraform -chdir="$TF_ROOT" state list 2>/dev/null || true)"
+          if grep -qxF 'module.stage_13.module.vmPrivate[0].azapi_resource.virtual_machine[0]' <<< "$managed"; then
+            admin_vm_exists=false
+          fi
+          export TF_VAR_admin_vm_exists="$admin_vm_exists"
+          # The local admin password exists only in this step (write-only in the VM request, never in state).
+          TF_VAR_admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$TF_VAR_admin_password"
+          export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
           aif_tf_plan_apply() {
-            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            rm -f "$TF_ROOT/tfplan"
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
           trap 'rm -f "$TF_ROOT/tfplan"' EXIT
@@ -1005,10 +1023,6 @@ jobs:
           set -euo pipefail
           # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${enableEncryptionAtHost:-true}" "${{ env.dev_test_prod_sub_id }}" "${enableAdminVM:-false}" || exit 1
-          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
-          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
-          admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
-          echo "::add-mask::$admin_password"
           subscription="${JSON_SUBSCRIPTION_ID:-${{ env.dev_test_prod_sub_id }}}"
           {
             # Terraform variables: the configuration file, and only what the Bicep job takes from secrets,
@@ -1025,8 +1039,6 @@ jobs:
             echo "TF_VAR_technical_admins_ad_object_id=${technical_admins_ad_object_id:-}"
             echo "TF_VAR_technical_admins_email=${technical_admins_email:-}"
             echo "TF_VAR_ip_whitelist=${technical_admins_bastion_IP_whitelist:-}"
-            echo "TF_VAR_admin_vm_exists=$admin_vm_exists"
-            echo "TF_VAR_admin_password=$admin_password"
             echo "TF_VAR_key_vault_secret_expiry=$(date -u -d '+1 year' +%s)"
             # Provider and backend authentication: the same identity azure/login used.
             echo "ARM_SUBSCRIPTION_ID=$subscription"
@@ -1051,8 +1063,9 @@ jobs:
           for required in TFSTATE_RESOURCE_GROUP TFSTATE_STORAGE_ACCOUNT; do
             if [ -z "${!required}" ]; then echo "::error::GitHub variable $required is required for the Terraform state."; exit 1; fi
           done
-          # One state per factory and environment: the common resource group name is unique per factory,
-          # scale set and environment (13-rgLevel commonResourceGroupName).
+          # One state per factory and environment: subscription, common resource group (13-rgLevel
+          # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
+          # still gives each environment its own state.
           common_rg="${commonResourceGroup_param:-}"
           if [ -z "$common_rg" ]; then
             common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
@@ -1062,7 +1075,7 @@ jobs:
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
             -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT"
             -backend-config="container_name=$TFSTATE_CONTAINER"
-            -backend-config="key=aifactory/$common_rg/esml-common.tfstate"
+            -backend-config="key=aifactory/${ARM_SUBSCRIPTION_ID}/$common_rg/${{ env.dev_test_prod }}/esml-common.tfstate"
             -backend-config="use_azuread_auth=true"
           )
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
@@ -1073,10 +1086,24 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
+          # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
+          # "existing": that would plan its destroy.
+          admin_vm_exists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${enableAdminVM:-false}" "${{ env.dev_test_prod_sub_id }}" "${commonResourceGroup_param:-}" "${admin_aifactoryPrefixRG:-}" "${vnetResourceGroupBase:-esml-common}" "${admin_locationSuffix:-}" "${{ env.dev_test_prod }}" "${admin_aifactorySuffixRG:-}" "${admin_commonResourceSuffix:--001}")"
+          managed="$(terraform -chdir="$TF_ROOT" state list 2>/dev/null || true)"
+          if grep -qxF 'module.stage_13.module.vmPrivate[0].azapi_resource.virtual_machine[0]' <<< "$managed"; then
+            admin_vm_exists=false
+          fi
+          export TF_VAR_admin_vm_exists="$admin_vm_exists"
+          # The local admin password exists only in this step (write-only in the VM request, never in state).
+          TF_VAR_admin_password="$(openssl rand -base64 48 | tr -d '\n/+=' | head -c 32)"
+          echo "::add-mask::$TF_VAR_admin_password"
+          export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
           aif_tf_plan_apply() {
-            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan
+            rm -f "$TF_ROOT/tfplan"
+            terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
           trap 'rm -f "$TF_ROOT/tfplan"' EXIT

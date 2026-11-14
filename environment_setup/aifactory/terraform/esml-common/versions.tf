@@ -13,7 +13,7 @@ terraform {
   }
 
   # Remote state in an Azure Storage container. The workflow passes the account, container and the key
-  # "<factory>/<scale set>/<environment>/esml-common.tfstate" with -backend-config: one state per factory and
+  # "aifactory/<subscription>/<common resource group>/<environment>/esml-common.tfstate" with -backend-config: one state per factory and
   # environment, never in the repository. Tests run `terraform init -backend=false`.
   backend "azurerm" {}
 }

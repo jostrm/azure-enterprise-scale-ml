@@ -490,13 +490,13 @@
     },
     "Microsoft.Security/pricings@2024-01-01": {
       "terraform": [
-        "azapi_resource"
+        "azapi_update_resource"
       ],
       "provider": "azapi",
       "modules": [
         "modules/defender"
       ],
-      "reason": "azurerm_security_center_subscription_pricing (5.12.0) has no `enforce` property and manages the whole extension set instead of the exact extensions array the Bicep sends (additionalExtensionProperties)."
+      "reason": "azurerm_security_center_subscription_pricing (5.12.0) has no `enforce` property and manages the whole extension set instead of the exact extensions array the Bicep sends. azapi_update_resource because every plan always exists on a subscription (Free): it PUTs like the Bicep and never deletes."
     },
     "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01": {
       "terraform": [
@@ -510,23 +510,23 @@
     },
     "Microsoft.Storage/storageAccounts/blobServices@2023-05-01": {
       "terraform": [
-        "azapi_resource"
+        "azapi_update_resource"
       ],
       "provider": "azapi",
       "modules": [
         "modules/data-lake"
       ],
-      "reason": "No standalone azurerm resource (the blob properties live inside azurerm_storage_account, which is azapi here)."
+      "reason": "No standalone azurerm resource (the blob properties live inside azurerm_storage_account, which is azapi here). azapi_update_resource because the 'default' service exists as soon as the account does."
     },
     "Microsoft.Storage/storageAccounts/fileServices@2023-05-01": {
       "terraform": [
-        "azapi_resource"
+        "azapi_update_resource"
       ],
       "provider": "azapi",
       "modules": [
         "modules/data-lake"
       ],
-      "reason": "No standalone azurerm resource (share properties live inside azurerm_storage_account, which is azapi here)."
+      "reason": "No standalone azurerm resource (share properties live inside azurerm_storage_account, which is azapi here). azapi_update_resource because the 'default' service exists as soon as the account does."
     },
     "Microsoft.Storage/storageAccounts@2023-05-01": {
       "terraform": [

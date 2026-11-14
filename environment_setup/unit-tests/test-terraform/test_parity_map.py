@@ -51,21 +51,23 @@ def test_every_mapping_is_implemented_in_its_modules():
         assert entry["terraform"] and entry["modules"], arm_type
         texts = {module: module_text(module) for module in entry["modules"]}
         if entry["provider"] == "azapi":
-            assert entry["terraform"] == ["azapi_resource"], arm_type
+            assert entry["terraform"] in (["azapi_resource"], ["azapi_update_resource"]), arm_type
         else:
             assert all(name.startswith("azurerm_") or name == "azapi_resource" for name in entry["terraform"]), arm_type
             assert entry["terraform"][0].startswith("azurerm_"), f"{arm_type}: an azurerm entry leads with azurerm"
-        if "azapi_resource" in entry["terraform"]:
+        azapi = [name for name in entry["terraform"] if name.startswith("azapi_")]
+        if azapi:
             assert entry["reason"].strip(), f"{arm_type}: say why azapi"
             assert any(re.search(r'type\s*=\s*"' + re.escape(arm_type) + '"', text) for text in texts.values()), \
                 f"no azapi_resource of type {arm_type} in {entry['modules']}"
         for module, text in texts.items():
             implemented = [name for name in entry["terraform"]
-                           if (name == "azapi_resource" and re.search(r'type\s*=\s*"' + re.escape(arm_type) + '"', text))
-                           or (name != "azapi_resource" and f'resource "{name}"' in text)]
+                           if (name.startswith("azapi_") and f'resource "{name}"' in text
+                               and re.search(r'type\s*=\s*"' + re.escape(arm_type) + '"', text))
+                           or (name.startswith("azurerm_") and f'resource "{name}"' in text)]
             assert implemented, f"{module} implements none of {entry['terraform']} for {arm_type}"
         for name in entry["terraform"]:
-            if name != "azapi_resource":
+            if name.startswith("azurerm_"):
                 assert any(f'resource "{name}"' in text for text in texts.values()), (arm_type, name)
 
 

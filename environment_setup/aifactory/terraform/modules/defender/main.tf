@@ -1,4 +1,7 @@
 # Port of environment_setup/aifactory/bicep/esml-common/security/defender.bicep
+# Every Microsoft.Security/pricings plan always exists on a subscription (Free by default), so the plans are PUT with
+# azapi_update_resource: the same request as the Bicep, no "already exists" error on first apply, and never a DELETE
+# on destroy (the Bicep never deletes a plan either).
 
 # MICROSOFT DEFENDER FOR CLOUD - SUBSCRIPTION-LEVEL PRICING CONFIGURATION (subscription scope)
 # - pricingTier: AI and Key Vault plans; advancedPricingTier: Storage, Containers, Cloud Posture, Virtual Machines.
@@ -105,7 +108,7 @@ locals {
 }
 
 # Deploy Microsoft Defender for AI at subscription level
-resource "azapi_resource" "defender_for_ai" {
+resource "azapi_update_resource" "defender_for_ai" {
   count     = local.deploy_ai ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = var.ai_plan_name
@@ -116,7 +119,7 @@ resource "azapi_resource" "defender_for_ai" {
 }
 
 # Enable Defender for Storage (recommended for AI workloads)
-resource "azapi_resource" "defender_for_storage" {
+resource "azapi_update_resource" "defender_for_storage" {
   count     = local.deploy_storage ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = "StorageAccounts"
@@ -127,7 +130,7 @@ resource "azapi_resource" "defender_for_storage" {
 }
 
 # Enable Defender for Key Vault
-resource "azapi_resource" "defender_for_key_vault" {
+resource "azapi_update_resource" "defender_for_key_vault" {
   count     = local.deploy_key_vault ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = "KeyVaults"
@@ -141,7 +144,7 @@ resource "azapi_resource" "defender_for_key_vault" {
 }
 
 # Enable Defender for Containers
-resource "azapi_resource" "defender_for_containers" {
+resource "azapi_update_resource" "defender_for_containers" {
   count     = local.deploy_containers ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = "Containers"
@@ -152,7 +155,7 @@ resource "azapi_resource" "defender_for_containers" {
 }
 
 # Enable Defender for Cloud Posture Management
-resource "azapi_resource" "defender_for_cloud_posture" {
+resource "azapi_update_resource" "defender_for_cloud_posture" {
   count     = local.deploy_cloud_posture ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = "CloudPosture"
@@ -163,7 +166,7 @@ resource "azapi_resource" "defender_for_cloud_posture" {
 }
 
 # Enable Defender for Virtual Machines
-resource "azapi_resource" "defender_for_virtual_machines" {
+resource "azapi_update_resource" "defender_for_virtual_machines" {
   count     = local.deploy_virtual_machine ? 1 : 0
   type      = "Microsoft.Security/pricings@2024-01-01"
   name      = "VirtualMachines"

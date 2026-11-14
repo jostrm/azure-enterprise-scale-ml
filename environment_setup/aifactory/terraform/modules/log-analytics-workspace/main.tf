@@ -30,7 +30,6 @@ resource "azapi_resource" "key_log_analytics_ws" {
 
   body = {
     properties = {
-      value       = azurerm_log_analytics_workspace.alyt.primary_shared_key # sensitive
       contentType = "text/plain"
       attributes = {
         enabled = true
@@ -38,7 +37,8 @@ resource "azapi_resource" "key_log_analytics_ws" {
       }
     }
   }
-
-  # ARM never returns the secret value; do not show it as drift.
-  ignore_missing_property = true
+  # The key goes in the write-only sensitive_body: not stored with this resource in state (the workspace resource
+  # itself still holds primary_shared_key, as every azurerm workspace does). Re-sent on every run, like the Bicep.
+  sensitive_body         = { properties = { value = azurerm_log_analytics_workspace.alyt.primary_shared_key } }
+  sensitive_body_version = { "properties.value" = tostring(var.key_vault_secret_expiry) }
 }

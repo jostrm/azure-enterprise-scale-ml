@@ -33,12 +33,18 @@ def test_no_state_plans_lock_files_or_working_directories_are_tracked():
     assert not offending, offending
 
 
-def test_terraform_sources_use_lf_line_endings_and_utf8():
+def test_terraform_sources_are_committed_with_lf_line_endings_and_utf8():
+    """The committed blobs (git's index), not the working tree: a Windows checkout may convert to CRLF."""
+    listing = subprocess.run(["git", "-C", str(REPO_ROOT), "ls-files", "--eol", "--", str(TERRAFORM_DIR),
+                              str(TERRAFORM_DIR.parents[1] / "unit-tests" / "test-terraform")],
+                             capture_output=True, text=True, check=True).stdout.splitlines()
+    assert listing
+    for line in listing:
+        index_eol, path = line.split()[0], line.split("\t", 1)[1]
+        assert index_eol in ("i/lf", "i/none", "i/-text"), f"{path} is committed with {index_eol}"
     for path in TERRAFORM_DIR.rglob("*"):
         if path.is_file() and ".terraform" not in path.parts and path.suffix in (".tf", ".hcl", ".py", ".md", ".json", ".yml"):
-            data = path.read_bytes()
-            assert b"\r\n" not in data, f"{path} has CRLF line endings"
-            data.decode("utf-8")
+            path.read_bytes().decode("utf-8")
 
 
 def test_every_module_has_the_standard_files_and_names_its_bicep_source():

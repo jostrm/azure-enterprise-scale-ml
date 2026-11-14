@@ -70,20 +70,39 @@ def test_terraform_is_pinned_authenticated_with_oidc_and_planned_before_apply_wi
         assert "ARM_USE_OIDC=true" in inputs and "ARM_CLIENT_ID=" in inputs and "ARM_TENANT_ID=" in inputs
         init = named["Terraform init (remote state)"]["run"]
         assert "init -input=false" in init and "use_azuread_auth=true" in init
-        assert 'key=aifactory/$common_rg/esml-common.tfstate' in init
+        assert "key=aifactory/${ARM_SUBSCRIPTION_ID}/$common_rg/${{ env.dev_test_prod }}/esml-common.tfstate" in init
         apply = named["01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)"]["run"]
         plan_at, apply_at = apply.index(" plan -input=false"), apply.index(" apply -input=false")
-        assert plan_at < apply_at and "-out=tfplan" in apply and "apply -input=false -no-color -lock-timeout=20m tfplan" in apply
+        assert plan_at < apply_at and "-out=tfplan || return $?" in apply, "a failed plan must not apply an older plan"
+        assert "apply -input=false -no-color -lock-timeout=20m tfplan" in apply
         assert "scripts/modules/aif-retry.sh" in apply and "aif_retry " in apply and "--base-delay" in apply
         assert "-- aif_tf_plan_apply" in apply, "the retry re-plans: each attempt plans from refreshed state"
         assert "rm -f" in apply, "the saved plan holds sensitive values and is removed"
+        # The admin password lives only in the apply step; a VM this state manages is never treated as existing.
+        assert "TF_VAR_admin_password" not in named["Terraform inputs"]["run"]
+        assert "export TF_VAR_admin_password" in apply
+        assert "module.stage_13.module.vmPrivate[0].azapi_resource.virtual_machine[0]" in apply
+        assert apply.index("admin-vm-exists.sh") < apply.index("aif_tf_plan_apply()")
+
+
+def test_the_admin_vm_state_address_the_workflow_checks_exists():
+    """The workflow keeps a VM this state manages (never `admin_vm_exists=true` for it); the address it looks for
+    must be the real one, or the VM would be planned for destroy on the next run."""
+    root = (ROOT_MODULE / "main.tf").read_text(encoding="utf-8")
+    stage = (ROOT_MODULE.parent / "modules" / "stage-13-rg-level" / "main.tf").read_text(encoding="utf-8")
+    vm = (ROOT_MODULE.parent / "modules" / "virtual-machine-private" / "main.tf").read_text(encoding="utf-8")
+    assert 'module "stage_13" {' in root
+    assert re.search(r'module "vmPrivate" \{\n\s+source\s+= "\.\./virtual-machine-private"\n\s+count ', stage)
+    assert re.search(r'resource "azapi_resource" "virtual_machine" \{\n\s+count\s+= var\.vm_exists \? 0 : 1', vm)
 
 
 def test_the_workflow_sets_every_root_variable_and_nothing_else():
     declared = set(re.findall(r'^variable "(\w+)"', (ROOT_MODULE / "variables.tf").read_text(encoding="utf-8"), re.M))
     text = TERRAFORM_WORKFLOW.read_text(encoding="utf-8")
     for name, job in load(TERRAFORM_WORKFLOW)["jobs"].items():
-        run = steps(job)["Terraform inputs"]["run"]
+        named = steps(job)
+        run = named["Terraform inputs"]["run"] + named[
+            "01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)"]["run"]
         assert set(re.findall(r"TF_VAR_(\w+)=", run)) == declared, name
     assert "terraform.tfvars" not in text and "-var " not in text and "-var-file" not in text
 

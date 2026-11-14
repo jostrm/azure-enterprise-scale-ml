@@ -135,4 +135,9 @@ resource "azurerm_private_endpoint" "pend_acr" {
     subresource_names              = ["registry"]
     is_manual_connection           = false
   }
+
+  # 13-rgLevel attaches the DNS zone group with privateDns.bicep (modules/private-dns); azurerm would remove it.
+  lifecycle {
+    ignore_changes = [private_dns_zone_group]
+  }
 }

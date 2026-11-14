@@ -105,7 +105,9 @@ resource "azapi_resource" "lake" {
   response_export_values = ["properties.networkAcls.virtualNetworkRules"]
 }
 
-resource "azapi_resource" "blob_services" {
+# blobServices/default and fileServices/default exist as soon as the account does: PUT them with azapi_update_resource
+# (same type, name and body as the Bicep child resources) instead of creating them.
+resource "azapi_update_resource" "blob_services" {
   count     = length(var.containers) > 0 ? 1 : 0
   type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
   name      = "default"
@@ -133,10 +135,10 @@ resource "azurerm_storage_container" "container" {
   storage_account_id    = azapi_resource.lake.id
   container_access_type = "private" # publicAccess: 'None'
 
-  depends_on = [azapi_resource.blob_services]
+  depends_on = [azapi_update_resource.blob_services]
 }
 
-resource "azapi_resource" "file_services" {
+resource "azapi_update_resource" "file_services" {
   count     = length(var.files) > 0 ? 1 : 0
   type      = "Microsoft.Storage/storageAccounts/fileServices@2023-05-01"
   name      = "default"
@@ -173,5 +175,10 @@ resource "azurerm_private_endpoint" "pend_sacc" {
     private_connection_resource_id = azapi_resource.lake.id
     subresource_names              = [each.key]
     is_manual_connection           = false
+  }
+
+  # 13-rgLevel attaches the DNS zone group with privateDns.bicep (modules/private-dns); azurerm would remove it.
+  lifecycle {
+    ignore_changes = [private_dns_zone_group]
   }
 }

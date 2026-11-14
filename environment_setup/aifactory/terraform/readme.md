@@ -53,7 +53,9 @@ has a `deploy` map with one entry per Bicep `module` symbol. That entry is the B
 | Terraform | >= 1.11 (CI: 1.17.1) | Write-only attributes and ephemeral values keep secrets out of plan and state |
 
 The root pins exact provider versions; modules accept `>= x, < next major`. `parity_map.json` maps all
-51 resource types (type@apiVersion) of the 11/12/13 closure: 31 to azurerm, 20 to azapi. Two of the azurerm
+51 resource types (type@apiVersion) of the 11/12/13 closure: 31 to azurerm, 20 to azapi. Three of the azapi
+ones use `azapi_update_resource`, because the resource always exists already: the Defender plans and the lake's
+`default` blob and file services. They are PUT like the Bicep does and never deleted. Two of the azurerm
 entries also use azapi in one branch: the regional private DNS zone and link when `allGlobal` is false. Most
 azapi cases are properties azurerm 5.12.0 cannot set, such as service endpoint locations,
 `ignoreMissingVnetServiceEndpoint`, the ACR trust policy, a storage key policy or Defender extensions. The rest
@@ -95,8 +97,8 @@ The root's variables are only what the Bicep job takes from GitHub secrets, GitH
 Backend `azurerm`, configured by the workflow (`-backend-config`). State lives in a storage container named by
 the GitHub variables `TFSTATE_RESOURCE_GROUP`, `TFSTATE_STORAGE_ACCOUNT` and `TFSTATE_CONTAINER` (default
 `tfstate`), plus `TFSTATE_SUBSCRIPTION_ID` (default: the target subscription). The key is
-`aifactory/<common resource group>/esml-common.tfstate`. The common resource group name is unique per factory,
-scale set and environment, so each factory and environment gets one state. The repository never holds state;
+`aifactory/<subscription>/<common resource group>/<environment>/esml-common.tfstate`: one state per factory, scale
+set and environment, also when `commonResourceGroup_param` is the same for every environment. The repository never holds state;
 `.gitignore` excludes it.
 
 ## Secrets

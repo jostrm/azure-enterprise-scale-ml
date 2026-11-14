@@ -17,11 +17,14 @@ It mirrors `infra-common.yml`:
 Only the three `az deployment sub create` steps are replaced:
 
 1. **Set up Terraform**: `hashicorp/setup-terraform`, pinned to a commit, with Terraform 1.17.1.
-2. **Terraform inputs**: runs the same encryption-at-host and admin-VM checks as step 03. It sets the Terraform
-   variables (the configuration file, and only what the Bicep job takes from secrets and GitHub variables). It
-   authenticates the providers with the same identity (`ARM_USE_OIDC`).
-3. **Terraform init (remote state)**: `azurerm` backend, key `aifactory/<common resource group>/esml-common.tfstate`.
-4. **01-03 terraform plan and apply**: `terraform plan -out=tfplan`, then `terraform apply tfplan`, under the
+2. **Terraform inputs**: runs the same encryption-at-host check as step 03. It sets the Terraform variables (the
+   configuration file, and only what the Bicep job takes from secrets and GitHub variables). It authenticates the
+   providers with the same identity (`ARM_USE_OIDC`).
+3. **Terraform init (remote state)**: `azurerm` backend, key
+   `aifactory/<subscription>/<common resource group>/<environment>/esml-common.tfstate`.
+4. **01-03 terraform plan and apply**: the admin-VM check of step 03 (a VM this state already manages is kept,
+   never treated as existing), a per-run admin password that exists only in this step, then
+   `terraform plan -out=tfplan` and `terraform apply tfplan`, under the
    shared retry helper `bicep/scripts/modules/aif-retry.sh`. It retries transient ARM errors (throttling, 5xx,
    timeouts, dropped connections, `AnotherOperationInProgress`) with exponential backoff, at most 4 attempts.
    Every attempt plans again from the refreshed state, so a partly applied run continues where it stopped. A run
