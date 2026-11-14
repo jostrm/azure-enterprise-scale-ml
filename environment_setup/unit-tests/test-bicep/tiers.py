@@ -41,6 +41,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
     Tier(2, "pipelines", "Azure DevOps pipelines, GitHub workflows, update and run launchers, manual "
          "inputs, run monitoring and release-version selection.", (
         "test_foundry_account_update_retry.py",
+        "unit/test_acr_default_image_wait.py",
         "unit/test_ado_custom_url.py",
         "unit/test_ado_json_initialization.py",
         "unit/test_ado_manual_run.py",

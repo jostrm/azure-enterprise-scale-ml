@@ -2892,13 +2892,26 @@ steps:
       echo "##vso[task.setvariable variable=acr_added_ips]$SUCCESSFULLY_ADDED_IPS"
       echo "Successfully added IPs for cleanup: $SUCCESSFULLY_ADDED_IPS"
       
-      # Wait for network rules to propagate
-      echo "Waiting for network rules to propagate..."
-      sleep 30
+      # Polls the image lookup until it succeeds or the given number of seconds has passed. The lookup is
+      # the real condition: a success proves the network rules are active and the image is there. The last
+      # lookup never runs before the full wait has passed, so this is as patient as a fixed sleep.
+      wait_for_acr_image() {
+        local deadline=$((SECONDS + $1))
+        while :; do
+          if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+            return 0
+          fi
+          [ $SECONDS -ge $deadline ] && return 1
+          sleep 2
+        done
+      }
+
+      # Wait for network rules to propagate (returns early when the image is already visible)
+      echo "Waiting up to 30s for network rules to propagate..."
       
       # Now check if image already exists (after network access is configured)
       echo "Checking if image containerapps-default:latest already exists in ACR..."
-      if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+      if wait_for_acr_image 30; then
         echo "✅ Image containerapps-default:latest already exists in ACR. Skipping image creation but keeping IP rules for cleanup."
         # Note: We keep the SUCCESSFULLY_ADDED_IPS for cleanup, don't exit early
       else
@@ -2933,9 +2946,8 @@ steps:
         fi
       fi
 
-      # Verify image exists (whether it was already there or just created)
-      sleep 30
-      if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+      # Verify image exists (whether it was already there or just created): poll for up to 30s
+      if wait_for_acr_image 30; then
         echo "✅ Image verified successfully in ACR."
       else
         echo "❌ Failed to verify image in ACR"
