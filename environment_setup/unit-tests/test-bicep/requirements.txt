@@ -1,5 +1,6 @@
-# Test deps. Unit tests run on stdlib only; these add pytest + mocking sugar.
+# Offline test dependencies, including native provider signature verification.
 pytest>=7.4
 pytest-mock>=3.12
 PyYAML>=6.0
 tzdata>=2025.2
+cryptography>=50.0.1

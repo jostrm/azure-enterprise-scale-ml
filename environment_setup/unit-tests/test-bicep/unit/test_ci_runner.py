@@ -16,6 +16,13 @@ from domain.pipeline_contracts import evaluate
 import run_ci
 
 
+def test_ci_dependencies_include_native_approval_signature_verification():
+    requirements = (run_ci.SUITE / "requirements.txt").read_text(encoding="utf-8")
+    assert re.search(r"(?m)^cryptography(?:[<>=!~].*)?$", requirements), (
+        "Native provider approval tests require cryptography on clean CI runners."
+    )
+
+
 def test_default_collection_includes_root_tests_but_never_live_integration(tmp_path):
     (tmp_path / "unit").mkdir()
     (tmp_path / "integration").mkdir()
