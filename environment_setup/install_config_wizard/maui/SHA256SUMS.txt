@@ -1,5 +1,0 @@
-66b5befdf9022091fb9cb6cb7f83934b47935cbc2e25a00181d7319a4ef2458e  ESAIF.ConfigWizard-1.0.27-win-x64.msi
-3d6b66f6cd175e91a18ce89735e937e77e66a92087bbf270b10ffb92b6ee9fab  ESAIF.ConfigWizard-1.0.27-win-x64-1.cab
-7f547d1a7c72ed145e555fe636329ebb5b170c85d03ceca9b808ef4e31984c85  ESAIF.ConfigWizard-1.0.27-win-x64-2.cab
-eafcedb92e0dccc0b50ff1ac6e1402fddc2338e669562f99529e9fb7231c585a  ESAIF.ConfigWizard-1.0.27-win-x64-3.cab
-ea4bd95b8ae88902ac4a9cf682115c1244fb8777593c4eb3aa66cd4e8b8a61b9  ESAIF.ConfigWizard-1.0.27-win-x64-4.cab

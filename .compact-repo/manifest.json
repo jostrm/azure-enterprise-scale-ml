@@ -1,0 +1,1315 @@
+{
+  "schema": "compact-repo/manifest/1",
+  "tool_version": "0.1.0rc1",
+  "base_commit": "1bf4ba3e2d68129e2d8670ba39da8431adca6066",
+  "profile_hash": "48a2383b1f23fe475b20e30ec10626cdcf2bd5d1990fdfb7576fd037631afe67",
+  "profile": {
+    "version": 1,
+    "base": "release/v1.26",
+    "target": "release/v1.26",
+    "roots": [
+      {
+        "path": ".github/workflows/infrastructure-tests.yml",
+        "reason": "Purple CI: runs on every push to any branch (unit on Ubuntu and Windows, syntax, bicep)."
+      },
+      {
+        "path": ".github/workflows/verify-aifactory-dev.yml",
+        "reason": "Purple CI: offline unit tests on pushes that touch copy_to_local_settings/** or unit-tests/**."
+      },
+      {
+        "path": ".github/workflows/verify-aifactory-stage.yml",
+        "reason": "Purple CI: manual placeholder; reaches no repo file."
+      },
+      {
+        "path": ".github/workflows/verify-aifactory-prod.yml",
+        "reason": "Purple CI: manual placeholder; reaches no repo file."
+      },
+      {
+        "path": "00-start.sh",
+        "reason": "Consumer entry point, all layouts (v1.24 legacy paths included, R6)."
+      },
+      {
+        "path": "01-start-v125-and-above.sh",
+        "reason": "Consumer entry point, registered layout (v1.25 and above)."
+      },
+      {
+        "path": "bootstrap/ADO-azurefactory.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/ADO-create-new-aifactory-scaleset.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/ADO-update-aifactory-and-run-project.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/AIFactory-lifecycle.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/ALL-create-new-aifactory-scaleset.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/GH-update-aifactory-and-run-project.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/GHA-azurefactory.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/GHA-create-new-aifactory-scaleset.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/GHA-update-aifactory-and-run-project.sh",
+        "reason": "AIF_DUAL_LAYOUT_LAUNCHERS: 00-start.sh installs these launchers into the consumer root by bare name (bootstrap/lib/layout_router.sh); the user runs them from there."
+      },
+      {
+        "path": "bootstrap/azurefactory.sh",
+        "reason": "Registered-layout launcher that registered_setup.py installs into the consumer root (with AIFactory-lifecycle.sh and the provider wrappers)."
+      },
+      {
+        "path": "bootstrap/.gitignore.template",
+        "reason": "Merged into the consumer's .gitignore by registered_setup.py and copied by 01-aif-copy-aifactory-templates.sh."
+      },
+      {
+        "path": "bootstrap/lib/**",
+        "reason": "01-start-v125-and-above.sh (bootstrap/lib/registered_setup.py) copies this whole folder into the consumer's lib/, and 00-start.sh installs AIF_DUAL_LAYOUT_LIBRARIES from it by bare name (layout_router.sh). The Factory API runs factory_lifecycle.py and its siblings from the submodule and vendors most of the folder byte for byte."
+      },
+      {
+        "path": "bootstrap/ui/**",
+        "reason": "Sourced by every launcher; registered_setup.py copies the folder into the consumer's ui/."
+      },
+      {
+        "path": "environment_setup/aifactory/bicep/personas/**",
+        "reason": "registered_setup.py copies every .py and .json of the persona engine into the consumer (.azurefactory-tools/persona-engine); the pipelines run personas/pipeline.py in every scenario."
+      },
+      {
+        "path": "environment_setup/aifactory/bicep/esml-util/project_lake_access.py",
+        "reason": "Copied into the consumer by registered_setup.py with the persona engine; the project pipelines call it for lake access."
+      },
+      {
+        "path": "bootstrap/templates/**",
+        "reason": "The Factory API commits factory-lifecycle-*.yml into the consumer repo (.github/workflows/factory-lifecycle.yml or aifactory/pipelines/factory-lifecycle.yml) and hub_private_probe.py into .azurefactory/; it requires them in purple's GitHub tree (pink registered_repository.py)."
+      },
+      {
+        "path": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/**",
+        "reason": "GitHub Actions workflows, .env.template and the variable script copied into the consumer repo; scenarios 1 to 6 on GitHub run infra-common.yml and infra-project.yml (which calls infra-project-phase.yml)."
+      },
+      {
+        "path": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/**",
+        "reason": "Azure DevOps pipelines, job templates and variables.yaml copied into the consumer repo; the Factory API reads variables.yaml from the submodule in every scenario."
+      },
+      {
+        "path": "environment_setup/aifactory/variables.json",
+        "reason": "Canonical v1.25 configuration template: the variable contract shared with pink and MAUI."
+      },
+      {
+        "path": "environment_setup/azurefactory-cli/pyproject.toml",
+        "reason": "CLI and SDK package `azurefactory`; console script azurefactory = azurefactory.cli:main."
+      },
+      {
+        "path": "environment_setup/azurefactory-cli/setup.py",
+        "reason": "Builds the CLI wheel and vendors bootstrap/lib/factory_enrollment.py and provider_repository_state.py."
+      },
+      {
+        "path": "environment_setup/azurefactory-cli/src/azurefactory/**",
+        "reason": "The package: cli.py, client.py, esaf.py (the six scenarios) and their modules."
+      },
+      {
+        "path": "environment_setup/install_config_wizard/api-usage-examples/**",
+        "reason": "API usage examples (Python, PowerShell, Node, raw requests) and scenarios.json."
+      },
+      {
+        "path": "esml-v2/pyproject.toml",
+        "reason": "ESML v2 package `azure_esml`; console script esml = azure_esml.cli:main."
+      },
+      {
+        "path": "esml-v2/esml_build.py",
+        "reason": "ESML v2 build backend (bundles the shared ML Model Factory engine)."
+      },
+      {
+        "path": "esml-v2/azure_esml/**",
+        "reason": "The ESML v2 package."
+      },
+      {
+        "path": "esml-v2/examples/**",
+        "reason": "Documented ESML v2 app-layer examples."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/pyproject.toml",
+        "reason": "ML Model Factory package; console script ml-model-factory = ml_model_factory.cli:main."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/**",
+        "reason": "The ML Model Factory package (python -m ml_model_factory)."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/accelerator/scripts/**",
+        "reason": "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/accelerator/databricks/**",
+        "reason": "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/accelerator/environments/**",
+        "reason": "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/accelerator/schemas/**",
+        "reason": "Azure ML and Databricks job entry scripts, environments and schemas the package submits by path."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/usecase-type/**",
+        "reason": "Generated use-case notebooks and pipelines; the Factory API's project-team catalog links each of them."
+      },
+      {
+        "path": "usecase_code/50-ml-model-factory/user-config/**",
+        "reason": "Documented user configuration (model, storage selection, lake) the package reads."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/agent_factory/**",
+        "reason": "Shared operator package (python -m agent_factory); the project workflows and pipelines call it."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-aifactory-agent/deploy.py",
+        "reason": "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-aifactory-agent/probe_factory.py",
+        "reason": "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/**",
+        "reason": "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-aifactory-agent/infra/**",
+        "reason": "AI Factory Agent: python -m aifactory_agent, deploy.py and its infra; home of the dual-graph runtime AGENTS.md names."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/Start-FoundryVoiceSales.ps1",
+        "reason": "Voice sales agent: documented start script and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/sales_agent/**",
+        "reason": "Voice sales agent: documented start script and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/scripts/**",
+        "reason": "Voice sales agent: documented start script and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/41-single-agent/**/*.py",
+        "reason": "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/42-multi-agent/**/*.py",
+        "reason": "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/42-multi-agent-fabric-iq/**/*.py",
+        "reason": "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/43-data/**/*.py",
+        "reason": "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/45-rag-agent/**/*.py",
+        "reason": "Documented example entry scripts (main.py, agents.py, chat.py, setup_*.py, worker.py, hosted agents)."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/44-azure-mcp/deploy.py",
+        "reason": "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py",
+        "reason": "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/46-factory-chat-agent/deploy.py",
+        "reason": "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py",
+        "reason": "Deploy entry points the project workflows and pipelines run after the Foundry phase."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/main.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sync.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/webhook.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/preview.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/retrieval_only.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/check_sum.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/acl_scenario.py",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/**",
+        "reason": "RAG with split tables and ACL: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/main.py",
+        "reason": "Agent that trains an ML churn model: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/hosted_main.py",
+        "reason": "Agent that trains an ML churn model: documented entry scripts and package."
+      },
+      {
+        "path": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/**",
+        "reason": "Agent that trains an ML churn model: documented entry scripts and package."
+      },
+      {
+        "path": "environment_setup/graphify/generate.py",
+        "reason": "Graph maintenance entry point named in AGENTS.md."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/app/**",
+        "reason": "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/base/**",
+        "reason": "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/domain/**",
+        "reason": "Test framework package imported by the unit and integration tests that run_ci.py runs through pytest."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/unit/__init__.py",
+        "reason": "Package marker: the unit tests import each other's helpers through it."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/pytest.ini",
+        "reason": "pytest configuration that run_ci.py relies on."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/conftest.py",
+        "reason": "pytest fixtures for every test in the folder."
+      },
+      {
+        "path": "environment_setup/unit-tests/test-bicep/requirements.txt",
+        "reason": "What CI installs before run_ci.py."
+      },
+      {
+        "path": "mcp/usecase_code/**",
+        "reason": "Examples that mcp/tests import (test_health.py, test_registration.py)."
+      },
+      {
+        "path": "environment_setup/install_config_wizard/SHA256SUMS.txt",
+        "reason": "Read by unit/test_install_config_wizard_downloads.py."
+      },
+      {
+        "path": "environment_setup/install_config_wizard/windows/SHA256SUMS.txt",
+        "reason": "Read by unit/test_install_config_wizard_downloads.py."
+      }
+    ],
+    "externals": [
+      {
+        "repo": "jostrm/azure-aifactory-config",
+        "ref": "main",
+        "path_prefix": "azure-enterprise-scale-ml",
+        "include": [
+          "src/**",
+          "template-files/**",
+          "scripts/**",
+          "sync-creation-source.py"
+        ]
+      },
+      {
+        "repo": "jostrm/maui-apps",
+        "ref": "main",
+        "path_prefix": "azure-enterprise-scale-ml",
+        "include": [
+          "ESAIF.*/**",
+          ".github/workflows/**"
+        ]
+      }
+    ],
+    "keep": [
+      "LICENSE",
+      ".gitignore",
+      ".gitattributes",
+      "__init__.py",
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".claude/**",
+      ".github/copilot-instructions.md",
+      ".compact-repo.yml",
+      "README.md",
+      "RELEASE_120.md",
+      "RELEASE_123.md",
+      "RELEASE_124.md",
+      "RELEASE_125.md",
+      "ROADMAP_MAIN.md",
+      "SECURITY.md",
+      "SUPPORT.md",
+      "CODE_OF_CONDUCT.md",
+      "CONTRIBUTING.md",
+      "documentation/readme.md",
+      "documentation/v2/**",
+      "documentation/architecture/**",
+      "environment_setup/graphify/**",
+      "meta/graphify/.gitignore",
+      "usecase_code/40-agent-factory/**",
+      "usecase_code/50-ml-model-factory/**",
+      "esml-v2/**",
+      "environment_setup/azurefactory-cli/**",
+      "environment_setup/aifactory/bicep/copy_to_local_settings/**",
+      "copy_my_subfolders_to_my_grandparent/**"
+    ],
+    "drop": [
+      "**/previous-release/**",
+      "environment_setup/install_tutorial_guide/old/**",
+      "environment_setup/install_config_wizard/maui/*.cab",
+      "environment_setup/install_config_wizard/maui/*.msi",
+      "environment_setup/install_tutorial_guide/*.cab",
+      "environment_setup/install_tutorial_guide/*.msi"
+    ],
+    "followers": {
+      "tests": [
+        "**/test_*.py",
+        "**/conftest.py",
+        "**/tests/**",
+        "**/*.test.js",
+        "environment_setup/unit-tests/test-bicep/integration/**"
+      ],
+      "docs": [
+        "**/*.md",
+        "documentation/**"
+      ]
+    },
+    "limits": {
+      "max_text_blob_mb": 2
+    },
+    "verify": [
+      {
+        "name": "iac-unit",
+        "run": "python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --tiers 1-3",
+        "timeout_minutes": 45
+      },
+      {
+        "name": "iac-syntax",
+        "run": "python environment_setup/unit-tests/test-bicep/run_ci.py --phase syntax",
+        "timeout_minutes": 45
+      },
+      {
+        "name": "iac-bicep",
+        "run": "python environment_setup/unit-tests/test-bicep/run_ci.py --phase bicep --bicep bicep",
+        "timeout_minutes": 45
+      }
+    ],
+    "self_heal": {
+      "max_rounds": 5
+    },
+    "embed_report": true
+  },
+  "totals": {
+    "files": {
+      "total": 3235,
+      "keep": 3100,
+      "drop": 135
+    },
+    "bytes": {
+      "total": 1552682019,
+      "keep": 309022435,
+      "drop": 1243659584
+    },
+    "by_class": {
+      "root": {
+        "files": 865,
+        "bytes": 10254403,
+        "keep_files": 865,
+        "drop_files": 0
+      },
+      "pinned": {
+        "files": 950,
+        "bytes": 83432138,
+        "keep_files": 950,
+        "drop_files": 0
+      },
+      "dependency": {
+        "files": 775,
+        "bytes": 171728774,
+        "keep_files": 775,
+        "drop_files": 0
+      },
+      "follower": {
+        "files": 513,
+        "bytes": 43608769,
+        "keep_files": 510,
+        "drop_files": 3
+      },
+      "forced-drop": {
+        "files": 56,
+        "bytes": 1226780768,
+        "keep_files": 0,
+        "drop_files": 56
+      },
+      "unreferenced": {
+        "files": 76,
+        "bytes": 16877167,
+        "keep_files": 0,
+        "drop_files": 76
+      }
+    },
+    "by_confidence": {
+      "certain": {
+        "files": 2248,
+        "bytes": 137861922
+      },
+      "likely": {
+        "files": 587,
+        "bytes": 65719421
+      },
+      "dynamic": {
+        "files": 265,
+        "bytes": 105441092
+      }
+    },
+    "inexact_sizes": 0
+  },
+  "verification": {
+    "status": "not-run",
+    "commands": []
+  },
+  "heals": [],
+  "special": [],
+  "dropped": [
+    {
+      "path": "environment_setup/aigateway/kong/scripts/restart-kong.ps1",
+      "size": 1573,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/linux/build-linux.sh",
+      "size": 2973,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/macos/build-macos.sh",
+      "size": 2576,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/.gitattributes",
+      "size": 48,
+      "class": "follower",
+      "reason": "repository: nothing it belongs to is kept"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/.gitignore",
+      "size": 103,
+      "class": "follower",
+      "reason": "repository: nothing it belongs to is kept"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-1.cab",
+      "size": 28787052,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_config_wizard/maui/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-2.cab",
+      "size": 25122393,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_config_wizard/maui/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-3.cab",
+      "size": 34533180,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_config_wizard/maui/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64-4.cab",
+      "size": 35031234,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_config_wizard/maui/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.27-win-x64.msi",
+      "size": 1410696,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_config_wizard/maui/*.msi)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/SHA256SUMS.txt",
+      "size": 533,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/SUPPORT.txt",
+      "size": 2754,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/.gitattributes",
+      "size": 24,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/.gitignore",
+      "size": 103,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.0-win-x64-setup-1.bin",
+      "size": 93704192,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.0-win-x64-setup-2.bin",
+      "size": 96000000,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.0-win-x64-setup-3.bin",
+      "size": 33345704,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.0-win-x64-setup.exe",
+      "size": 2295329,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64-1.cab",
+      "size": 33256530,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64-2.cab",
+      "size": 22131496,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64-3.cab",
+      "size": 34213938,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64-4.cab",
+      "size": 33842200,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64-5.cab",
+      "size": 14286252,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.24-win-x64.msi",
+      "size": 1409805,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.25-win-x64-1.cab",
+      "size": 28762352,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.25-win-x64-2.cab",
+      "size": 25126291,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.25-win-x64-3.cab",
+      "size": 34532676,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.25-win-x64-4.cab",
+      "size": 34827576,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.25-win-x64.msi",
+      "size": 1405790,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.26-win-x64-1.cab",
+      "size": 28780308,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.26-win-x64-2.cab",
+      "size": 25122393,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.26-win-x64-3.cab",
+      "size": 34533126,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.26-win-x64-4.cab",
+      "size": 34987119,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/ESAIF.ConfigWizard-1.0.26-win-x64.msi",
+      "size": 1406027,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/SHA256SUMS-replaced-20261112-014617.txt",
+      "size": 640,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/SHA256SUMS-replaced-20261112-030952.txt",
+      "size": 533,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/SHA256SUMS-replaced-20261112-072146.txt",
+      "size": 533,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/SHA256SUMS.txt",
+      "size": 446,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/SUPPORT.txt",
+      "size": 2376,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_config_wizard/maui/previous-release/readme.md",
+      "size": 5399,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: **/previous-release/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/readme.md",
+      "size": 1498,
+      "class": "follower",
+      "reason": "docs: nothing it belongs to is kept"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab",
+      "size": 32003127,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab",
+      "size": 24237373,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab",
+      "size": 30348057,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab",
+      "size": 34791645,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/*.cab)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi",
+      "size": 995581,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/*.msi)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/SHA256SUMS.txt",
+      "size": 623,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/SUPPORT.txt",
+      "size": 3676,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/installer/ESAIF.TutorialApp.iss",
+      "size": 3897,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/installer/licenses/Apache-2.0.txt",
+      "size": 11358,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/installer/licenses/OpenSans-NOTICES.txt",
+      "size": 1207,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-1-replaced-20261112-030952.cab",
+      "size": 31983321,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-1.cab",
+      "size": 32091138,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-2-replaced-20261112-030952.cab",
+      "size": 24237373,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-2.cab",
+      "size": 24949722,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-3-replaced-20261112-030952.cab",
+      "size": 30346742,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-3.cab",
+      "size": 29197934,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-4-replaced-20261112-030952.cab",
+      "size": 34423789,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-4.cab",
+      "size": 34353839,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned-replaced-20261112-030952.msi",
+      "size": 938770,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.0-win-x64-protected-unsigned.msi",
+      "size": 935914,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-1.cab",
+      "size": 31970453,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-2.cab",
+      "size": 24237373,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-3.cab",
+      "size": 30347212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.1-win-x64-protected-unsigned-4.cab",
+      "size": 34586894,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/ESAF-Tutorials-0.2.1-win-x64-protected-unsigned.msi",
+      "size": 938989,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/SHA256SUMS-replaced-20261112-030952.txt",
+      "size": 603,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/SHA256SUMS-replaced-20261112-072146.txt",
+      "size": 603,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/old/SHA256SUMS.txt",
+      "size": 603,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_tutorial_guide/old/**)"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/scripts/Publish-TutorialApp.ps1",
+      "size": 31797,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "environment_setup/install_tutorial_guide/scripts/Validate-VideoCatalog.ps1",
+      "size": 3059,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml-workspace.code-workspace",
+      "size": 505,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Dev/ESML-MLOps-Dev.yml",
+      "size": 4187,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.yml",
+      "size": 4100,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/azure_provisioning/company_specific_convention/__init__.py",
+      "size": 0,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/azure_provisioning/company_specific_convention/esml_naming_convention.py",
+      "size": 8817,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/baselayer_azure.py",
+      "size": 4342,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/baselayer_azure_ml_fc_score.py",
+      "size": 1440,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/baselayer_azure_ml_model.py",
+      "size": 43343,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/baselayer_python.py",
+      "size": 6234,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/esml.py",
+      "size": 153574,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/common/storage_factory.py",
+      "size": 12524,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/01_setup_model_1.png",
+      "size": 64958,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/01_setup_model_2.png",
+      "size": 154787,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/01_setup_model_6.png",
+      "size": 29954,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/01_setup_model_7.png",
+      "size": 24348,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/01_setup_model_8.png",
+      "size": 24567,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/03-use cases-notebooks-1-3.png",
+      "size": 150101,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/03_readme_usecases_1.png",
+      "size": 1348301,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/1_line_vs_143.png",
+      "size": 3736253,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/CAF_ESLZ.png",
+      "size": 329771,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/Install_Readme_ComputeInstance_Conda.png",
+      "size": 1080094,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/aml-pipeline_batch_ppt-1.png",
+      "size": 999988,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/aml-pipeline_batch_ppt-2.png",
+      "size": 665342,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/aml-pipeline_batch_ppt-4.png",
+      "size": 94820,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/azure-devops-service-connnection.png",
+      "size": 42524,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/debug-git_ignore.png",
+      "size": 90613,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/deploybutton.png",
+      "size": 17108,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-compare.png",
+      "size": 606738,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-copy-config.png",
+      "size": 997748,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-dash-small.png",
+      "size": 546052,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-linked-git-1.png",
+      "size": 15522,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-linked-git-2.png",
+      "size": 21839,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-mlops-release.png",
+      "size": 648176,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-s02e01-templates1.png",
+      "size": 210569,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-s02e01-templates2.png",
+      "size": 90683,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-settings-3.png",
+      "size": 172375,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/esml-turnkey-small.png",
+      "size": 389018,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/folder_structure_post_copy.png",
+      "size": 6620,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/git_submodule_add.png",
+      "size": 12120,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/lake_settings.png",
+      "size": 363369,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/lake_settings_usage.png",
+      "size": 29320,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/mlops-1.png",
+      "size": 443238,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/mlops-pipeline.png",
+      "size": 445311,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/pipeline_IN2GOLD.png",
+      "size": 87681,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/quickstart_branch_guid_1.png",
+      "size": 63532,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/quickstart_branch_guid_2.png",
+      "size": 65028,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/quickstart_branch_guid_3.png",
+      "size": 75163,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/quickstart_notebooks_1.png",
+      "size": 172524,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/quickstart_notebooks_2_select_conda.png",
+      "size": 355508,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/scoring-lake-dataset.png",
+      "size": 855774,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esml/images/split_gold_and_train_automl.png",
+      "size": 1012541,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/baselayer/cmn.py",
+      "size": 6234,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/core/AMLutils.py",
+      "size": 1010,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/core/__init__.py",
+      "size": 0,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLDatalake.py",
+      "size": 252,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLDataset.py",
+      "size": 142,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "esmlrt/settings/project_specific/model/your_scoring_file_v_1_0_0.py",
+      "size": 5502,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/01_read_health.py",
+      "size": 2089,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/02_alerts.py",
+      "size": 3685,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/03_external_signals.py",
+      "size": 3245,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/04_ai_triage.py",
+      "size": 1514,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/05_mcp_tools.py",
+      "size": 1192,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/06_multiple_models.py",
+      "size": 5623,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    },
+    {
+      "path": "healthmodel/usecase_code/_common.py",
+      "size": 1609,
+      "class": "unreferenced",
+      "reason": "nothing reaches it from an entry point"
+    }
+  ]
+}
