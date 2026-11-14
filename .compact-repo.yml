@@ -291,23 +291,24 @@ keep:
   - "environment_setup/aifactory/bicep/copy_to_local_settings/**"   # decision D6
 
   # --- Images that README.md and two v2 documents embed (37-datascientist-ml-acceleration, 42-FAQ-01).
-  # They live under esml/images; everything else under esml/ is dropped in round 3.
-  - "esml/images/01_setup_model_10.png"
-  - "esml/images/01_setup_model_3.png"
-  - "esml/images/01_setup_model_9.png"
-  - "esml/images/23_esml_pipeline_overview_intro.png"
-  - "esml/images/aml-pipeline_batch_ppt-3.png"
-  - "esml/images/deploy-to-aks.png"
-  - "esml/images/esml-automapping.png"
-  - "esml/images/esml-mlops-2.png"
-  - "esml/images/esml-s01e01-3.png"
-  - "esml/images/esml-s02e01-challenge.png"
-  - "esml/images/esml-s02e01-the-solution.png"
-  - "esml/images/esml-settings.png"
-  - "esml/images/esml-testset-scoring.png"
-  - "esml/images/mlops-env-arg.png"
-  - "esml/images/split_gold_and_train_automl_small.png"
-  - "esml/images/templates-aml.png"
+  # They lived under esml/images until round 4 moved them to documentation/images/esml; everything else
+  # under esml/ was dropped in round 3.
+  - "documentation/images/esml/01_setup_model_10.png"
+  - "documentation/images/esml/01_setup_model_3.png"
+  - "documentation/images/esml/01_setup_model_9.png"
+  - "documentation/images/esml/23_esml_pipeline_overview_intro.png"
+  - "documentation/images/esml/aml-pipeline_batch_ppt-3.png"
+  - "documentation/images/esml/deploy-to-aks.png"
+  - "documentation/images/esml/esml-automapping.png"
+  - "documentation/images/esml/esml-mlops-2.png"
+  - "documentation/images/esml/esml-s01e01-3.png"
+  - "documentation/images/esml/esml-s02e01-challenge.png"
+  - "documentation/images/esml/esml-s02e01-the-solution.png"
+  - "documentation/images/esml/esml-settings.png"
+  - "documentation/images/esml/esml-testset-scoring.png"
+  - "documentation/images/esml/mlops-env-arg.png"
+  - "documentation/images/esml/split_gold_and_train_automl_small.png"
+  - "documentation/images/esml/templates-aml.png"
 
 drop:
   # --- Installers (R3) -----------------------------------------------------------------------------------

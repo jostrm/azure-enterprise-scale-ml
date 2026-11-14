@@ -69,7 +69,7 @@ Open a notebook (note what level the folder is on). You can use any combinations
 - Note: If you cannot see either `notebook_template_...` or `settings` folder in your ROOT, then you need to `INIT` all TEMPLATES, run this notebook: [01_init_templates_ALL.ipynb](../../azure-enterprise-scale-ml/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
 
 ### Select correct CONDA environment, when running notebooks (only need to do this once, per notebook)
-![](../esml/images/quickstart_notebooks_2_select_conda.png)
+![](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/esml/images/quickstart_notebooks_2_select_conda.png?raw=true)
 
 
 # FAQ: How-to clone repo with submodule to local computer? 

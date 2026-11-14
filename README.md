@@ -207,11 +207,11 @@ Other requirements were to have an `enterprise datalake design`, able to `share 
 -	`Challenge 3:` Turnkey: Datalake, DataOps,  INNER & OUTER LOOP MLOps
 Also, the full solution should be able to be provisioned 100% via `infrastructure-as-code`, to be recreated and scale across multiple Azure subscriptions, and `project-based` to scale up to 250 projects - all with their own set of services such as their own Azure machine learning workspace & compute clusters.
 
-![](./esml/images/esml-s02e01-challenge.png)
+![](./documentation/images/esml/esml-s02e01-challenge.png)
 
 ## THE Strategy 2019
 To meet the requirements & challenge, multiple best practices needed to be married and implemented, such as: `CAF/WAF, MLOps, Datalake design, AI Factory, Microsoft Intelligent Data Platform / Modern Data Architecture.`
-![](./esml/images/esml-s02e01-the-solution.png)
+![](./documentation/images/esml/esml-s02e01-the-solution.png)
 An open source initiative could help all at once, this open-source accelerator Enterprise Scale ML(ESML) -  `to get an AI Factory on Azure`
 
 ## THE Solution 2019 - TEMPLATES & Accelerator
@@ -229,7 +229,7 @@ The below is how it looked like, when ESML automated both the infrastructure, an
 TRAINING & INFERENCE pipeline templates types in ESML AIFactory that accelerates for the end-user. 
 - 0.1% percentage of the code to write, to go from R&D process, to productional Pipelines: 
 
-![](./esml/images/23_esml_pipeline_overview_intro.png)
+![](./documentation/images/esml/23_esml_pipeline_overview_intro.png)
 
 </details>
 
