@@ -160,7 +160,8 @@ class McpPipelineTests(unittest.TestCase):
         )
         self.assertEqual("self", self.steps[0]["checkout"])
         self.assertEqual("recursive", self.steps[0]["submodules"])
-        self.assertEqual(0, self.steps[0]["fetchDepth"])
+        # One commit is enough: no step reads history (unit/test_pipeline_checkout_depth.py).
+        self.assertEqual(1, self.steps[0]["fetchDepth"])
         self.assertEqual(
             {
                 "target": "${{ parameters.deploymentTarget }}",

@@ -29,7 +29,7 @@ stages:
             steps:
               - checkout: self
                 submodules: recursive
-                fetchDepth: 0
+                fetchDepth: 1
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-cross-charging.yaml
                 parameters:
@@ -56,7 +56,7 @@ stages:
             steps:
               - checkout: self
                 submodules: recursive
-                fetchDepth: 0
+                fetchDepth: 1
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-cross-charging.yaml
                 parameters:
@@ -83,7 +83,7 @@ stages:
             steps:
               - checkout: self
                 submodules: recursive
-                fetchDepth: 0
+                fetchDepth: 1
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-cross-charging.yaml
                 parameters:

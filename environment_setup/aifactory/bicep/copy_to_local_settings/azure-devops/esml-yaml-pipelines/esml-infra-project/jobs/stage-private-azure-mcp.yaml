@@ -37,7 +37,7 @@ jobs:
           steps:
             - checkout: self
               submodules: recursive
-              fetchDepth: 0
+              fetchDepth: 1
               displayName: Checkout with submodules
             - template: ./job-0-reviewed-project-config.yaml
               parameters:

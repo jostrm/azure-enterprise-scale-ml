@@ -65,6 +65,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_json_identity_routing.py",
         "unit/test_json_override_runtime_names.py",
         "unit/test_linux_project_pipeline.py",
+        "unit/test_pipeline_checkout_depth.py",
         "unit/test_preflight_env_keeps_job_values.py",
         "unit/test_project_deployment_contract.py",
         "unit/test_project_only_launchers.py",
