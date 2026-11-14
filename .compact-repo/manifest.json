@@ -1,11 +1,11 @@
 {
   "schema": "compact-repo/manifest/1",
-  "tool_version": "0.1.0rc1",
-  "base_commit": "c8ab933fb1ea58ae799e962bc21d568a154745df",
-  "profile_hash": "40c6d9b497a288d21c95495d84e0455207e1119606479623c8c185873f59cf11",
+  "tool_version": "0.1.0",
+  "base_commit": "550e8f4a9e848ffcfa782b59fe9bb1410032d633",
+  "profile_hash": "a252e4946e8b0daad55aaf01f90b07a824c67b4a92d80e0a65a30877319fae87",
   "profile": {
     "version": 1,
-    "base": "c8ab933fb1ea58ae799e962bc21d568a154745df",
+    "base": "550e8f4a9e848ffcfa782b59fe9bb1410032d633",
     "target": "release/v1.26",
     "roots": [
       {
@@ -327,6 +327,14 @@
       {
         "path": "environment_setup/install_config_wizard/windows/SHA256SUMS.txt",
         "reason": "Read by unit/test_install_config_wizard_downloads.py."
+      },
+      {
+        "path": "copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/**",
+        "reason": "ML Model Factory data-ops template; accelerator/tests/test_orchestration_matrix.py and test_storage_selection.py read it."
+      },
+      {
+        "path": "copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/**",
+        "reason": "ML Model Factory MLOps template for Azure DevOps and GitHub; accelerator/tests/test_orchestration_matrix.py reads it."
       }
     ],
     "externals": [
@@ -381,9 +389,23 @@
       "usecase_code/50-ml-model-factory/**",
       "esml-v2/**",
       "environment_setup/azurefactory-cli/**",
-      "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/**",
       "environment_setup/aifactory/bicep/copy_to_local_settings/**",
-      "copy_my_subfolders_to_my_grandparent/**"
+      "esml/images/01_setup_model_10.png",
+      "esml/images/01_setup_model_3.png",
+      "esml/images/01_setup_model_9.png",
+      "esml/images/23_esml_pipeline_overview_intro.png",
+      "esml/images/aml-pipeline_batch_ppt-3.png",
+      "esml/images/deploy-to-aks.png",
+      "esml/images/esml-automapping.png",
+      "esml/images/esml-mlops-2.png",
+      "esml/images/esml-s01e01-3.png",
+      "esml/images/esml-s02e01-challenge.png",
+      "esml/images/esml-s02e01-the-solution.png",
+      "esml/images/esml-settings.png",
+      "esml/images/esml-testset-scoring.png",
+      "esml/images/mlops-env-arg.png",
+      "esml/images/split_gold_and_train_automl_small.png",
+      "esml/images/templates-aml.png"
     ],
     "drop": [
       "**/previous-release/**",
@@ -465,7 +487,22 @@
       "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Dev/ESML-project002_M03-Dev.json",
       "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.json",
       "esml/azure_provisioning/azure_devops_pipelines/Release/Dev/Release-Online-Dev.json",
-      "esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json"
+      "esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json",
+      "esml/**",
+      "esmlrt/**",
+      "esmlfac/**",
+      "copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb",
+      "copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb",
+      "copy_my_subfolders_to_my_grandparent/adf/**",
+      "copy_my_subfolders_to_my_grandparent/dbx/**",
+      "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**",
+      "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**",
+      "copy_my_subfolders_to_my_grandparent/mlops/old/**",
+      "copy_my_subfolders_to_my_grandparent/notebook_templates/**",
+      "copy_my_subfolders_to_my_grandparent/settings/**",
+      "environment_setup/install_sdk/**",
+      "usecase_code/00-install-prereqs/**",
+      "documentation/v1/**"
     ],
     "followers": {
       "tests": [
@@ -507,65 +544,65 @@
   },
   "totals": {
     "files": {
-      "total": 3105,
-      "keep": 3030,
-      "drop": 75
+      "total": 3031,
+      "keep": 2694,
+      "drop": 337
     },
     "bytes": {
-      "total": 309196475,
-      "keep": 308845225,
-      "drop": 351250
+      "total": 308861201,
+      "keep": 294659833,
+      "drop": 14201368
     },
     "by_class": {
       "root": {
-        "files": 865,
-        "bytes": 10256008,
-        "keep_files": 865,
+        "files": 883,
+        "bytes": 10399506,
+        "keep_files": 883,
         "drop_files": 0
       },
       "pinned": {
-        "files": 958,
-        "bytes": 83473599,
-        "keep_files": 958,
+        "files": 744,
+        "bytes": 86387154,
+        "keep_files": 744,
         "drop_files": 0
       },
       "dependency": {
-        "files": 694,
-        "bytes": 171388951,
-        "keep_files": 694,
+        "files": 571,
+        "bytes": 154289841,
+        "keep_files": 571,
         "drop_files": 0
       },
       "follower": {
-        "files": 512,
-        "bytes": 43597838,
-        "keep_files": 511,
-        "drop_files": 1
+        "files": 494,
+        "bytes": 43436670,
+        "keep_files": 494,
+        "drop_files": 0
       },
       "report": {
         "files": 2,
-        "bytes": 150449,
+        "bytes": 146662,
         "keep_files": 2,
         "drop_files": 0
       },
       "forced-drop": {
-        "files": 74,
-        "bytes": 329630,
+        "files": 337,
+        "bytes": 14201368,
         "keep_files": 0,
-        "drop_files": 74
+        "drop_files": 337
       }
     },
     "by_confidence": {
       "certain": {
-        "files": 2242,
-        "bytes": 137795409
+        "files": 2014,
+        "bytes": 133488459
       },
       "likely": {
-        "files": 619,
-        "bytes": 66072823
+        "files": 589,
+        "bytes": 56448083
       },
       "dynamic": {
-        "files": 169,
-        "bytes": 104976993
+        "files": 91,
+        "bytes": 104723291
       }
     },
     "inexact_sizes": 0
@@ -578,454 +615,2026 @@
   "special": [],
   "dropped": [
     {
-      "path": "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-1.json",
-      "size": 18635,
+      "path": "copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb",
+      "size": 15970,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/azure_dashboards/ESML-AIFactory-1.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb)"
     },
     {
-      "path": "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-DEV.json",
-      "size": 16456,
+      "path": "copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb",
+      "size": 14894,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/azure_dashboards/ESML-AIFactory-DEV.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb)"
     },
     {
-      "path": "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-Dev-v2.json",
-      "size": 7682,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/Project000/STEP02b_MASTER_IN_csv_2_Project_IN_parquet_dsXX.zip",
+      "size": 67506,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/azure_dashboards/ESML-AIFactory-Dev-v2.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/azure_dashboards/ESML-AIFactory-v2.json",
-      "size": 7669,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/Project000/STEP04_PRJ_WRITEBACK_2_DB_Upsert.zip",
+      "size": 77874,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/azure_dashboards/ESML-AIFactory-v2.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/cleanup-role-assignments.ps1",
-      "size": 4052,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/Project000/STEP04_ShareBack_2_MASTER.zip",
+      "size": 46440,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/cleanup-role-assignments.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-common/modules-common/nsgCommonScoring.json",
-      "size": 18927,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/Project000/old/STEP02a_MASTER_IN_csv_2_Project_IN_csv_n_OUT_pq.zip",
+      "size": 61822,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-common/modules-common/nsgCommonScoring.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-genai-1/21-sample-app.bicep",
-      "size": 5525,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/STEP01a_MR_ds01_Source_2_MASTER_IN_as_DELTA.zip",
+      "size": 15696,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-genai-1/21-sample-app.bicep)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-project/21-network.bicep",
-      "size": 6733,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/SAP/ds_diabetes/STEP01b_MR_ds01_Source_2_MASTER_IN_v14.zip",
+      "size": 44899,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-project/21-network.bicep)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-rg.ps1",
-      "size": 4120,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/SQL_CSV_PARQUET_abc/STEP00_DEMO_PRJ002_M11_Init_DB.zip",
+      "size": 16708,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-rg.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-sub.ps1",
-      "size": 955,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/MASTER/STEP00_DEMO_PRJ002_M11_Init_DB_1.zip",
+      "size": 16708,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-assign-roles-on-sub.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-assigned-roles-del-on-rg.ps1",
-      "size": 3942,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/LakeOnly/STEP03_IN_2_GOLD_PowerBI_LakeOnly.zip",
+      "size": 26036,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-assigned-roles-del-on-rg.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-cost-from-rg-tag.ps1",
-      "size": 8495,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/LakeOnly/STEP03_IN_2_GOLD_SCORING_wTrigger.zip",
+      "size": 75216,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-cost-from-rg-tag.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-create-compute-instance-in-vnet.sh",
-      "size": 372,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/LakeOnly/STEP03_IN_2_GOLD_TRAIN_v1_3.zip",
+      "size": 51029,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-create-compute-instance-in-vnet.sh)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-delete-subnets-for-project.ps1",
-      "size": 19133,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/WriteBack2SQL/STEP03_IN_2_GOLD_PowerBI.zip",
+      "size": 58056,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-delete-subnets-for-project.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-deleteCapHost.sh",
-      "size": 3931,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/WriteBack2SQL/STEP03_IN_2_GOLD_SCORING.zip",
+      "size": 65234,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-deleteCapHost.sh)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-get_your_own_object_id.ps1",
-      "size": 206,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/PROJECT000/WriteBack2SQL/STEP03_IN_2_GOLD_TRAIN.zip",
+      "size": 38346,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-get_your_own_object_id.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-list-rbac-for-user-on-rg.ps1",
-      "size": 3703,
+      "path": "copy_my_subfolders_to_my_grandparent/adf/v1_3/sql_demo_scripts/M11_AzureSQLDB_create_tables.sql",
+      "size": 1215,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-list-rbac-for-user-on-rg.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/adf/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-load-env-file.ps1",
-      "size": 503,
+      "path": "copy_my_subfolders_to_my_grandparent/dbx/01_dataset_paths.dbc",
+      "size": 4775,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-load-env-file.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/dbx/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-update-az-add-ml-extension.sh",
-      "size": 459,
+      "path": "copy_my_subfolders_to_my_grandparent/dbx/M11.dbc",
+      "size": 39895,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-update-az-add-ml-extension.sh)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/dbx/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/000-update-storage-account-access.ps1",
-      "size": 1972,
+      "path": "copy_my_subfolders_to_my_grandparent/dbx/esml_v14_aml_v145.dbc",
+      "size": 161468,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/000-update-storage-account-access.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/dbx/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/001-set-owner-on-sub.ps1",
-      "size": 1089,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/10-get_environment.py",
+      "size": 2450,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/001-set-owner-on-sub.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/001-set-privateDnsZoneContrib-on-RG.ps1",
-      "size": 1561,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/21-train_in_2_gold_train_pipeline.py",
+      "size": 5364,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/001-set-privateDnsZoneContrib-on-RG.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/002-set-accesspolicy-for-sp.ps1",
-      "size": 424,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/31-deploy_and_smoketest_batch_scoring.py",
+      "size": 3787,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/002-set-accesspolicy-for-sp.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/003-set-BlobDataOwner-to-sp.ps1",
-      "size": 2863,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/32-deploy_online_aks.py",
+      "size": 2570,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/003-set-BlobDataOwner-to-sp.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/10-generate-pwd-4-ado.sh",
-      "size": 1141,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/32-smoke_test_online.py",
+      "size": 2998,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/10-generate-pwd-4-ado.sh)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/01_template_v14/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/100-aml-rbac.ps1",
-      "size": 1403,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops/build_pipeline/ESML-v14-project000_M00-DevTest-clean.json",
+      "size": 15730,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/100-aml-rbac.ps1)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/12-GENAI-update-ip-rule-cmd.sh",
-      "size": 8997,
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops/build_pipeline/ESML-v14-project000_M00-DevTest-clean.yml",
+      "size": 7276,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/12-GENAI-update-ip-rule-cmd.sh)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**)"
     },
     {
-      "path": "environment_setup/aifactory/bicep/esml-util/23-add-dsvm.ps1",
-      "size": 3007,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/23-add-dsvm.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/23-install-sdks-on-win11.ps1",
-      "size": 11168,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/23-install-sdks-on-win11.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/26-remove-esml-coreteam-member.ps1",
-      "size": 0,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/26-remove-esml-coreteam-member.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/26-remove-esml-project-member.ps1",
-      "size": 0,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/26-remove-esml-project-member.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/30-vpn-gateway-certificates.ps1",
-      "size": 1163,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/30-vpn-gateway-certificates.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/31-create-priv-dns-zones-if-not-exists.ps1",
-      "size": 1605,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/31-create-priv-dns-zones-if-not-exists.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/_24-add-aks.ps1",
-      "size": 3724,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/_24-add-aks.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/esml-util/_25-add-users-to-bastion.ps1",
-      "size": 2859,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/esml-util/_25-add-users-to-bastion.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/applicationInsights.bicep",
-      "size": 970,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/applicationInsights.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/common/CmnRoleAssignments.bicep",
-      "size": 0,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/common/CmnRoleAssignments.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csDocIntelligence-kvSecret.bicep",
-      "size": 1130,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csDocIntelligence-kvSecret.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/aiFoundry2025.bicep",
-      "size": 5414,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/aiFoundry2025.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/README.md",
-      "size": 21620,
-      "class": "follower",
-      "reason": "docs: nothing it belongs to is kept"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/azuredeploy.parameters.json",
-      "size": 1711,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/azuredeploy.parameters.json)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteAllCapHosts.ps1",
-      "size": 7741,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteAllCapHosts.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteCapHost.sh",
-      "size": 3266,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteCapHost.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.ps1",
-      "size": 3943,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.sh",
-      "size": 1827,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/listCapHosts.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-project-identity.json",
-      "size": 9265,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-project-identity.json)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csSpeech-kvSecret.bicep",
-      "size": 1059,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csSpeech-kvSecret.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/csVision-kvSecret.bicep",
-      "size": 1076,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/csVision-kvSecret.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/dataLakeVnetRules.bicep",
-      "size": 2688,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/dataLakeVnetRules.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/databases/cosmosdb/cosmosCustomRole.bicep",
-      "size": 863,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/databases/cosmosdb/cosmosCustomRole.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/databases/elasticsearch/elasticsearch-rbac-example.bicep",
-      "size": 3959,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/databases/elasticsearch/elasticsearch-rbac-example.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/databricksAssets.bicep",
-      "size": 6012,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/databricksAssets.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/diagnosticSettingCognitive.bicep",
-      "size": 536,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/diagnosticSettingCognitive.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/diagnostics/eventHubDiagnostics.bicep",
-      "size": 3017,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/diagnostics/eventHubDiagnostics.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/diagnostics/logAnalyticsWorkspaceDiagnostics.bicep",
-      "size": 2503,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/diagnostics/logAnalyticsWorkspaceDiagnostics.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/monitoring/Get-AmplsResources.ps1",
-      "size": 3200,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/monitoring/Get-AmplsResources.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/monitoring/amplsApplicationInsightsManager.bicep",
-      "size": 2491,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/monitoring/amplsApplicationInsightsManager.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/monitoring/amplsHub.bicep",
-      "size": 6776,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/monitoring/amplsHub.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/monitoring/getAmplsApplicationInsights.bicep",
-      "size": 1900,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/monitoring/getAmplsApplicationInsights.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/policyExcemptions/policy-exempt-foundry-subnets.bicep",
-      "size": 3553,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/policyExcemptions/policy-exempt-foundry-subnets.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/privateDnsZone.bicep",
-      "size": 1106,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/privateDnsZone.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/readerRbac.bicep",
-      "size": 761,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/readerRbac.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/resourcegroupManaged.bicep",
-      "size": 342,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/resourcegroupManaged.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/modules/verify-acr-rbac.bicep",
-      "size": 6423,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/modules/verify-acr-rbac.bicep)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/databricks/deployment/_pre_cluster_create.sh",
-      "size": 2883,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/databricks/deployment/_pre_cluster_create.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/databricks/deployment/create_cluster.sh",
-      "size": 2300,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/databricks/deployment/create_cluster.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/databricks/deployment/create_secret_scope.sh",
-      "size": 2283,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/databricks/deployment/create_secret_scope.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/databricks/deployment/post_cluster_create.sh",
-      "size": 1930,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/databricks/deployment/post_cluster_create.sh)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/enableADDloginPostDeploy.ps1",
-      "size": 511,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/enableADDloginPostDeploy.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/test-git-functionality.ps1",
-      "size": 4150,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/test-git-functionality.ps1)"
-    },
-    {
-      "path": "environment_setup/aifactory/bicep/scripts/test-submodule-detection.ps1",
-      "size": 2889,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: environment_setup/aifactory/bicep/scripts/test-submodule-detection.ps1)"
-    },
-    {
-      "path": "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Dev/ESML-project002_M03-Dev.json",
-      "size": 11177,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Dev/ESML-project002_M03-Dev.json)"
-    },
-    {
-      "path": "esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.json",
-      "size": 10908,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: esml/azure_provisioning/azure_devops_pipelines/Build_pipelines/Test_Prod/ESML-project002_M03-Test_Prod.json)"
-    },
-    {
-      "path": "esml/azure_provisioning/azure_devops_pipelines/Release/Dev/Release-Online-Dev.json",
-      "size": 11991,
-      "class": "forced-drop",
-      "reason": "dropped by the profile (drop: esml/azure_provisioning/azure_devops_pipelines/Release/Dev/Release-Online-Dev.json)"
-    },
-    {
-      "path": "esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json",
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops/release/release-test-prod-v14.json",
       "size": 20602,
       "class": "forced-drop",
-      "reason": "dropped by the profile (drop: esml/azure_provisioning/azure_devops_pipelines/Release/Test_Prod/Release-Online-Test_Prod.json)"
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/github_actions/readme.md",
+      "size": 19,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/01-esml-test-steps.ipynb",
+      "size": 36741,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/10-get_environment.py",
+      "size": 2974,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/21-bronze_2_gold.py",
+      "size": 2827,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/22-train_automl.py",
+      "size": 3504,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/23-compare_scoring_register.py",
+      "size": 2985,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/31-deploy_online_aks.py",
+      "size": 2526,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/31-test_online_aks.py",
+      "size": 2833,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/40-deploy_batch_aml.py",
+      "size": 2241,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m03/40-test_batch_aml.py",
+      "size": 2241,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/01-esml-test-steps.ipynb",
+      "size": 48086,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/10-get_environment.py",
+      "size": 2974,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/21-bronze_2_gold_local.py",
+      "size": 3233,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/21-bronze_2_gold_pipeline.py",
+      "size": 2848,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/22-train_automl.py",
+      "size": 3597,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/22-train_manual_pipeline.py",
+      "size": 2804,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/23-compare_scoring_register.py",
+      "size": 2998,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/31-deploy_online_aks.py",
+      "size": 2556,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/31-test_online_aks.py",
+      "size": 2830,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/mlops/old/demo_project02_m12_remote/40-deploy_batch_aml.py",
+      "size": 5081,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/mlops/old/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/1a_R&D_TRAIN_M00_No_rehydrate.ipynb",
+      "size": 127131,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/1b_R&D_TRAIN_M00.ipynb",
+      "size": 133368,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/2a_PROD_TRAIN_PIPE_AML_AutoML.ipynb",
+      "size": 33326,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/2b_PROD_TRAIN_PIPE_DBX_all_steps.ipynb",
+      "size": 32615,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/2c_PROD_TRAIN_PIPE_MIX_some_steps_adv_Databricks.ipynb",
+      "size": 19577,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/2d_PROD_TRAIN_PIPE_ManualML.ipynb",
+      "size": 30530,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/3a_PROD_INF_BATCH_Pipeline.ipynb",
+      "size": 25006,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/3b_PROD_INF_BATCH_Pipeline_DBX.ipynb",
+      "size": 47770,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/3c_PROD_INF_ONLINE_Adv_Private_AKS_Endpoint.ipynb",
+      "size": 21432,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/1_quickstart/3d_PROD_INF_ONLINE_Private_AKS_Endpoint.ipynb",
+      "size": 43627,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/MLmodel",
+      "size": 261,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/conda.yaml",
+      "size": 536,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/model.pkl",
+      "size": 7747,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/python_env.yaml",
+      "size": 122,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/requirements.txt",
+      "size": 234,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/model_diabetes/score.py",
+      "size": 2296,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_aml_sdkv2_versus_sdkv1/10-v1-setup-computeinstance.ipynb",
+      "size": 13187,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_aml_sdkv2_versus_sdkv1/10-v2-setup-computeinstance.ipynb",
+      "size": 11238,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_aml_sdkv2_versus_sdkv1/20-v2-deploy-online-ep.ipynb",
+      "size": 9386,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/00_esmladmin_scripts/1_Lake_init_mount.py",
+      "size": 2493,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/common/ESMLDatabricksController.py",
+      "size": 22143,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/common/azure_functions.py",
+      "size": 8205,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/common/esml_lake_design/esml_lake.py",
+      "size": 6830,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/common/import/azureml_helper.py",
+      "size": 6935,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/common/import/pip_libs.py",
+      "size": 186,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/00_project_settings/esml_project.py",
+      "size": 3806,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/00_model_settings/01_dataset_paths.py",
+      "size": 5115,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/10_in2silver_ds01_diabetes.py",
+      "size": 5743,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/10_in2silver_ds02_other.py",
+      "size": 5743,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/20_merge_2_gold.py",
+      "size": 6722,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/21_split_GOLD_and_register_datasets.py",
+      "size": 7783,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/30_scoring_gold.py",
+      "size": 14683,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/30_train_code/your_train_code.py",
+      "size": 6864,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/01_your_model_placeholder/M01/30_train_register.py",
+      "size": 27740,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/00_model_settings/01_dataset_paths.py",
+      "size": 5115,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes.py",
+      "size": 5743,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds02_other.py",
+      "size": 5740,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/20_merge_2_gold.py",
+      "size": 6722,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/21_split_GOLD_and_register_datasets.py",
+      "size": 7783,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/30_scoring_gold.py",
+      "size": 14683,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/30_train_code/your_train_code.py",
+      "size": 6864,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/esml/dev/project/11_diabetes_model_reg/M11/30_train_register.py",
+      "size": 27740,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_databricks/readme.md",
+      "size": 104,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/00_SQL_DDL.ipynb",
+      "size": 1918,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/00_v143_aml_features.ipynb",
+      "size": 57149,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/00_v143_esml_1_clean.ipynb",
+      "size": 1569,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/00_v143_esml_controller_misc.ipynb",
+      "size": 49711,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/00_v143_esml_ml_features.ipynb",
+      "size": 188979,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/0_update_templates_QUICK.ipynb",
+      "size": 4423,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M01_IN_2_GOLD_pipeline.ipynb",
+      "size": 13858,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M10_v143_esml_classification_1_train_env_dev.ipynb",
+      "size": 172118,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M10_v143_esml_pipelines_mulit_types.ipynb",
+      "size": 36913,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M10_v144_esml_classification.ipynb",
+      "size": 121656,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v143_esml_regression_1a_train_register_testset_online_scoring.ipynb",
+      "size": 105917,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v143_esml_regression_1c_train_Databricks.ipynb",
+      "size": 105478,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v143_esml_regression_batch_score_pipelines.ipynb",
+      "size": 11436,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v143_esml_regression_batch_train_automl.ipynb",
+      "size": 12870,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v143_esml_regression_batch_train_pipe.ipynb",
+      "size": 11766,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/M11_v144_esml_regression_1a_esmlrt_train_register_testset_scoring.ipynb",
+      "size": 120710,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/notebook_templates_esml_v14_2022-06-2023_aml_v143/readme.md",
+      "size": 132,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/1a_R&D_phase_M11.ipynb",
+      "size": 26250,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/1b_R&D_phase_M10.ipynb",
+      "size": 20493,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/2a_PRODUCTION_phase_TRAIN_Pipeline_M11.ipynb",
+      "size": 10591,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/2b_PRODUCTION_phase_TRAIN_Pipeline_M10.ipynb",
+      "size": 10591,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/3a_PRODUCTION_phase_BATCH_INFERENCE_Pipeline_M11.ipynb",
+      "size": 8991,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/0_quickstart_B/3b_PRODUCTION_phase_ONLINE_INFERENCE_Endpoint_M11.ipynb",
+      "size": 6043,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/01-azure-resources.ipynb",
+      "size": 3475,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_1_ESMLProject_constructor.ipynb",
+      "size": 24268,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_1_ESML_ML_features.ipynb",
+      "size": 132742,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_1_clean.ipynb",
+      "size": 2351,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_1_howto_configure_model.ipynb",
+      "size": 15985,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_1_train.ipynb",
+      "size": 24188,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_1_train_env_dev.ipynb",
+      "size": 146776,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_1b_train_M10_Databricks.ipynb",
+      "size": 28263,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_1b_train_env_dev_2_test.ipynb",
+      "size": 19511,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_2_score_testset.ipynb",
+      "size": 36362,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_3_predict_proba_custom_scoring.ipynb",
+      "size": 46586,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_4_batch_pipeline_esml_auto.ipynb",
+      "size": 33758,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_4b_batch_pipelines_mulit_types.ipynb",
+      "size": 38183,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_classification_4b_batch_pipelines_mulit_types2.ipynb",
+      "size": 38183,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_1_train_deploy.ipynb",
+      "size": 103731,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_1b_train_deploy_cars_M12.ipynb",
+      "size": 127922,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_1c_train_deploy_M11_Databricks.ipynb",
+      "size": 105786,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_2_train_2datasets.ipynb",
+      "size": 17521,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_3_compare_and_register.ipynb",
+      "size": 26991,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_3_deploy_score.ipynb",
+      "size": 17234,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_4_dev_to_test.ipynb",
+      "size": 41979,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_6_score_testset_regr.ipynb",
+      "size": 48422,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/all/esml_regression_7_batch_pipeline_esml_auto.ipynb",
+      "size": 34442,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/notebook_templates/old/notebook_templates_esml_v13_2019-2022_aml_v126/readme.md",
+      "size": 108,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/notebook_templates/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/active_dev_test_prod.json",
+      "size": 31,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/aml_compute_dev.json",
+      "size": 210,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/aml_compute_prod.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/aml_compute_test.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/frequency_dev.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/frequency_prod.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/batch/frequency_test.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/online/aks_config_dev.json",
+      "size": 1214,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/online/aks_config_prod.json",
+      "size": 1217,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/online/aks_config_test.json",
+      "size": 1220,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/in2silver.py",
+      "size": 4059,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/scoring_gold.py",
+      "size": 12825,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/silver_merged_2_gold.py",
+      "size": 11038,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/train_manual.py",
+      "size": 22225,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/train_post_automl_step.py",
+      "size": 23255,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/train_split_and_register.py",
+      "size": 7918,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/your_code/ESMLPipelineStepMap.py",
+      "size": 8027,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/your_code/ESMLYourSplitter.py",
+      "size": 3297,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/your_code/your_custom_code.py",
+      "size": 5502,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/your_code/your_scoring_file_v_1_0_0.py",
+      "size": 10468,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/pipeline_template/your_code/your_train_code.py",
+      "size": 11146,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/aml_compute_dev.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/aml_compute_prod.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/aml_compute_test.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/active/automl_active_model_dev.json",
+      "size": 141,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/active/automl_active_model_prod.json",
+      "size": 141,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/active/automl_active_model_test.json",
+      "size": 141,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/automl_dev.json",
+      "size": 1445,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/automl_prod.json",
+      "size": 579,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_defaults/train/automl/automl_test.json",
+      "size": 574,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/dev_test_prod_settings.json",
+      "size": 1591,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/enterprise_specific/naming_convention.json",
+      "size": 1124,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/active/active_in_folder.json",
+      "size": 172,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/active/active_scoring_in_folder.json",
+      "size": 310,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/active/automl_active_model_dev.json",
+      "size": 197,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/active/automl_active_model_prod.json",
+      "size": 141,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/active/automl_active_model_test.json",
+      "size": 199,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/scoring_file_custom.py",
+      "size": 3809,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/scoring_file_dev.py",
+      "size": 2294,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/scoring_file_dev_M01_titanic.py",
+      "size": 3809,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl/scoring_file_test.py",
+      "size": 2294,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/ml/manual_ml_dummy.txt",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/aml_compute_dev.json",
+      "size": 212,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/aml_compute_prod.json",
+      "size": 214,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/aml_compute_test.json",
+      "size": 214,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/frequency_dev.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/frequency_prod.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/batch/frequency_test.json",
+      "size": 49,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/online/aks_config_dev.json",
+      "size": 1207,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/online/aks_config_prod.json",
+      "size": 1221,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/online/aks_config_test.json",
+      "size": 1221,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/aml_compute_dev.json",
+      "size": 305,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/aml_compute_prod.json",
+      "size": 306,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/aml_compute_test.json",
+      "size": 306,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/automl/automl_dev.json",
+      "size": 1356,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/automl/automl_prod.json",
+      "size": 1320,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod_override/train/automl/automl_test.json",
+      "size": 1320,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/lake_settings.json",
+      "size": 1271,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/model_settings.json",
+      "size": 1324,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/project_specific/security_config.json",
+      "size": 619,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "copy_my_subfolders_to_my_grandparent/settings/readme_perf_recommendation.md",
+      "size": 6232,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: copy_my_subfolders_to_my_grandparent/settings/**)"
+    },
+    {
+      "path": "documentation/v1/00-install_quickstart.md",
+      "size": 13074,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/00-readme-old-intro.md",
+      "size": 1053,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/01-install-azureml-sdk-v1+v2.md",
+      "size": 3461,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/01-jumphost-vm-bastion-access.md",
+      "size": 4774,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/02-install_notes_more_info.md",
+      "size": 3274,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/03-use_cases-where_to_start.md",
+      "size": 15696,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/10-AIFactory-infra-subscription-resourceproviders.md",
+      "size": 1795,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/11-AIFactory-infra-cross-location-compute.md",
+      "size": 3146,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "documentation/v1/99-readme-to-add-to-your-repo.md",
+      "size": 9702,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: documentation/v1/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/build_agent/linux_for_unattended_mlops_buildagent/readme.md",
+      "size": 1594,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/build_agent/windows_10_dsvm-cmn-weu-dev-001/readme.md",
+      "size": 1594,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/01-install-azureml-sdk-v1+v2.md",
+      "size": 3298,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/README.md",
+      "size": 24309,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_env.yml",
+      "size": 1039,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_env_linux.yml",
+      "size": 1206,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_env_mac.yml",
+      "size": 1141,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_setup.cmd",
+      "size": 2401,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_setup_linux.sh",
+      "size": 1686,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/automl_setup_mac.sh",
+      "size": 1755,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/check_conda_version.py",
+      "size": 793,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15.zip",
+      "size": 14373,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/README.md",
+      "size": 24309,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_env.yml",
+      "size": 1151,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_env_linux.yml",
+      "size": 1302,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_env_mac.yml",
+      "size": 1237,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_setup.cmd",
+      "size": 2406,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_setup_linux.sh",
+      "size": 1691,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/automl_setup_mac.sh",
+      "size": 1761,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/check_conda_version.py",
+      "size": 793,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_env.yml",
+      "size": 1435,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_env_linux.yml",
+      "size": 882,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_env_mac.yml",
+      "size": 886,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_setup.cmd",
+      "size": 2336,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_setup_linux.sh",
+      "size": 1676,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/automl_setup_mac.sh",
+      "size": 1745,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/check_conda_version.py",
+      "size": 785,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_42/readme.md",
+      "size": 382,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_env.yml",
+      "size": 1605,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_env_linux.yml",
+      "size": 1394,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_env_mac.yml",
+      "size": 1398,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_setup.cmd",
+      "size": 2336,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_setup_linux.sh",
+      "size": 1684,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/automl_setup_mac.sh",
+      "size": 1753,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/check_conda_version.py",
+      "size": 784,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_43/readme.md",
+      "size": 356,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_env.yml",
+      "size": 1798,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_env_linux.yml",
+      "size": 1401,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_env_mac.yml",
+      "size": 1405,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_setup.cmd",
+      "size": 2336,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_setup_linux.sh",
+      "size": 1686,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/automl_setup_mac.sh",
+      "size": 1755,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/check_conda_version.py",
+      "size": 785,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_44/readme.md",
+      "size": 361,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_env.yml",
+      "size": 913,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_env_linux.yml",
+      "size": 919,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_env_mac.yml",
+      "size": 925,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_setup.cmd",
+      "size": 2401,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_setup_linux.sh",
+      "size": 1676,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/automl_setup_mac.sh",
+      "size": 1745,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/check_conda_version.py",
+      "size": 793,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_48/readme.md",
+      "size": 519,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_env.yml",
+      "size": 978,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_env_linux.yml",
+      "size": 919,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_env_mac.yml",
+      "size": 925,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_setup.cmd",
+      "size": 2336,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_setup_linux.sh",
+      "size": 1675,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/automl_setup_mac.sh",
+      "size": 1745,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/check_conda_version.py",
+      "size": 786,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_49/readme.md",
+      "size": 348,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_env.yml",
+      "size": 1054,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_env_linux.yml",
+      "size": 919,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_env_mac.yml",
+      "size": 925,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_setup.cmd",
+      "size": 2401,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_setup_linux.sh",
+      "size": 1675,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/automl_setup_mac.sh",
+      "size": 1745,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/check_conda_version.py",
+      "size": 792,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/AzureML_v1_50/readme.md",
+      "size": 479,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_env.yml",
+      "size": 1912,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_env_linux.yml",
+      "size": 1465,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_env_mac.yml",
+      "size": 1469,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_setup.cmd",
+      "size": 2336,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_setup_linux.sh",
+      "size": 1683,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/automl_setup_mac.sh",
+      "size": 1751,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/check_conda_version.py",
+      "size": 785,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_45/readme.md",
+      "size": 284,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_env.yml",
+      "size": 1310,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_env_linux.yml",
+      "size": 931,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_env_mac.yml",
+      "size": 927,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_setup.cmd",
+      "size": 2401,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_setup_linux.sh",
+      "size": 1676,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/automl_setup_mac.sh",
+      "size": 1745,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/check_conda_version.py",
+      "size": 793,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "environment_setup/install_sdk/user_dev_env_install/_previous_versions_from_1_45/_AzureML_v1_47/conda_147_v2_kvAdded_NoLake.txt",
+      "size": 25223,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: environment_setup/install_sdk/**)"
+    },
+    {
+      "path": "esml/LICENSE",
+      "size": 1162,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/common/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/common/baselayer_azure_ml.py",
+      "size": 98785,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/common/baselayer_azure_ml_pipeline.py",
+      "size": 137301,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/common/baselayer_ml.py",
+      "size": 9292,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/01_setup_model_4.png",
+      "size": 46748,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/01_setup_model_5.png",
+      "size": 70724,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/23_ESML_4_main_components.png",
+      "size": 112198,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/Bicep-1-click.png",
+      "size": 412107,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-arch-small.png",
+      "size": 278885,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-autolake-meta.png",
+      "size": 281704,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-autolake.png",
+      "size": 1188762,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-get-scoring.png",
+      "size": 754019,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-oneslider.png",
+      "size": 931426,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-project-ticket.png",
+      "size": 265032,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-s01e01-0.png",
+      "size": 1281056,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-s01e01-1.png",
+      "size": 582773,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-s01e01-2.png",
+      "size": 235905,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-s02e01-4steps.png",
+      "size": 645119,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/esml-turnkey.png",
+      "size": 1067857,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/mlops-release-gate.png",
+      "size": 129798,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/scoring-batch-or-online.png",
+      "size": 188806,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/images/scoring-lake.png",
+      "size": 782643,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esml/z/README.md",
+      "size": 51602,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esml/**)"
+    },
+    {
+      "path": "esmlfac/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlfac/**)"
+    },
+    {
+      "path": "esmlfac/adapter.py",
+      "size": 1985,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlfac/**)"
+    },
+    {
+      "path": "esmlrt/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/baselayer/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/baselayer/ml.py",
+      "size": 9547,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLController.py",
+      "size": 67109,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLModelCompare.py",
+      "size": 7757,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLPipelineStepMap.py",
+      "size": 9480,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLSplitter.py",
+      "size": 958,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLTestScoringFactory.py",
+      "size": 3873,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/interfaces/iESMLTrainer.py",
+      "size": 1663,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/runtime/ESMLController.py",
+      "size": 8804,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/runtime/ESMLModelCompare2.py",
+      "size": 19725,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/runtime/ESMLSplitter.py",
+      "size": 3164,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/runtime/ESMLTestScoringFactory2.py",
+      "size": 8198,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/runtime/__init__.py",
+      "size": 0,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "esmlrt/settings/project_specific/model/model_settings.json",
+      "size": 1194,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: esmlrt/**)"
+    },
+    {
+      "path": "usecase_code/00-install-prereqs/Install_VSCode_SDKs_RunAsAdmin.bat",
+      "size": 4865,
+      "class": "forced-drop",
+      "reason": "dropped by the profile (drop: usecase_code/00-install-prereqs/**)"
     }
   ]
 }
