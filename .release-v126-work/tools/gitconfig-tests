@@ -1,0 +1,12 @@
+[user]
+	name = AI Factory Tests
+	email = tests@example.invalid
+[commit]
+	gpgsign = false
+[tag]
+	gpgsign = false
+[init]
+	defaultBranch = main
+[core]
+	checkstat = minimal
+	trustctime = false

@@ -1,0 +1,3358 @@
+{
+ "worktree": "/home/user/wt-base",
+ "head": "ebd300db85ab37cdcc96d0c4c552b8d0d4dc8429",
+ "started_utc": "2026-11-14T00:31:47Z",
+ "finished_utc": "2026-11-14T00:37:44Z",
+ "runner_recipe": "7",
+ "ran_this_invocation": [
+  "ml-model-factory",
+  "mlops-2026-09",
+  "dataops-adf"
+ ],
+ "porcelain_after": "",
+ "suites": [
+  {
+   "id": "azurefactory-cli",
+   "component": "environment_setup/azurefactory-cli",
+   "kind": "pytest",
+   "cwd": ".",
+   "test_files": 36,
+   "tests": 1820,
+   "passed": 1765,
+   "failed": 43,
+   "errors": 0,
+   "skipped": 12,
+   "seconds": 103.1,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_documentation_quickstarts.py::test_images_have_alt_text_and_stay_small[documentation/v2/quickstarts/01-install-esaf.md]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_documentation_quickstarts.py::test_every_rest_route_and_body_field_shown_is_one_the_api_route_takes[environment_setup/install_config_wizard/readme.md]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_plan_ensure_offline_api_free_and_scope_bound",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra0]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra1]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra2]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra3]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra4]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[digest]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[reference]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[scope]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[review]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[unknown]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[secret]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[source]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_acknowledgment_is_not_automatic_and_artifacts_are_not_overwritten",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_direct_hash_ensure_supported_without_api",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_partial_failure_uses_failure_code_and_preserves_result",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_result_path_errors_block_before_ensure_or_report_reconciliation_after",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_exact_api_receipt_then_separate_confirm",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_candidate_scope_tampering_even_with_recomputed_digest_is_rejected",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[binding]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[factory]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[revision]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_bundle_and_copy_rules_include_all_helpers",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_plan_and_publish_one_consent_exact_scope_and_offline_cost",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_never_invents_approval_or_governance[flags0-approval-required]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_never_invents_approval_or_governance[flags1-blocked]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_cost_and_intent_are_saved_before_mutation",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_explicit_blob_options[explicit0]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_explicit_blob_options[explicit1]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_existing_blob_binding_without_mode_option",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_excludes_dependencies_and_reused_identity_groups[True]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_excludes_dependencies_and_reused_identity_groups[False]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_never_turns_shared_identity_dependency_into_owned_group",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_rejects_register_drift_between_convenience_and_plan",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_respects_explicit_empty_creation_and_rejects_broad_roles",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_catalog_revision_preflight_blocks_before_ensure",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[ensure]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[prepare]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[confirm]",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_blocked_binding_receipt_never_publishes",
+     "kind": "failure",
+     "reason": ""
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_rejects_changed_binding_preview",
+     "kind": "failure",
+     "reason": ""
+    }
+   ],
+   "summary_line": "43 failed, 1765 passed, 12 skipped in 102.38s (0:01:42)",
+   "repo_command": "python -m pytest environment_setup/azurefactory-cli/tests/<files> -q  (deploy-docs.yml, repo root); readme: pip install -e .",
+   "notes": "Package has no dependencies; azurefactory comes from <worktree>/src (tests/conftest.py + PYTHONPATH).",
+   "environment": {
+    "venv": "/home/user/venvs/azurefactory-cli",
+    "python_version": "3.12",
+    "inputs_sha256": "e8fda5acddc10d5ef8b2561f8f6db79699376d498d43476be04f1b60e01268b5",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/azurefactory-cli",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10 mkdocs-material setuptools wheel"
+    ],
+    "install_seconds": 8.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/azurefactory-cli/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/azurefactory-cli/bin -- env PYTHONPATH=<worktree>/environment_setup/azurefactory-cli/src /home/user/venvs/azurefactory-cli/bin/python -m pytest environment_setup/azurefactory-cli/tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/azurefactory-cli/junit.xml",
+   "started_utc": "2026-11-14T00:07:28Z",
+   "finished_utc": "2026-11-14T00:09:11Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Git Bash is unavailable",
+    "Optional canonical source contract validation",
+    "Optional canonical source roundtrip"
+   ],
+   "rerun": [
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_documentation_quickstarts.py::test_images_have_alt_text_and_stay_small[documentation/v2/quickstarts/01-install-esaf.md]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.18s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_documentation_quickstarts.py::test_every_rest_route_and_body_field_shown_is_one_the_api_route_takes[environment_setup/install_config_wizard/readme.md]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.16s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_plan_ensure_offline_api_free_and_scope_bound",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra0]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.7,
+     "summary_line": "1 failed in 1.09s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra1]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.22s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra2]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra3]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.25s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_ensure_rejects_missing_consent_or_inconsistent_flags[extra4]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[digest]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.9,
+     "summary_line": "1 failed in 0.32s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[reference]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[scope]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[review]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[unknown]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.24s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[secret]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_review_integrity_and_source_changes_block_ensure[source]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_acknowledgment_is_not_automatic_and_artifacts_are_not_overwritten",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_direct_hash_ensure_supported_without_api",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.18s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_partial_failure_uses_failure_code_and_preserves_result",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.24s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_result_path_errors_block_before_ensure_or_report_reconciliation_after",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.24s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_exact_api_receipt_then_separate_confirm",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_candidate_scope_tampering_even_with_recomputed_digest_is_rejected",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.27s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[binding]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[factory]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_binding_preview_must_acknowledge_exact_candidate[revision]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_bundle_and_copy_rules_include_all_helpers",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_plan_and_publish_one_consent_exact_scope_and_offline_cost",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_never_invents_approval_or_governance[flags0-approval-required]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.21s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_never_invents_approval_or_governance[flags1-blocked]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_cost_and_intent_are_saved_before_mutation",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_explicit_blob_options[explicit0]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_explicit_blob_options[explicit1]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_preserves_existing_blob_binding_without_mode_option",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_excludes_dependencies_and_reused_identity_groups[True]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_excludes_dependencies_and_reused_identity_groups[False]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_auto_creation_never_turns_shared_identity_dependency_into_owned_group",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_rejects_register_drift_between_convenience_and_plan",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_respects_explicit_empty_creation_and_rejects_broad_roles",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_catalog_revision_preflight_blocks_before_ensure",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[ensure]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[prepare]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.21s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_persists_partial_or_uncertain_failure_without_retry[confirm]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_blocked_binding_receipt_never_publishes",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    },
+    {
+     "id": "environment_setup/azurefactory-cli/tests/test_enrollment.py::test_wrapper_rejects_changed_binding_preview",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.8,
+     "summary_line": "1 failed in 0.19s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 43,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "graphify",
+   "component": "environment_setup/graphify",
+   "kind": "pytest",
+   "cwd": ".",
+   "test_files": 4,
+   "tests": 30,
+   "passed": 30,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 9.0,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "30 passed in 8.35s",
+   "repo_command": "no documented test command; environment per documentation/architecture/contracts/dual-graph-lifecycle.md (uv venv --python 3.12; pip install -r requirements.lock.txt), repo root",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/graphify",
+    "python_version": "3.12",
+    "inputs_sha256": "18f3d68135d3adca3667299e8e5cd60180d6c986d8b367286b3b9e45f7fab904",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/graphify",
+     "uv pip install --python <venv>/bin/python -r <worktree>/environment_setup/graphify/requirements.txt -c <worktree>/environment_setup/graphify/requirements.lock.txt  [FALLBACK: alternative 2; earlier alternatives failed]"
+    ],
+    "install_seconds": 1.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/graphify/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/graphify/bin -- /home/user/venvs/graphify/bin/python -m pytest environment_setup/graphify/tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/graphify/junit.xml",
+   "started_utc": "2026-11-14T00:09:12Z",
+   "finished_utc": "2026-11-14T00:09:21Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "wizard-api-usage-examples",
+   "component": "environment_setup/install_config_wizard/api-usage-examples",
+   "kind": "pytest",
+   "cwd": "environment_setup/install_config_wizard/api-usage-examples",
+   "test_files": 3,
+   "tests": 168,
+   "passed": 148,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 20,
+   "seconds": 16.7,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "148 passed, 20 skipped in 16.22s",
+   "repo_command": "python -m pytest .\\tests ..\\..\\azurefactory-cli\\tests\\test_{cli,client,reviews,quickstart_examples}.py -q --basetemp .local\\pytest-work  (readme, from this folder)",
+   "notes": "Deviation: the four azurefactory-cli files of the readme command run in suite azurefactory-cli, and --basetemp .local/pytest-work is dropped so that nothing is written into the worktree.",
+   "environment": {
+    "venv": "/home/user/venvs/wizard-api-usage-examples",
+    "python_version": "3.12",
+    "inputs_sha256": "ebd390d79bfaaceda6a00cb01db7f90e948ae11d94cba93fd3b4c5f570170956",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/wizard-api-usage-examples",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 0.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/wizard-api-usage-examples/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/wizard-api-usage-examples/bin -- env PYTHONPATH=<worktree>/environment_setup/azurefactory-cli/src /home/user/venvs/wizard-api-usage-examples/bin/python -m pytest ./tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/wizard-api-usage-examples/junit.xml",
+   "started_utc": "2026-11-14T00:09:22Z",
+   "finished_utc": "2026-11-14T00:09:38Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Optional authoritative model validation",
+    "Optional master-source contract validation"
+   ]
+  },
+  {
+   "id": "bicep-automation",
+   "component": "environment_setup/aifactory/bicep/copy_to_local_settings/automation",
+   "kind": "pytest",
+   "cwd": "environment_setup/aifactory/bicep/copy_to_local_settings/automation",
+   "test_files": 3,
+   "tests": 145,
+   "passed": 145,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 10.4,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "145 passed in 9.83s",
+   "repo_command": "no documented command; tests import sibling modules, so they run from the automation folder",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/bicep-automation",
+    "python_version": "3.12",
+    "inputs_sha256": "f62d0b229b79e726adfc4ef9d888db1c623ed051268aee92c38d0f9dd2e486d0",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/bicep-automation",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 0.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/bicep-automation/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/bicep-automation/bin -- /home/user/venvs/bicep-automation/bin/python -m pytest . -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/bicep-automation/junit.xml",
+   "started_utc": "2026-11-14T00:09:39Z",
+   "finished_utc": "2026-11-14T00:09:49Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "esml-v2",
+   "component": "esml-v2",
+   "kind": "pytest",
+   "cwd": "esml-v2",
+   "test_files": 27,
+   "tests": 952,
+   "passed": 952,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 268.7,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "952 passed, 51483 warnings in 263.73s (0:04:23)",
+   "repo_command": "python -m pytest from esml-v2 ([tool.pytest.ini_options] testpaths=tests, pythonpath=., ../usecase_code/50-ml-model-factory/accelerator/src)",
+   "notes": "PYTHONPATH = what an installed azure-esml-sdk provides (azure_esml + bundled ml_model_factory), taken from the worktree: one test starts `python -m azure_esml.domain_layer.runtime` as a subprocess, which does not see pytest's own pythonpath setting.",
+   "environment": {
+    "venv": "/home/user/venvs/esml-v2",
+    "python_version": "3.12",
+    "inputs_sha256": "e71c084d93225b6671cf2e37aa92ccac9f2cfb14eb84b05d918a3bf98f71bc26",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/esml-v2",
+     "uv pip install --python <venv>/bin/python -r <worktree>/esml-v2/pyproject.toml --extra train --extra storage --extra dev",
+     "uv pip install --python <venv>/bin/python six",
+     "uv pip install --python <venv>/bin/python Pillow>=11,<13",
+     "uv pip install --python <venv>/bin/python setuptools>=77 wheel"
+    ],
+    "install_seconds": 4.1
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/esml-v2:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/esml-v2/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/esml-v2:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/esml-v2/bin -- env PYTHONPATH=<worktree>/esml-v2:<worktree>/usecase_code/50-ml-model-factory/accelerator/src /home/user/venvs/esml-v2/bin/python -m pytest -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/esml-v2/junit.xml",
+   "started_utc": "2026-11-14T00:09:53Z",
+   "finished_utc": "2026-11-14T00:14:22Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "healthmodel",
+   "component": "healthmodel",
+   "kind": "pytest",
+   "cwd": "healthmodel",
+   "test_files": 20,
+   "tests": 557,
+   "passed": 549,
+   "failed": 3,
+   "errors": 0,
+   "skipped": 5,
+   "seconds": 14.4,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_bicep.py::test_main_template_compiles_without_warnings",
+     "kind": "failure",
+     "reason": "assert [\"/home/user/...quence '\\\\/'\"] == []"
+    },
+    {
+     "id": "tests/test_catalog.py::test_every_default_true_resource_flag_is_modelled",
+     "kind": "failure",
+     "reason": "AssertionError: assert {'enableAFoun...Service', ...} == {'enableAFoun...Service', ...}"
+    },
+    {
+     "id": "tests/test_catalog.py::test_every_enable_flag_is_mapped_or_explained",
+     "kind": "failure",
+     "reason": "AssertionError: assert {'enableAIFac...ersonas', ...} == set()"
+    }
+   ],
+   "summary_line": "3 failed, 549 passed, 5 skipped in 13.81s",
+   "repo_command": "cd healthmodel; python -m pytest  (readme section 14; addopts=-q, pythonpath=src,tests; live tests opt in with AIF_HEALTHMODEL_LIVE=1)",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/healthmodel",
+    "python_version": "3.12",
+    "inputs_sha256": "f0d34b19db0a5713491f6884e891ce8ca7eee465775206e31e9f0f3b805a8ccf",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/healthmodel",
+     "uv pip install --python <venv>/bin/python -r <worktree>/healthmodel/pyproject.toml --extra test"
+    ],
+    "install_seconds": 0.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/healthmodel/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/healthmodel/bin -- /home/user/venvs/healthmodel/bin/python -m pytest --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/healthmodel/junit.xml",
+   "started_utc": "2026-11-14T00:14:22Z",
+   "finished_utc": "2026-11-14T00:14:37Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "could not import 'jsonschema': No module named 'jsonschema'",
+    "set AIF_HEALTHMODEL_LIVE=1 and AIF_HEALTHMODEL_ID to run live tests",
+    "write test is opt-in"
+   ],
+   "rerun": [
+    {
+     "id": "tests/test_bicep.py::test_main_template_compiles_without_warnings",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 5.6,
+     "summary_line": "1 failed in 5.11s"
+    },
+    {
+     "id": "tests/test_catalog.py::test_every_default_true_resource_flag_is_modelled",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.6,
+     "summary_line": "1 failed in 0.09s"
+    },
+    {
+     "id": "tests/test_catalog.py::test_every_enable_flag_is_mapped_or_explained",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.6,
+     "summary_line": "1 failed in 0.07s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 3,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "mcp",
+   "component": "mcp",
+   "kind": "pytest",
+   "cwd": "mcp",
+   "test_files": 18,
+   "tests": 676,
+   "passed": 673,
+   "failed": 3,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 34.8,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_backend.py::test_costs_use_real_cost_skill_and_bound_azure_resource_group",
+     "kind": "failure",
+     "reason": "aifactory_mcp.backend.BackendError: The Factory request was rejected by the configured policy or service."
+    },
+    {
+     "id": "tests/test_rollout_scaffold.py::test_native_command_resolves_azure_cli_batch_launcher_without_a_shell",
+     "kind": "failure",
+     "reason": "RuntimeError: An unsupported batch launcher cannot be executed safely."
+    },
+    {
+     "id": "tests/test_runtime.py::test_package_outside_checkout_requires_explicit_repository",
+     "kind": "failure",
+     "reason": "Failed: DID NOT RAISE RuntimeError"
+    }
+   ],
+   "summary_line": "3 failed, 673 passed in 33.49s",
+   "repo_command": "& $Python -m pytest -q from mcp (readme); install: pip install -r ../usecase_code/40-agent-factory/40-aifactory-agent/requirements.txt -e ../environment_setup/azurefactory-cli -e .[dev]",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/mcp",
+    "python_version": "3.12",
+    "inputs_sha256": "65b8a30672f82d983cf79fab5dd58b65c37280d73c8e27222f12244156ce6291",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/mcp",
+     "uv pip install --python <venv>/bin/python -r <worktree>/mcp/deploy/requirements.linux.lock.txt",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 1.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/mcp/src:/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/mcp/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/mcp/src:/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/mcp/bin -- env PYTHONPATH=<worktree>/mcp/src:<worktree>/environment_setup/azurefactory-cli/src /home/user/venvs/mcp/bin/python -m pytest -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/mcp/junit.xml",
+   "started_utc": "2026-11-14T00:14:38Z",
+   "finished_utc": "2026-11-14T00:15:13Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [],
+   "rerun": [
+    {
+     "id": "tests/test_backend.py::test_costs_use_real_cost_skill_and_bound_azure_resource_group",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.2,
+     "summary_line": "1 failed in 1.34s"
+    },
+    {
+     "id": "tests/test_rollout_scaffold.py::test_native_command_resolves_azure_cli_batch_launcher_without_a_shell",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.9,
+     "summary_line": "1 failed in 0.11s"
+    },
+    {
+     "id": "tests/test_runtime.py::test_package_outside_checkout_requires_explicit_repository",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.18s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 3,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "func-aifactory-lifecycle",
+   "component": "usecase_code/10-azure-function/12_func_aifactory_lifecycle",
+   "kind": "pytest",
+   "cwd": "usecase_code/10-azure-function/12_func_aifactory_lifecycle",
+   "test_files": 23,
+   "tests": 380,
+   "passed": 380,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 25.5,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "380 passed in 24.98s",
+   "repo_command": "python -m venv .venv; .\\.venv\\Scripts\\pip install -r requirements-dev.txt (README); pytest from the folder",
+   "notes": "As the component declares it: the azurefactory SDK is the commit pinned in requirements.txt, fetched from GitHub at venv build time, NOT the worktree's SDK (tests/conftest.py prefers an installed SDK).",
+   "environment": {
+    "venv": "/home/user/venvs/func-aifactory-lifecycle",
+    "python_version": "3.12",
+    "inputs_sha256": "8f449039eea3e2dda907ae1b3a21477b6be2d45d22d3a7a55e6b1eb34e92ade9",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/func-aifactory-lifecycle",
+     "install_func_requirements_pinned_sdk_sparse()  # requirements-dev.txt; the git-pinned azurefactory-cli is built from a shallow, sparse checkout of that commit."
+    ],
+    "install_seconds": 1.5
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/func-aifactory-lifecycle/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/func-aifactory-lifecycle/bin -- /home/user/venvs/func-aifactory-lifecycle/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/func-aifactory-lifecycle/junit.xml",
+   "started_utc": "2026-11-14T00:15:15Z",
+   "finished_utc": "2026-11-14T00:15:40Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "func-aifactory-lifecycle-wt-sdk",
+   "component": "usecase_code/10-azure-function/12_func_aifactory_lifecycle",
+   "kind": "pytest",
+   "cwd": "usecase_code/10-azure-function/12_func_aifactory_lifecycle",
+   "test_files": 23,
+   "tests": 380,
+   "passed": 380,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 25.0,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "380 passed in 24.52s",
+   "repo_command": "variant of func-aifactory-lifecycle: tests/conftest.py falls back to the SDK of the accelerator checkout when azurefactory is not installed",
+   "notes": "Same tests, but the azurefactory SDK comes from <worktree>/environment_setup/azurefactory-cli/src (conftest fallback), so SDK changes of the worktree are exercised.",
+   "environment": {
+    "venv": "/home/user/venvs/func-aifactory-lifecycle-wt-sdk",
+    "python_version": "3.12",
+    "inputs_sha256": "cc8fa72272269df14e2a07ea00f91ddf148fbd1f1884bbf841605efd8bbce71e",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/func-aifactory-lifecycle-wt-sdk",
+     "install_func_requirements_without_sdk()  # requirements-dev.txt minus the azurefactory-cli line (the SDK then comes from the worktree)."
+    ],
+    "install_seconds": 0.5
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/func-aifactory-lifecycle-wt-sdk/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/func-aifactory-lifecycle-wt-sdk/bin -- /home/user/venvs/func-aifactory-lifecycle-wt-sdk/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/func-aifactory-lifecycle-wt-sdk/junit.xml",
+   "started_utc": "2026-11-14T00:15:41Z",
+   "finished_utc": "2026-11-14T00:16:06Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "agent-factory",
+   "component": "usecase_code/40-agent-factory",
+   "kind": "pytest",
+   "cwd": "usecase_code/40-agent-factory",
+   "test_files": 28,
+   "tests": 622,
+   "passed": 599,
+   "failed": 4,
+   "errors": 0,
+   "skipped": 19,
+   "seconds": 28.2,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_customer_configuration_overlays_the_generated_baseline",
+     "kind": "failure",
+     "reason": "ModuleNotFoundError: No module named 'azurefactory'"
+    },
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_generated_configuration_is_valid_for_the_applications_own_schema_with_voice_on",
+     "kind": "failure",
+     "reason": "ModuleNotFoundError: No module named 'azurefactory'"
+    },
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_command_line_reports_configuration_and_command_errors_in_one_line",
+     "kind": "failure",
+     "reason": "TypeError: test_the_command_line_reports_configuration_and_command_errors_in_one_line.<locals>.<lambda>() got an unexpected keyword argument 'skip_incomplete'"
+    },
+    {
+     "id": "tests/test_mcp_gateway.py::IntegrationTests::test_runtime_settings_satisfy_the_mcp_image_settings_model",
+     "kind": "failure",
+     "reason": "ModuleNotFoundError: No module named 'azurefactory'"
+    }
+   ],
+   "summary_line": "4 failed, 599 passed, 19 skipped, 929 subtests passed in 27.04s",
+   "repo_command": ".\\.venv\\Scripts\\python.exe -m unittest discover -s tests  from 40-agent-factory, Python 3.13 (tests/readme.md)",
+   "notes": "Documented operator environment only. Three pytest-style tests import 40-aifactory-agent and therefore need its runtime (azurefactory SDK, httpx, ...), which requirements.txt does not install; the two environments must not be merged according to the agent readme.",
+   "environment": {
+    "venv": "/home/user/venvs/agent-factory",
+    "python_version": "3.13",
+    "inputs_sha256": "e8009a91a1abc9abcbb8b5e7e5c7ed99a82ad9f9aacdf09e40e8f6d8acbef8f4",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.13 /home/user/venvs/agent-factory",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/40-agent-factory/requirements.txt",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10 PyYAML"
+    ],
+    "install_seconds": 1.2
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/agent-factory/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/agent-factory/bin -- /home/user/venvs/agent-factory/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/agent-factory/junit.xml",
+   "started_utc": "2026-11-14T00:16:07Z",
+   "finished_utc": "2026-11-14T00:16:35Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Optional: install example requirements in an isolated venv.",
+    "example requirements not installed: No module named 'dotenv'"
+   ],
+   "rerun": [
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_customer_configuration_overlays_the_generated_baseline",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 failed in 0.44s"
+    },
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_generated_configuration_is_valid_for_the_applications_own_schema_with_voice_on",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 failed in 0.57s"
+    },
+    {
+     "id": "tests/test_agent_live_voice.py::test_the_command_line_reports_configuration_and_command_errors_in_one_line",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "tests/test_mcp_gateway.py::IntegrationTests::test_runtime_settings_satisfy_the_mcp_image_settings_model",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.1,
+     "summary_line": "1 failed in 0.34s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 4,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "aifactory-agent",
+   "component": "usecase_code/40-agent-factory/40-aifactory-agent",
+   "kind": "pytest",
+   "cwd": "usecase_code/40-agent-factory/40-aifactory-agent",
+   "test_files": 32,
+   "tests": 1557,
+   "passed": 1527,
+   "failed": 17,
+   "errors": 11,
+   "skipped": 2,
+   "seconds": 42.0,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_config.py::test_relative_repository_root_is_config_relative",
+     "kind": "failure",
+     "reason": "AssertionError: assert False"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_azureml_strategy_renders_canonical_pipeline_and_returns_running",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[compute-workload_runtime_required]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[environment-workload_runtime_required]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[scenario-workload_selection_invalid]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[workspace-workload_target_mismatch]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[credentials-secret_in_workload_config]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_invalid_provider_runtime_has_safe_structured_blocker",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_model_never_guesses_output_scope_or_mutable_environment[lake-workload_output_scope_unapproved]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_model_never_guesses_output_scope_or_mutable_environment[latest-workload_runtime_required]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_private_ancestor_filter_is_identical_for_snapshot_and_packaging",
+     "kind": "failure",
+     "reason": "assert not True"
+    },
+    {
+     "id": "tests/test_workloads.py::test_actual_aml_renderer_uses_only_immutable_staged_approved_sources",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[extra]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[changed]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[code_path]",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_approved_vision_renderer_normalization_is_verified_without_false_drift",
+     "kind": "failure",
+     "reason": "FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator\\\\scripts'"
+    },
+    {
+     "id": "tests/test_workloads.py::test_provider_code_is_compiled_from_verified_immutable_source_not_late_file_reads",
+     "kind": "failure",
+     "reason": "StopIteration"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_packages_only_verified_immutable_snapshot_no_checkout",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[corrupt]",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[partial]",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[mismatched]",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[unpinned]",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_moving_graph_root_must_be_fresh_but_fixed_snapshot_is_immutable",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_broad_corpus_packaging_excludes_graph_and_test_material",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_unpinned_canonical_template_is_bundled_with_the_checkouts_own_hash",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_pinned_default_cost_template_is_in_cloud_bundle",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_changed_default_cost_template_cannot_be_packaged",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_only_approved_workload_source_entries_are_packaged",
+     "kind": "error",
+     "reason": "failed on setup with \"FileNotFoundError: [Errno 2] No such file or directory: '/home/user/wt-base/usecase_code/40-agent-factory/40-aifactory-agent/..\\\\..\\\\../environment_setup/aifactory/variables.json'\""
+    }
+   ],
+   "summary_line": "17 failed, 1527 passed, 2 skipped, 2 warnings, 11 errors in 40.60s",
+   "repo_command": ".\\.venv\\Scripts\\python.exe -m pytest -q tests  from 40-aifactory-agent, Python 3.12 (readme); install: pip install -r requirements.lock.txt; pip install -e ..\\..\\..\\environment_setup\\azurefactory-cli",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/aifactory-agent",
+    "python_version": "3.12",
+    "inputs_sha256": "09dbfb5abdd5fc85c8b205c33190c8e228f6595ec7d8a4f41628b5843ae56456",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/aifactory-agent",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/40-agent-factory/40-aifactory-agent/requirements.lock.txt",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 1.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/aifactory-agent/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/environment_setup/azurefactory-cli/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/aifactory-agent/bin -- env PYTHONPATH=<worktree>/environment_setup/azurefactory-cli/src /home/user/venvs/aifactory-agent/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/aifactory-agent/junit.xml",
+   "started_utc": "2026-11-14T00:16:37Z",
+   "finished_utc": "2026-11-14T00:17:19Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Windows reparse-point regression"
+   ],
+   "rerun": [
+    {
+     "id": "tests/test_config.py::test_relative_repository_root_is_config_relative",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.5,
+     "summary_line": "1 failed in 2.43s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_azureml_strategy_renders_canonical_pipeline_and_returns_running",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.22s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[compute-workload_runtime_required]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.23s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[environment-workload_runtime_required]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.1,
+     "summary_line": "1 failed in 1.28s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[scenario-workload_selection_invalid]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.2,
+     "summary_line": "1 failed in 1.36s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[workspace-workload_target_mismatch]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.2,
+     "summary_line": "1 failed in 1.35s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_real_model_strategy_unconfigured_inputs_never_submit[credentials-secret_in_workload_config]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.1,
+     "summary_line": "1 failed in 1.29s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_invalid_provider_runtime_has_safe_structured_blocker",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.19s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_model_never_guesses_output_scope_or_mutable_environment[lake-workload_output_scope_unapproved]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.22s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_model_never_guesses_output_scope_or_mutable_environment[latest-workload_runtime_required]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.22s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_private_ancestor_filter_is_identical_for_snapshot_and_packaging",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.1,
+     "summary_line": "1 failed in 1.30s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_actual_aml_renderer_uses_only_immutable_staged_approved_sources",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.1,
+     "summary_line": "1 failed in 1.29s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[extra]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.20s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[changed]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.1,
+     "summary_line": "1 failed in 1.18s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_rendered_upload_must_exactly_match_approved_code_before_submit[code_path]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.18s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_approved_vision_renderer_normalization_is_verified_without_false_drift",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed in 1.21s"
+    },
+    {
+     "id": "tests/test_workloads.py::test_provider_code_is_compiled_from_verified_immutable_source_not_late_file_reads",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.3,
+     "summary_line": "1 failed in 1.48s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_packages_only_verified_immutable_snapshot_no_checkout",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.8,
+     "summary_line": "2 warnings, 1 error in 1.95s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[corrupt]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.0,
+     "summary_line": "2 warnings, 1 error in 2.11s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[partial]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.9,
+     "summary_line": "2 warnings, 1 error in 1.98s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[mismatched]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.1,
+     "summary_line": "2 warnings, 1 error in 2.16s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_enabled_graph_fail_closed_before_creating_bundle[unpinned]",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.9,
+     "summary_line": "2 warnings, 1 error in 1.96s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_moving_graph_root_must_be_fresh_but_fixed_snapshot_is_immutable",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.2,
+     "summary_line": "2 warnings, 1 error in 2.19s"
+    },
+    {
+     "id": "tests/test_graph_packaging.py::test_broad_corpus_packaging_excludes_graph_and_test_material",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.9,
+     "summary_line": "2 warnings, 1 error in 1.93s"
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_unpinned_canonical_template_is_bundled_with_the_checkouts_own_hash",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.2,
+     "summary_line": "2 warnings, 1 error in 2.28s"
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_pinned_default_cost_template_is_in_cloud_bundle",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.1,
+     "summary_line": "2 warnings, 1 error in 2.18s"
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_changed_default_cost_template_cannot_be_packaged",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.1,
+     "summary_line": "2 warnings, 1 error in 2.16s"
+    },
+    {
+     "id": "tests/test_skill_packaging.py::test_only_approved_workload_source_entries_are_packaged",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.0,
+     "summary_line": "2 warnings, 1 error in 2.10s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 28,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "voice-sales-py",
+   "component": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric",
+   "kind": "pytest",
+   "cwd": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric",
+   "test_files": 8,
+   "tests": 105,
+   "passed": 104,
+   "failed": 1,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 31.1,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_artifacts.py::ArtifactTests::test_primary_manifest_is_satisfied_by_reproducible_lock",
+     "kind": "failure",
+     "reason": "importlib.metadata.PackageNotFoundError: No package metadata was found for pywin32"
+    }
+   ],
+   "summary_line": "1 failed, 104 passed, 3 warnings, 112 subtests passed in 29.87s",
+   "repo_command": "Start-FoundryVoiceSales.ps1 -Action Test: python -m unittest discover -s tests -p test_*.py (Python 3.13, pip install -r requirements.lock.txt), then node --test tests/frontend*.test.js",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/voice-sales-py",
+    "python_version": "3.13",
+    "inputs_sha256": "8a8dd96012d12b96f590c33159113d77afb0a1935473dbef84bc063d1e13e026",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.13 /home/user/venvs/voice-sales-py",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/requirements.txt -c <worktree>/usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric/requirements.lock.txt  [FALLBACK: alternative 2; earlier alternatives failed]",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 1.6
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/voice-sales-py/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/voice-sales-py/bin -- /home/user/venvs/voice-sales-py/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/voice-sales-py/junit.xml",
+   "started_utc": "2026-11-14T00:17:20Z",
+   "finished_utc": "2026-11-14T00:17:51Z",
+   "worktree_new_paths": [
+    "?? .offline-bicep-work-fcbfc8f87d4a4abcb1ef6122ebe37b1e/"
+   ],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [],
+   "rerun": [
+    {
+     "id": "tests/test_artifacts.py::ArtifactTests::test_primary_manifest_is_satisfied_by_reproducible_lock",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.1,
+     "summary_line": "1 failed in 0.14s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 1,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "voice-sales-frontend-js",
+   "component": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric",
+   "kind": "node",
+   "cwd": "usecase_code/40-agent-factory/40-foundry-voice-sales--from-fabric",
+   "test_files": 5,
+   "tests": 46,
+   "passed": 46,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 0.5,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "tests 46, pass 46, fail 0, cancelled 0, skipped 0, todo 0",
+   "repo_command": "npm test = node --test tests/frontend*.test.js (package.json; Node 22, no npm dependencies)",
+   "notes": "",
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh -- /opt/node22/bin/node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=/home/user/results/base/components/voice-sales-frontend-js/junit.xml tests/frontend-api.test.js tests/frontend-audio.test.js tests/frontend-branding.test.js tests/frontend-render.test.js tests/frontend-voice.test.js",
+   "started_utc": "2026-11-14T00:17:51Z",
+   "finished_utc": "2026-11-14T00:17:52Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "rag-48",
+   "component": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2",
+   "kind": "pytest",
+   "cwd": "usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2",
+   "test_files": 24,
+   "tests": 308,
+   "passed": 231,
+   "failed": 15,
+   "errors": 59,
+   "skipped": 3,
+   "seconds": 13.7,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_bad_arrays_offsets_lengths_and_text_fail",
+     "kind": "sub-test failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_exclusively_record_boundary_cuts_do_not_prove_requirement",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_gap_and_unicode_unit_confusion_fail",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_incomplete_tail_and_missing_parent_or_bad_source_fail",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_offline_fixture_exact_unicode_reconstruction_and_envelopes",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_offline_normalized_excel_fixture_and_malformed_rows",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_small_source_and_oversized_chunk_fail",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_search.py::ClientTests::test_runtime_real_verifier_with_offline_synthetic_unicode_arrays",
+     "kind": "failure",
+     "reason": "AssertionError: Tokenizer downloads are prohibited in tests"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_content_then_permission_only_then_no_change_preserves_immutable_inputs",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_force_renew_is_explicitly_available_for_lifecycle_repair",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_notification_during_delta_never_commits_old_candidate",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_reconcile_rejects_unapproved_candidate_before_mutations",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_restored_source_after_quarantine_forces_acl_repair",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_source_deletion_stages_quarantine_not_a_partial_dataset",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_unrepresentable_permissions_quarantine_without_guessing_public_access",
+     "kind": "failure",
+     "reason": "requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Failed to resolve 'opena"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_existing_output_refused_without_modification",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_image_docx_is_original_drawing_and_has_no_answer_in_document_text",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_independent_expected_decimal_totals_and_isolation",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_invalid_arguments_fail_without_publication",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_publication_shape_hashes_counts_and_token_budgets",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_reproducible_artifacts_and_separate_seed",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_six_library_layout_and_separate_overlap_fixture",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_whole_workbook_rows_match_authoritative_jsonl",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_caller_cannot_override_content_derived_version",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_candidate_reproducible_and_existing_output_immutable",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_existing_loader_and_immutable_deployment_plan_accept_candidate",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_formula_workbook_fails_without_artifacts",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_missing_deleted_foreign_or_unsupported_source_never_publishes",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_mixed_versions_wrong_schema_bad_arithmetic_duplicate_rows_and_small_inputs",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_permission_only_change_keeps_input_hashes_and_version",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_version_changes_for_content_not_permissions_or_signed_url",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_whole_sources_derived_version_lineage_and_identical_copies",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_both_source_activity_without_both_references_is_not_evidence",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_changed_rows_fail_before_any_model_or_cloud_request",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_cli_has_no_implicit_mutation_or_paid_calls",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_cli_routes_full_text_control_without_retrieval_agent_invocation",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_configure_routes_by_partition_not_truncated_resource_name",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_empty_retrieval_cannot_count_as_a_successful_probe",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_failed_embedding_is_not_cached",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_fresh_runs_keep_separate_artifacts",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_propagates_model_failure_without_retry",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_rechecks_actual_payload_before_model_call",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_rejects_changed_agent_or_model_binding",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_requires_paid_and_corpus_approval",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_retains_incomplete_and_unexpected_tool_responses",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_sends_exact_live_text_without_tools_or_oracle",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_inference_and_writes_require_approval_before_network",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_knowledge_probe_uses_both_sources_and_no_permission_bypass_headers",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_ask_retains_raw_response_and_scoring_metadata",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_configuration_uses_two_scoped_indexers_and_never_pushes_documents",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_whole_table_preserves_every_source_byte_and_needs_no_operator_upload",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_partial_upload_can_resume_only_missing_exact_documents",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_real_document_readback_must_match_exact_expected_text",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_synthetic_project_corpus_requires_explicit_approval",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_two_sources_one_knowledge_base_no_local_function_tool",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_verify_checks_owned_sources_and_base_before_using_them",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_whole_rows_cover_all_sources_without_text_split_or_totals",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_checker_cli_is_offline_and_refuses_data_or_input_overwrite",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_code_fenced_examples_and_unsupported_rows_do_not_count",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_correct_total_mentioned_in_prose_is_not_a_valid_audit",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_duplicate_and_contradictory_totals_are_rejected",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_duplicate_total_is_not_labelled_correct",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_full_audit_and_exact_totals_pass",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_known_header_variations_and_column_order_are_supported",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_malformed_raw_output_cannot_crash_or_pass",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_mcp_errors_fail_even_when_answer_matches",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_missing_metadata_failed_status_and_tools_do_not_pass",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_missing_or_duplicate_group_cannot_pass",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_oracle_mismatch_and_changed_authoritative_rows_fail",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_raw_responses_output_is_supported_without_hidden_reasoning_text",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_recorded_source_binding_must_match_fixture",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_unknown_source_or_range_and_oversized_group_fail",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_wrong_group_amount_is_reported_independently_of_correct_totals",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_wrong_money_count_or_currency_fails",
+     "kind": "error",
+     "reason": "failed on setup with \"requests.exceptions.ConnectionError: HTTPSConnectionPool(host='openaipublic.blob.core.windows.net', port=443): Max retries exceeded with url: /encodings/cl100k_base.tiktoken (Caused by NameResolutionError(\"HTTPSConnection(host='openaipublic.blob.core.windows.net', port=443): Fa"
+    }
+   ],
+   "summary_line": "25 failed, 232 passed, 3 skipped, 59 errors, 245 subtests passed in 12.50s",
+   "repo_command": "& $Python -m unittest discover -s tests  from the folder, Python 3.13, TIKTOKEN_CACHE_DIR=.venv\\tiktoken-cache (readme); tests/service and tests/live are unittest classes that skip unless AIF48_SERVICE_TESTS / AIF48_GRAPH_SERVICE_TESTS / AIF48_LIVE_EVALUATIONS+AIF48_ALLOW_PAID are set",
+   "notes": "tiktoken needs the cl100k_base encoding file. It is read from TIKTOKEN_CACHE_DIR (<venvs>/.cache/tiktoken-cache, file name 9b5ad71b2ce5302211f9c61530b329a4922fc6a4 = sha1 of https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken) or downloaded from that URL on first use; the runner never downloads it.",
+   "environment": {
+    "venv": "/home/user/venvs/rag-48",
+    "python_version": "3.13",
+    "inputs_sha256": "bab47e3a4b8b32d06eb39c8e9e9539775f70ca2bee21d893063fcd769f7363ac",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.13 /home/user/venvs/rag-48",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/requirements.txt",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 1.6
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "TIKTOKEN_CACHE_DIR": "/home/user/venvs/.cache/tiktoken-cache"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/rag-48/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "TIKTOKEN_CACHE_DIR": "/home/user/venvs/.cache/tiktoken-cache"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/rag-48/bin -- env TIKTOKEN_CACHE_DIR=/home/user/venvs/.cache/tiktoken-cache /home/user/venvs/rag-48/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/rag-48/junit.xml",
+   "started_utc": "2026-11-14T00:17:54Z",
+   "finished_utc": "2026-11-14T00:18:07Z",
+   "worktree_new_paths": [
+    "?? .lifecycle-offline-390a3423-d957-4a0c-a77c-72ebc6bedd7b/"
+   ],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Deployed-agent evaluations require explicit paid-call opt-in.",
+    "Real Azure service tests are opt-in.",
+    "Real Graph source reads require explicit scope-bound approval."
+   ],
+   "rerun": [
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_bad_arrays_offsets_lengths_and_text_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.4,
+     "summary_line": "11 failed, 1 passed, 2 subtests passed in 1.33s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_exclusively_record_boundary_cuts_do_not_prove_requirement",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.29s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_gap_and_unicode_unit_confusion_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.29s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_incomplete_tail_and_missing_parent_or_bad_source_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.31s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_offline_fixture_exact_unicode_reconstruction_and_envelopes",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.30s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_offline_normalized_excel_fixture_and_malformed_rows",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.28s"
+    },
+    {
+     "id": "tests/test_chunks.py::ChunkTests::test_small_source_and_oversized_chunk_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.0,
+     "summary_line": "1 failed in 0.28s"
+    },
+    {
+     "id": "tests/test_search.py::ClientTests::test_runtime_real_verifier_with_offline_synthetic_unicode_arrays",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.9,
+     "summary_line": "1 failed in 0.20s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_content_then_permission_only_then_no_change_preserves_immutable_inputs",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 failed in 0.62s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_force_renew_is_explicitly_available_for_lifecycle_repair",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 failed in 0.61s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_notification_during_delta_never_commits_old_candidate",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.5,
+     "summary_line": "1 failed in 0.73s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_reconcile_rejects_unapproved_candidate_before_mutations",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 failed in 0.64s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_restored_source_after_quarantine_forces_acl_repair",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 failed in 0.61s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_source_deletion_stages_quarantine_not_a_partial_dataset",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 failed in 0.61s"
+    },
+    {
+     "id": "tests/test_sync_cli.py::SyncCliTests::test_unrepresentable_permissions_quarantine_without_guessing_public_access",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 failed in 0.60s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_existing_output_refused_without_modification",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.61s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_image_docx_is_original_drawing_and_has_no_answer_in_document_text",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.57s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_independent_expected_decimal_totals_and_isolation",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.61s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_invalid_arguments_fail_without_publication",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_publication_shape_hashes_counts_and_token_budgets",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.54s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_reproducible_artifacts_and_separate_seed",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.56s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_six_library_layout_and_separate_overlap_fixture",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_dataset.py::DatasetTests::test_whole_workbook_rows_match_authoritative_jsonl",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_caller_cannot_override_content_derived_version",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.56s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_candidate_reproducible_and_existing_output_immutable",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.57s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_existing_loader_and_immutable_deployment_plan_accept_candidate",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_formula_workbook_fails_without_artifacts",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.61s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_missing_deleted_foreign_or_unsupported_source_never_publishes",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_mixed_versions_wrong_schema_bad_arithmetic_duplicate_rows_and_small_inputs",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.60s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_permission_only_change_keeps_input_hashes_and_version",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.57s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_version_changes_for_content_not_permissions_or_signed_url",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.68s"
+    },
+    {
+     "id": "tests/test_graph_publication.py::GraphPublicationTests::test_whole_sources_derived_version_lineage_and_identical_copies",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_both_source_activity_without_both_references_is_not_evidence",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_changed_rows_fail_before_any_model_or_cloud_request",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.6,
+     "summary_line": "1 error in 0.75s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_cli_has_no_implicit_mutation_or_paid_calls",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.63s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_cli_routes_full_text_control_without_retrieval_agent_invocation",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.64s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_configure_routes_by_partition_not_truncated_resource_name",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_empty_retrieval_cannot_count_as_a_successful_probe",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_failed_embedding_is_not_cached",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_fresh_runs_keep_separate_artifacts",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.60s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_propagates_model_failure_without_retry",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.62s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_rechecks_actual_payload_before_model_call",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_rejects_changed_agent_or_model_binding",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_requires_paid_and_corpus_approval",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.61s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_retains_incomplete_and_unexpected_tool_responses",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_full_text_control_sends_exact_live_text_without_tools_or_oracle",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.71s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_inference_and_writes_require_approval_before_network",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_knowledge_probe_uses_both_sources_and_no_permission_bypass_headers",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_ask_retains_raw_response_and_scoring_metadata",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_configuration_uses_two_scoped_indexers_and_never_pushes_documents",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.61s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_native_whole_table_preserves_every_source_byte_and_needs_no_operator_upload",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.65s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_partial_upload_can_resume_only_missing_exact_documents",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_real_document_readback_must_match_exact_expected_text",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_synthetic_project_corpus_requires_explicit_approval",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.64s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_two_sources_one_knowledge_base_no_local_function_tool",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.62s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_verify_checks_owned_sources_and_base_before_using_them",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.65s"
+    },
+    {
+     "id": "tests/test_retrieval_experiment.py::RetrievalExperimentTests::test_whole_rows_cover_all_sources_without_text_split_or_totals",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_checker_cli_is_offline_and_refuses_data_or_input_overwrite",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.57s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_code_fenced_examples_and_unsupported_rows_do_not_count",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.62s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_correct_total_mentioned_in_prose_is_not_a_valid_audit",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_duplicate_and_contradictory_totals_are_rejected",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.60s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_duplicate_total_is_not_labelled_correct",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_full_audit_and_exact_totals_pass",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.57s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_known_header_variations_and_column_order_are_supported",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_malformed_raw_output_cannot_crash_or_pass",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.56s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_mcp_errors_fail_even_when_answer_matches",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_missing_metadata_failed_status_and_tools_do_not_pass",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.59s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_missing_or_duplicate_group_cannot_pass",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_oracle_mismatch_and_changed_authoritative_rows_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.4,
+     "summary_line": "1 error in 0.63s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_raw_responses_output_is_supported_without_hidden_reasoning_text",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.56s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_recorded_source_binding_must_match_fixture",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.58s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_unknown_source_or_range_and_oversized_group_fail",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_wrong_group_amount_is_reported_independently_of_correct_totals",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.55s"
+    },
+    {
+     "id": "tests/test_sum_evaluation.py::SumEvaluationTests::test_wrong_money_count_or_currency_fails",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.3,
+     "summary_line": "1 error in 0.60s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 74,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "ml-churn-49",
+   "component": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction",
+   "kind": "pytest",
+   "cwd": "usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction",
+   "test_files": 10,
+   "tests": 32,
+   "passed": 27,
+   "failed": 4,
+   "errors": 0,
+   "skipped": 1,
+   "seconds": 29.8,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "tests/test_configuration.py::ConfigurationTests::test_init_config_binds_the_reviewed_scope_and_common_lake",
+     "kind": "failure",
+     "reason": "AssertionError: False is not true"
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_02_create_usecase_writes_the_m49_copy_and_publishes_synthetic_data",
+     "kind": "failure",
+     "reason": "ValueError: Other generated factory files are stale or edited; run `python -m ml_model_factory usecase-examples` and review them first: usecase-type/batch/classification/azure-automl/azureml-pipeline-with-automl-step/churn-automl-pipeline.ipynb, usecase-type/batch/classification/azure-automl/azureml"
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_03_training_registers_m49_once_and_resumes_from_receipts",
+     "kind": "failure",
+     "reason": "ValueError: Create the use case first: synthetic data version aif49-synth-v1 is not published to the shared lake yet (create_usecase_from_template)."
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_04_churn_inference_uploads_unlabeled_gold_once_and_reads_lake_predictions",
+     "kind": "failure",
+     "reason": "ValueError: Train 49-agent-training-ml-churn-prediction in the approved plan before scoring it."
+    }
+   ],
+   "summary_line": "4 failed, 27 passed, 1 skipped, 13 warnings, 9 subtests passed in 28.08s",
+   "repo_command": "pip install -r requirements.txt \"..\\..\\..\\esml-v2[train,storage,dev]\"; python -m unittest discover -s tests  (readme); tests/live skips unless AIF49_LIVE=1 and AIF49_CONFIG",
+   "notes": "The readme installs the built ESML SDK (bundles ml_model_factory). The runner puts <worktree>/esml-v2 and <worktree>/usecase_code/50-ml-model-factory/accelerator/src on PYTHONPATH instead (same sources).",
+   "environment": {
+    "venv": "/home/user/venvs/ml-churn-49",
+    "python_version": "3.13",
+    "inputs_sha256": "e21d62960a2a4c9055ffc9c05b3f90936f0f1d9e7f5309bc5456f357de36d49a",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.13 /home/user/venvs/ml-churn-49",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/requirements.txt",
+     "uv pip install --python <venv>/bin/python -r <worktree>/esml-v2/pyproject.toml --extra train --extra storage --extra dev",
+     "uv pip install --python <venv>/bin/python six"
+    ],
+    "install_seconds": 5.3
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/esml-v2:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/ml-churn-49/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/esml-v2:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/ml-churn-49/bin -- env PYTHONPATH=<worktree>/esml-v2:<worktree>/usecase_code/50-ml-model-factory/accelerator/src /home/user/venvs/ml-churn-49/bin/python -m pytest tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/ml-churn-49/junit.xml",
+   "started_utc": "2026-11-14T00:18:13Z",
+   "finished_utc": "2026-11-14T00:18:42Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "Set AIF49_LIVE=1 and AIF49_CONFIG=<consumer config.json> for read-only live checks"
+   ],
+   "rerun": [
+    {
+     "id": "tests/test_configuration.py::ConfigurationTests::test_init_config_binds_the_reviewed_scope_and_common_lake",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 0.7,
+     "summary_line": "1 failed in 0.03s"
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_02_create_usecase_writes_the_m49_copy_and_publishes_synthetic_data",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.4,
+     "summary_line": "1 failed in 1.56s"
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_03_training_registers_m49_once_and_resumes_from_receipts",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.4,
+     "summary_line": "1 failed in 1.63s"
+    },
+    {
+     "id": "tests/test_runtime.py::RuntimeTests::test_04_churn_inference_uploads_unlabeled_gold_once_and_reads_lake_predictions",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.3,
+     "summary_line": "1 failed in 1.46s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 4,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "ml-model-factory",
+   "component": "usecase_code/50-ml-model-factory",
+   "kind": "pytest",
+   "cwd": "usecase_code/50-ml-model-factory",
+   "test_files": 29,
+   "tests": 1088,
+   "passed": 1031,
+   "failed": 4,
+   "errors": 0,
+   "skipped": 53,
+   "seconds": 325.0,
+   "exit_code": 1,
+   "status": "fail",
+   "failing": [
+    {
+     "id": "accelerator/tests/test_consumer_examples.py::test_synthetic_consumer_copy_renders_one_notebook_that_runs_dry",
+     "kind": "failure",
+     "reason": "AssertionError: assert ['usecase-typ...l.ipynb', ...] == ['usecase-typ...ne/readme.md']"
+    },
+    {
+     "id": "accelerator/tests/test_inference.py::test_vision_requests_carry_base64_images_and_reviewed_labels",
+     "kind": "failure",
+     "reason": "ModuleNotFoundError: No module named 'PIL'"
+    },
+    {
+     "id": "accelerator/tests/test_monitoring.py::test_real_image_summary_shift",
+     "kind": "failure",
+     "reason": "ModuleNotFoundError: No module named 'PIL'"
+    },
+    {
+     "id": "accelerator/tests/test_usecases.py::test_generated_notebooks_and_readmes_match_the_catalog",
+     "kind": "failure",
+     "reason": "AssertionError: Run: python -m ml_model_factory usecase-examples --write"
+    }
+   ],
+   "summary_line": "4 failed, 1031 passed, 53 skipped, 9716 warnings, 83 subtests passed in 321.44s (0:05:21)",
+   "repo_command": "python -m pip install -e \".[train,azure,dev]\"; python -m pytest  from 50-ml-model-factory (readme); pytest config: testpaths=accelerator/tests, pythonpath=accelerator/src,accelerator",
+   "notes": "PYTHONPATH = the folder an editable install exposes (accelerator/src of the worktree): tests start `python -m ml_model_factory` as a subprocess, which does not see pytest's own pythonpath setting. The `vision` extra (torch, torchvision, torchmetrics, pycocotools, Pillow) is not installed: the vision tests skip through the repo's own importorskip('PIL.Image'). Installing Pillow alone would turn those skips into failures ('Vision training requires the declared [train,vision] extras').",
+   "environment": {
+    "venv": "/home/user/venvs/ml-model-factory",
+    "python_version": "3.12",
+    "inputs_sha256": "b30011974fbf383434b2d958066bb7d8420073cd1af32b32866bfbc24b01fb70",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/ml-model-factory",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/50-ml-model-factory/pyproject.toml --extra train --extra azure --extra dev --extra kaggle",
+     "uv pip install --python <venv>/bin/python six",
+     "uv pip install --python <venv>/bin/python setuptools>=75 wheel"
+    ],
+    "install_seconds": 3.5
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/ml-model-factory/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/ml-model-factory/bin -- env PYTHONPATH=<worktree>/usecase_code/50-ml-model-factory/accelerator/src /home/user/venvs/ml-model-factory/bin/python -m pytest -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/ml-model-factory/junit.xml",
+   "started_utc": "2026-11-14T00:31:51Z",
+   "finished_utc": "2026-11-14T00:37:16Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": [
+    "could not import 'PIL.Image': No module named 'PIL'",
+    "could not import 'torch': No module named 'torch'",
+    "could not import 'torchmetrics': No module named 'torchmetrics'"
+   ],
+   "rerun": [
+    {
+     "id": "accelerator/tests/test_consumer_examples.py::test_synthetic_consumer_copy_renders_one_notebook_that_runs_dry",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 1.1,
+     "summary_line": "1 failed, 1 warning in 0.31s"
+    },
+    {
+     "id": "accelerator/tests/test_inference.py::test_vision_requests_carry_base64_images_and_reviewed_labels",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.7,
+     "summary_line": "1 failed, 1 warning in 2.39s"
+    },
+    {
+     "id": "accelerator/tests/test_monitoring.py::test_real_image_summary_shift",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 3.8,
+     "summary_line": "1 failed, 1 warning in 2.52s"
+    },
+    {
+     "id": "accelerator/tests/test_usecases.py::test_generated_notebooks_and_readmes_match_the_catalog",
+     "outcome": "failed-again",
+     "exit_code": 1,
+     "seconds": 2.0,
+     "summary_line": "1 failed, 1 warning in 0.72s"
+    }
+   ],
+   "rerun_verdict": {
+    "reproducible": 4,
+    "flaky_or_order_dependent": [],
+    "not_rerun": 0
+   }
+  },
+  {
+   "id": "mlops-2026-09",
+   "component": "copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09",
+   "kind": "pytest",
+   "cwd": "usecase_code/50-ml-model-factory",
+   "test_files": 2,
+   "tests": 51,
+   "passed": 51,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 16.3,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "51 passed, 40 subtests passed in 15.46s",
+   "repo_command": "model-factory .venv python: -m unittest discover -s <template>\\tests -v (ado/github ml-factory.yml); documentation/v2/30-39/36-dataops.md runs it with pytest from the model-factory root",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/mlops-2026-09",
+    "python_version": "3.12",
+    "inputs_sha256": "b30011974fbf383434b2d958066bb7d8420073cd1af32b32866bfbc24b01fb70",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/mlops-2026-09",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/50-ml-model-factory/pyproject.toml --extra train --extra azure --extra dev --extra kaggle",
+     "uv pip install --python <venv>/bin/python six",
+     "uv pip install --python <venv>/bin/python setuptools>=75 wheel"
+    ],
+    "install_seconds": 3.7
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/mlops-2026-09/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/mlops-2026-09/bin -- env PYTHONPATH=<worktree>/usecase_code/50-ml-model-factory/accelerator/src:<worktree>/usecase_code/50-ml-model-factory/accelerator /home/user/venvs/mlops-2026-09/bin/python -m pytest ../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/mlops-2026-09/junit.xml",
+   "started_utc": "2026-11-14T00:37:20Z",
+   "finished_utc": "2026-11-14T00:37:36Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "dataops-adf",
+   "component": "copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory",
+   "kind": "pytest",
+   "cwd": "usecase_code/50-ml-model-factory",
+   "test_files": 1,
+   "tests": 15,
+   "passed": 15,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 4.4,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "15 passed, 12 subtests passed in 3.59s",
+   "repo_command": "python -m unittest discover -s \"$templates\\tests\" -v (azure-datafactory/readme.md); documentation/v2/30-39/36-dataops.md runs it with pytest from the model-factory root",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/dataops-adf",
+    "python_version": "3.12",
+    "inputs_sha256": "b30011974fbf383434b2d958066bb7d8420073cd1af32b32866bfbc24b01fb70",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/dataops-adf",
+     "uv pip install --python <venv>/bin/python -r <worktree>/usecase_code/50-ml-model-factory/pyproject.toml --extra train --extra azure --extra dev --extra kaggle",
+     "uv pip install --python <venv>/bin/python six",
+     "uv pip install --python <venv>/bin/python setuptools>=75 wheel"
+    ],
+    "install_seconds": 3.3
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator"
+   },
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/dataops-adf/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1",
+    "PYTHONPATH": "/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator/src:/home/user/wt-base/usecase_code/50-ml-model-factory/accelerator"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/dataops-adf/bin -- env PYTHONPATH=<worktree>/usecase_code/50-ml-model-factory/accelerator/src:<worktree>/usecase_code/50-ml-model-factory/accelerator /home/user/venvs/dataops-adf/bin/python -m pytest ../../copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/tests -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/dataops-adf/junit.xml",
+   "started_utc": "2026-11-14T00:37:39Z",
+   "finished_utc": "2026-11-14T00:37:44Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "onion",
+   "component": "documentation/v2/10-19/images/onion",
+   "kind": "pytest",
+   "cwd": "documentation/v2/10-19/images/onion",
+   "test_files": 1,
+   "tests": 21,
+   "passed": 21,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 0.6,
+   "exit_code": 0,
+   "status": "pass",
+   "failing": [],
+   "summary_line": "21 passed in 0.13s",
+   "repo_command": "python -m unittest test_onion.py from the onion folder (documentation/v2/10-19/10-factory-onion-architecture-v2.md)",
+   "notes": "",
+   "environment": {
+    "venv": "/home/user/venvs/onion",
+    "python_version": "3.12",
+    "inputs_sha256": "dbfe886e8d925933212a448b384d5faf585cb51e71fbbfdec45e26bd674b6f00",
+    "action": "built",
+    "recipe": [
+     "uv venv --seed --python 3.12 /home/user/venvs/onion",
+     "uv pip install --python <venv>/bin/python pytest>=8,<10"
+    ],
+    "install_seconds": 0.4
+   },
+   "environment_mode": "wrapper",
+   "wrapper": {
+    "path": "/home/user/tools/cienv.sh",
+    "sha256": "72009457c9f7582453ae5a3781175966acef0215fdb085a5ba5daaa5e5b4bf57"
+   },
+   "suite_variables": {},
+   "effective_environment": {
+    "HOME": "/root",
+    "USER": "root",
+    "LOGNAME": "root",
+    "SHELL": "/bin/bash",
+    "TERM": "dumb",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/user/venvs/onion/bin:/home/user/tools/bicep:/home/user/tools/pwsh:/home/user/venvs/azcli/bin:/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LIVE_AZURE": "0",
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_GLOBAL": "/home/user/tools/gitconfig-tests",
+    "AZURE_BICEP_USE_BINARY_FROM_PATH": "true",
+    "AZURE_CORE_COLLECT_TELEMETRY": "false",
+    "AZURE_CONFIG_DIR": "/home/user/results/az-config",
+    "AZURE_CORE_ONLY_SHOW_ERRORS": "true",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "POWERSHELL_TELEMETRY_OPTOUT": "1"
+   },
+   "command": "/home/user/tools/cienv.sh /home/user/venvs/onion/bin -- /home/user/venvs/onion/bin/python -m pytest test_onion.py -q --tb=short -p no:cacheprovider --junitxml=/home/user/results/base/components/onion/junit.xml",
+   "started_utc": "2026-11-14T00:24:55Z",
+   "finished_utc": "2026-11-14T00:24:55Z",
+   "worktree_new_paths": [],
+   "worktree_new_pycache": [],
+   "skipped_reasons": []
+  },
+  {
+   "id": "tutorial-distribution-ps1",
+   "component": "environment_setup/install_tutorial_guide",
+   "kind": "pwsh",
+   "cwd": "environment_setup/install_tutorial_guide",
+   "test_files": 1,
+   "tests": 0,
+   "passed": 0,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 0.0,
+   "exit_code": null,
+   "status": "not-run",
+   "failing": [],
+   "summary_line": "",
+   "repo_command": ".\\tests\\Test-Distribution.ps1 [-SourceRoot <ESAIF.TutorialApp source>] [-ExercisePackaging] (README.packaging-draft.md); run without parameters: the app source is not in this repository",
+   "notes": "",
+   "reason": "Windows-only: Test-Distribution.ps1 drives scripts/Publish-TutorialApp.ps1, which requires Windows path semantics ($OutputRoot.StartsWith($root + '\\'), regex '\\\\(artifacts|staging|private)'), subst.exe, pwsh.exe and Authenticode. Tried on Linux with pwsh 7.4.6 (offline, no parameters): it stops at the first Publish call with 'OutputRoot must be a child of this distribution directory'. Needs Windows 11 + PowerShell 7.4 (and, for the optional parts, the ESAIF.TutorialApp source and Inno Setup). --run-windows-only forces the attempt."
+  },
+  {
+   "id": "agent-foundry-legacy",
+   "component": "usecase_code/20-agent-foundry/_legacy",
+   "kind": "not-run",
+   "cwd": "",
+   "test_files": 1,
+   "tests": 0,
+   "passed": 0,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 0.0,
+   "exit_code": null,
+   "status": "not-run",
+   "failing": [],
+   "summary_line": "",
+   "repo_command": "",
+   "notes": "",
+   "reason": "agent_01_rag_test.py is not a test: it has no test function or TestCase; it is a live sample script (DefaultAzureCredential, creates an AI Search index and a Foundry agent). Needs Azure login and deployed AI Foundry + AI Search; forbidden offline."
+  },
+  {
+   "id": "automl-scoring-file",
+   "component": "copy_my_subfolders_to_my_grandparent/settings/project_specific/model/dev_test_prod/train/automl",
+   "kind": "not-run",
+   "cwd": "",
+   "test_files": 1,
+   "tests": 0,
+   "passed": 0,
+   "failed": 0,
+   "errors": 0,
+   "skipped": 0,
+   "seconds": 0.0,
+   "exit_code": null,
+   "status": "not-run",
+   "failing": [],
+   "summary_line": "",
+   "repo_command": "",
+   "notes": "",
+   "reason": "scoring_file_test.py is not a test: it is an Azure AutoML scoring script (init()/run()) for the 'test' environment, with no test function. It imports azureml.automl.core / inference_schema (Azure ML SDK v1 AutoML runtime) and needs a registered model file."
+  }
+ ]
+}

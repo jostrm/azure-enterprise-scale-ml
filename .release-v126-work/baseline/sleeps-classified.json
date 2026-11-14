@@ -1,0 +1,639 @@
+[
+ {
+  "file": "bootstrap/ADO-update-aifactory-and-run-project.sh",
+  "line": 1368,
+  "class": "P",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "bootstrap/GH-update-aifactory-and-run-project.sh",
+  "line": 762,
+  "class": "P",
+  "seconds": 2,
+  "source": "sleep 2"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 1189,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 1349,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 1407,
+  "class": "F",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 1886,
+  "class": "F",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 2207,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 2278,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 2580,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 2668,
+  "class": "P",
+  "seconds": 2,
+  "source": "sleep 2"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3173,
+  "class": "P",
+  "seconds": 20,
+  "source": "[[ \"$status\" == \"completed\" ]] || { sleep 20; continue; }"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3480,
+  "class": "P",
+  "seconds": 2,
+  "source": "sleep 2"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3621,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3735,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3817,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "bootstrap/lib/create-new-aifactory-scaleset.sh",
+  "line": 3911,
+  "class": "P",
+  "seconds": 30,
+  "source": "sleep 30"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-common/jobs/job-2-ai-gateway.yaml",
+  "line": 229,
+  "class": "P",
+  "seconds": 30,
+  "source": "sleep 30"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-1-genai-networking.yaml",
+  "line": 572,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 684,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 979,
+  "class": "P",
+  "seconds": 10,
+  "source": "Start-Sleep -Seconds 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2225,
+  "class": "I",
+  "seconds": 300,
+  "source": "sleep 300"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2609,
+  "class": "I",
+  "seconds": null,
+  "source": "sleep $sleep_time"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2685,
+  "class": "F",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2696,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2798,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2897,
+  "class": "I",
+  "seconds": 30,
+  "source": "sleep 30"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 2937,
+  "class": "I",
+  "seconds": 30,
+  "source": "sleep 30"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 4369,
+  "class": "F",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 4895,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 5006,
+  "class": "I",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 5088,
+  "class": "P",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 5094,
+  "class": "P",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 5174,
+  "class": "P",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml",
+  "line": 5197,
+  "class": "P",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/03a-GH-create-or-update-github-variables.sh",
+  "line": 82,
+  "class": "R",
+  "seconds": null,
+  "source": "sleep \"$rate_limit_sleep_seconds\""
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/03a-GH-create-or-update-github-variables.sh",
+  "line": 85,
+  "class": "R",
+  "seconds": null,
+  "source": "sleep \"$rate_limit_sleep_seconds_2\""
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-ai-gateway.yml",
+  "line": 239,
+  "class": "P",
+  "seconds": 30,
+  "source": "sleep 30"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 908,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 925,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 1289,
+  "class": "I",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 1306,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 1806,
+  "class": "I",
+  "seconds": 300,
+  "source": "sleep 300"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 1945,
+  "class": "I",
+  "seconds": null,
+  "source": "sleep $sleep_time"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 3356,
+  "class": "F",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 3763,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 3820,
+  "class": "I",
+  "seconds": 300,
+  "source": "sleep 300"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 3869,
+  "class": "P",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 3884,
+  "class": "P",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 4000,
+  "class": "P",
+  "seconds": 2,
+  "source": "sleep 2"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 4004,
+  "class": "F",
+  "seconds": null,
+  "source": "sleep $((attempt * 10))"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 4172,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml",
+  "line": 4233,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/esml-util/000-delete-subnets-for-project.ps1",
+  "line": 133,
+  "class": "P",
+  "seconds": 5,
+  "source": "Start-Sleep -Seconds 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/esml-util/000-delete-subnets-for-project.ps1",
+  "line": 366,
+  "class": "F",
+  "seconds": 20,
+  "source": "Start-Sleep -Seconds 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/esml-util/000-deleteCapHost.sh",
+  "line": 91,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/esml-util/000-deleteCapHost.sh",
+  "line": 107,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteAllCapHosts.ps1",
+  "line": 104,
+  "class": "P",
+  "seconds": 5,
+  "source": "Start-Sleep -Seconds 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteCapHost.sh",
+  "line": 73,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/deleteCapHost.sh",
+  "line": 89,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/122_collect_cost_data.sh",
+  "line": 136,
+  "class": "R",
+  "seconds": 2,
+  "source": "sleep 2"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh",
+  "line": 91,
+  "class": "P",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh",
+  "line": 103,
+  "class": "F",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh",
+  "line": 192,
+  "class": "I",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh",
+  "line": 196,
+  "class": "I",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ado/79_Purge_If_SoftDeleted_71_72_After5minutes.sh",
+  "line": 47,
+  "class": "I",
+  "seconds": 300,
+  "source": "sleep 300"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-capHost-command.sh",
+  "line": 91,
+  "class": "I",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-caphost-and-foundry-and-its-subnet.sh",
+  "line": 357,
+  "class": "F",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-caphost-and-foundry-and-its-subnet.sh",
+  "line": 542,
+  "class": "I",
+  "seconds": 10,
+  "source": "[ \"$WHATIF\" = \"false\" ] && { echo \"  Waiting 10s for PE deletions to settle...\"; sleep 10; }"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-caphost-and-foundry-and-its-subnet.sh",
+  "line": 645,
+  "class": "I",
+  "seconds": 60,
+  "source": "sleep 60"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 237,
+  "class": "I",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 384,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 410,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 552,
+  "class": "P",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 592,
+  "class": "F",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 883,
+  "class": "P",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 2196,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 2216,
+  "class": "I",
+  "seconds": 15,
+  "source": "sleep 15"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 2631,
+  "class": "I",
+  "seconds": 300,
+  "source": "sleep 300"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 2718,
+  "class": "P",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 2991,
+  "class": "P",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 3013,
+  "class": "P",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh",
+  "line": 3033,
+  "class": "F",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-subnets-for-projects.sh",
+  "line": 147,
+  "class": "P",
+  "seconds": 5,
+  "source": "sleep 5"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/delete-subnets-for-projects.sh",
+  "line": 408,
+  "class": "F",
+  "seconds": 20,
+  "source": "sleep 20"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh",
+  "line": 52,
+  "class": "P",
+  "seconds": 10,
+  "source": "sleep 10"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/preflight.sh",
+  "line": 547,
+  "class": "F",
+  "seconds": null,
+  "source": "sleep \"$(( i * backoff ))\"; i=$((i + 1)); continue"
+ },
+ {
+  "file": "environment_setup/aifactory/bicep/scripts/prepareSeedingKeyVaultPrivateDns.ps1",
+  "line": 94,
+  "class": "P",
+  "seconds": 10,
+  "source": "Start-Sleep -Seconds 10"
+ },
+ {
+  "file": "usecase_code/10-azure-function/12_func_aifactory_lifecycle/deploy.ps1",
+  "line": 60,
+  "class": "P",
+  "seconds": 15,
+  "source": "Start-Sleep -Seconds 15"
+ },
+ {
+  "file": "usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1",
+  "line": 183,
+  "class": "P",
+  "seconds": 3,
+  "source": "} catch { Start-Sleep -Seconds 3 }"
+ },
+ {
+  "file": "usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-dummy-step.yml",
+  "line": 67,
+  "class": "I",
+  "seconds": null,
+  "source": "sleep \"$DURATION\""
+ },
+ {
+  "file": "usecase_code/10-azure-function/12_func_aifactory_lifecycle/workflows/aif-event-relay.yml",
+  "line": 56,
+  "class": "F",
+  "seconds": 2,
+  "source": "Start-Sleep -Seconds (2 * $attempt)"
+ }
+]
