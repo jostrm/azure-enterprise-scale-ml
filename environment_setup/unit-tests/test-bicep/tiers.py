@@ -54,6 +54,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_apim_gateway_workflows.py",
         "unit/test_byo_common_subnet.py",
         "unit/test_common_deployment_contract.py",
+        "unit/test_deployment_transient_retry.py",
         "unit/test_factory_chat_agent_flag.py",
         "unit/test_foundry_69a_poll_from_start.py",
         "unit/test_foundry_publishing_wiring.py",
@@ -78,6 +79,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_release_version.py",
         "unit/test_repository_gitlinks.py",
         "unit/test_shared_acr_update.py",
+        "unit/test_shared_retry_bash.py",
         "unit/test_workflow_run_monitor.py",
     )),
     Tier(3, "infra", "Bicep and compiled ARM resources: networking, private DNS and endpoints, RBAC, "

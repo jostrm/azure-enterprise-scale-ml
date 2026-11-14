@@ -334,7 +334,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "01_az_bicep_common_rg" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}-DeplRG" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -383,7 +384,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "02_az_bicep_private_networking" -- az deployment sub create \
             --name "esml-cmn${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}${{ env.admin_locationSuffix }}Subnets" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -434,7 +436,8 @@ jobs:
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "03_az_bicep_deploy_resources" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -819,7 +822,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "01_az_bicep_common_rg" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}-DeplRG" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -868,7 +872,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "02_az_bicep_private_networking" -- az deployment sub create \
             --name "esml-cmn${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}${{ env.admin_locationSuffix }}Subnets" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -919,7 +924,8 @@ jobs:
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "03_az_bicep_deploy_resources" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -1306,7 +1312,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "01_az_bicep_common_rg" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}-DeplRG" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -1355,7 +1362,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "02_az_bicep_private_networking" -- az deployment sub create \
             --name "esml-cmn${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}${{ env.admin_locationSuffix }}Subnets" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \
@@ -1406,7 +1414,8 @@ jobs:
           bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAdminVM }}" || exit 1
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           adminVmExists="$(bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/admin-vm-exists.sh" "${{ env.enableAdminVM }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.commonResourceGroup_param }}" "${{ env.admin_aifactoryPrefixRG }}" "${{ env.vnetResourceGroupBase }}" "${{ env.admin_locationSuffix }}" "${{ env.dev_test_prod }}" "${{ env.admin_aifactorySuffixRG }}" "${{ env.admin_commonResourceSuffix }}")"
-          az deployment sub create \
+          source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          aif_retry_deployment --label "03_az_bicep_deploy_resources" -- az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}${{ env.admin_commonResourceSuffix }}-DeplRes" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}" \

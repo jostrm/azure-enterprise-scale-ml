@@ -13,6 +13,7 @@ import sys
 
 import pytest
 
+from base.step_sandbox import provide_step_helpers
 from domain.pipeline_contracts import ADO_SERVICES, GHA_PHASE, evaluate, load_pipeline, objects
 from unit.test_capacity_preflight import bash_executable
 
@@ -101,6 +102,7 @@ az() {
   printf 'ARG:%s\\n' "$@"
 }
 """
+    provide_step_helpers(tmp_path)   # the step sources the shared retry helper from the accelerator checkout
     result = subprocess.run([bash_executable(), "--noprofile", "--norc", "-s"], input=capture + source,
                             text=True, capture_output=True, timeout=30, cwd=tmp_path,
                             env=os.environ | {"PrjDepl": "", "MSYS_NO_PATHCONV": "1"})

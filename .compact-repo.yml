@@ -235,6 +235,9 @@ roots:
     reason: "Copied into the payload by Publish-TutorialApp.ps1."
   - path: "environment_setup/install_tutorial_guide/SUPPORT.txt"
     reason: "Required by Test-Distribution.ps1 and copied into the payload by Publish-TutorialApp.ps1."
+  # --- Shared helpers that pipeline steps source from the consumer's submodule path ---------------------------
+  - path: "environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh"
+    reason: "Sourced by every deployment step of infra-common and infra-project (GitHub Actions: azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh; Azure DevOps: scripts/modules/aif-retry.sh from the bicep folder). Inline step scripts are not always read by the analyzer."
 
 externals:
   # Pink: Tkinter wizard and the canonical Factory API. It runs purple from the consumer's submodule

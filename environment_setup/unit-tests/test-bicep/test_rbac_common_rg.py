@@ -93,6 +93,7 @@ class TestCommonRbacScript(unittest.TestCase):
             [command, "--noprofile", "--norc", "-s"],
             input=mock_az + self.script,
             env=environment,
+            cwd=BICEP,  # the task's workingDirectory; the script sources scripts/modules/aif-retry.sh from it
             capture_output=True,
             text=True,
             timeout=30,

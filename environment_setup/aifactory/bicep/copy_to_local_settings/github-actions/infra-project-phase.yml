@@ -1974,7 +1974,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "61-foundation" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-61-foundation" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2163,7 +2164,8 @@ jobs:
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
             bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableProjectVM }}" || exit 1
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "62-core-infrastructure" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-62-core-infrastructure" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2238,7 +2240,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "63-cognitive-services" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63-cognitive-services" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2397,7 +2400,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "64-databases" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-64-databases" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2527,7 +2531,8 @@ jobs:
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
             bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "${{ env.enableAKS }}" || exit 1
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "65-compute-services" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-65-compute-services" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2655,7 +2660,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "66-ai-platform" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-66-ai-platform" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2753,7 +2759,8 @@ jobs:
             fi
             # Defender baseline: Microsoft.Compute/EncryptionAtHost must be Registered before a VM or AKS create.
             bash "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ensure-encryption-at-host.sh" "${{ env.enableEncryptionAtHost }}" "${{ env.dev_test_prod_sub_id }}" "$( [ "${{ env.enableAzureMachineLearning }}" = "true" ] && echo "${{ env.enableAksForAzureML }}" || echo false )" || exit 1
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "67-data_ml_platform" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-67-data-ml-platform" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -2998,7 +3005,8 @@ jobs:
             echo "Effective enableAzureMachineLearning for RBAC: $AML_RBAC (amlExists=${{ env.amlExists }})"
             echo "Effective aksExists for RBAC: $AKS_RBAC_EXISTS"
 
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "100-rbac-security" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-100-rbac-security" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -3087,7 +3095,8 @@ jobs:
             if [ "${{ env.enableAzureMachineLearning }}" = "true" ] && [ "${{ env.amlExists }}" = "true" ]; then AML_RBAC="true"; fi
             echo "Effective enableAzureMachineLearning for Common RG RBAC: $AML_RBAC (amlExists=${{ env.amlExists }})"
 
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "101-rbac-common-rg" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-101-rbac-common-rg" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -3594,7 +3603,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "69a-aifoundry-2025-2ndOption-Account" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-69-aif-a" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
@@ -4479,7 +4489,8 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            az deployment sub create \
+            source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+            aif_retry_deployment --label "10-aifactory-dashboards" -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}-10-dashboards" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
