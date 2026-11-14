@@ -49,13 +49,15 @@ would give every job the 208 MB.
 
 | | `main` (`ebd300db`) | `release/v1.26` | Change |
 |---|---:|---:|---:|
-| Files | 3,234 | 2,705 | 542 removed, 13 added |
-| Tree size | 1,553 MB | 295 MB | 81% smaller |
+| Files | 3,234 | 2,643 | 604 removed, 13 added |
+| Tree size | 1,553 MB | 294 MB | 81% smaller |
 | Shallow clone (`--depth 1 --single-branch`), time | 128 s | 15 s | 8 times faster |
 | Shallow clone, download | 1,147 MB | 208 MB | 5.5 times smaller |
 | "Check out code" in this repository's own CI, per job | about 110 s | 13 to 20 s | 4 jobs per push |
 | Azure DevOps job checkout of the submodule | 2,407 MB in 143 s | 1,151 MB in 63 s | see "What got faster" |
-| Bicep files | 320 | 297 | 23 unused modules removed |
+| Bicep files | 320 | 254 | 66 unused files removed (rounds 2 and 5) |
+| PowerShell scripts (`.ps1`) | 81 | 47 | 34 removed |
+| Shell scripts (`.sh`) | 96 | 56 | 40 removed |
 | Sleeps of 20 s or longer in the five pipeline and script files that changed | 16 | 4 | see "What got faster" |
 
 The clones and the checkouts were measured on one cloud machine on 14 November 2026, the clone on commit
@@ -93,8 +95,9 @@ Nothing is lost: every removed file is still on `main`.
 | 3 | ESML v1, by decision: the v1 SDK packages (`esml`, `esmlrt`, `esmlfac`), its notebook, pipeline, Data Factory, Databricks and settings templates, the Azure ML SDK install scripts for v1 developer machines, and the v1 documentation | 337 | 14 MB |
 | Fix-up | Put back, because a kept document or test needs them: one Kong operator script and six tutorial packaging files | -7 | -0.06 MB |
 | 4 | The root: the empty `__init__.py` and `meta/graphify/.gitignore` (see "Round 4: the root"; its other removed files were made on this branch) | 2 | 0.0 MB |
+| 5 | Scripts and Bicep that nothing depends on: 43 Bicep files, 13 scripts and 6 files that only they used (see "Round 5: scripts and Bicep") | 62 | 0.9 MB |
 
-Per top-level folder: `environment_setup/` 219 files (1,227 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `esmlfac/` 2, `usecase_code/` 1, `meta/` 1, repository root 2. In total 542 files and 1,258 MB. The folder names are the ones on `main`; "Round 4: the root" says where the kept parts are now.
+Per top-level folder: `environment_setup/` 278 files (1,228 MB), `copy_my_subfolders_to_my_grandparent/` 200 (4 MB), `esml/` 79 (26 MB), `esmlrt/` 22, `documentation/` 9, `healthmodel/` 7, `bootstrap/` 3, `esmlfac/` 2, `usecase_code/` 1, `meta/` 1, repository root 2. In total 604 files and 1,259 MB. The folder names are the ones on `main`; "Round 4: the root" says where the kept parts are now.
 
 What stays of the two folders that held ESML v1:
 
@@ -149,6 +152,120 @@ Removed (4 files):
 Follow-ups for the consumers (not done here): orange's one `healthmodel/` path and pink's one `mcp` path
 must gain the `usecase_code/` prefix when they move to v1.26. The consumer hits come from the scan before
 this round (14 November 2026); the consumer repositories were not read again.
+
+## Round 5: scripts and Bicep
+
+Every `.ps1`, `.sh` and `.bicep` file was decided on its own. A file stays when a pipeline, a workflow, a
+start or bootstrap script, the CLI, a Bicep module that is itself used, or a consumer repository reaches it,
+or when `documentation/v2` or the readme next to it tells the operator to run it. A mention in a test, a
+comment or another document is not a dependency. Joakim: "remove all not depending .ps1 or .sh or bicep".
+
+| | Before (`2b32ad93`) | After |
+|---|---:|---:|
+| Files in the branch | 2,705 | 2,643 |
+| Size | 294.7 MB | 293.8 MB |
+| `.ps1` | 52 | 47 |
+| `.sh` | 64 | 56 |
+| `.bicep` | 297 | 254 |
+| Folders at the root (`.github/` and `.claude/` not counted) | 4 | 4 |
+| Markdown files at the root | 4 | 4 |
+| README files | 274 | 274 |
+
+2,705 - 62 = 2,643. Of the 413 scripts and Bicep files before this round, 56 went and 357 stay: 292
+because a root reaches them, and 65 because they are operator commands or are reached through a computed
+path (list below).
+
+Removed (62 files):
+
+| Group | Files | Why nothing needs them |
+|---|---:|---|
+| Foundry templates `09-ai-foundry-2025-v2.bicep` and `-v3.bicep`, the `modules/csFoundry/foundry-apim/` tree (main, 17 network modules, 4 parameter and metadata files), `aiFoundry2025AvmOff.bicep` and `keyVaultExport.bicep` | 26 | The pipelines and the Factory lifecycle deploy only `09-ai-foundry-2025-v4.bicep`; the rest was used only by v2 and v3 |
+| The ESML v1 project template `esml-project/22-main.bicep` and the 7 modules only it used (Databricks, Event Hub, Azure ML, RBAC) | 8 | No pipeline deploys it; ESML v1 left in round 3 |
+| Manual helpers in `esml-util/` and `esml-project/` (DSVM, AKS, bastion, IP rules, role helpers) and the bastion NSG pair in `copy_to_local_settings/user_connectivity_dsvm/` | 14 | No pipeline, script or operator page calls them |
+| The two IP-rule scripts and the post-Bicep agentic script in `bootstrap/` | 3 | Only two commented-out lines in `00-start.sh` name them |
+| Modules nothing names: `avdSessionHost`, `cloudflareTunnelVm`, `virtualMachinePublic`, `csFoundry/cs.bicep`, `networking/dnsForwarding.bicep` | 5 | No module statement uses them; the DNS forwarding guide now links the module on `main` |
+| Scripts without a caller: Azure DevOps cross-charging step 120, the Databricks token and log-metrics scripts with the two Spark listener jars only the log-metrics script loaded, and a second copy of the finops `run-and-export.ps1` (the documented copy under `showback/` stays) | 6 | No caller |
+| **Total** | **62** | 43 `.bicep`, 8 `.sh`, 5 `.ps1`, 3 `.json`, 2 `.jar`, 1 `.bicepparam` |
+
+Tests followed their subjects. No test file was removed, and every check on a kept file is unchanged: 29
+test cases went with the files they tested, one test was renamed, and three new cases check the kept AKS
+module on its own instead of through the removed ESML v1 template. Ten test files changed:
+`test_dns_policy_ownership.py`, and in `unit/`: `test_admin_object_ids.py`, `test_aks_outbound_type.py`,
+`test_bootstrap_scaleset.py`, `test_defender_compute_baseline.py`, `test_diagnostics_telemetry.py`,
+`test_foundry_model_deployments.py`, `test_key_vault_security_defaults.py`,
+`test_private_foundry_capability_host.py` and `test_project_lake_acl.py`. Links in four documents and three
+architecture notes now point at `main`.
+
+<details>
+<summary>The 65 files kept because they are operator commands or are reached through a computed path</summary>
+
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep`: operator command (readme). Deployed by hand with main.bicepparam (using, line 1; command in lines 8-9 and in the folder readme.md)
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/actionGroup.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:181
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/budget.resourcegroup.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:206
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/budget.subscription.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:193
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/logicApp.throttle.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:151
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/roleAssignment.resourcegroup.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:172
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/roleAssignment.subscription.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:164
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/modules/scheduledQueryAlert.tokens.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/bicep/main.bicep:220
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/scripts/throttle-genai.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/readme.md (PowerShell variant); name...
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/scripts/throttle-genai.sh`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/aimodel-throttle/readme.md:155
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/logicapps/report-dispatch/main.bicep`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/readme.md:173 ("Nothing deploys automatically"); repor...
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/Update-AgentMonitoringReport.ps1`: operator command (documentation/v2). documentation/v2/30-39/32-dashboards.md:1108
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/Update-FoundryTokenReport.ps1`: reached through a computed path. environment_setup/aifactory/bicep/copy_to_local_settings/automation/report_compute.py:25 (path built from parts; report_compute.py is an operator C...
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/deploy-automation.bicep`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/readme.md:245
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/Update-ShowbackReport.ps1`: reached through a computed path. environment_setup/aifactory/bicep/copy_to_local_settings/automation/report_compute.py:26 (path built from parts)
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/deploy-automation.bicep`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/readme.md:72
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/modules/automationAccount.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/deploy-automation.bicep:41
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/run-and-export.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/readme.md:39
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/governance/region-policy/New-EsafRegionPolicy.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/governance/region-policy/README.md:40
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/governance/region-policy/Remove-EsafRegionPolicy.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/governance/region-policy/README.md:47
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-publishing/publich-agent-to-Copilot.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-publishing/readme.md:117
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-publishing/publich-agent-to-TEAMS.ps1`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-publishing/readme.md:111
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/foundry-usage-runbook.bicep`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/readme.md:157
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/run-foundry-usage-report.sh`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/readme.md:62
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/save-foundry-usage-queries.sh`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/readme.md:48
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/verify-and-configure-foundry-diagnostics.sh`: operator command (readme). environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/readme.md:33
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/report-local.ps1`: reached through a computed path. environment_setup/aifactory/bicep/copy_to_local_settings/automation/report_compute.py:359 (root / "report-local.ps1")
+- `environment_setup/aifactory/bicep/copy_to_local_settings/automation/run-native-monitoring-sample.ps1`: operator command (documentation/v2). documentation/v2/30-39/32-dashboards.md:1185
+- `environment_setup/aifactory/bicep/esml-util/000-switch-sub2_dev.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-resourceproviders.md:16 (login step before the resource provider script)
+- `environment_setup/aifactory/bicep/esml-util/25-add-users-to-kv-get-list-access-policy.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-permissions-users-ad-sps.md:164; called by 26-add-esml-coreteam-member.ps1:123
+- `environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-permissions-users-ad-sps.md:124
+- `environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-permissions-users-ad-sps.md:114
+- `environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-prerequisites-setup.md:359
+- `environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1`: operator command (documentation/v2). documentation/v2/10-19/12-prerequisites-setup.md:408
+- `environment_setup/aifactory/bicep/esml-util/28-policy.bicep`: operator command (documentation/v2). documentation/v2/10-19/14-networking-privateDNS.md:345 (optional policy the operator deploys by hand)
+- `environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh`: operator command (documentation/v2). documentation/v2/10-19/12-prerequisites-setup.md:372
+- `environment_setup/aifactory/bicep/esml-util/32-create-azure-groups.sh`: operator command (documentation/v2). documentation/v2/10-19/16-ad-groups-personas.md:43
+- `environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1:79
+- `environment_setup/aifactory/bicep/modules/addUserAsCoreteamBYOVnet.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1:93
+- `environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1:136
+- `environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnet.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1:111
+- `environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1:122
+- `environment_setup/aifactory/bicep/modules/contributorRbacSimple.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep:89
+- `environment_setup/aifactory/bicep/modules/monitoring/Deploy-AMPLS.ps1`: operator command (readme). environment_setup/aifactory/bicep/modules/monitoring/IMPLEMENTATION_SUMMARY.md:76 (weak: an implementation summary, not a guide)
+- `environment_setup/aifactory/bicep/modules/ownerRbac.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/modules/addUserAsCoreteamBYOVnet.bicep:30
+- `environment_setup/aifactory/bicep/modules/rbacGeneric.bicep`: used by an operator command. Used by environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep:101
+- `environment_setup/aifactory/bicep/scripts/Copy-PrivateDnsRecords.ps1`: operator command (readme). environment_setup/aifactory/bicep/scripts/Copy-PrivateDnsRecords.md:63
+- `environment_setup/aifactory/bicep/scripts/delete-caphost-and-foundry-and-its-subnet.sh`: operator command (documentation/v2). Protected clean-up script; documentation/v2/10-19/10-deployment-stack-VS-aifactory-governance.md:115
+- `environment_setup/aifactory/bicep/scripts/delete-subnets-for-projects.sh`: reached through a computed path. environment_setup/aifactory/bicep/scripts/delete-caphost-and-foundry-and-its-subnet.sh:607 ("${SCRIPT_DIR}/delete-subnets-for-projects.sh"); protec...
+- `environment_setup/aifactory/bicep/scripts/enable-resource-providers.ps1`: operator command (readme). usecase_code/healthmodel/readme.md:60 (weak: the only script that registers Microsoft.CloudHealth for the health model; esml-util/26-enable-resourc...
+- `usecase_code/10-azure-function/11_func_read_from_storage/deploy.ps1`: operator command (readme). usecase_code/10-azure-function/11_func_read_from_storage/README.md:68
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/deploy.ps1`: operator command (documentation/v2). documentation/v2/10-19/22-lifecycle-azure-function.md:88
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/function-app.bicep`: reached through a computed path. usecase_code/10-azure-function/12_func_aifactory_lifecycle/deploy.ps1:105 (Join-Path $here infra/function-app.bicep)
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/roles.bicep`: used by an operator command. Used by usecase_code/10-azure-function/12_func_aifactory_lifecycle/infra/function-app.bicep:286
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-factory-api-host.ps1`: operator command (documentation/v2). documentation/v2/10-19/22-lifecycle-azure-function.md:110
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-github-runner.ps1`: reached through a computed path. usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/register-management-runner.ps1:28 (Join-Path $PSScriptRoot)
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/install-lifecycle-runner.ps1`: operator command (documentation/v2). documentation/v2/10-19/22-lifecycle-azure-function.md:109
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/register-entra-app.ps1`: operator command (readme). usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md:244
+- `usecase_code/10-azure-function/12_func_aifactory_lifecycle/scripts/register-management-runner.ps1`: operator command (readme). usecase_code/10-azure-function/12_func_aifactory_lifecycle/README_More_Info.md:174
+- `usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/main.bicep`: operator command (readme). usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md:57; also inside the profile root azure-datafactory/**
+- `usecase_code/healthmodel/bicep/main.bicep`: reached through a computed path. usecase_code/healthmodel/src/aifactory_healthmodel/bootstrap.py:28 (HEALTHMODEL_ROOT / "bicep" / "main.bicep"); the CLI is run by github-actions/in...
+- `usecase_code/healthmodel/bicep/modules/action-group.bicep`: used by an operator command. Used by usecase_code/healthmodel/bicep/main.bicep:115
+- `usecase_code/healthmodel/bicep/modules/reader-role.bicep`: used by an operator command. Used by usecase_code/healthmodel/bicep/main.bicep:138
+- `usecase_code/mcp/deploy/rollback.ps1`: operator command (readme). Protected failure path; usecase_code/mcp/readme.md:637
+- `usecase_code/mcp/deploy/rollout.ps1`: operator command (readme). usecase_code/mcp/readme.md:598
+
+</details>
 
 ## What got faster
 
@@ -220,6 +337,14 @@ Azure DevOps tasks 62, 63, 69a and 69b.
 | Second, independent check of rounds 1 and 2 on `049b9d74` (cloud, Ubuntu) | All five tiers: none of the 9,424 tests that passed on the base fails; the same 166 fail on both; 3 cases left with their removed modules. All 25 Bicep entry files compile to the same ARM JSON as on the base, ignoring generator metadata and template hash. All 1,782 file references in 41 workflow and pipeline files resolve. A scratch repository with this branch as its submodule runs `01-start-v125-and-above.sh` offline, twice. |
 | The same checks on `2f15e6eb`, which has round 3 and the changes under "What got more robust" (cloud, Ubuntu) | All five tiers: 9,872 tests, 9,680 passed, 166 failed. None of the tests that passed on the base fails; the same 166 fail on both; 3 cases left with their removed modules and 259 are new. The 25 Bicep entry files still compile to the same ARM JSON as on the base. The 19 component suites give the same result as on the base, test by test: 8,953 tests, 8,674 passed, 94 failed, 70 errors. The scratch repository check passes with the three commands above. |
 | GitHub Actions on `2f15e6eb` | Green on Ubuntu and Windows (run 43579595936). |
+| Round 4, all five tiers, before (`4b6e7c1e`) and after | 9,872 tests before, 9,874 after: the two new root-layout tests. Ubuntu: 9,680 passed before, 9,682 after. Windows: 9,687 and 9,689. 166 failed on both. No test that passed before fails. |
+| Round 4, the 16 component suites | No test that passed before fails. |
+| Round 5, default tiers, Ubuntu and Windows | Green on the probe. |
+| Round 5, all five tiers, before (`4b6e7c1e`) and after | 9,872 tests before, 9,846 after: 29 cases went with their removed files, one test was renamed, three are new. Ubuntu: 9,680 passed before, 9,654 after. Windows: 9,687 and 9,661. 166 failed on both. No test that passed before fails. |
+| Round 5, Bicep matrix | The same 25 entry points pass with 696 cases and the same 208 reachable templates: none of the 62 removed files was reachable. |
+| Round 5, the 16 component suites | The same counts in every suite. |
+| Round 5, consumers | The Azure DevOps consumer repository, the Factory API and the MAUI apps name none of the 62 files. |
+| Every count in this table | Counts every test id. One test takes a random GUID as a parameter, so one id differs between any two runs. |
 
 Not checked: no deployment to Azure was run from this branch. The checks are static analysis, compilation
 and the offline test suites.
@@ -229,13 +354,13 @@ and the offline test suites.
 These would make the branch smaller still. They are not applied, because each is a choice about what
 v1.26 should contain.
 
-1. **Three Config Wizard archives, 145 MB of the remaining 295 MB.** `install_config_wizard/` for Linux,
+1. **Three Config Wizard archives, 145 MB of the remaining 294 MB.** `install_config_wizard/` for Linux,
    Windows and macOS. The release manifest and the lifecycle function's install script read them from the
    checkout.
-2. **89 more Bicep files outside the 25 main entry points.** The Bicep compile matrix reaches 208 of the
-   320 files from its 25 entry points. Round 2 removed the 23 that nothing names. The other 89 are named
-   by a test, a document or a script, and some belong to parts with their own deployment. The list is in
-   the appendix.
+2. **46 Bicep files outside the 25 main entry points.** Round 5 checked each one and removed 43. The 46
+   that stay belong to parts with their own deployment (MCP, health model, project automation, the
+   simple application gateway, the lifecycle function, Data Factory) or are operator commands. The
+   list is in the appendix.
 3. **What is left of ESML v1.** v1 was removed in round 3. Two things remain: the 16 images under
    `documentation/images/esml/`, and four v2 pages that still describe v1 steps (24 legacy setup, 32, 33 and 35).
    The pages can be dropped, or rewritten to send the reader to `release/v1.24`.
@@ -275,14 +400,14 @@ compact-repo apply   . --plan <dir>/plan.json --target release/v1.26 --update --
 
 To restore a file: `git checkout origin/main -- <path>`.
 
-## Appendix: 89 Bicep files outside the reach of the 25 main entry points
+## Appendix: 46 Bicep files outside the reach of the 25 main entry points
 
 The 25 entry points are the ones the Bicep compile matrix builds: `esml-common/main`, `esml-genai-1`
 and the AI gateway. Some files below belong to parts with their own deployment (MCP, health model,
-project automation, the simple application gateway), so this is a list to review, not a list to delete.
+project automation, the simple application gateway). Round 5 removed the 43 that nothing deploys.
 
 <details>
-<summary>Show the 89 files</summary>
+<summary>Show the 46 files</summary>
 
 - `bootstrap/lib/all-factories-dashboard.bicep`
 - `bootstrap/lib/simple-app-gateway-network.bicep`
@@ -301,21 +426,8 @@ project automation, the simple application gateway), so this is a list to review
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/deploy-automation.bicep`
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/showback/modules/automationAccount.bicep`
 - `environment_setup/aifactory/bicep/copy_to_local_settings/automation/projectteam/foundry-usage/foundry-usage-runbook.bicep`
-- `environment_setup/aifactory/bicep/copy_to_local_settings/user_connectivity_dsvm/bicep-addOrUpdate-bastion-nsg-rule/007-main-bastionNsg.bicep`
 - `environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep`
-- `environment_setup/aifactory/bicep/esml-common/modules-common/avdSessionHost.bicep`
-- `environment_setup/aifactory/bicep/esml-common/modules-common/cloudflareTunnelVm.bicep`
 - `environment_setup/aifactory/bicep/esml-genai-1/08-azure-mcp.bicep`
-- `environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v2.bicep`
-- `environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v3.bicep`
-- `environment_setup/aifactory/bicep/esml-project/22-main.bicep`
-- `environment_setup/aifactory/bicep/esml-project/23-add-dsvm.bicep`
-- `environment_setup/aifactory/bicep/esml-project/24-add-aks.bicep`
-- `environment_setup/aifactory/bicep/esml-util/007-main-bastionNsg.bicep`
-- `environment_setup/aifactory/bicep/esml-util/100-aml-rbac.bicep`
-- `environment_setup/aifactory/bicep/esml-util/23-add-dsvm.bicep`
-- `environment_setup/aifactory/bicep/esml-util/24-add-aks.bicep`
-- `environment_setup/aifactory/bicep/esml-util/25-add-user-to-bastion.bicep`
 - `environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep`
 - `environment_setup/aifactory/bicep/esml-util/28-policy.bicep`
 - `environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep`
@@ -326,38 +438,8 @@ project automation, the simple application gateway), so this is a list to review
 - `environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep`
 - `environment_setup/aifactory/bicep/modules/azureMcpServer.bicep`
 - `environment_setup/aifactory/bicep/modules/contributorRbacSimple.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/aiFoundry2025AvmOff.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/cs.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/main.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/add-project-capability-host.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-account-encryption.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-account-identity.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-project-identity.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-search-role-assignments.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/azure-storage-account-role-assignment.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/blob-storage-container-role-assignments.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/cosmos-container-role-assignments.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/cosmosdb-account-role-assignment.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/existing-vnet.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/format-project-workspace-id.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/network-agent-vnet.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/private-endpoint-and-dns.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/standard-dependent-resources.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/subnet.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/validate-existing-resources.bicep`
-- `environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/vnet.bicep`
-- `environment_setup/aifactory/bicep/modules/dataBricks.bicep`
-- `environment_setup/aifactory/bicep/modules/databricksManagedIdentityRBAC.bicep`
-- `environment_setup/aifactory/bicep/modules/databricksPrivate.bicep`
-- `environment_setup/aifactory/bicep/modules/databricksRBAC.bicep`
-- `environment_setup/aifactory/bicep/modules/eventhub.bicep`
-- `environment_setup/aifactory/bicep/modules/keyVaultExport.bicep`
-- `environment_setup/aifactory/bicep/modules/machineLearning.bicep`
-- `environment_setup/aifactory/bicep/modules/networking/dnsForwarding.bicep`
 - `environment_setup/aifactory/bicep/modules/ownerRbac.bicep`
 - `environment_setup/aifactory/bicep/modules/rbacGeneric.bicep`
-- `environment_setup/aifactory/bicep/modules/rbacRGlevelAml.bicep`
-- `environment_setup/aifactory/bicep/modules/virtualMachinePublic.bicep`
 - `environment_setup/aifactory/bicep/personas/custom-roles.bicep`
 - `usecase_code/healthmodel/bicep/main.bicep`
 - `usecase_code/healthmodel/bicep/modules/action-group.bicep`

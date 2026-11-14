@@ -420,6 +420,80 @@ drop:
   - "usecase_code/00-install-prereqs/**"      # installs the removed Azure ML SDK v1.55 set on a developer VM
   - "documentation/v1/**"
 
+  # --- Round 5 (2026-11-14): scripts and Bicep that nothing depends on -------------------------------------
+  # .ps1, .sh and .bicep files that no root reaches: no pipeline, workflow, script, CLI command or Bicep
+  # module uses them, documentation/v2 does not tell the operator to run them, and the Azure DevOps
+  # consumer repository, the Factory API and the MAUI apps name none of them. A mention in a test, a
+  # comment or another document is not a dependency. They stay on main.
+  - "bootstrap/12-GENAI-update-ip-rule-ux.sh"
+  - "bootstrap/13-ESML-update-ip-rule-ux.sh"
+  - "bootstrap/20-genai-agentic-post-bicep.sh"
+  - "environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/runbooks/run-and-export.ps1"
+  - "environment_setup/aifactory/bicep/copy_to_local_settings/user_connectivity_dsvm/bicep-addOrUpdate-bastion-nsg-rule/007-bastionNSGInbound.ps1"
+  - "environment_setup/aifactory/bicep/copy_to_local_settings/user_connectivity_dsvm/bicep-addOrUpdate-bastion-nsg-rule/007-main-bastionNsg.bicep"
+  - "environment_setup/aifactory/bicep/esml-project/23-add-dsvm.bicep"
+  - "environment_setup/aifactory/bicep/esml-project/23-add-dsvm.ps1"
+  - "environment_setup/aifactory/bicep/esml-project/24-add-aks.bicep"
+  - "environment_setup/aifactory/bicep/esml-project/24-add-aks.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/007-main-bastionNsg.bicep"
+  - "environment_setup/aifactory/bicep/esml-util/100-aml-rbac.bicep"
+  - "environment_setup/aifactory/bicep/esml-util/12-GENAI-update-ip-rule-ux.sh"
+  - "environment_setup/aifactory/bicep/esml-util/13-ESML-update-ip-rule-ux.sh"
+  - "environment_setup/aifactory/bicep/esml-util/201-az-cli-give-role.ps1"
+  - "environment_setup/aifactory/bicep/esml-util/23-add-dsvm.bicep"
+  - "environment_setup/aifactory/bicep/esml-util/24-add-aks.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/cs.bicep"
+  - "environment_setup/aifactory/bicep/modules/networking/dnsForwarding.bicep"
+  - "environment_setup/aifactory/bicep/scripts/ado/120_cross_charging.sh"
+  - "environment_setup/aifactory/bicep/scripts/databricks/deployment/create_pat.sh"
+  - "environment_setup/aifactory/bicep/scripts/databricks/init_scripts/capture_log_metrics.sh"
+  # Unused chains: an unused entry file and the modules only it reaches. 09-ai-foundry-2025-v2 -> foundry-apim/main
+  # -> foundry-apim/modules-network-secured/*; 09-ai-foundry-2025-v3 -> aiFoundry2025AvmOff -> keyVaultExport;
+  # esml-project/22-main (ESML v1 project) -> the Databricks, Event Hubs, classic AML and AML RG-level RBAC
+  # modules. The Factory lifecycle and the pipelines deploy only esml-genai-1/09-ai-foundry-2025-v4.bicep.
+  - "environment_setup/aifactory/bicep/esml-common/modules-common/avdSessionHost.bicep"
+  - "environment_setup/aifactory/bicep/esml-common/modules-common/cloudflareTunnelVm.bicep"
+  - "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v2.bicep"
+  - "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v3.bicep"
+  - "environment_setup/aifactory/bicep/esml-project/22-main.bicep"
+  - "environment_setup/aifactory/bicep/esml-util/25-add-user-to-bastion.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/aiFoundry2025AvmOff.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/main.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/add-project-capability-host.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-account-encryption.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-account-identity.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-project-identity.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/ai-search-role-assignments.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/azure-storage-account-role-assignment.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/blob-storage-container-role-assignments.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/cosmos-container-role-assignments.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/cosmosdb-account-role-assignment.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/existing-vnet.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/format-project-workspace-id.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/network-agent-vnet.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/private-endpoint-and-dns.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/standard-dependent-resources.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/subnet.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/validate-existing-resources.bicep"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/modules-network-secured/vnet.bicep"
+  - "environment_setup/aifactory/bicep/modules/dataBricks.bicep"
+  - "environment_setup/aifactory/bicep/modules/databricksManagedIdentityRBAC.bicep"
+  - "environment_setup/aifactory/bicep/modules/databricksPrivate.bicep"
+  - "environment_setup/aifactory/bicep/modules/databricksRBAC.bicep"
+  - "environment_setup/aifactory/bicep/modules/eventhub.bicep"
+  - "environment_setup/aifactory/bicep/modules/keyVaultExport.bicep"
+  - "environment_setup/aifactory/bicep/modules/machineLearning.bicep"
+  - "environment_setup/aifactory/bicep/modules/rbacRGlevelAml.bicep"
+  - "environment_setup/aifactory/bicep/modules/virtualMachinePublic.bicep"
+  # Followers: used only by scripts/databricks/init_scripts/capture_log_metrics.sh (removed above).
+  - "environment_setup/aifactory/bicep/scripts/databricks/jars/spark-listeners-loganalytics_3.0.1_2.12-1.0.0.jar"
+  - "environment_setup/aifactory/bicep/scripts/databricks/jars/spark-listeners_3.0.1_2.12-1.0.0.jar"
+  # Followers: the parameter file, the compiled ARM copies and the metadata of foundry-apim/main.bicep (removed above).
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/azuredeploy.json"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/main.bicepparam"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/main.json"
+  - "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim/metadata.json"
+
 followers:
   tests:
     - "**/test_*.py"
