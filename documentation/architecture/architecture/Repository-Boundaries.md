@@ -24,7 +24,7 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 |---|---|
 | `bootstrap`, root launchers | Maintained launch/control adapters, copying, enrollment, runner and registered lifecycle helpers. Running them is not a documentation operation. |
 | `environment_setup/aifactory` | Maintained canonical configuration, Bicep, provider pipeline templates and infrastructure scripts. `copy_to_local_settings` is template source, not an installed consumer instance. |
-| `copy_my_subfolders_to_my_grandparent` | Maintained distributable DataOps/MLOps/GenAIOps, settings and notebook templates; copied destinations become consumer-owned. Not merely disposable generated output. |
+| `usecase_code/copy_my_subfolders_to_my_grandparent` | Maintained distributable DataOps/MLOps/GenAIOps, settings and notebook templates; copied destinations become consumer-owned. Not merely disposable generated output. |
 | `esml`, `esmlfac`, `esmlrt` | Retained SDK-v1-era implementation and contracts. `ESMLFactory` imports controllers/comparison/scoring from `esmlrt`; these are real code, not empty folders, but not the new v2 API. |
 | `usecase_code/esml-v2` | Maintained `azure-esml-sdk` / `azure_esml` pipeline factory. Bundles canonical model-factory engines when building, not a second maintained implementation. |
 | `usecase_code/healthmodel`, `usecase_code/mcp` | Active working source for health modeling and repository MCP. Unpublished code is not installed-service evidence. |

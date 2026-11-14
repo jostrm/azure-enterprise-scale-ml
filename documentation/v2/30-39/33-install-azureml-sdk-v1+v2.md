@@ -65,8 +65,8 @@ Open a notebook (note what level the folder is on). You can use any combinations
 
 
 ![](./images/33-setup-notebook-templates.png)
-- Note: if you cannot see any `notebook_template_...` folder, but `settings` folder at your root,  please update ESML (pull latest on "azure-enterprise-scale-ml) , and then use the  [02_update_templates_QUICK.ipynb](../../azure-enterprise-scale-ml/copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb) that automatically `UPDATES` (copy templtes folders) See `4) Copy TEMPLATES ` below in this readme.
-- Note: If you cannot see either `notebook_template_...` or `settings` folder in your ROOT, then you need to `INIT` all TEMPLATES, run this notebook: [01_init_templates_ALL.ipynb](../../azure-enterprise-scale-ml/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
+- Note: if you cannot see any `notebook_template_...` folder, but `settings` folder at your root,  please update ESML (pull latest on "azure-enterprise-scale-ml) , and then use the  [02_update_templates_QUICK.ipynb](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb) that automatically `UPDATES` (copy templtes folders) See `4) Copy TEMPLATES ` below in this readme.
+- Note: If you cannot see either `notebook_template_...` or `settings` folder in your ROOT, then you need to `INIT` all TEMPLATES, run this notebook: [01_init_templates_ALL.ipynb](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
 
 ### Select correct CONDA environment, when running notebooks (only need to do this once, per notebook)
 ![](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/esml/images/quickstart_notebooks_2_select_conda.png?raw=true)

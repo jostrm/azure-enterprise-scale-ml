@@ -75,7 +75,7 @@ Registered roots instead use protected scoped lifecycle manifests; ordinary lega
 
 GHA OIDC identity routing and ADO service-connection selection are distinct provider mechanisms. Authentication, provider authorization, private runner connectivity, source publication and deployment approval must all succeed. A local configuration save grants none of these.
 
-DataOps/MLOps templates in `copy_my_subfolders_to_my_grandparent` orchestrate workload jobs, not whole-factory state transitions. Generated workflow/job artifacts are execution inputs; canonical template source and consumer configuration remain separate.
+DataOps/MLOps templates in `usecase_code/copy_my_subfolders_to_my_grandparent` orchestrate workload jobs, not whole-factory state transitions. Generated workflow/job artifacts are execution inputs; canonical template source and consumer configuration remain separate.
 
 ## Credential-free CI
 
@@ -99,4 +99,4 @@ group, so a push cannot cancel the nightly run.
 
 See [[Bootstrap-and-Layouts]], [[Lifecycle-and-Recovery]], [[Factory-Scope-Model]], [[Engines-and-Pipelines]], [[State-Machines-and-DAGs]] and [[Index]].
 
-Authority: [update behavior and version compatibility](../../v2/20-29/26-update-AIFactory.md), [GHA topology and runners](../../gh-io/docs/orchestrators/gh.md), [current MLOps templates](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
+Authority: [update behavior and version compatibility](../../v2/20-29/26-update-AIFactory.md), [GHA topology and runners](../../gh-io/docs/orchestrators/gh.md), [current MLOps templates](../../../usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).

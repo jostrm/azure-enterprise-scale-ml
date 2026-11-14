@@ -36,7 +36,7 @@ from ml_model_factory.tags import TAG_KEYS
 
 ROOT = Path(__file__).resolve().parents[2]
 REPO = ROOT.parents[1]
-EXTERNAL = REPO / "copy_my_subfolders_to_my_grandparent"
+EXTERNAL = REPO / "usecase_code" / "copy_my_subfolders_to_my_grandparent"
 ADF = EXTERNAL / "dataops" / "azure-datafactory"
 MLOPS = EXTERNAL / "mlops" / "03_mlops_2026-09"
 MODES = ("custom", "automl")

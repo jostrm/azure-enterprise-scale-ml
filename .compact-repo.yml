@@ -17,7 +17,7 @@
 #                on their unreached files (see "Named components" under keep).
 #   R3 installers: previous-release/ and old/ are dropped. A current installer stays only when a kept
 #                script or test reads it from the checkout by relative path.
-#   R4 copied folders: copy_to_local_settings/ and copy_my_subfolders_to_my_grandparent/ are copied
+#   R4 copied folders: copy_to_local_settings/ and usecase_code/copy_my_subfolders_to_my_grandparent/ are copied
 #                wholesale into the consumer repo; files nothing uses there are on the decision list and
 #                stay until Joakim has decided.
 #   R5 failure paths are used: retry, recovery, clean-up and self-heal code stays; operator recovery
@@ -215,9 +215,9 @@ roots:
     reason: "Read by unit/test_install_config_wizard_downloads.py."
 
   # --- Templates for the consumer repository that are current (the rest of the folder was ESML v1) ------
-  - path: "copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/**"
+  - path: "usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/**"
     reason: "ML Model Factory data-ops template; accelerator/tests/test_orchestration_matrix.py and test_storage_selection.py read it."
-  - path: "copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/**"
+  - path: "usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/**"
     reason: "ML Model Factory MLOps template for Azure DevOps and GitHub; accelerator/tests/test_orchestration_matrix.py reads it."
 
   # --- Restored after the independent proof run (2026-11-14): kept files need these by relative path --------

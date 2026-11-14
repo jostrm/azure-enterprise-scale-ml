@@ -8,7 +8,7 @@ All Azure ML control-plane examples use **Python SDK v2 and CLI v2**.
 
 Start with [data onboarding and lake design](34-datalake-onboard-data.md) and
 [DataOps orchestration](36-dataops.md). Reusable CI templates are in
-[`mlops/03_mlops_2026-09`](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
+[`mlops/03_mlops_2026-09`](../../../usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
 
 ## ESML v2: the pip-installable pipeline factory
 
@@ -665,7 +665,7 @@ for local lake execution, deployment helpers and Databricks job parameters.
 ## 5. Azure DevOps and GitHub Actions
 
 Both providers call the same `scripts\ci.py` in the
-[current MLOps template folder](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
+[current MLOps template folder](../../../usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
 Reuse the existing AI Factory self-hosted runner/agent, private connectivity and
 authentication configuration. Preprovision dependencies; workflows do not install
 tools or silently switch to a hosted runner.
@@ -745,7 +745,7 @@ distinguished from real Kaggle data.
 Run the combined suite from the model-factory root:
 
 ```powershell
-python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+python -m pytest tests ..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
 ```
 
 At the September 11, 2026 project snapshot, real local Kaggle classification,
@@ -790,7 +790,7 @@ not be placed into monitoring reports.
 ## 8. Legacy ESML workflows
 
 Older ESML notebook flows and
-[`02_cicd-ado-gha_mlops`](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
+[`02_cicd-ado-gha_mlops`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
 remain legacy references. Their `AutoMLStep`, `DatabricksStep` and published-pipeline
 patterns are not the implementation contract for this SDK/CLI v2 model factory.
 Do not mix the old execution APIs or lake paths into new templates without an

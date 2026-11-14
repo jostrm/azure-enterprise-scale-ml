@@ -382,13 +382,13 @@ bundle are references: direct Azure output bindings do not publish a snapshot or
 provide storage-enforced immutability. Existing configurations without `lake`
 retain their previous behavior.
 
-Use the [ADF templates](../../../copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md)
+Use the [ADF templates](../../../usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md)
 for raw Copy into landing and explicit Azure ML v2 or Databricks job orchestration.
 The lake-aware ADF adapter currently binds a single source file; image directories
 need a reviewed folder/manifest binding. Do not claim that a raw copy performs
 schema validation, quarantine or model promotion.
 
-The [MLOps templates](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md)
+The [MLOps templates](../../../usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md)
 generate fresh execution IDs and retain source/snapshot lineage. Databricks uses
 the same path builder and stable checkpoint identity; physical checkpoint backend
 support and cluster permissions must be configured explicitly.
@@ -432,7 +432,7 @@ Implementation references:
 From the model-factory root, using its configured Python environment:
 
 ```powershell
-python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+python -m pytest tests ..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
 ```
 
 Treat validation evidence as three different levels:

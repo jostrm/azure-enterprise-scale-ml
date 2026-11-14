@@ -45,7 +45,7 @@ are embedded in these templates.
 From the repository root in PowerShell 7, with Azure CLI and Bicep already provisioned:
 
 ```powershell
-$templates = 'copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory'
+$templates = 'usecase_code\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory'
 Copy-Item "$templates\parameters.example.json" "$templates\parameters.local.json"
 # Edit parameters.local.json: existing factory, SHIR, Blob endpoints and optional credential names.
 bicep build "$templates\main.bicep" --stdout | Out-Null

@@ -20,7 +20,7 @@ import yaml
 
 ROOTS = (
     "00-start.sh", "01-start-v125-and-above.sh",
-    ".github", "bootstrap", "environment_setup", "copy_my_subfolders_to_my_grandparent",
+    ".github", "bootstrap", "environment_setup",
     "esml", "esmlfac", "esmlrt", "usecase_code",
 )
 EXTENSIONS = {".py", ".sh", ".ps1", ".bicep", ".bicepparam", ".yml", ".yaml", ".json", ".ipynb", ".toml", ".txt"}
@@ -148,7 +148,7 @@ def select_inputs(root):
 
 
 def ownership(path):
-    if path.startswith("copy_my_subfolders_to_my_grandparent/") or "/copy_to_local_settings/" in path:
+    if path.startswith("usecase_code/copy_my_subfolders_to_my_grandparent/") or "/copy_to_local_settings/" in path:
         return "consumer_template"
     if path.startswith("usecase_code/50-ml-model-factory/usecase-type/"):
         return "generated_example"

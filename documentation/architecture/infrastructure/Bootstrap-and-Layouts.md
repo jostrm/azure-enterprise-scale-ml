@@ -53,7 +53,7 @@ register. The rule covers `azurefactory/.azurefactory/` (`.catalog.lock`,
 |---|---|
 | `aifactory` | Legacy copied consumer configuration and provider templates. Retained compatibility route. |
 | `azurefactory/register.json` | Registered catalog with explicit factory/scale-set/project projections. Empty register is not deployed infrastructure. |
-| `copy_to_local_settings`, `copy_my_subfolders_to_my_grandparent` | Canonical sources copied into consumers; do not edit generated consumer projections as if they were upstream source. |
+| `copy_to_local_settings`, `usecase_code/copy_my_subfolders_to_my_grandparent` | Canonical sources copied into consumers; do not edit generated consumer projections as if they were upstream source. |
 
 Changing the requested release does **not** migrate layouts. Registered roots reject ordinary legacy update/copy operations; migration requires separate API review and confirmation.
 

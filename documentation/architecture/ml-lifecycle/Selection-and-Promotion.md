@@ -6,7 +6,7 @@ sources:
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/tags.py
   - usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/evaluation.py
   - usecase_code/esml-v2/azure_esml/domain_layer/rollout.py
-  - copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md
+  - usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md
 tests:
   - usecase_code/50-ml-model-factory/accelerator/tests/test_selection.py
   - usecase_code/50-ml-model-factory/accelerator/tests/test_tags.py
@@ -44,4 +44,4 @@ Infrastructure Stage/Prod predecessor checks are a separate lifecycle contract f
 
 See [[Engines-and-Pipelines]], [[Monitoring-and-Retraining]], [[Lake-and-Data-Lineage]], [[Reviewed-Operations]] and [[Index]].
 
-Authority: [candidate/champion CI contract](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md), [model identity and lifecycle](../../v2/30-39/37-mlops.md).
+Authority: [candidate/champion CI contract](../../../usecase_code/copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md), [model identity and lifecycle](../../v2/30-39/37-mlops.md).

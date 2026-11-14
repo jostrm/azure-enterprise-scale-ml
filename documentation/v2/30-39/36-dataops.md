@@ -6,7 +6,7 @@ the [versioned project/use-case lake](34-datalake-onboard-data.md), Azure Data F
 (ADF), Azure ML v2 jobs and Azure Databricks notebooks.
 
 Use the implemented
-[Azure Data Factory templates](../../../copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md).
+[Azure Data Factory templates](../../../usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md).
 They are opt-in code-first artifacts, not evidence that pipelines, permissions or
 triggers have already been deployed.
 
@@ -506,7 +506,7 @@ Do not fix missing private connectivity by silently enabling public access.
 
 ## 4. Code-first ADF templates
 
-The [template directory](../../../copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory)
+The [template directory](../../../usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory)
 contains:
 
 | File | Purpose |
@@ -530,7 +530,7 @@ Two pipeline definitions are available:
 | `<namePrefix>_copy_databricks` | Copy input and call the supplied training notebook; created only with an existing Databricks linked service |
 
 Resolve and review local parameters before following the
-[installation instructions](../../../copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md#manual-install-administrator-action-not-performed-automatically).
+[installation instructions](../../../usecase_code/copy_my_subfolders_to_my_grandparent/dataops/azure-datafactory/readme.md#manual-install-administrator-action-not-performed-automatically).
 Installation and queueing are separate, authenticated operations.
 
 ### Initial versus delta loads
@@ -564,7 +564,7 @@ With `--lake` or `runtime.lake`, the optional adapter uses the shared `LakeLayou
 From the repository root with the model-factory environment available:
 
 ```powershell
-$templates = 'copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory'
+$templates = 'usecase_code\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory'
 $python = 'usecase_code\50-ml-model-factory\.venv\Scripts\python.exe'
 & $python "$templates\prepare_run.py" --runtime runtime.local.json `
   --copy copy.local.json --job-payload job-payload.local.json `
@@ -625,7 +625,7 @@ The former placeholder list of five pipelines was not implemented functionality.
 Run the combined suite from `usecase_code\50-ml-model-factory`:
 
 ```powershell
-python -m pytest accelerator\tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=ml-environment\outputs\validation\lifecycle-results.xml -q
+python -m pytest accelerator\tests ..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=ml-environment\outputs\validation\lifecycle-results.xml -q
 ```
 
 Local lifecycle tests execute ingestion/provenance, preparation, custom training,

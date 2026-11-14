@@ -16,7 +16,7 @@ parameters:
     default: usecase_code\50-ml-model-factory\.venv\Scripts\python.exe
   - name: templatePath
     type: string
-    default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+    default: usecase_code\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
   - name: scenario
     displayName: Scenario name or user-config\model\scenarios JSON path
     type: string

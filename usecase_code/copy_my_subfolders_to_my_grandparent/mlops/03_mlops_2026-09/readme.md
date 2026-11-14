@@ -16,8 +16,8 @@ dataset/snapshot/run paths. Missing or conflicting identity stops registration.
 Registered models remain candidates until a separate promotion/deployment decision.
 CI does not silently rewrite training origin when selecting a deployment target.
 
-See [MLOps and model tags](../../../documentation/v2/30-39/37-mlops.md)
-and [the lake layout](../../../documentation/v2/30-39/34-datalake-onboard-data.md)
+See [MLOps and model tags](../../../../documentation/v2/30-39/37-mlops.md)
+and [the lake layout](../../../../documentation/v2/30-39/34-datalake-onboard-data.md)
 for the full execution and storage contracts.
 
 ## Model-factory ownership layout
@@ -65,7 +65,7 @@ resolve relative to the **runtime JSON's directory**, not the runner's working
 directory; absolute paths also work. Choose the paths for your checkout layout.
 The example assumes the runtime JSON is directly under `user-config`.
 The editable canonical policy is
-[`usecase_code/50-ml-model-factory/user-config/model/model-selection.json`](../../../usecase_code/50-ml-model-factory/user-config/model/model-selection.json).
+[`usecase_code/50-ml-model-factory/user-config/model/model-selection.json`](../../../50-ml-model-factory/user-config/model/model-selection.json).
 It has profiles for all seven supported tasks. Each selected metric has its own
 maximize/minimize direction and signed `min_delta`: positive requires improvement,
 negative allows a bounded regression. Absolute deltas use metric units; relative

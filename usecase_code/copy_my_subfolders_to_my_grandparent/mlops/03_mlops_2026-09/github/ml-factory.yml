@@ -13,7 +13,7 @@ name: Reusable Azure ML v2 factory
         default: usecase_code\50-ml-model-factory\.venv\Scripts\python.exe
       template_path:
         type: string
-        default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+        default: usecase_code\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
       scenario:
         type: string
         required: true
@@ -63,7 +63,7 @@ name: Reusable Azure ML v2 factory
       template_path:
         description: Installed templates directory
         type: string
-        default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+        default: usecase_code\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
       scenario:
         description: Scenario name or user-config\model\scenarios JSON path
         type: string

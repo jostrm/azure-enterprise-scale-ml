@@ -245,7 +245,7 @@ def test_databricks_adapter_and_adf_use_selected_lake_without_new_storage_logic(
     scenario = {"name": "customers", "dataset": {"file": "data.csv"}}
     layout = dbx.load_lake(json.dumps(runtime["lake"]), scenario)
     assert dbx.landing_file(layout, scenario).startswith("wasbs://lake3@examplecommonlake.blob.core.windows.net/")
-    path = ROOT.parents[1] / "copy_my_subfolders_to_my_grandparent" / "dataops" / "azure-datafactory" / "prepare_run.py"
+    path = ROOT.parents[1] / "usecase_code" / "copy_my_subfolders_to_my_grandparent" / "dataops" / "azure-datafactory" / "prepare_run.py"
     spec = importlib.util.spec_from_file_location("storage_adf", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
