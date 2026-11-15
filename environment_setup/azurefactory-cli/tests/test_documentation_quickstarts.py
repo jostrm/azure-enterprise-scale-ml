@@ -372,6 +372,8 @@ WIZARD_README = ROOT / "environment_setup" / "install_config_wizard" / "readme.m
 DRIFT_CHECKED = [*END_USER, CLI_DOCS, WIZARD_README,
                  *(V2 / "10-19" / f"{number}-cli-and-api-and-usage.md" for number in (17, 18, 19, 20))]
 ADD_SCALE_SET, ADD_PROJECT, AGENT_CHAT, CLEAN_UP = SETUP_QUICKSTARTS[2:]
+ESAF_SCENARIO_ROUTES = {"init-factory", "add-scale-set", "upsert-project", "delete-project", "delete-scale-set",
+                        "delete-factory"}
 LAB_GUIDE = "environment_setup/install_tutorial_guide"
 PREVIEW_CONTACT = "https://www.linkedin.com/in/joakimastrom/"
 FENCE = r"(?ms)^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$"
@@ -400,24 +402,36 @@ def is_esaf_call(node, method=None):
 
 
 def accepted_rest_fields():
-    """The body each route takes, read by calling every scenario against a recording client."""
-    class Recorder:
-        def __init__(self):
-            self.bodies = {}
+    """The body each /api/v1/esaf route takes, recorded from every public esaf call through the real client."""
+    from azurefactory.client import AzureFactoryClient
 
-        def esaf_submit(self, route, body):
-            self.bodies[route] = set(body)
+    class Recorded(Exception):
+        pass
+
+    bodies = {}
+
+    class RecordingClient(AzureFactoryClient):  # the client is a frozen dataclass, so override, don't assign
+        def _esaf_request(self, method, path, **kwargs):
+            route = path.removeprefix("/api/v1/esaf/")
+            bodies[route] = set(kwargs.get("body") or {})
+            if route not in ESAF_SCENARIO_ROUTES:  # a read such as an export: stop before it parses a reply
+                raise Recorded
             return {"job_id": "recorded"}
 
-    recorder = Recorder()
-    session = esaf.Session("folder", recorder, "factory")
-    for function in (esaf.init_factory, esaf.add_scale_set, esaf.upsert_project, esaf.delete_project,
-                     esaf.delete_scale_set, esaf.delete_factory):
-        arguments = {parameter: ("dev" if parameter == "environment" else "x")
-                     for parameter in inspect.signature(function).parameters
-                     if parameter not in ("wait", "poll", "session")}
-        function(**arguments, session=session)
-    return recorder.bodies
+    session = esaf.Session("folder", RecordingClient("http://127.0.0.1:8765", "recording-only"), "acme-ai")
+    values = {"environment": "dev", "factory": "acme-ai", "project_numbers": ["001"]}
+    for function_name in esaf.__all__:
+        function = getattr(esaf, function_name)
+        if not inspect.isfunction(function) or function is esaf.connect:
+            continue
+        arguments = {parameter: values.get(parameter, "x")
+                     for parameter, spec in inspect.signature(function).parameters.items()
+                     if parameter not in ("wait", "poll", "session") and spec.kind is not spec.VAR_KEYWORD}
+        try:
+            function(**arguments, session=session)
+        except Recorded:
+            pass
+    return bodies
 
 
 def top_level_keys(program):
@@ -468,12 +482,29 @@ def test_every_python_call_shown_matches_the_real_esaf_signature(page):
 @pytest.mark.parametrize("page", DRIFT_CHECKED, ids=name)
 def test_every_rest_route_and_body_field_shown_is_one_the_api_route_takes(page):
     accepted, text = accepted_rest_fields(), read(page)
-    unknown = set(re.findall(r"/api/v1/esaf/([a-z][a-z-]*)", text)) - set(accepted) - {"jobs"}
+    unknown = unknown_esaf_routes(text)
     assert not unknown, f"{name(page)} shows routes the SDK never calls: {unknown}"
     for span in code_spans(text):
         for program, route in re.findall(REST_CALL, span):
             extra = top_level_keys(program) - accepted[route]
             assert not extra, f"{name(page)} posts {extra} to {route}, which takes {sorted(accepted[route])}"
+
+
+def unknown_esaf_routes(text):
+    return set(re.findall(r"/api/v1/esaf/([a-z][a-z-]*)", text)) - set(accepted_rest_fields()) - {"jobs"}
+
+
+def test_route_recorder_covers_every_route_the_sdk_calls():
+    accepted = accepted_rest_fields()
+    assert {"init-factory", "add-scale-set", "upsert-project", "delete-project", "delete-scale-set",
+            "delete-factory"} <= set(accepted)
+    assert accepted["export-allowed-projects"] == {"folder", "factory", "project_numbers"}
+    assert accepted["upsert-project"] >= {"folder", "approved", "project", "environment", "settings"}
+
+
+def test_drift_check_still_reports_a_route_the_sdk_never_calls():
+    assert unknown_esaf_routes("POST /api/v1/esaf/made-up-route") == {"made-up-route"}
+    assert not unknown_esaf_routes("POST /api/v1/esaf/export-allowed-projects and GET /api/v1/esaf/jobs/1")
 
 
 # --- The quickstarts tell one story: what a page deletes or updates, an earlier page created. --------------------
