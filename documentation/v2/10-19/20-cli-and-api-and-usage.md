@@ -34,7 +34,7 @@ separate `authorize-deletion` step. Connect once, as in guide 19:
 
 ```powershell
 $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
-$env:AIFACTORY_API_KEY = (Get-Content -Raw (Join-Path $env:USERPROFILE '.aifactory\api.key')).Trim()
+$env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the app'
 $env:ESAF_FOLDER = (Resolve-Path (Read-Host 'Absolute azurefactory folder on the API host')).Path
 ```
 
@@ -540,12 +540,12 @@ no separate `authorize_deletion_prepare` step. Save this as
 **`esaf_scenarios_4_6.py`** and run it:
 
 ```python
-from pathlib import Path
+from getpass import getpass
 
 from azurefactory import esaf
 
 folder = input("Absolute azurefactory folder on the API host: ").strip()
-key = (Path.home() / ".aifactory" / "api.key").read_text(encoding="utf-8").strip()
+key = getpass("API key you entered in the app: ").strip()
 esaf.connect(folder=folder, url="http://127.0.0.1:8765", api_key=key)
 
 

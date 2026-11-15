@@ -507,6 +507,13 @@ def test_drift_check_still_reports_a_route_the_sdk_never_calls():
     assert not unknown_esaf_routes("POST /api/v1/esaf/export-allowed-projects and GET /api/v1/esaf/jobs/1")
 
 
+@pytest.mark.parametrize("page", [*END_USER, *(V2 / "10-19" / f"{n}-cli-and-api-and-usage.md" for n in (18, 19, 20))],
+                         ids=name)
+def test_api_key_comes_from_the_reader_not_a_developer_key_file(page):
+    """The app asks the reader for a key; only the API's developer start script writes ~/.aifactory/api.key."""
+    assert not re.search(r"\.aifactory[\\/\"', ]+api\.key", read(page)), f"{name(page)} reads the developer key file"
+
+
 # --- The quickstarts tell one story: what a page deletes or updates, an earlier page created. --------------------
 def shown_targets(page, command):
     return set(re.findall(rf"azurefactory esaf {command} (\d{{3}}) (dev|stage|prod)", read(page)))
