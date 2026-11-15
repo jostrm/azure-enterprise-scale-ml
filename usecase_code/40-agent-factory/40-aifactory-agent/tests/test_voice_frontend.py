@@ -288,6 +288,38 @@ for (let step = 1; step <= 6; step++) { if (scheduled.length) scheduled.shift()(
 assert.ok(colours.some((value) => value.startsWith("rgba(16,32,48")), "the new theme colour appears within about a second");
 """, STATIC / "voice-orb.js")
 
+def test_idle_orb_repaints_once_when_the_palette_attribute_changes():
+    node(ORB_HARNESS + r"""
+let accent = "#2B65B5";
+const scheduled = [], colours = [], observers = [];
+class MutationObserver { constructor(callback) { this.callback = callback; observers.push(this); } observe(target, options) { this.target = target; this.options = options; } disconnect() {} }
+const canvas = {width: 0, height: 0, clientWidth: 200, getContext: () => ({clearRect() {},
+  createRadialGradient: () => ({addColorStop: (_, colour) => colours.push(colour)}), beginPath() {}, arc() {}, fill() {}, stroke() {},
+  set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {}, set lineCap(v) {}})};
+const root = {};
+const environment = {devicePixelRatio: 1, MutationObserver, requestAnimationFrame: (callback) => { scheduled.push(callback); return scheduled.length; }, cancelAnimationFrame() {},
+  document: {hidden: false, documentElement: root, addEventListener() {}}, performance: {now: () => 5000}, matchMedia: () => ({matches: false}),
+  getComputedStyle: () => ({getPropertyValue: (name) => name === "--cp-muted" || name === "--cp-text-muted" ? accent : ""})};
+const api = orb.createOrb(canvas, {environment});
+api.start();
+api.setState("off");
+while (scheduled.length) scheduled.shift()(5000);
+assert.equal(observers.length, 1, "the orb watches the page root for palette changes");
+assert.equal(observers[0].target, root);
+assert.ok(observers[0].options.attributeFilter.includes("data-palette") && observers[0].options.attributeFilter.includes("data-theme"));
+accent = "#6750A4";
+colours.length = 0;
+observers[0].callback([{type: "attributes", attributeName: "data-palette"}]);
+while (scheduled.length) scheduled.shift()(5016);
+assert.ok(colours.some((value) => value.startsWith("rgba(103,80,164")), "the idle orb repaints in the new palette without a state change");
+api.stop();
+colours.length = 0;
+observers[0].callback([{type: "attributes", attributeName: "data-palette"}]);
+while (scheduled.length) scheduled.shift()(5032);
+assert.equal(colours.length, 0, "a stopped orb does not draw");
+""", STATIC / "voice-orb.js")
+
+
 def test_orb_animation_loop_runs_only_while_needed_and_visible():
     node(ORB_HARNESS + r"""
 function make(options = {}) {

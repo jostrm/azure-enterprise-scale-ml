@@ -6,3 +6,6 @@ bootstrap/**/*.sh text eol=lf
 environment_setup/aifactory/bicep/**/*.sh text eol=lf
 environment_setup/unit-tests/**/*.sh text eol=lf
 portal/agent-chat/*.sh text eol=lf
+
+# Agent web assets ship byte-identical to git (bundle reproducibility): no end-of-line conversion.
+usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/** -text

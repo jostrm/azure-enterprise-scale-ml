@@ -102,3 +102,18 @@ def test_the_packaged_config_carries_the_voice_block_but_never_a_credential():
     cloud = settings(enabled=True).model_dump(mode="json")
     assert cloud["voice"]["enabled"] is True
     assert "key" not in json.dumps(cloud["voice"]).lower() and "secret" not in json.dumps(cloud["voice"]).lower()
+
+
+def test_static_assets_check_out_byte_identical_to_git_on_every_os():
+    """The bundle is built from a checkout; no end-of-line conversion keeps it byte-reproducible from git."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("git") or subprocess.run(["git", "-C", str(ROOT), "rev-parse"], capture_output=True).returncode:
+        pytest.skip("not a git checkout")
+    static = ROOT / "aifactory_agent" / "static"
+    files = [path.relative_to(ROOT).as_posix() for path in sorted(static.rglob("*")) if path.is_file()]
+    assert any(name.endswith("vendor/markdown-it.min.js") for name in files)
+    output = subprocess.run(["git", "check-attr", "text", "--", *files], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    converted = [line for line in output.splitlines() if not line.endswith(": text: unset")]
+    assert not converted, "static assets must be -text in .gitattributes: " + "; ".join(converted[:3])

@@ -222,6 +222,14 @@
         if (!environment.document.hidden) kick();
       });
     }
+    if (environment.MutationObserver && root) {
+      // An idle orb draws no frames, so repaint once when the page palette or theme changes.
+      new environment.MutationObserver(() => {
+        if (!orb.running) return;
+        refreshPalette();
+        if (orb.frame === 0) render(environment.performance ? environment.performance.now() : 0);
+      }).observe(root, {attributes: true, attributeFilter: ["data-palette", "data-theme"]});
+    }
     return api;
   }
 
