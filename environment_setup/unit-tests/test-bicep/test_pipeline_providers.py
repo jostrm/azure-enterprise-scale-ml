@@ -663,3 +663,24 @@ def test_provider_receipt_reader_has_no_azure_or_write_capability(provider):
     with pytest.raises(dispatch.DispatchError, match="read-only"):
         reader.state_request(provider, "POST", "ignored", {"write": "forbidden"})
     assert len(calls) == count
+
+
+def test_ado_dispatch_omits_empty_template_parameters():
+    """ADO rejects '' for string template parameters (live 2026-11-16: 'not a valid String').
+
+    Unset continuation/recovery selectors must be left out so the YAML defaults apply.
+    """
+    traffic = Traffic("ado", "succeeded")
+    parameters = {"request_path": "requests/01.json", "correlation_id": CORRELATION,
+                  "request_digest": dispatch.digest(request("ado")), "consumer_commit": COMMIT,
+                  "source_commit": SOURCE, "parent_operation_id": "", "parent_plan_hash": "",
+                  "recovery_operation_id": "", "recovery_plan_hash": ""}
+    dispatch.dispatch_run(parameters, request("ado"), binding("ado"), transport=traffic,
+                          sleep=lambda _: None, max_polls=1)
+    posted = [body for method, _, body in traffic.calls if method == "POST"]
+    assert len(posted) == 1
+    sent = posted[0]["templateParameters"]
+    assert "" not in sent.values()
+    assert sent["correlation_id"] == CORRELATION and sent["request_path"] == "requests/01.json"
+    assert not {"parent_operation_id", "parent_plan_hash", "recovery_operation_id",
+                "recovery_plan_hash"} & set(sent)

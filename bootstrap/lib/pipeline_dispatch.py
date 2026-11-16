@@ -491,10 +491,12 @@ def dispatch_run(parameters, canonical, binding, *, transport=None,
     else:
         pipeline_id = _ado_definition(transport, base, binding)
         binding = dict(binding, pipeline_id=pipeline_id)
+        # ADO rejects '' for string template parameters ("not a valid String"); omit
+        # unset selectors so the pipeline's own '' defaults apply.
         _, _, run = transport.request("POST", f"{base}/pipelines/{pipeline_id}/runs?api-version=7.1", {
             "resources": {"repositories": {"self": {"refName": selected_ref,
                                                     "version": binding["consumer_commit"]}}},
-            "templateParameters": parameters})
+            "templateParameters": {key: value for key, value in parameters.items() if value != ""}})
         _ado_identity(run, binding=binding, correlation=correlation, request_digest=request_digest)
         run_id = run["id"]
     return run_id, binding, workflow_id
