@@ -80,6 +80,20 @@ def local_file(root, value):
     return path
 
 
+def same_repository(agent_uri, bound_repository):
+    """Compare a provider-reported repository URI with the bound one.
+
+    ADO agents report BUILD_REPOSITORY_URI as https://<org>@dev.azure.com/...; the
+    user-info is routing only. Scheme, host and path must still match exactly.
+    """
+    def normal(value):
+        parts = urlsplit(value or "")
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port,
+                parts.path.rstrip("/").lower())
+    actual, expected = normal(agent_uri), normal(bound_repository)
+    return actual[0] == "https" and bool(actual[1]) and actual == expected
+
+
 def validate_binding(canonical, binding):
     require(isinstance(binding, dict), "provider-binding-required")
     common = {"schema", "provider", "repository", "consumer_commit"}
@@ -661,7 +675,7 @@ def preflight(root, request_path, canonical, binding, provider, output):
     else:
         require(os.environ.get("BUILD_SOURCEVERSION") == binding["consumer_commit"]
                 and os.environ.get("BUILD_SOURCEBRANCH") == selected_ref
-                and os.environ.get("BUILD_REPOSITORY_URI", "").lower() == binding["repository"].lower()
+                and same_repository(os.environ.get("BUILD_REPOSITORY_URI", ""), binding["repository"])
                 and os.environ.get("SYSTEM_JOBATTEMPT") == "1", "provider-execution-context-mismatch")
         run_id = os.environ.get("BUILD_BUILDID", "")
     correlation = os.environ.get("ESAF_CORRELATION_ID") or uuid4().hex
@@ -850,7 +864,7 @@ def download_input(repo_root, request_path, *, provider=None, transport=None, en
                 "input-download-consumer-context-mismatch")
     else:
         actual_repository = _origin_repository(root)
-    require(actual_repository.lower() == source["repository"].lower(), "input-artifact-repository-mismatch")
+    require(same_repository(actual_repository, source["repository"]), "input-artifact-repository-mismatch")
     verify_checkout(root, request_path, {"request": request}, binding)
     require(bool(_git(root, "ls-files", "--error-unmatch", "--", sidecar_path)),
             "artifact-source-must-be-committed")

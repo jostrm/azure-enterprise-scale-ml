@@ -684,3 +684,23 @@ def test_ado_dispatch_omits_empty_template_parameters():
     assert sent["correlation_id"] == CORRELATION and sent["request_path"] == "requests/01.json"
     assert not {"parent_operation_id", "parent_plan_hash", "recovery_operation_id",
                 "recovery_plan_hash"} & set(sent)
+
+
+@pytest.mark.parametrize("agent_uri", [
+    "https://acme@dev.azure.com/acme/project/_git/factory",
+    "https://dev.azure.com/acme/project/_git/factory/",
+    "https://DEV.azure.com/Acme/Project/_git/Factory",
+])
+def test_ado_agent_repository_uri_matches_binding_without_userinfo(agent_uri):
+    """Live 2026-11-16: ADO agents set BUILD_REPOSITORY_URI to https://<org>@dev.azure.com/..."""
+    assert dispatch.same_repository(agent_uri, binding("ado")["repository"])
+
+
+@pytest.mark.parametrize("agent_uri", [
+    "https://acme@dev.azure.com/acme/project/_git/other",
+    "https://evil.example/acme/project/_git/factory",
+    "http://dev.azure.com/acme/project/_git/factory",
+    "",
+])
+def test_ado_agent_repository_uri_still_rejects_other_repositories(agent_uri):
+    assert not dispatch.same_repository(agent_uri, binding("ado")["repository"])
