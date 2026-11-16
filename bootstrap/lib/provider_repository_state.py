@@ -25,6 +25,20 @@ MAX_BYTES = 32 * 1024 * 1024
 STATE_READ_ATTEMPTS = 6
 
 
+def same_repository(agent_uri, bound_repository):
+    """Compare a provider-reported repository URI with the bound one.
+
+    ADO agents report BUILD_REPOSITORY_URI as https://<org>@dev.azure.com/...; the
+    user-info is routing only. Scheme, host and path must still match exactly.
+    """
+    def normal(value):
+        parts = urlsplit(value or "")
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port,
+                parts.path.rstrip("/").lower())
+    actual, expected = normal(agent_uri), normal(bound_repository)
+    return actual[0] == "https" and bool(actual[1]) and actual == expected
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
@@ -63,7 +77,7 @@ class ProviderState:
                          "single-writer-private-repository-required")
         else:
             self.require(body.get("project", {}).get("visibility") == "private"
-                         and str(body.get("remoteUrl", "")).lower() == self.route["repository"].lower(),
+                         and same_repository(str(body.get("remoteUrl", "")), self.route["repository"]),
                          "single-writer-private-repository-required")
 
     def head(self):

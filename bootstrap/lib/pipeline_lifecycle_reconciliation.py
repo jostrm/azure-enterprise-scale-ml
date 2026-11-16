@@ -696,7 +696,7 @@ class NativeReconciliationEvidence:
             _, _, repository = cloud.state_request("ado", "GET", base + "/git/repositories/"
                                                   + quote(repository_name) + "?api-version=7.1", None, (200,))
             require(isinstance(repository, dict) and fl.guid(repository.get("id"))
-                    and repository.get("remoteUrl", "").lower() == route["repository"].lower(),
+                    and provider_repository_state.same_repository(repository.get("remoteUrl", ""), route["repository"]),
                     "reconciliation-provider-repository-unverified")
             _, _, run = cloud.state_request("ado", "GET", base + "/build/builds/" + run_id + "?api-version=7.1", None, (200,))
             require(isinstance(run, dict) and str(run.get("id")) == run_id

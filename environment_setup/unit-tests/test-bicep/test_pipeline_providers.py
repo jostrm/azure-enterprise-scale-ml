@@ -704,3 +704,24 @@ def test_ado_agent_repository_uri_matches_binding_without_userinfo(agent_uri):
 ])
 def test_ado_agent_repository_uri_still_rejects_other_repositories(agent_uri):
     assert not dispatch.same_repository(agent_uri, binding("ado")["repository"])
+
+
+def test_ado_single_writer_private_check_accepts_remote_url_with_org_userinfo():
+    """Live 2026-11-16: ADO's repository API returns remoteUrl as https://<org>@dev.azure.com/..."""
+    import provider_repository_state
+
+    class Cloud:
+        def __init__(self, remote):
+            self.remote = remote
+
+        def state_request(self, kind, method, path, body, allowed):
+            return 200, {}, {"project": {"visibility": "private"}, "remoteUrl": self.remote}
+
+    route = {"kind": "ado", "repository": binding("ado")["repository"]}
+    error = lambda code: AssertionError(code)
+    provider_repository_state.ProviderState(
+        Cloud("https://acme@dev.azure.com/acme/project/_git/factory"), route, error).private()
+    with pytest.raises(AssertionError, match="single-writer-private-repository-required"):
+        provider_repository_state.ProviderState(
+            Cloud("https://acme@dev.azure.com/acme/project/_git/other"), route, error).private()
+    assert dispatch.same_repository is provider_repository_state.same_repository

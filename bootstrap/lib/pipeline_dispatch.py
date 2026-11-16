@@ -24,6 +24,7 @@ from uuid import uuid4
 import zipfile
 
 from pipeline_credentials import CredentialError, environment_file_path, load_dispatch_env
+from provider_repository_state import same_repository  # noqa: F401  (one shared rule)
 
 
 GHA_WORKFLOW = ".github/workflows/pipelines-only-gha.yml"
@@ -78,20 +79,6 @@ def local_file(root, value):
     path = (root / relative_path(value)).resolve()
     require(path.is_relative_to(root.resolve()) and path.is_file(), "repository-file-required")
     return path
-
-
-def same_repository(agent_uri, bound_repository):
-    """Compare a provider-reported repository URI with the bound one.
-
-    ADO agents report BUILD_REPOSITORY_URI as https://<org>@dev.azure.com/...; the
-    user-info is routing only. Scheme, host and path must still match exactly.
-    """
-    def normal(value):
-        parts = urlsplit(value or "")
-        return (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port,
-                parts.path.rstrip("/").lower())
-    actual, expected = normal(agent_uri), normal(bound_repository)
-    return actual[0] == "https" and bool(actual[1]) and actual == expected
 
 
 def validate_binding(canonical, binding):
