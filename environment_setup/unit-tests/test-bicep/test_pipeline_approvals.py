@@ -352,3 +352,52 @@ def test_finalizer_cannot_attest_an_active_or_different_mutator(provider, key, c
     with pytest.raises(approvals.ApprovalError):
         approvals.verify_finalizer(record(provider), transport=transport, oidc=oidc,
                                     environ=env, clock=lambda: NOW)
+
+
+def live_ado_timeline(provider):
+    """Shape observed on dev.azure.com in run 2438 (2026-11-16): Phase records between
+    Stage and Job, dotted Job identifiers, '__default' refName for plain jobs and the
+    review job displayName left as the unexpanded template macro."""
+    by_id = {row["id"]: row for row in provider.records}
+    phases = []
+    for row in provider.records:
+        if row["type"] != "Job":
+            continue
+        stage = by_id[row["parentId"]]
+        job = row["identifier"]
+        phase = {"id": row["id"] + "-phase", "parentId": stage["id"], "type": "Phase", "name": job,
+                 "refName": job, "identifier": stage["name"] + "." + job, "attempt": 1}
+        phases.append(phase)
+        row["parentId"] = phase["id"]
+        row["refName"] = "__default" if job == "ReviewPipelinesLifecycle" else job
+        row["identifier"] = stage["name"] + "." + job + "." + row["refName"]
+        if job == "ReviewPipelinesLifecycle":
+            row["name"] = "Review $(operation_id) / $(plan_hash)"
+    provider.records.extend(phases)
+
+
+def test_ado_live_timeline_shape_review_accepted(key):
+    provider = Provider("ado")
+    live_ado_timeline(provider)
+    proof = approvals.verify_review(record("ado"), transport=provider, oidc=OIDC(key),
+                                    environ=environ("ado"), clock=lambda: NOW)
+    assert proof["operation_id"] == OPERATION and proof["plan_hash"] == HASH
+
+
+def test_ado_live_timeline_shape_still_rejects_wrong_stage_job(key):
+    provider = Provider("ado")
+    live_ado_timeline(provider)
+    review = [row for row in provider.records if row["type"] == "Job"
+              and row["identifier"].startswith("Review.")][0]
+    review["identifier"] = "Review.SomethingElse.__default"
+    with pytest.raises(approvals.ApprovalError):
+        approvals.verify_review(record("ado"), transport=provider, oidc=OIDC(key),
+                                environ=environ("ado"), clock=lambda: NOW)
+
+
+def test_ado_job_name_reads_the_yaml_job_from_live_identifiers():
+    import provider_repository_state as prs
+    assert prs.ado_job_name({"identifier": "Prepare.PrepareOperation.PrepareOperation"}) == "PrepareOperation"
+    assert prs.ado_job_name({"identifier": "Review.ReviewPipelinesLifecycle.__default"}) == "ReviewPipelinesLifecycle"
+    assert prs.ado_job_name({"identifier": "ExecuteReviewedOperation"}) == "ExecuteReviewedOperation"
+    assert prs.ado_job_name({"identifier": "a.b"}) is None and prs.ado_job_name({}) is None

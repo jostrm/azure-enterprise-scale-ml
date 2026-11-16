@@ -18,6 +18,7 @@ from urllib.request import Request, build_opener
 from uuid import UUID
 
 from pipeline_dispatch import DispatchError, ProviderTransport, _NoRedirect
+from provider_repository_state import ado_job_name
 
 
 ENVIRONMENT = "esaf-pipelines-execute"
@@ -354,27 +355,28 @@ class _Review:
             return row
         tasks = [row for row in rows if row.get("type") == "Task" and row.get("name") == "ReviewPipelinesLifecycle"]
         prepared_jobs = [row for row in rows if row.get("type") == "Job"
-                         and row.get("identifier") == "PrepareOperation"]
+                         and ado_job_name(row) == "PrepareOperation"]
         require(len(tasks) == len(prepared_jobs) == 1 and env["SYSTEM_JOBID"] in by_id,
                 "ado-exact-native-review-task-required")
         task, prepare, current_job = tasks[0], prepared_jobs[0], by_id[env["SYSTEM_JOBID"]]
         execute_jobs = [row for row in rows if row.get("type") == "Job"
-                        and row.get("identifier") == "ExecuteReviewedOperation"]
+                        and ado_job_name(row) == "ExecuteReviewedOperation"]
         require(len(execute_jobs) == 1, "ado-exact-mutating-job-required")
         execute = execute_jobs[0]
         review_job = by_id.get(task.get("parentId"), {})
         for row in (task, prepare, execute, review_job, current_job):
             require(row.get("attempt") == 1 and not row.get("previousAttempts"), "ado-review-rerun-forbidden")
-        require(review_job.get("type") == "Job" and review_job.get("identifier") == "ReviewPipelinesLifecycle"
-                and review_job.get("name") == f"Review {self.record['operation_id']} / {self.record['plan_hash']}"
+        require(review_job.get("type") == "Job" and ado_job_name(review_job) == "ReviewPipelinesLifecycle"
+                and review_job.get("name") in (f"Review {self.record['operation_id']} / {self.record['plan_hash']}",
+                                        "Review $(operation_id) / $(plan_hash)")
                 and review_job.get("workerName") in (None, "", "Server")
                 and review_job.get("state") == "completed" and review_job.get("result") == "succeeded"
                 and stage(review_job).get("name") == "Review", "ado-native-server-review-job-required")
-        require(execute.get("type") == "Job" and execute.get("identifier") == "ExecuteReviewedOperation"
+        require(execute.get("type") == "Job" and ado_job_name(execute) == "ExecuteReviewedOperation"
                 and stage(execute).get("name") == "Execute", "ado-native-mutating-job-required")
         expected_job = "FinalizeReviewedOperation" if finalize else "ExecuteReviewedOperation"
         expected_stage = "Finalize" if finalize else "Execute"
-        require(current_job.get("type") == "Job" and current_job.get("identifier") == expected_job
+        require(current_job.get("type") == "Job" and ado_job_name(current_job) == expected_job
                 and current_job.get("state") == "inProgress" and stage(current_job).get("name") == expected_stage
                 and stage(current_job)["id"] == env["SYSTEM_STAGEID"], "ado-current-provider-job-required")
         if finalize:

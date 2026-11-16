@@ -11,6 +11,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from lifecycle_admission import RECORD, PROTOCOL
 from pipeline_lifecycle import PipelineError, bound_plan, digest, identifier, require
+from provider_repository_state import ado_job_name
 
 
 ORIGIN_FIELDS = ("provider", "repository", "run_id", "attempt", "commit", "ref")
@@ -147,7 +148,7 @@ def _ado(record, origin, proof, request):
     stages = [row for row in rows if row.get("type") == "Stage"]
     jobs = [row for row in rows if row.get("type") == "Job"]
     require(len(stages) == len(jobs) == 5 and {row.get("name") for row in stages} == set(expected.values())
-            and {row.get("identifier") for row in jobs} == set(expected), "ancestor-jobs-mismatch")
+            and {ado_job_name(row) for row in jobs} == set(expected), "ancestor-jobs-mismatch")
     for row in rows:
         require(row.get("attempt", 1) == 1 and not row.get("previousAttempts"), "ancestor-rerun-forbidden")
         root, seen = row, set()
@@ -157,7 +158,7 @@ def _ado(record, origin, proof, request):
             root = by_id[root["parentId"]]
         require(root.get("type") == "Stage", "ancestor-timeline-ancestry-invalid")
         if row.get("type") == "Job":
-            require(root["name"] == expected[row["identifier"]], "ancestor-job-stage-mismatch")
+            require(root["name"] == expected[ado_job_name(row)], "ancestor-job-stage-mismatch")
         if root.get("name") != "Complete":
             require(row.get("state") == "completed" and row.get("result") == "succeeded",
                     "ancestor-mutating-job-not-succeeded")
@@ -166,7 +167,7 @@ def _ado(record, origin, proof, request):
                     and (row.get("state") in ("pending", "inProgress") and row.get("result") is None
                          or row.get("state") == "completed" and row.get("result") == "succeeded"),
                     "ancestor-readonly-completion-required")
-    by_name = {row["identifier"]: row for row in jobs}
+    by_name = {ado_job_name(row): row for row in jobs}
     require(by_name["FinalizeReviewedOperation"]["id"] == proof.get("job_id")
             and by_name["ExecuteReviewedOperation"]["id"] == proof.get("execution_job_id")
             and proof.get("execution_result") == "succeeded", "ancestor-finalizer-job-mismatch")

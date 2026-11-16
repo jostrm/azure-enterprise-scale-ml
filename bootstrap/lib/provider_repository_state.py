@@ -39,6 +39,19 @@ def same_repository(agent_uri, bound_repository):
     return actual[0] == "https" and bool(actual[1]) and actual == expected
 
 
+def ado_job_name(row):
+    """The YAML job name of an ADO timeline Job record.
+
+    Live timelines identify jobs as <Stage>.<Job>.<Instance> (the instance is the
+    deployment name or '__default'); the bare form is accepted for older readers.
+    """
+    identifier = row.get("identifier") if isinstance(row, dict) else None
+    if not isinstance(identifier, str) or not identifier:
+        return None
+    parts = identifier.split(".")
+    return parts[1] if len(parts) == 3 and all(parts) else (identifier if len(parts) == 1 else None)
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
