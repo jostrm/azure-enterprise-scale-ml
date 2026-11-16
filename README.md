@@ -1,6 +1,6 @@
 # Enterprise Scale Azure Factory (ESAF) - 
 ![](./documentation/v2/20-29/images/26-esaf-agent-chat-voice-purple.png)
-<br> 147 Code templates as this. 
+<br>
 
 **Deploy Factory infrastructure (quick test)**
 
@@ -8,7 +8,7 @@
 
 Creates a standalone test Factory and project 001. This button **does not deploy ESAF Agent Chat** or AI models.
 
-**Deploy ESAF Agent Chat + live voice (preview)**
+**Deploy ESAF Agent Chat + live voice**
 
 [![Deploy ESAF Agent Chat to Azure](./portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
 
