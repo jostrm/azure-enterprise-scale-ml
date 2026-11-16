@@ -116,8 +116,13 @@ stages:
                         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", prepared[name]):
                             raise SystemExit("Invalid prepared operation")
                         print("##vso[task.setvariable variable=" + name + ";isOutput=true]" + prepared[name])
-                    Path(".esaf/review.txt").write_text(json.dumps(prepared, indent=2))
-                    print("##vso[task.uploadsummary].esaf/review.txt")
+                    # ADO resolves the summary attachment only from an absolute, existing path.
+                    summary = Path(".esaf/review.md").resolve()
+                    fence = chr(96) * 3
+                    summary.write_text(chr(10).join(["## Review the prepared ESAF operation", "",
+                        "The approval authorizes ONLY this operation and plan.", "",
+                        fence + "json", json.dumps(prepared, indent=2), fence, ""]))
+                    print("##vso[task.uploadsummary]" + str(summary))
                     destination = Path(".esaf/prepared-artifact")
                     destination.mkdir()
                     for name in ("context.json", "prepared.json"):

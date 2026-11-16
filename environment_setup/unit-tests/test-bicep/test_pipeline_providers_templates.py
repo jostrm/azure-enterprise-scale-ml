@@ -230,3 +230,12 @@ def test_real_bash_custom_root_and_local_env_reach_all_validation_phases(workspa
     assert len(outputs) == 3 and outputs[1]["valid"] is outputs[2]["valid"] is True
     assert "offline-not-a-real-token" not in result.stdout + result.stderr
     assert "dispatching" not in result.stderr
+
+
+def test_ado_review_summary_is_uploaded_from_an_absolute_markdown_path():
+    """Live 2026-11-16: '##vso[task.uploadsummary].esaf/review.txt' failed the prepare job
+    ('attachment file location is not specified or ... does not exist on disk')."""
+    text = (ROOT / "bootstrap/templates/pipelines-only-ado.yml").read_text()
+    assert "##vso[task.uploadsummary]." not in text
+    assert 'summary = Path(".esaf/review.md").resolve()' in text
+    assert 'print("##vso[task.uploadsummary]" + str(summary))' in text
