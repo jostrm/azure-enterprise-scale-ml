@@ -62,6 +62,10 @@ Governed Microsoft Foundry, Azure Machine Learning and up to <b>+54</b> Azure re
 - **Private by design.** Hub-spoke or Virtual WAN, private endpoints and DNS, isolation per team, Bicep through GitHub Actions or Azure DevOps.
 - **Operating models included.** DataOps, MLOps and GenAIOps templates that run on the secure infrastructure, with [+147 usecase templates to choose from](usecase_code/readme.md).
 - **Subscription vending (auto).**: Choose 1 team per Subscription/LZ or Multiple teams (e.g.Hackathons,Sandbox)
+submodule 
+- "<b>Dare to delete"</b> | "Project based"  | "Ops: Dev,Stage,Prod" |"Secure from day 1/private" |"Battle tested since 2019 | Only GA:No AVD,AZD
+- <b>"Result & Value" - Get AI to Production</b>, accelerated: 147 templates with Ops, such as below "Live voice AI chat" created in <1h
+
 
 <p align="center">
 <a href="./documentation/v2/20-29/24-end-2-end-setup.md"><b>Set up</b></a> &nbsp;·&nbsp;
