@@ -140,6 +140,14 @@ def schedule_continuation(service, operation_id, plan_hash, context, binding, *,
     return parent["provider_continuation"]
 
 
+def error_code(error):
+    """A DispatchError carries its nonsecret code in args[0]; other errors keep the generic code."""
+    code = getattr(error, "code", None)
+    if code is None and isinstance(error, DispatchError) and error.args and isinstance(error.args[0], str):
+        code = error.args[0]
+    return code or "provider-workflow-not-completed"
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("prepare", "execute", "finalize", "complete"))
@@ -223,8 +231,7 @@ def main(argv=None):
             output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
         return 0
     except (ValueError, KeyError, TypeError, OSError, RuntimeError, DispatchError) as error:
-        print(json.dumps({"status": "not-completed",
-                          "error_code": getattr(error, "code", "provider-workflow-not-completed")}), file=sys.stderr)
+        print(json.dumps({"status": "not-completed", "error_code": error_code(error)}), file=sys.stderr)
         return 2
 
 

@@ -582,3 +582,36 @@ def test_real_cli_all_phases_share_original_request_and_new_reviewed_runs(
         assert original["status"] == "recovered"
         assert original["plan"]["provider_context"]["run_id"] == 6
         assert original["recovery_completion"]["operation_id"] == root_receipt["operation_id"]
+
+
+class LiveTimelineTraffic(PredecessorTraffic):
+    """Live ADO timelines name jobs <Stage>.<Job>.<Instance>, not the bare YAML job."""
+    def request(self, method, url, body=None, raw=False):
+        status, headers, value = super().request(method, url, body, raw)
+        if "/timeline?" in url:
+            for row in value["records"]:
+                if row["type"] == "Job":
+                    stage = row["parentId"].split("-")[0]
+                    row["identifier"] = f"{stage}.{row['identifier']}.{row['identifier']}"
+        return status, headers, value
+
+
+def test_ado_child_prepare_reads_parent_finalizer_from_live_timeline_identifiers():
+    import pipeline_provider as provider
+    parent = record("ado")
+    reader = Mock()
+    reader._load.return_value = ("rev", parent)
+    transport = LiveTimelineTraffic(parent, ["finalizer-completed"])
+    provider.wait_for_predecessor(PARENT, HASH, dict(context("ado", 8), correlation_id="f" * 32),
+                                  reader=reader, transport=transport, max_polls=2, sleep=lambda _: None)
+
+
+def test_provider_cli_reports_the_exact_dispatch_error_code(tmp_path, capsys):
+    import pipeline_provider as provider
+    (tmp_path / "context.json").write_text(json.dumps(context("ado", 8)))
+    code = provider.main(["complete", "--repo-root", str(tmp_path), "--source-root", str(tmp_path),
+                          "--request", "requests/run.json", "--provider-context", "context.json",
+                          "--output", "out.json"])
+    assert code == 2
+    assert json.loads(capsys.readouterr().err) == {"status": "not-completed",
+                                                   "error_code": "prepared-operation-required"}

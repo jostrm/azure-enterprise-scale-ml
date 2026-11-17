@@ -6,6 +6,7 @@ from pipeline_dispatch import (
     DispatchError, GHA_WORKFLOW, ProviderReceiptReader, ProviderTransport,
     _ado_definition, _gha_identity, _pages, require, validate_binding,
 )
+from provider_repository_state import ado_job_name
 
 
 class NativeJobs:
@@ -98,7 +99,7 @@ class NativeJobs:
             pairs = [("PrepareOperation", "Prepare"), ("ExecuteReviewedOperation", "Execute"),
                      ("FinalizeReviewedOperation", "Finalize")]
             for name, stage_name in pairs[-1:] if finalizer_only else pairs:
-                matches = [row for row in rows if row.get("type") == "Job" and row.get("identifier") == name]
+                matches = [row for row in rows if row.get("type") == "Job" and ado_job_name(row) == name]
                 require(len(matches) <= 1, "observer-native-job-ambiguous")
                 if not matches:
                     return False
