@@ -162,6 +162,9 @@ DEFAULT_MISMATCH_ALLOWED = {
 }
 
 KNOWN_MISSING = {
+    # iac switch (2026-11-17): the Factory API reads these from the JSON config and sets the TFSTATE_* GitHub
+    # variables of infra-common-terraform.yml itself; Terraform is GitHub Actions only, so no .env twin.
+    "iac", "tfstateResourceGroup", "tfstateStorageAccount", "tfstateContainer", "tfstateSubscriptionId",
     "azureDevOpsTenantId",  # ADO organization authentication tenant; GHA has no organization tenant.
     "adminVMBuildAgentPool",  # ADO agent pool; GHA selects runners by selfHostedRunnerLabel.
     "adminVMBuildAgentName",  # ADO Agent.Name demand; no equivalent GHA agent-name demand.
