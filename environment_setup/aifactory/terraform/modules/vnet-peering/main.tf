@@ -7,7 +7,8 @@ resource "azurerm_virtual_network_peering" "peering" {
   name                         = var.peering_name
   resource_group_name          = var.resource_group_name
   virtual_network_name         = var.vnet_name
-  remote_virtual_network_id    = var.remote_vnet_id
+  # The Factory API passes ids lowercased; azurerm parses them strictly (aif-164, 2026-11-17).
+  remote_virtual_network_id    = provider::azurerm::normalise_resource_id(var.remote_vnet_id)
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = var.allow_gateway_transit
