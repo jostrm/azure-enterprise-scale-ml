@@ -138,7 +138,7 @@ Besides above, optionally, automation exists for
 
 <p align="center">
 - Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/code-templates/" target="_blank"><b>Code Template Library</b></a> - with <b>search and filter</b> template by type<br>
-- Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/resource-templates/" target="_blank"><b>Resources Library</b></a> - to see what Azure Resources you can use plug-and-play, in categories.<br>
+- Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/resources/" target="_blank"><b>Resources Library</b></a> - to see what Azure Resources you can use plug-and-play, in categories.<br>
 - Docs: <a href="https://jostrm.github.io/azure-enterprise-scale-ml/architectures/" target="_blank"><b>Architecture library</b></a> Azure Resources connected with <b>Teams, Copilot, Fabric, Sharepoint</b> and which <b>Code template</b> to use.
 </p>
 
