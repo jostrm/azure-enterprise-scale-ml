@@ -372,7 +372,13 @@ Added on top of the compaction. It is the first Terraform slice of the AI Factor
 * **Still Bicep only.** Projects (`esml-genai-1`, the next slice), the AI gateway, Kong, FinOps, policies and
   dashboards. A factory deployed with Bicep must be imported before Terraform manages it.
 
-No Bicep template, variable or existing pipeline was changed for this.
+* **The `iac` switch (2026-11-17).** `variables.json` has `"iac": "bicep"` (default) or `"terraform"`, plus the
+  state keys `tfstateResourceGroup`, `tfstateStorageAccount`, `tfstateContainer` and `tfstateSubscriptionId`.
+  The SDK (`esaf.init_factory(..., iac=...)`, `esaf.add_scale_set(..., iac=...)`) and the CLI (`--iac`) pass it on
+  as a scale-set setting; the Factory API checks it and runs `infra-common-terraform.yml`. See
+  `environment_setup/aifactory/terraform/readme.md`, "Choose Terraform: the `iac` switch".
+
+No Bicep template or existing pipeline was changed for this; the `iac` switch added five variables.
 
 ## Open decisions
 

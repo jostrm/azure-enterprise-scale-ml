@@ -28,6 +28,36 @@ Use one tool per factory. A factory that Bicep deployed first must be imported i
 Terraform manages it. See `environment_setup/aifactory/terraform/readme.md` for the design, the providers and
 what differs.
 
+## Choose Terraform: the `iac` switch
+
+`iac` in the factory configuration (`variables.json`, `dev`) picks the tool for the factory foundation:
+`"iac": "bicep"` (the default) or `"iac": "terraform"`. Set it before the factory is first deployed; one tool
+per factory, because switching needs a `terraform import`. A new scale set takes the factory's `iac`.
+
+```json
+"iac": "terraform",
+"tfstateResourceGroup": "rg-aif-tfstate-sdc-001",
+"tfstateStorageAccount": "staiftfstatesdc001",
+"tfstateContainer": "tfstate",
+"tfstateSubscriptionId": ""
+```
+
+| Key | GitHub variable of `infra-common-terraform.yml` | Default |
+| --- | --- | --- |
+| `tfstateResourceGroup` | `TFSTATE_RESOURCE_GROUP` | required with Terraform |
+| `tfstateStorageAccount` | `TFSTATE_STORAGE_ACCOUNT` | required with Terraform |
+| `tfstateContainer` | `TFSTATE_CONTAINER` | `tfstate` |
+| `tfstateSubscriptionId` | `TFSTATE_SUBSCRIPTION_ID` | the target subscription |
+
+With the Factory API (`esaf.init_factory(..., iac="terraform")`, `azurefactory esaf init-factory --iac terraform`),
+the API installs `infra-common-terraform.yml` instead of `infra-common.yml`, sets those GitHub variables and runs
+the factory common through the pipeline route. It refuses Terraform with Azure DevOps (only a GitHub Actions
+template exists), with an accelerator that has no Terraform template (before v1.26), without the two required
+state keys, or for a factory that already uses the other tool. Projects stay on Bicep until the Terraform
+project slice ships. Deleting a scale set or the factory also removes its state blobs
+(`aifactory/<subscription>/<common resource group>/...`). Keep the state account outside the factory, so it
+survives the factory's deletion, and give the deployment identity `Storage Blob Data Contributor` on it.
+
 ## A practical split
 
 Your platform team provides subscriptions, the hub network, DNS, storage or other common services. ESAF then

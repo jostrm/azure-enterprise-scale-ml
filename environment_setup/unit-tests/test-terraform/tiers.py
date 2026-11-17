@@ -18,6 +18,7 @@ MANIFEST = TierManifest(default="1-2", tiers=(
     Tier(1, "static", "Terraform formatting, generated files, the Bicep-to-Terraform parity map, the GitHub "
          "Actions template and CI wiring, and this suite's own harness.", (
         "test_format_and_generated.py",
+        "test_iac_switch.py",
         "test_parity_map.py",
         "test_terraform_workflow.py",
         "test_tiers.py",
