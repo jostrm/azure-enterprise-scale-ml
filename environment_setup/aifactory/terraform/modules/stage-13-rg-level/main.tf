@@ -287,7 +287,7 @@ module "privateDnsContainerRegistryCommon" {
   dns_config              = module.acrCommon[0].dns_config
   private_links_dns_zones = local.private_links_dns_zones
 
-  depends_on = [module.createPrivateDnsZonesIfNotExists]
+  depends_on = [module.createPrivateDnsZonesIfNotExists, module.acrCommon]
 }
 
 # Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landing zone/environment)
@@ -627,7 +627,7 @@ module "privateDnsDatalake" {
   dns_config              = module.dataLake[0].dns_config
   private_links_dns_zones = local.private_links_dns_zones
 
-  depends_on = [module.createPrivateDnsZonesIfNotExists]
+  depends_on = [module.createPrivateDnsZonesIfNotExists, module.dataLake]
 }
 
 module "privateDnsKeyVaultCmn" {
