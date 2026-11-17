@@ -3758,7 +3758,7 @@ with both lines.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">413</td>
+<td style="text-align: right;">418</td>
 </tr>
 <tr>
 <td><code>env</code></td>
@@ -3778,7 +3778,7 @@ with both lines.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">421</td>
+<td style="text-align: right;">426</td>
 </tr>
 </tbody>
 </table>
@@ -4986,6 +4986,13 @@ with both lines.</p>
 <td>Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:iac --><!-- parameter json.dev:iac --><code>iac</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"bicep"</code><br>J.dev: <code>"bicep"</code></td>
+<td>Infrastructure as code for the common foundation keep-as-is: terraform needs accelerator release/v1.26+ and GitHub Actions (infra-common-terraform.yml).</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:kvNameFromCOMMON_param --><!-- parameter json.dev:kvNameFromCOMMON_param --><code>kvNameFromCOMMON_param</code></td>
 <td><code>KV_NAME_FROM_COMMON_PARAM</code></td>
 <td>O</td>
@@ -5222,6 +5229,34 @@ with both lines.</p>
 <td>C</td>
 <td>Y: <code>"&lt;todo&gt;_SubID"</code><br>J.dev: <code>"&lt;todo&gt;_SubID"</code></td>
 <td>STAGE subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:tfstateContainer --><!-- parameter json.dev:tfstateContainer --><code>tfstateContainer</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"tfstate"</code><br>J.dev: <code>"tfstate"</code></td>
+<td>Terraform state container</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:tfstateResourceGroup --><!-- parameter json.dev:tfstateResourceGroup --><code>tfstateResourceGroup</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Terraform state resource group (iac=terraform)</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:tfstateStorageAccount --><!-- parameter json.dev:tfstateStorageAccount --><code>tfstateStorageAccount</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Terraform state storage account (iac=terraform)</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:tfstateSubscriptionId --><!-- parameter json.dev:tfstateSubscriptionId --><code>tfstateSubscriptionId</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Terraform state subscription keep-as-is: Empty uses the target subscription.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:useCommonACR --><!-- parameter json.dev:useCommonACR --><code>useCommonACR</code></td>

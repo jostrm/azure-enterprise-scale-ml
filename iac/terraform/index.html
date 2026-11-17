@@ -2258,6 +2258,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#choose-terraform-the-iac-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Terraform: the iac switch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-practical-split" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2499,6 +2510,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#choose-terraform-the-iac-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Terraform: the iac switch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-practical-split" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2548,6 +2570,55 @@ below. Decide which tool owns each resource, so that Terraform and ESAF never ch
 <p>ESAF has no Terraform templates of its own. You keep Terraform for the resources it already manages, and
 ESAF deploys the rest with Bicep.</p>
 </div>
+<h2 id="choose-terraform-the-iac-switch">Choose Terraform: the <code>iac</code> switch<a class="headerlink" href="#choose-terraform-the-iac-switch" title="Permanent link">&para;</a></h2>
+<p><code>iac</code> in the factory configuration (<code>variables.json</code>, <code>dev</code>) picks the tool for the factory foundation:
+<code>"iac": "bicep"</code> (the default) or <code>"iac": "terraform"</code>. Set it before the factory is first deployed; one tool
+per factory, because switching needs a <code>terraform import</code>. A new scale set takes the factory's <code>iac</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">"iac"</span><span class="p">:</span><span class="w"> </span><span class="s2">"terraform"</span><span class="p">,</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">"tfstateResourceGroup"</span><span class="p">:</span><span class="w"> </span><span class="s2">"rg-aif-tfstate-sdc-001"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">"tfstateStorageAccount"</span><span class="p">:</span><span class="w"> </span><span class="s2">"staiftfstatesdc001"</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nt">"tfstateContainer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">"tfstateSubscriptionId"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>GitHub variable of <code>infra-common-terraform.yml</code></th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tfstateResourceGroup</code></td>
+<td><code>TFSTATE_RESOURCE_GROUP</code></td>
+<td>required with Terraform</td>
+</tr>
+<tr>
+<td><code>tfstateStorageAccount</code></td>
+<td><code>TFSTATE_STORAGE_ACCOUNT</code></td>
+<td>required with Terraform</td>
+</tr>
+<tr>
+<td><code>tfstateContainer</code></td>
+<td><code>TFSTATE_CONTAINER</code></td>
+<td><code>tfstate</code></td>
+</tr>
+<tr>
+<td><code>tfstateSubscriptionId</code></td>
+<td><code>TFSTATE_SUBSCRIPTION_ID</code></td>
+<td>the target subscription</td>
+</tr>
+</tbody>
+</table>
+<p>With the Factory API (<code>esaf.init_factory(..., iac="terraform")</code>, <code>azurefactory esaf init-factory --iac terraform</code>),
+the API installs <code>infra-common-terraform.yml</code> instead of <code>infra-common.yml</code>, sets those GitHub variables and runs
+the factory common through the pipeline route. It refuses Terraform with Azure DevOps (only a GitHub Actions
+template exists), with an accelerator that has no Terraform template (before v1.26), without the two required
+state keys, or for a factory that already uses the other tool. Projects stay on Bicep until the Terraform
+project slice ships. Deleting a scale set or the factory also removes its state blobs
+(<code>aifactory/&lt;subscription&gt;/&lt;common resource group&gt;/...</code>). Keep the state account outside the factory, so it
+survives the factory's deletion, and give the deployment identity <code>Storage Blob Data Contributor</code> on it.</p>
 <h2 id="a-practical-split">A practical split<a class="headerlink" href="#a-practical-split" title="Permanent link">&para;</a></h2>
 <p>Your platform team provides subscriptions, the hub network, DNS, storage or other common services. ESAF then
 uses them through these settings.</p>
