@@ -1022,3 +1022,19 @@ def test_initial_schema2_native_bootstrap_persists_canonical_binding_and_fresh_c
     assert len(transport().writes) == writes
     assert original_register.read_bytes() == original_bytes
     assert data["document"] == document and digest(data) == original_hash
+
+
+def test_unrelated_subscription_role_assignment_after_review_warns_but_does_not_block(workspace, capsys):
+    """A shared subscription gains unrelated role assignments between review and approval (live 2026-11-17)."""
+    data = snapshot("ado")
+    adapter, _, transport = harness(workspace, data)
+    operation = str(uuid4())
+    plan = adapter.prepare(data, operation)
+    scope = f"/subscriptions/{native.te.SUB}/resourcegroups/rg-other-workload"
+    key = scope + "/providers/microsoft.authorization/roleassignments/" + str(uuid4())
+    transport().resources[key] = {"id": key, "properties": {
+        "scope": scope, "principalId": str(uuid4()),
+        "roleDefinitionId": f"/subscriptions/{native.te.SUB}/providers/microsoft.authorization/roledefinitions/{native.te.CONTRIBUTOR}"}}
+    result = adapter.execute(plan["stages"][0], record_for(data, plan, operation))
+    assert result["status"] == "continuation-required" and result["verified"] is True
+    assert "bootstrap-reviewed-inventory-drift" in capsys.readouterr().err

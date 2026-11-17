@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
+import sys
 
 import factory_enrollment as enrollment
 import pipeline_inputs
@@ -51,9 +53,22 @@ def _ordinary(path, root):
     return path
 
 
+# Raw subscription-wide inventories: every role and deny assignment in a shared
+# subscription, which unrelated workloads change between review and approval.
+# The decisions derived from them (grants, blockers) stay bound in "roles";
+# only the raw inventory digests are review evidence, never an execute gate.
+INVENTORY_KEYS = ("assignments_hash", "denies_hash")
+
+
+def _inventory_digest(state):
+    return digest({key: (state.get("roles") or {}).get(key) for key in INVENTORY_KEYS})
+
+
 def _normalized_state(state, operation_id, *, stage=None, record=None):
     value = copy.deepcopy(state)
     value.pop("repository_head", None)
+    for key in INVENTORY_KEYS:
+        (value.get("roles") or {}).pop(key, None)
     if value.get("enrollment"):
         value["enrollment"]["etag"] = None
     remote = value.get("repository_state")
@@ -370,6 +385,7 @@ class BootstrapAdapter:
                  "snapshot_hash": digest(snapshot), "source_hashes": self._source(),
                  "enrollment": request, "native_review": review,
                  "native_state_digest": digest(_normalized_state(state, operation_id)),
+                 "inventory_digest": _inventory_digest(state),
                  "admission_policy": copy.deepcopy((state.get("repository_state") or {}).get(
                      "records", {}).get("lifecycle_admission_v1", {}).get("policy")),
                  "empty_groups": self._empty_groups(request, cloud, snapshot)}
@@ -430,6 +446,11 @@ class BootstrapAdapter:
         require(digest(_normalized_state(state, record["operation_id"], stage=stage, record=record))
                 == stage["native_state_digest"],
                 "bootstrap-reviewed-native-state-changed")
+        if _inventory_digest(state) != stage.get("inventory_digest"):
+            print(json.dumps({"warning": "bootstrap-reviewed-inventory-drift", "operation_id": record["operation_id"],
+                              "detail": "subscription role or deny assignment inventory changed after review; "
+                                        "derived grants and blockers still match the reviewed state"}),
+                  file=sys.stderr)
         require(self._empty_groups(request, cloud, record["snapshot"]) == stage["empty_groups"],
                 "bootstrap-reviewed-groups-changed")
         fresh = enrollment._review(native_request, state, True)
