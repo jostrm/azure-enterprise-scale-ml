@@ -3093,3 +3093,20 @@ def test_failed_command_names_the_command_and_sanitized_stderr(capsys):
     assert event["command"] == "az account get-access-token" and event["returncode"] == 1
     assert "AADSTS700016" in event["stderr"]
     assert jwt not in event["stderr"] and "secret" not in event["stderr"] and len(event["stderr"]) <= 600
+
+
+def test_relative_source_root_compiles_templates_and_loads_network_helper(tmp_path, monkeypatch):
+    """Live 2026-11-17: pipelines pass --source-root azure-enterprise-scale-ml (relative); every template was refused."""
+    template = tmp_path / "src" / "environment_setup" / "main.bicep"
+    template.parent.mkdir(parents=True)
+    template.write_text("param a string")
+    helper = tmp_path / "src" / "bootstrap" / "lib" / "common_network_preservation.py"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("MARKER = 7\n")
+    monkeypatch.chdir(tmp_path)
+    result = SimpleNamespace(returncode=0, stdout=json.dumps({"parameters": {"a": {"type": "string"}}}), stderr="")
+    cloud = fl.Cloud(manifest(), command_runner=lambda *args, **kwargs: result, opener=Mock())
+    assert cloud.compile_template(Path("src"), "environment_setup/main.bicep")["parameters"] == {"a": {"type": "string"}}
+    assert fl._network_preservation_helper(Path("src")).MARKER == 7
+    with pytest.raises(fl.Blocked, match="canonical-template-unavailable"):
+        cloud.compile_template(Path("src"), "../outside.bicep")

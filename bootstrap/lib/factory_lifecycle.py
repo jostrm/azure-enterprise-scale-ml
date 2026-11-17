@@ -1670,6 +1670,8 @@ class Cloud:
         return sorted(values, key=lambda row: row["id"].lower()), None
 
     def compile_template(self, source_root, relative):
+        # Pipelines pass a repository-relative source root; containment compares resolved paths.
+        source_root = clean_path(source_root)
         path = clean_path(source_root / Path(relative))
         require(path.is_relative_to(source_root) and path.is_file(), "canonical-template-unavailable")
         template = json.loads(self.command(["az", "bicep", "build", "--file", str(path), "--stdout"], cwd=str(source_root)))
@@ -3910,6 +3912,7 @@ def deployment_endpoint(document, step):
 
 
 def _network_preservation_helper(source_root):
+    source_root = clean_path(source_root)
     path = clean_path(source_root / "bootstrap" / "lib" / "common_network_preservation.py")
     require(path.is_relative_to(source_root) and path.is_file(), "published-network-preservation-helper-required")
     module = types.ModuleType("published_common_network_preservation")
