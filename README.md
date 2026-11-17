@@ -10,10 +10,11 @@ Creates a standalone test Factory and project 001. This button **does not deploy
 
 **Deploy ESAF Agent Chat + live voice**
 
-[![Deploy ESAF Agent Chat to Azure](./portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+[![Deploy ESAF Agent Chat to Azure](./portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fform.json)
 
 Deploys the Foundry agent, knowledge index and private web chat with live voice into an **existing private Dev project**.
-Runs the actual deployment on your prepared Linux runner VM after you review and create the Azure deployment.
+Select your prepared Linux VM and project number; region, an unambiguous attached identity and project subscription are automatic.
+Standard VM folder/Python paths are used unless you choose **Advanced settings**. Review and create runs the actual deployment.
 Requires configured models, Entra sign-in, reader permissions and private connectivity; it does not create a new Factory.
 [Prerequisites and portal inputs](./documentation/v2/quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal).
 

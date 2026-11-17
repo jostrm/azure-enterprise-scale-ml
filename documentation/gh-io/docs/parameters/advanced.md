@@ -397,12 +397,12 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 413 |
+| `yaml` | 418 |
 | `env` | 411 |
 | `bootstrap` | 93 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 421 |
+| `json.dev` | 426 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
@@ -590,6 +590,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:functionRuntime --><!-- parameter json.dev:functionRuntime -->`functionRuntime` | `FUNCTION_RUNTIME` | O | Y: `"dotnet"`<br>J.dev: `"dotnet"` | Azure Function runtime otherwise: "python", "node", "java", "powershell". |
 | <!-- parameter yaml:functionVersion --><!-- parameter json.dev:functionVersion -->`functionVersion` | `FUNCTION_VERSION` | O | Y: `"v7.0"`<br>J.dev: `"v7.0"` | Azure Function runtime version |
 | <!-- parameter yaml:highAvailabilityRedisManaged --><!-- parameter json.dev:highAvailabilityRedisManaged -->`highAvailabilityRedisManaged` | `HIGH_AVAILABILITY_REDIS_MANAGED` | O | Y: `"Enabled"`<br>J.dev: `"Enabled"` | Enabled&#124;Disabled; Enabled -&gt; Disabled is unsupported. |
+| <!-- parameter yaml:iac --><!-- parameter json.dev:iac -->`iac` | No verified binding | O | Y: `"bicep"`<br>J.dev: `"bicep"` | Infrastructure as code for the common foundation keep-as-is: terraform needs accelerator release/v1.26+ and GitHub Actions (infra-common-terraform.yml). |
 | <!-- parameter yaml:kvNameFromCOMMON_param --><!-- parameter json.dev:kvNameFromCOMMON_param -->`kvNameFromCOMMON_param` | `KV_NAME_FROM_COMMON_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
 | <!-- parameter yaml:lakeContainerName --><!-- parameter json.dev:lakeContainerName -->`lakeContainerName` | `LAKE_CONTAINER_NAME` | O | Y: `"lake3"`<br>J.dev: `"lake3"` | Data lake container name |
 | <!-- parameter yaml:logicAppType --><!-- parameter json.dev:logicAppType -->`logicAppType` | `LOGIC_APP_TYPE` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Logic Apps hosting type |
@@ -624,6 +625,10 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:test_admin_bicep_kv_fw --><!-- parameter json.dev:test_admin_bicep_kv_fw -->`test_admin_bicep_kv_fw` | `AIFACTORY_SEEDING_KEYVAULT_NAME` | C | Y: `"<todo>_Name_Test"`<br>J.dev: `"<todo>_Name_Test"` | STAGE seeding KV name mandatory: STAGE seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
 | <!-- parameter yaml:test_admin_bicep_kv_fw_rg --><!-- parameter json.dev:test_admin_bicep_kv_fw_rg -->`test_admin_bicep_kv_fw_rg` | `AIFACTORY_SEEDING_KEYVAULT_RG` | C | Y: `"<todo>_ResourceGroup_Test"`<br>J.dev: `"<todo>_ResourceGroup_Test"` | STAGE seeding KV resource group mandatory: STAGE seeding KV resource group ensure: resource group where the STAGE seeding Key Vault resides. Required when deploying that environment. |
 | <!-- parameter yaml:test_sub_id --><!-- parameter json.dev:test_sub_id -->`test_sub_id` | `STAGE_SUBSCRIPTION_ID` | C | Y: `"<todo>_SubID"`<br>J.dev: `"<todo>_SubID"` | STAGE subscription ID recommended: separate subscription from DEV. otherwise: can reuse dev_sub_id. Required when deploying that environment. |
+| <!-- parameter yaml:tfstateContainer --><!-- parameter json.dev:tfstateContainer -->`tfstateContainer` | No verified binding | O | Y: `"tfstate"`<br>J.dev: `"tfstate"` | Terraform state container |
+| <!-- parameter yaml:tfstateResourceGroup --><!-- parameter json.dev:tfstateResourceGroup -->`tfstateResourceGroup` | No verified binding | O | Y: `""`<br>J.dev: `""` | Terraform state resource group (iac=terraform) |
+| <!-- parameter yaml:tfstateStorageAccount --><!-- parameter json.dev:tfstateStorageAccount -->`tfstateStorageAccount` | No verified binding | O | Y: `""`<br>J.dev: `""` | Terraform state storage account (iac=terraform) |
+| <!-- parameter yaml:tfstateSubscriptionId --><!-- parameter json.dev:tfstateSubscriptionId -->`tfstateSubscriptionId` | No verified binding | O | Y: `""`<br>J.dev: `""` | Terraform state subscription keep-as-is: Empty uses the target subscription. |
 | <!-- parameter yaml:useCommonACR --><!-- parameter json.dev:useCommonACR -->`useCommonACR` | `USE_COMMON_ACR_FOR_PROJECTS` | O | Y: `"true"`<br>J.dev: `"true"` | Use shared ACR across projects otherwise: false, each project gets its own ACR (higher cost). |
 | <!-- parameter yaml:useCommonACR_override --><!-- parameter json.dev:useCommonACR_override -->`useCommonACR_override` | `USE_COMMON_ACR_FOR_PROJECTS`, `USE_COMMON_ACR_OVERRIDE` | O | Y: `"true"`<br>J.dev: `"true"` | Use shared ACR override otherwise: false, each project gets its own ACR (higher cost). |
 | <!-- parameter yaml:webAppRuntime --><!-- parameter json.dev:webAppRuntime -->`webAppRuntime` | `WEBAPP_RUNTIME` | O | Y: `"python"`<br>J.dev: `"python"` | Azure Web App runtime otherwise: "dotnet", "node", "java". |

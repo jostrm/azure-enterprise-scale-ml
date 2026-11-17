@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "16193225759104726990"
+      "templateHash": "9803467711404755964"
     }
   },
   "parameters": {
@@ -17,36 +17,38 @@
     },
     "runnerLocation": {
       "type": "string",
-      "defaultValue": "[resourceGroup().location]",
+      "defaultValue": "",
       "metadata": {
-        "description": "Azure region of the existing runner VM. Change this if the VM is in a different region from its resource group."
+        "description": "Optional VM region override. Leave empty to read the actual region from the selected VM."
       }
     },
     "consumerRoot": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "description": "Absolute path to the prepared consumer repository on that VM. Its accelerator submodule and project configuration are reused, not overwritten."
+        "description": "Factory project folder on VM (not your PC): the prepared repository containing azurefactory/ or aifactory/ and the accelerator submodule. Empty uses /opt/esaf/consumer. No repository is downloaded."
       }
     },
     "pythonExecutable": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "description": "Absolute path to the existing Python 3.12+ environment on the VM with the Agent Factory operator dependencies installed."
+        "description": "Prepared Python on VM: the existing Python 3.12+ interpreter with operator dependencies installed. Empty uses <Factory project folder>/.venv-agent-operator/bin/python. Nothing is installed automatically."
       }
     },
     "managedIdentityClientId": {
       "type": "string",
-      "minLength": 36,
+      "defaultValue": "",
       "maxLength": 36,
       "metadata": {
-        "description": "Client ID of the existing user-assigned managed identity attached to the VM and authorized to deploy Agent Chat. No identity or role assignment is created by this entry point."
+        "description": "Optional identity override. Empty selects the VM sole user-assigned identity, or its system identity when no user-assigned identity exists. For multiple identities enter an attached client ID; system explicitly selects the system identity. Existing project permissions are still required."
       }
     },
     "projectSubscriptionId": {
       "type": "string",
-      "defaultValue": "[subscription().subscriptionId]",
+      "defaultValue": "",
       "metadata": {
-        "description": "Subscription containing the Dev project; must match its variables.json. The selected resource group above contains the runner VM."
+        "description": "Optional project subscription override. Empty reads dev_sub_id from the selected project variables.json; an override must match that configuration and the current tenant."
       }
     },
     "projectNumber": {
@@ -73,67 +75,163 @@
       }
     }
   },
-  "variables": {
-    "$fxv#0": "#!/usr/bin/env bash\nset -euo pipefail\n\n# Run only the operator-maintained checkout and Python; never fetch source or install the operator environment.\n: \"${AIF_CONSUMER_ROOT:?An absolute durable consumer checkout is required}\"\n: \"${AIF_PYTHON:?An absolute prepared Python 3.12+ executable is required}\"\n[[ \"$AIF_CONSUMER_ROOT\" == /* && -d \"$AIF_CONSUMER_ROOT\" ]] || {\n  echo \"AIF_CONSUMER_ROOT must be an existing absolute Linux directory.\" >&2\n  exit 2\n}\n[[ \"$AIF_PYTHON\" == /* && -x \"$AIF_PYTHON\" ]] || {\n  echo \"AIF_PYTHON must be an existing absolute executable.\" >&2\n  exit 2\n}\nadapter=\"$AIF_CONSUMER_ROOT/azure-enterprise-scale-ml/bootstrap/lib/agent_chat_portal.py\"\n[[ -f \"$adapter\" ]] || {\n  echo \"Update the prepared accelerator submodule: bootstrap/lib/agent_chat_portal.py is missing.\" >&2\n  exit 2\n}\n# The adapter validates configuration before its isolated managed-identity login, and owns cleanup and readiness.\nexec \"$AIF_PYTHON\" -B \"$adapter\"\n"
-  },
   "resources": [
     {
-      "type": "Microsoft.Compute/virtualMachines/runCommands",
-      "apiVersion": "2024-11-01",
-      "name": "[format('{0}/{1}', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]",
-      "location": "[parameters('runnerLocation')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('esaf-agent-chat-{0}-{1}', parameters('projectNumber'), uniqueString(deployment().name))]",
       "properties": {
-        "asyncExecution": false,
-        "treatFailureAsDeploymentFailure": true,
-        "timeoutInSeconds": 14400,
-        "source": {
-          "script": "[variables('$fxv#0')]"
+        "expressionEvaluationOptions": {
+          "scope": "inner"
         },
-        "parameters": [
-          {
-            "name": "AIF_CONSUMER_ROOT",
+        "mode": "Incremental",
+        "parameters": {
+          "runnerVmName": {
+            "value": "[parameters('runnerVmName')]"
+          },
+          "runnerLocation": "[if(empty(parameters('runnerLocation')), createObject('value', reference(resourceId('Microsoft.Compute/virtualMachines', parameters('runnerVmName')), '2024-11-01', 'full').location), createObject('value', parameters('runnerLocation')))]",
+          "vmIdentity": {
+            "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Compute/virtualMachines', parameters('runnerVmName')), '2024-11-01', 'full'), 'identity'), createObject())]"
+          },
+          "consumerRoot": {
             "value": "[parameters('consumerRoot')]"
           },
-          {
-            "name": "AIF_PROJECT_NUMBER",
-            "value": "[parameters('projectNumber')]"
-          },
-          {
-            "name": "AIF_PYTHON",
+          "pythonExecutable": {
             "value": "[parameters('pythonExecutable')]"
           },
-          {
-            "name": "AIF_IDENTITY_CLIENT_ID",
+          "managedIdentityClientId": {
             "value": "[parameters('managedIdentityClientId')]"
           },
-          {
-            "name": "AIF_SUBSCRIPTION_ID",
+          "projectSubscriptionId": {
             "value": "[parameters('projectSubscriptionId')]"
           },
-          {
-            "name": "AIF_TENANT_ID",
-            "value": "[subscription().tenantId]"
+          "projectNumber": {
+            "value": "[parameters('projectNumber')]"
           },
-          {
-            "name": "AIF_CONFIGURATION_PATH",
+          "configurationPath": {
             "value": "[parameters('configurationPath')]"
           },
-          {
-            "name": "AIF_RUN_ID",
+          "runId": {
             "value": "[parameters('runId')]"
           }
-        ]
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "2889342574077150200"
+            }
+          },
+          "parameters": {
+            "runnerVmName": {
+              "type": "string"
+            },
+            "runnerLocation": {
+              "type": "string"
+            },
+            "vmIdentity": {
+              "type": "object"
+            },
+            "consumerRoot": {
+              "type": "string"
+            },
+            "pythonExecutable": {
+              "type": "string"
+            },
+            "managedIdentityClientId": {
+              "type": "string"
+            },
+            "projectSubscriptionId": {
+              "type": "string"
+            },
+            "projectNumber": {
+              "type": "string"
+            },
+            "configurationPath": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "$fxv#0": "#!/usr/bin/env bash\nset -euo pipefail\n\n# Run only the operator-maintained checkout and Python; never fetch source or install the operator environment.\nexport AIF_CONSUMER_ROOT=\"${AIF_CONSUMER_ROOT:-/opt/esaf/consumer}\"\nexport AIF_PYTHON=\"${AIF_PYTHON:-$AIF_CONSUMER_ROOT/.venv-agent-operator/bin/python}\"\n[[ \"$AIF_CONSUMER_ROOT\" == /* && -d \"$AIF_CONSUMER_ROOT\" ]] || {\n  echo \"Factory project folder on VM must be an existing absolute Linux directory: $AIF_CONSUMER_ROOT. Prepare the standard folder /opt/esaf/consumer or set another folder in advanced settings.\" >&2\n  exit 2\n}\n[[ \"$AIF_PYTHON\" == /* && -f \"$AIF_PYTHON\" && -x \"$AIF_PYTHON\" ]] || {\n  echo \"Prepared Python on VM must be an existing absolute Python 3.12+ executable: $AIF_PYTHON. Prepare the standard executable $AIF_CONSUMER_ROOT/.venv-agent-operator/bin/python or set another executable in advanced settings; no system Python fallback or installation is performed.\" >&2\n  exit 2\n}\nadapter=\"$AIF_CONSUMER_ROOT/azure-enterprise-scale-ml/bootstrap/lib/agent_chat_portal.py\"\n[[ -f \"$adapter\" ]] || {\n  echo \"Update the prepared accelerator submodule: bootstrap/lib/agent_chat_portal.py is missing.\" >&2\n  exit 2\n}\n# The adapter validates configuration before its isolated managed-identity login, and owns cleanup and readiness.\nexec \"$AIF_PYTHON\" -B \"$adapter\"\n"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Compute/virtualMachines/runCommands",
+              "apiVersion": "2024-11-01",
+              "name": "[format('{0}/{1}', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]",
+              "location": "[parameters('runnerLocation')]",
+              "properties": {
+                "asyncExecution": false,
+                "treatFailureAsDeploymentFailure": true,
+                "timeoutInSeconds": 14400,
+                "source": {
+                  "script": "[variables('$fxv#0')]"
+                },
+                "parameters": [
+                  {
+                    "name": "AIF_CONSUMER_ROOT",
+                    "value": "[parameters('consumerRoot')]"
+                  },
+                  {
+                    "name": "AIF_PROJECT_NUMBER",
+                    "value": "[parameters('projectNumber')]"
+                  },
+                  {
+                    "name": "AIF_PYTHON",
+                    "value": "[parameters('pythonExecutable')]"
+                  },
+                  {
+                    "name": "AIF_IDENTITY_CLIENT_ID",
+                    "value": "[parameters('managedIdentityClientId')]"
+                  },
+                  {
+                    "name": "AIF_SUBSCRIPTION_ID",
+                    "value": "[parameters('projectSubscriptionId')]"
+                  },
+                  {
+                    "name": "AIF_TENANT_ID",
+                    "value": "[subscription().tenantId]"
+                  },
+                  {
+                    "name": "AIF_CONFIGURATION_PATH",
+                    "value": "[parameters('configurationPath')]"
+                  },
+                  {
+                    "name": "AIF_RUN_ID",
+                    "value": "[parameters('runId')]"
+                  },
+                  {
+                    "name": "AIF_VM_IDENTITY",
+                    "value": "[string(parameters('vmIdentity'))]"
+                  }
+                ]
+              }
+            }
+          ],
+          "outputs": {
+            "runCommandResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Compute/virtualMachines/runCommands', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]"
+            }
+          }
+        }
       }
     }
   ],
   "outputs": {
     "runCommandResourceId": {
       "type": "string",
-      "value": "[resourceId('Microsoft.Compute/virtualMachines/runCommands', parameters('runnerVmName'), format('esaf-agent-chat-{0}', parameters('projectNumber')))]"
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('esaf-agent-chat-{0}-{1}', parameters('projectNumber'), uniqueString(deployment().name))), '2022-09-01').outputs.runCommandResourceId.value]"
     },
     "results": {
       "type": "string",
-      "value": "Read this Run Command instance view for the application URL or failure details. The chat URL requires private network access and the configured Entra sign-in."
+      "value": "Read this Run Command instance view for resolved inputs, the application URL or failure details. The chat URL requires private network access and the configured Entra sign-in."
     }
   }
 }

@@ -33,29 +33,90 @@ TARGET_FIELDS = (
 )
 
 
+def nonzero_uuid(value):
+    return isinstance(value, str) and bool(UUID.fullmatch(value)) and bool(int(value.replace("-", ""), 16))
+
+
+def identity_client_id(environ):
+    selected = environ.get("AIF_IDENTITY_CLIENT_ID", "").strip()
+    if selected.lower() == "system":
+        selected = "system"
+    elif selected and not nonzero_uuid(selected):
+        raise ValueError("Managed identity client ID must be a nonzero UUID, 'system', or blank for automatic selection.")
+    if "AIF_VM_IDENTITY" not in environ:
+        # Older direct callers explicitly supplied a user-assigned client ID before ARM provided VM metadata.
+        if selected and selected != "system":
+            return selected
+        raise ValueError("Runner VM identity metadata is required for automatic or system identity selection.")
+    try:
+        metadata = json.loads(environ["AIF_VM_IDENTITY"]) if environ["AIF_VM_IDENTITY"].strip() else None
+    except ValueError as error:
+        raise ValueError("Runner VM identity metadata must be valid JSON.") from error
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        raise ValueError("Runner VM identity metadata must be a JSON object.")
+    kind = metadata.get("type", "")
+    if not isinstance(kind, str):
+        raise ValueError("Runner VM identity metadata has an invalid identity type.")
+    kinds = {part.strip().lower() for part in kind.split(",") if part.strip()}
+    if kinds - {"systemassigned", "userassigned", "none"} or ("none" in kinds and len(kinds) > 1):
+        raise ValueError("Runner VM identity metadata has an invalid identity type.")
+    attached = metadata.get("userAssignedIdentities")
+    if attached is None:
+        attached = {}
+    if not isinstance(attached, dict) or (attached and "userassigned" not in kinds):
+        raise ValueError("Runner VM identity metadata has invalid user-assigned identities.")
+    clients = []
+    for identity in attached.values():
+        if not isinstance(identity, dict) or not nonzero_uuid(identity.get("clientId")):
+            raise ValueError("Runner VM identity metadata must include a nonzero UUID client ID for each attached identity.")
+        clients.append(identity["clientId"])
+    system = "systemassigned" in kinds
+    if selected == "system":
+        if not system:
+            raise ValueError("The selected system-assigned managed identity is not attached to the runner VM.")
+        return selected
+    if selected:
+        if selected.lower() not in {client.lower() for client in clients}:
+            raise ValueError("The selected managed identity client ID is not attached to the runner VM.")
+        return selected
+    if len(clients) > 1:
+        raise ValueError("Multiple user-assigned managed identities are attached to the runner VM; "
+                         "set an explicit managed identity client ID in advanced settings.")
+    if clients:
+        return clients[0]
+    if system:
+        return "system"
+    raise ValueError("No managed identity is attached to the runner VM. Attach an authorized identity before retrying.")
+
+
 def inputs(environ):
     if sys.version_info < (3, 12):
-        raise ValueError("AIF_PYTHON must be a prepared Python 3.12+ executable.")
-    required = ("AIF_CONSUMER_ROOT", "AIF_PROJECT_NUMBER", "AIF_PYTHON", "AIF_IDENTITY_CLIENT_ID",
-                "AIF_SUBSCRIPTION_ID", "AIF_TENANT_ID", "AIF_RUN_ID")
+        raise ValueError("Prepared Python on VM must be a prepared Python 3.12+ executable.")
+    required = ("AIF_CONSUMER_ROOT", "AIF_PROJECT_NUMBER", "AIF_PYTHON", "AIF_TENANT_ID", "AIF_RUN_ID")
+    labels = {"AIF_CONSUMER_ROOT": "Factory project folder on VM", "AIF_PYTHON": "Prepared Python on VM"}
     for name in required:
         if not environ.get(name, "").strip():
-            raise ValueError(f"{name} is required.")
+            raise ValueError(f"{labels.get(name, name)} is required.")
     project = environ["AIF_PROJECT_NUMBER"]
     if not re.fullmatch(r"[0-9]{3}", project) or project == "000":
         raise ValueError("AIF_PROJECT_NUMBER must be 001-999 (Dev only).")
-    for name in ("AIF_IDENTITY_CLIENT_ID", "AIF_SUBSCRIPTION_ID", "AIF_TENANT_ID"):
-        if not UUID.fullmatch(environ[name]) or not int(environ[name].replace("-", ""), 16):
-            raise ValueError(f"{name} must be a nonzero UUID.")
+    if not nonzero_uuid(environ["AIF_TENANT_ID"]):
+        raise ValueError("AIF_TENANT_ID must be a nonzero UUID.")
+    subscription = environ.get("AIF_SUBSCRIPTION_ID", "").strip()
+    if subscription and not nonzero_uuid(subscription):
+        raise ValueError("AIF_SUBSCRIPTION_ID must be a nonzero UUID.")
+    environ["AIF_IDENTITY_CLIENT_ID"] = identity_client_id(environ)
     root = Path(environ["AIF_CONSUMER_ROOT"])
     python = Path(environ["AIF_PYTHON"])
     if not root.is_absolute() or not root.is_dir() or not (root / ".git").exists():
-        raise ValueError("AIF_CONSUMER_ROOT must be an existing absolute consumer checkout.")
+        raise ValueError("Factory project folder on VM must be an existing absolute consumer checkout with .git.")
     root = root.resolve()
     if any(part.lower() in {"_work", "_temp"} for part in root.parts):
-        raise ValueError("AIF_CONSUMER_ROOT must be durable, not an ephemeral pipeline _work or _temp checkout.")
+        raise ValueError("Factory project folder on VM must be durable, not an ephemeral pipeline _work or _temp checkout.")
     if not python.is_absolute() or not python.is_file() or not os.access(python, os.X_OK):
-        raise ValueError("AIF_PYTHON must be an existing absolute executable.")
+        raise ValueError("Prepared Python on VM must be an existing absolute executable.")
     if not shutil.which("bicep", path=environ.get("PATH", "")):
         raise ValueError("A prepared bicep executable must be installed on PATH; the portal does not install a compiler.")
     accelerator = root / entry.SUBMODULE
@@ -72,9 +133,14 @@ def inputs(environ):
     options = entry.parse(args)
     path = entry.resolve_configuration(root, project, options["config"])
     values = entry.pipeline_values(path, root, options)
-    for config_key, parameter in (("dev_sub_id", "AIF_SUBSCRIPTION_ID"), ("tenantId", "AIF_TENANT_ID")):
-        if values.get(config_key, "").lower() != environ[parameter].lower():
-            raise ValueError(f"Selected project {config_key} does not match {parameter}.")
+    project_subscription = values.get("dev_sub_id", "")
+    if not nonzero_uuid(project_subscription):
+        raise ValueError("Selected project dev_sub_id must be a nonzero UUID.")
+    if subscription and project_subscription.lower() != subscription.lower():
+        raise ValueError("Selected project dev_sub_id does not match AIF_SUBSCRIPTION_ID.")
+    if values.get("tenantId", "").lower() != environ["AIF_TENANT_ID"].lower():
+        raise ValueError("Selected project tenantId does not match AIF_TENANT_ID.")
+    environ["AIF_SUBSCRIPTION_ID"] = subscription or project_subscription
     return root, args, values
 
 
@@ -243,7 +309,10 @@ def main(environ=None, *, chat_runner=None, voice_runner=None, run=subprocess.ru
                                                              ".build", "node_modules", ".pytest_cache"))
                 chat_runner = supplied_chat or entry.launcher(staged, STAGES[0])
                 voice_runner = supplied_voice or entry.launcher(staged, STAGES[1])
-            az(["login", "--identity", "--client-id", environ["AIF_IDENTITY_CLIENT_ID"]], run)
+            login = ["login", "--identity"]
+            if environ["AIF_IDENTITY_CLIENT_ID"] != "system":
+                login.extend(["--client-id", environ["AIF_IDENTITY_CLIENT_ID"]])
+            az(login, run)
             az(["account", "set", "--subscription", environ["AIF_SUBSCRIPTION_ID"]], run)
             account = az(["account", "show"], run)
             if (account.get("id", "").lower() != environ["AIF_SUBSCRIPTION_ID"].lower()

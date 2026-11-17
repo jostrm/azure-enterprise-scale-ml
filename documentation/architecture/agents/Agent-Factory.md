@@ -3,6 +3,8 @@ id: agent-factory
 status: observed
 sources:
   - portal/agent-chat/main.bicep
+  - portal/agent-chat/run-command.bicep
+  - portal/agent-chat/form.json
   - portal/agent-chat/run.sh
   - bootstrap/lib/agent_chat_portal.py
   - usecase_code/40-agent-factory/readme.md
@@ -127,10 +129,19 @@ The shared operator and Factory Chat application have separate Python/dependency
 ### Agent Chat portal entry
 
 `portal/agent-chat/main.bicep` is a separate existing-project deployment entry, not an extension of the
-infrastructure-only `portal-125` bootstrap. It embeds `run.sh` into a synchronous managed Run Command on
-an existing prepared private Linux VM. The operator supplies a persistent consumer checkout, Python
-environment and explicitly authorized attached user-assigned identity. No temporary pipeline checkout,
-default runner identity, model deployment or Entra registration is assumed.
+infrastructure-only `portal-125` bootstrap. Its embedded child template `run-command.bicep` accepts the
+existing VM's runtime region and identity metadata, then embeds `run.sh` into a synchronous managed Run
+Command on that prepared private Linux VM. `form.json` asks for the VM and Dev project; optional
+overrides have plain-language labels and are hidden until enabled.
+
+The prepared folder defaults to `/opt/esaf/consumer` and Python to its
+`.venv-agent-operator/bin/python`; these are conventions, not operating-system discovery or automatic
+installation. The selected project's configuration supplies its subscription. The adapter selects the
+sole attached user-assigned identity, otherwise the system identity only when there are no user-assigned
+identities. Multiple user-assigned identities require an override; explicit identities must be attached.
+No permission is inferred from attachment, and failed authentication never tries another identity.
+Existing explicit ARM parameters remain compatible. No temporary pipeline checkout, model deployment
+or Entra registration is assumed (automatic inputs added 2026-11-17).
 
 The portal adapter reuses `agent_chat_entry.py` and the same two deployers as the terminal/pipeline route.
 It isolates Azure CLI authentication, rejects tenant/subscription mismatches and skipped stages, and waits

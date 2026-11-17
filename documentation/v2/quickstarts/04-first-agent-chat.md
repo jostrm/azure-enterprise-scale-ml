@@ -116,7 +116,7 @@ and then deploys them.
 
 ## Deploy Agent Chat from the Azure portal
 
-[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fform.json)
 
 This preview button **runs the deployment**, rather than opening this guide. After you select **Review + create**
 and **Create**, Azure runs the existing Agent Chat deployers on a prepared private Linux VM. They create
@@ -135,7 +135,8 @@ Keep a **dedicated, persistent consumer checkout** on that VM, including its acc
 project's own `variables.json`. Do not point this deployment at a temporary ADO/GHA `_work` checkout:
 another pipeline can clean or replace it. The operator maintains the checkout and reviews its source;
 the button does not clone repositories, fetch a new revision, ask for Git credentials or overwrite configuration.
-Update the accelerator to a revision containing `bootstrap/lib/agent_chat_portal.py` before using the button.
+Update the accelerator to a revision with the automatic VM identity support in `bootstrap/lib/agent_chat_portal.py`
+before using this form. An older prepared checkout still requires explicit advanced values.
 
 Prepare a separate operator environment in that checkout (replace the path with your actual location):
 
@@ -151,8 +152,8 @@ Allow free disk space for an isolated copy of the accelerator source, applicatio
 The runner removes its temporary source, build files and Azure CLI credentials when the command exits normally.
 The four settings above, model deployments and Entra registration must be ready in the selected project's configuration.
 
-An administrator must attach an **explicitly selected user-assigned managed identity** to this VM and
-authorize it to deploy into the target Dev project. It needs Contributor and User Access Administrator
+An administrator must authorize an **attached managed identity** to deploy into the target Dev project.
+It can be user-assigned or the VM's system-assigned identity. It needs Contributor and User Access Administrator
 on the project resource group, plus read access to the subscription and any referenced common resources.
 The shared build runner's default common-resource-group identity is **not automatically authorized** for this.
 The existing deployers create application identities and resource-scoped role assignments, including their
@@ -165,20 +166,27 @@ administrator privileges on the VM; keep that permission and the maintained chec
 
 ### Fill in the deployment
 
-Select the **subscription and resource group containing the runner VM**, which can differ from the project's
-resource group. Then supply:
+Select your **Deployment VM (existing Linux runner)** and **Dev project number** (default `001`).
+The form uses the VM's resource group automatically. Normally leave **Advanced settings** unchanged.
 
-| Input | Value |
+| Setting | Automatic value and when to override |
 |---|---|
-| `runnerVmName` | Existing, running Linux VM in the selected resource group. |
-| `runnerLocation` | The VM's Azure region; defaults to the selected resource group's region. |
-| `consumerRoot` | Absolute persistent checkout path, for example `/opt/esaf/consumer`. |
-| `pythonExecutable` | Absolute prepared operator interpreter, for example `/opt/esaf/consumer/.venv-agent-operator/bin/python`. |
-| `managedIdentityClientId` | Client ID of the authorized user-assigned identity attached to that VM, not an object ID. |
-| `projectSubscriptionId` | Subscription containing the Dev project; must match `variables.json` and the current tenant. |
-| `projectNumber` | Existing project `001` to `999`; Dev only. |
-| `configurationPath` | Optional project `variables.json` path; required when automatic project lookup is ambiguous. |
-| `runId` | Generated rerun marker. Change it to execute a completed deployment again. |
+| VM region | Read from the selected VM, even if its resource group's region differs. No field to fill in. |
+| Factory project folder on VM (`consumerRoot`) | `/opt/esaf/consumer`. This is the existing repository folder **on the VM**, containing `azurefactory/` or `aifactory/` and `azure-enterprise-scale-ml/`; it is not a folder on your PC. Override only if the administrator prepared it elsewhere. |
+| Prepared Python on VM (`pythonExecutable`) | `<Factory project folder>/.venv-agent-operator/bin/python`. This is the Python executable inside the prepared operator environment, not the environment's folder. Override only for another prepared installation. |
+| VM identity override (`managedIdentityClientId`) | The VM's sole user-assigned identity; if none exists, its system identity. With multiple user-assigned identities, specify an attached client ID; enter `system` to select the system identity explicitly. |
+| Project subscription override (`projectSubscriptionId`) | `dev_sub_id` from the selected project's `variables.json`. An override must match that configuration and the current tenant. |
+| Project settings file override (`configurationPath`) | The matching project's `variables.json`. Set a path only when lookup is ambiguous or you use another configuration location. |
+
+Azure knows the VM's region and attached identity IDs, but **cannot discover arbitrary folders or Python environments
+inside its operating system**. The two path defaults follow the preparation example above; they do not scan the
+VM, clone a repository or install missing packages. A missing default path gives a specific error instead of
+choosing another checkout. Automatic identity selection checks attachment, not project authorization: the selected
+identity still needs the permissions described above. Multiple identities are never tried one after another.
+
+The ARM parameter names remain available for scripts. `runnerVmName` is the only required template parameter;
+`projectNumber` defaults to `001`, the optional overrides default to empty, and `runId` is generated for each new
+deployment. A direct ARM caller can still override `runnerLocation`, but normally leaves it empty.
 
 > [!WARNING]
 > Selecting **Create** changes Azure and incurs application, model and embedding charges. Do not run this
@@ -190,7 +198,8 @@ The Run Command instance view shows the result and application URL; its captured
 last 4 KB. Read `runCommandResourceId` in the deployment outputs to find the command.
 After deployment, sign in from an authorized browser and try a question and live voice.
 
-For a failed run, fix the reported prerequisite and rerun with a new `runId`; there is no automatic rollback
+For a failed run, fix the reported prerequisite and reopen the button for a new run; a new `runId` is generated.
+When using ARM directly or redeploying stored parameters, change `runId`. There is no automatic rollback
 of Azure resources already created. No live Azure deployment is asserted by this template's offline coverage.
 For the implementation, see [the portal template](../../../portal/agent-chat/main.bicep) and
 [Microsoft's managed Run Command documentation](https://learn.microsoft.com/azure/virtual-machines/linux/run-command-managed).

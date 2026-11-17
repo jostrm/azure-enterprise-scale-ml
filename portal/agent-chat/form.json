@@ -1,0 +1,157 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2021-09-09/uiFormDefinition.schema.json#",
+  "view": {
+    "kind": "Form",
+    "properties": {
+      "title": "Deploy ESAF Agent Chat + live voice (preview)",
+      "steps": [
+        {
+          "name": "basics",
+          "label": "Choose your project",
+          "elements": [
+            {
+              "name": "intro",
+              "type": "Microsoft.Common.InfoBox",
+              "options": {
+                "style": "Info",
+                "text": "Choose a prepared Linux VM and an existing Dev project. Azure reads the VM region and attached identity automatically. This deploys Agent Chat, its knowledge index and live voice, not a new Factory. The VM, models, sign-in registration, project configuration and private networking must already be prepared.",
+                "uri": {
+                  "value": "https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal",
+                  "text": "Runner setup and prerequisites"
+                }
+              }
+            },
+            {
+              "name": "runner",
+              "type": "Microsoft.Solutions.ResourceSelector",
+              "label": "Deployment VM (existing Linux runner)",
+              "toolTip": "Select the prepared private Linux VM. Its resource group and region are used automatically; no VM is created.",
+              "resourceType": "Microsoft.Compute/virtualMachines",
+              "constraints": { "required": true }
+            },
+            {
+              "name": "projectNumber",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Dev project number",
+              "defaultValue": "001",
+              "toolTip": "The existing project to receive Agent Chat. Its subscription comes from that project's variables.json on the VM.",
+              "constraints": {
+                "required": true,
+                "regex": "^(00[1-9]|0[1-9][0-9]|[1-9][0-9]{2})$",
+                "validationMessage": "Enter a three-digit project number from 001 to 999."
+              }
+            }
+          ]
+        },
+        {
+          "name": "advanced",
+          "label": "Advanced settings (optional)",
+          "elements": [
+            {
+              "name": "defaults",
+              "type": "Microsoft.Common.InfoBox",
+              "options": {
+                "style": "Info",
+                "text": "Normally leave these settings unchanged. The Factory project folder is /opt/esaf/consumer on the VM; Python is .venv-agent-operator/bin/python inside that folder. The VM's only user-assigned identity is selected, or its system identity when no user-assigned identity exists. If it has multiple user-assigned identities, specify the authorized client ID below. Identity selection never grants missing permissions."
+              }
+            },
+            {
+              "name": "showAdvanced",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Override automatic settings",
+              "toolTip": "Only needed for a custom VM folder, Python installation, multiple identities or an ambiguous project configuration."
+            },
+            {
+              "name": "consumerRoot",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Factory project folder on VM",
+              "defaultValue": "",
+              "placeholder": "Automatic: /opt/esaf/consumer",
+              "toolTip": "A folder on the Linux VM, not your computer. It contains azurefactory/ or aifactory/ and the azure-enterprise-scale-ml submodule. Use an existing persistent checkout, not a temporary pipeline _work folder.",
+              "visible": "[steps('advanced').showAdvanced]",
+              "constraints": {
+                "required": false,
+                "regex": "^(/[^\\r\\n]*)?$",
+                "validationMessage": "Leave blank, or enter an absolute Linux folder path beginning with /."
+              }
+            },
+            {
+              "name": "pythonExecutable",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Prepared Python on VM",
+              "defaultValue": "",
+              "placeholder": "Automatic: <project folder>/.venv-agent-operator/bin/python",
+              "toolTip": "The existing Python program with Agent Factory operator packages installed, not the environment's folder. Normally no value is needed. No packages are installed by this setting.",
+              "visible": "[steps('advanced').showAdvanced]",
+              "constraints": {
+                "required": false,
+                "regex": "^(/[^\\r\\n]*)?$",
+                "validationMessage": "Leave blank, or enter the absolute Linux path to the Python executable."
+              }
+            },
+            {
+              "name": "managedIdentityClientId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "VM identity override",
+              "defaultValue": "",
+              "placeholder": "Automatic from the selected VM",
+              "toolTip": "For multiple user-assigned identities, enter the client ID authorized for this project. Enter system to choose the attached system identity explicitly. An override must be attached to this VM.",
+              "visible": "[steps('advanced').showAdvanced]",
+              "constraints": {
+                "required": false,
+                "regex": "^(|system|[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})$",
+                "validationMessage": "Leave blank, enter system, or enter an attached managed identity client ID (GUID)."
+              }
+            },
+            {
+              "name": "configurationPath",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Project settings file override",
+              "defaultValue": "",
+              "placeholder": "Automatic: the matching project variables.json",
+              "toolTip": "Only needed if more than one project configuration matches. Enter a path relative to the Factory project folder or an absolute path on the VM.",
+              "visible": "[steps('advanced').showAdvanced]",
+              "constraints": { "required": false }
+            },
+            {
+              "name": "projectSubscriptionId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Project subscription override",
+              "defaultValue": "",
+              "placeholder": "Automatic from project settings",
+              "toolTip": "Normally leave blank. If supplied, it must match dev_sub_id in the selected variables.json. The project and VM may be in different subscriptions within the same tenant.",
+              "visible": "[steps('advanced').showAdvanced]",
+              "constraints": {
+                "required": false,
+                "regex": "^(|[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})$",
+                "validationMessage": "Leave blank or enter the configured project subscription ID."
+              }
+            },
+            {
+              "name": "charges",
+              "type": "Microsoft.Common.InfoBox",
+              "options": {
+                "style": "Warning",
+                "text": "Create runs the real deployment and incurs Azure application and model charges, including knowledge-index embeddings. Do not run it concurrently with a project pipeline. No automatic rollback is performed."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "outputs": {
+      "kind": "ResourceGroup",
+      "resourceGroupId": "[first(split(steps('basics').runner.id, '/providers/'))]",
+      "location": "[steps('basics').runner.location]",
+      "parameters": {
+        "runnerVmName": "[steps('basics').runner.name]",
+        "projectNumber": "[steps('basics').projectNumber]",
+        "consumerRoot": "[if(steps('advanced').showAdvanced, coalesce(steps('advanced').consumerRoot, ''), '')]",
+        "pythonExecutable": "[if(steps('advanced').showAdvanced, coalesce(steps('advanced').pythonExecutable, ''), '')]",
+        "managedIdentityClientId": "[if(steps('advanced').showAdvanced, coalesce(steps('advanced').managedIdentityClientId, ''), '')]",
+        "configurationPath": "[if(steps('advanced').showAdvanced, coalesce(steps('advanced').configurationPath, ''), '')]",
+        "projectSubscriptionId": "[if(steps('advanced').showAdvanced, coalesce(steps('advanced').projectSubscriptionId, ''), '')]"
+      }
+    }
+  }
+}

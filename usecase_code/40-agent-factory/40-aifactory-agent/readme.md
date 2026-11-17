@@ -56,6 +56,40 @@ from enabling [browser live voice](#live-voice-optional).
 See [Private application deployment](#private-application-deployment) and
 [Live voice](#live-voice-optional) for setup and prerequisites.
 
+### Deploy ESAF Agent Chat to Azure
+
+[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fform.json)
+
+This preview button deploys the **Foundry agent, knowledge index, private browser chat and live voice**
+into an **existing Dev project**. It is separate from the blue Factory infrastructure button:
+it does not create a Factory, VM, AI models or an Entra sign-in registration.
+
+Choose your **Deployment VM (existing Linux runner)** and **Dev project number**, then review the
+deployment before selecting **Create**. Azure runs the existing deployers on that VM, where they can
+reach your private services. It reads the VM's region and attached identities, and reads the project
+subscription from its `variables.json`. The VM must already have the prepared checkout, tools, network
+access and an identity authorized to deploy into that project.
+
+**You normally do not need to enter paths.** The previous parameter names are now optional, plain-language
+fields under **Advanced settings**:
+
+| Field | What it means | Automatic value |
+|---|---|---|
+| Factory project folder on VM (`consumerRoot`) | Your prepared project repository **on the Linux VM**, not on your PC. It contains project settings and the `azure-enterprise-scale-ml` submodule. | `/opt/esaf/consumer` |
+| Prepared Python on VM (`pythonExecutable`) | The Python program inside the operator environment that already has the required packages. | `<project folder>/.venv-agent-operator/bin/python` |
+| VM identity override (`managedIdentityClientId`) | Which attached identity deploys the application. No need to copy its ID when selection is unambiguous. | The sole user-assigned identity; otherwise the system identity if there are no user-assigned identities. |
+
+If the VM has **multiple user-assigned identities**, choose the authorized client ID in Advanced settings;
+the deployment never guesses or tries identities until one works. You can explicitly enter `system` for
+the system identity. Finding an identity does not grant it project permissions. Azure cannot discover an
+arbitrary checkout or Python installation from the VM name, so custom locations need the path overrides.
+The standard paths must already exist; the button does not download the repository or prepare that environment.
+
+**Create changes Azure and incurs charges**, including knowledge-index embeddings. It waits for the deployment
+and private readiness endpoint; then sign in through your approved private network and try text and voice.
+See the [runner preparation, permissions and troubleshooting guide](../../../documentation/v2/quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal)
+before the first run. Do not run this deployment concurrently with a project pipeline.
+
 ## Boundaries
 
 - Use existing Foundry, Search, project data storage and internal Container Apps

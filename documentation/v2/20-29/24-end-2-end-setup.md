@@ -87,11 +87,13 @@ you select it. It lists the permissions, the regions and the checklist for after
 
 ### Deploy ESAF Agent Chat into an existing project
 
-[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json)
+[![Deploy ESAF Agent Chat to Azure](../../../portal/agent-chat/deploy-button.svg)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjostrm%2Fazure-enterprise-scale-ml%2Fmain%2Fportal%2Fagent-chat%2Fform.json)
 
 This separate button runs the Agent Chat deployment on your prepared private Linux runner VM: it creates
 the Foundry agent, builds its knowledge index and deploys the private chat app with live voice into an
 existing Dev project. It does not create Factory infrastructure, models or an Entra app registration.
+Choose the prepared VM and project number; use **Advanced settings** only to override the standard paths,
+select between multiple attached identities or resolve an ambiguous project configuration.
 Read the [Agent Chat prerequisites and portal inputs](../quickstarts/04-first-agent-chat.md#deploy-agent-chat-from-the-azure-portal)
 before selecting **Review + create**.
 

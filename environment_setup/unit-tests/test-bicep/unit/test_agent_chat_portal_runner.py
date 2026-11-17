@@ -22,11 +22,24 @@ SCRIPT = ROOT / "portal/agent-chat/run.sh"
 SUB = "11111111-1111-4111-8111-111111111111"
 TENANT = "22222222-2222-4222-8222-222222222222"
 IDENTITY = "33333333-3333-4333-8333-333333333333"
+OTHER_IDENTITY = "44444444-4444-4444-8444-444444444444"
 APP = "aifactory-agent-project012-dev"
 GROUP = "spider-esml-project012-sdc-dev-001-rg"
 RESOURCE = f"/subscriptions/{SUB}/resourceGroups/{GROUP}/providers/Microsoft.App/containerApps/{APP}"
 FQDN = f"{APP}.private.swedencentral.azurecontainerapps.io"
 READY = {"status": "ready", "checks": {"authentication": "configured", "knowledge": "ready"}}
+
+
+def identity_metadata(*client_ids, system=False):
+    kinds = (["SystemAssigned"] if system else []) + (["UserAssigned"] if client_ids else [])
+    return json.dumps({
+        "type": ", ".join(kinds) or "None",
+        "userAssignedIdentities": {
+            f"/subscriptions/{SUB}/resourceGroups/runner/providers/Microsoft.ManagedIdentity/"
+            f"userAssignedIdentities/runner{index}": {"clientId": client_id, "principalId": TENANT}
+            for index, client_id in enumerate(client_ids)
+        },
+    })
 
 
 @pytest.fixture
@@ -80,6 +93,7 @@ def prepared(tmp_path):
         "AIF_IDENTITY_CLIENT_ID": IDENTITY, "AIF_SUBSCRIPTION_ID": SUB, "AIF_TENANT_ID": TENANT,
         "AIF_CONFIGURATION_PATH": "", "AIF_RUN_ID": "rerun;$(not-executed)",
     }
+    env.pop("AIF_VM_IDENTITY", None)
     return SimpleNamespace(env=env, root=root, config=config, shared=shared, values=values)
 
 
@@ -157,6 +171,135 @@ def test_prevalidates_both_stages_then_uami_login_apply_and_verified_readiness(p
     assert (prepared.shared / "sentinel").read_text() == "operator login"
 
 
+@pytest.mark.parametrize("metadata,expected", [
+    (identity_metadata(IDENTITY), IDENTITY),
+    (identity_metadata(IDENTITY, system=True), IDENTITY),
+    (identity_metadata(system=True), "system"),
+    (json.dumps({"type": "SystemAssigned", "userAssignedIdentities": None}), "system"),
+])
+@pytest.mark.parametrize("selection", ["", None])
+def test_automatic_identity_uses_attached_vm_metadata(portal, prepared, metadata, expected, selection):
+    prepared.env["AIF_VM_IDENTITY"] = metadata
+    prepared.env["AIF_IDENTITY_CLIENT_ID"] = selection
+    if selection is None:
+        prepared.env.pop("AIF_IDENTITY_CLIENT_ID")
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 0
+    login = harness.commands[0]
+    assert login[:3] == ["az", "login", "--identity"]
+    if expected == "system":
+        assert "--client-id" not in login
+    else:
+        assert login[3:5] == ["--client-id", expected]
+
+
+@pytest.mark.parametrize("selection,metadata", [
+    (IDENTITY, identity_metadata(IDENTITY, OTHER_IDENTITY, system=True)),
+    ("system", identity_metadata(system=True)),
+    ("system", identity_metadata(IDENTITY, OTHER_IDENTITY, system=True)),
+])
+def test_explicit_identity_selects_an_attached_identity(portal, prepared, selection, metadata):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": selection, "AIF_VM_IDENTITY": metadata})
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 0
+    assert ("--client-id" in harness.commands[0]) is (selection != "system")
+    if selection != "system":
+        assert selection in harness.commands[0]
+
+
+@pytest.mark.parametrize("metadata", [
+    identity_metadata(IDENTITY, OTHER_IDENTITY),
+    identity_metadata(IDENTITY, OTHER_IDENTITY, system=True),
+])
+def test_automatic_identity_rejects_multiple_user_identities_before_login(portal, prepared, metadata, capsys):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": "", "AIF_VM_IDENTITY": metadata})
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    error = capsys.readouterr().err.lower()
+    assert "multiple" in error and "client id" in error
+
+
+@pytest.mark.parametrize("metadata", ["", "null", "{}", identity_metadata()])
+@pytest.mark.parametrize("selection", ["", IDENTITY, "system"])
+def test_vm_without_identity_never_uses_unverified_explicit_identity(portal, prepared, metadata, selection, capsys):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": selection, "AIF_VM_IDENTITY": metadata})
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    assert "identity" in capsys.readouterr().err.lower()
+
+
+@pytest.mark.parametrize("selection", ["", "system"])
+def test_identity_without_metadata_requires_legacy_explicit_client_id(portal, prepared, selection, capsys):
+    prepared.env["AIF_IDENTITY_CLIENT_ID"] = selection
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    assert "metadata" in capsys.readouterr().err.lower()
+
+
+@pytest.mark.parametrize("selection,metadata", [
+    (OTHER_IDENTITY, identity_metadata(IDENTITY, system=True)),
+    (IDENTITY, identity_metadata(system=True)),
+    ("system", identity_metadata(IDENTITY)),
+])
+def test_explicit_identity_must_be_attached_before_login(portal, prepared, selection, metadata, capsys):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": selection, "AIF_VM_IDENTITY": metadata})
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    assert "attached" in capsys.readouterr().err.lower()
+
+
+@pytest.mark.parametrize("metadata", [
+    "not-json", "[]", "false", '{"type": []}',
+    '{"type": "UserAssigned", "userAssignedIdentities": []}',
+    '{"type": "UserAssigned", "userAssignedIdentities": {"resource-id": {}}}',
+    '{"type": "UserAssigned", "userAssignedIdentities": {"resource-id": null}}',
+    identity_metadata("not-a-uuid"),
+    identity_metadata("00000000-0000-0000-0000-000000000000"),
+])
+def test_invalid_identity_metadata_fails_closed_before_login(portal, prepared, metadata, capsys):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": "", "AIF_VM_IDENTITY": metadata})
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    assert "metadata" in capsys.readouterr().err.lower()
+
+
+@pytest.mark.parametrize("selection", ["", None])
+def test_automatic_subscription_comes_from_selected_project_configuration(portal, prepared, selection):
+    prepared.env["AIF_SUBSCRIPTION_ID"] = selection
+    if selection is None:
+        prepared.env.pop("AIF_SUBSCRIPTION_ID")
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 0
+    assert harness.commands[1][1:5] == ["account", "set", "--subscription", SUB]
+    assert all(ctx["AIF_SUBSCRIPTION_ID"] == SUB for ctx in harness.contexts)
+
+
+@pytest.mark.parametrize("subscription", ["", "invalid", "00000000-0000-0000-0000-000000000000"])
+def test_automatic_subscription_requires_nonzero_project_uuid(portal, prepared, subscription, capsys):
+    prepared.env["AIF_SUBSCRIPTION_ID"] = ""
+    prepared.values["dev_sub_id"] = subscription
+    prepared.config.write_text(json.dumps({"dev": prepared.values}))
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    error = capsys.readouterr().err
+    assert "dev_sub_id" in error and "nonzero UUID" in error
+
+
+def test_automatic_subscription_still_requires_matching_portal_tenant(portal, prepared):
+    prepared.env["AIF_SUBSCRIPTION_ID"] = ""
+    prepared.values["tenantId"] = IDENTITY
+    prepared.config.write_text(json.dumps({"dev": prepared.values}))
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+
+
 @pytest.mark.parametrize("name,value", [
     ("AIF_PROJECT_NUMBER", "000"), ("AIF_PROJECT_NUMBER", "1"),
     ("AIF_PROJECT_NUMBER", "012;echo bad"), ("AIF_IDENTITY_CLIENT_ID", "not-a-uuid"),
@@ -169,6 +312,20 @@ def test_invalid_input_fails_before_login(portal, prepared, name, value):
     harness = Harness()
     assert harness.invoke(portal, prepared) == 2
     assert not harness.commands
+
+
+@pytest.mark.parametrize("name,label", [
+    ("AIF_CONSUMER_ROOT", "Factory project folder on VM"),
+    ("AIF_PYTHON", "Prepared Python on VM"),
+])
+@pytest.mark.parametrize("value", ["", "relative"])
+def test_path_errors_use_portal_field_labels(portal, prepared, name, label, value, capsys):
+    prepared.env[name] = value
+    harness = Harness()
+    assert harness.invoke(portal, prepared) == 2
+    assert not harness.commands
+    error = capsys.readouterr().err
+    assert label in error and name not in error
 
 
 @pytest.mark.parametrize("key,value", [("dev_sub_id", IDENTITY), ("tenantId", IDENTITY),
@@ -343,6 +500,7 @@ def test_wrong_authenticated_account_never_deploys(portal, prepared, field):
 
 
 @pytest.mark.parametrize("stage", ["chat", "voice"])
+@pytest.mark.parametrize("automatic_subscription", [False, True])
 @pytest.mark.parametrize("field,value", [
     ("dev_test_prod_sub_id", IDENTITY), ("tenantId", IDENTITY),
     ("project_number_000", "013"), ("dev_test_prod", "prod"),
@@ -350,9 +508,11 @@ def test_wrong_authenticated_account_never_deploys(portal, prepared, field):
     ("aifactoryAgentContainerAppsEnvironment", "other-environment"),
 ])
 def test_config_change_after_validation_is_rejected_before_affected_stage_mutates(
-        portal, prepared, monkeypatch, stage, field, value):
+        portal, prepared, monkeypatch, stage, field, value, automatic_subscription):
     harness = Harness()
-    _, _, validated = portal.inputs(prepared.env)
+    if automatic_subscription:
+        prepared.env["AIF_SUBSCRIPTION_ID"] = ""
+    _, _, validated = portal.inputs(dict(prepared.env))
     def changed_main(args, *, chat_runner, voice_runner):
         command = SimpleNamespace(command="apply", apply=True, skip_knowledge=False)
         current = {**os.environ, **validated}
@@ -420,6 +580,18 @@ def test_failed_login_preserves_shared_session_and_never_falls_back(portal, prep
     harness.fail_command = ["login", "--identity"]
     assert harness.invoke(portal, prepared) == 1
     assert len(harness.commands) == 1
+    assert (prepared.shared / "sentinel").read_text() == "operator login"
+    assert all(not Path(ctx["AZURE_CONFIG_DIR"]).exists() for ctx in harness.contexts)
+
+
+@pytest.mark.parametrize("metadata", [identity_metadata(system=True), identity_metadata(IDENTITY, system=True)])
+def test_failed_automatic_identity_login_never_falls_back(portal, prepared, metadata):
+    prepared.env.update({"AIF_IDENTITY_CLIENT_ID": "", "AIF_VM_IDENTITY": metadata, "AIF_SUBSCRIPTION_ID": ""})
+    harness = Harness()
+    harness.fail_command = ["login", "--identity"]
+    assert harness.invoke(portal, prepared) == 1
+    assert len(harness.commands) == 1
+    assert "chat:apply" not in harness.events
     assert (prepared.shared / "sentinel").read_text() == "operator login"
     assert all(not Path(ctx["AZURE_CONFIG_DIR"]).exists() for ctx in harness.contexts)
 
@@ -492,26 +664,70 @@ def test_readiness_does_not_retry_an_unknown_response_contract(portal):
                           sleep=lambda _: pytest.fail("unexpected retry"))
 
 
-def test_thin_bash_adapter_preserves_literal_environment_and_error_exit(tmp_path):
+@pytest.fixture
+def bash_executable():
     bash = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin/bash.exe"
     executable = str(bash) if bash.is_file() else shutil.which("bash")
     if not executable:
         pytest.skip("bash unavailable")
+    return executable
+
+
+def bash_path(path):
+    text = path.resolve().as_posix()
+    return "/" + text[0].lower() + text[2:] if len(text) > 1 and text[1] == ":" else text
+
+
+@pytest.mark.parametrize("automatic_python", [False, True])
+def test_thin_bash_adapter_preserves_literal_environment_and_error_exit(tmp_path, bash_executable, automatic_python):
     assert SCRIPT.is_file()
+    assert b"\r" not in SCRIPT.read_bytes()
     root = tmp_path / "consumer with spaces;literal"
     adapter = root / "azure-enterprise-scale-ml/bootstrap/lib/agent_chat_portal.py"
     adapter.parent.mkdir(parents=True)
     adapter.write_text("# fake adapter")
-    fake_python = tmp_path / "prepared python"
-    fake_python.write_text('#!/bin/bash\nprintf "%s\\n" "$@" "$AIF_RUN_ID"\nexit 23\n', encoding="utf-8")
+    fake_python = root / ".venv-agent-operator/bin/python" if automatic_python else tmp_path / "prepared python"
+    fake_python.parent.mkdir(parents=True, exist_ok=True)
+    fake_python.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$@" "$AIF_RUN_ID" "$AIF_CONSUMER_ROOT" "$AIF_PYTHON"\nexit 23\n',
+        encoding="utf-8", newline="\n",
+    )
     fake_python.chmod(0o755)
-    def linux(path):
-        text = path.resolve().as_posix()
-        return "/" + text[0].lower() + text[2:] if len(text) > 1 and text[1] == ":" else text
-    env = {**os.environ, "AIF_PYTHON": linux(fake_python), "AIF_CONSUMER_ROOT": linux(root),
+    env = {**os.environ, "AIF_PYTHON": "" if automatic_python else bash_path(fake_python),
+           "AIF_CONSUMER_ROOT": bash_path(root),
            "AIF_RUN_ID": "literal;$(touch should-not-exist)"}
-    result = subprocess.run([executable, linux(SCRIPT)], env=env, text=True, capture_output=True, cwd=tmp_path)
+    result = subprocess.run([bash_executable, bash_path(SCRIPT)], env=env, text=True, capture_output=True, cwd=tmp_path)
     assert result.returncode == 23, result.stderr
     assert "-B" in result.stdout
     assert "literal;$(touch should-not-exist)" in result.stdout
+    assert bash_path(fake_python) in result.stdout
+    assert bash_path(root) in result.stdout
     assert not (tmp_path / "should-not-exist").exists()
+
+
+def test_bash_missing_automatic_factory_folder_gives_actionable_error(tmp_path, bash_executable):
+    exists = subprocess.run([bash_executable, "-c", "[[ -d /opt/esaf/consumer ]]"], cwd=tmp_path)
+    if exists.returncode == 0:
+        pytest.skip("This operator machine already has the standard prepared checkout.")
+    env = {**os.environ, "AIF_CONSUMER_ROOT": "", "AIF_PYTHON": ""}
+    result = subprocess.run([bash_executable, bash_path(SCRIPT)], env=env, text=True, capture_output=True, cwd=tmp_path)
+    assert result.returncode == 2
+    assert "Factory project folder on VM" in result.stderr
+    assert "/opt/esaf/consumer" in result.stderr
+    assert "standard" in result.stderr.lower() and "advanced" in result.stderr.lower()
+    assert "AIF_CONSUMER_ROOT" not in result.stderr
+
+
+@pytest.mark.parametrize("automatic_python", [False, True])
+def test_bash_missing_prepared_python_never_falls_back(tmp_path, bash_executable, automatic_python):
+    root = tmp_path / "consumer"
+    root.mkdir()
+    env = {**os.environ, "AIF_CONSUMER_ROOT": bash_path(root),
+           "AIF_PYTHON": "" if automatic_python else bash_path(tmp_path / "missing-python")}
+    result = subprocess.run([bash_executable, bash_path(SCRIPT)], env=env, text=True, capture_output=True, cwd=tmp_path)
+    assert result.returncode == 2
+    assert "Prepared Python on VM" in result.stderr
+    assert "AIF_PYTHON" not in result.stderr
+    if automatic_python:
+        assert bash_path(root / ".venv-agent-operator/bin/python") in result.stderr
+        assert "standard" in result.stderr.lower() and "advanced" in result.stderr.lower()
