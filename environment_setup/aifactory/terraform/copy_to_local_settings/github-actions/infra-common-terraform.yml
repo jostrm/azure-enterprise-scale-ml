@@ -340,10 +340,8 @@ jobs:
           # One state per factory and environment: subscription, common resource group (13-rgLevel
           # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
           # still gives each environment its own state.
-          common_rg="${commonResourceGroup_param:-}"
-          if [ -z "$common_rg" ]; then
-            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
-          fi
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
           backend=(
             -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
@@ -360,6 +358,7 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
           # "existing": that would plan its destroy.
@@ -375,15 +374,22 @@ jobs:
           export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          # Bicep parity (create-or-update): resources of this factory that already exist, such as the common resource
+          # group, VNet, subnets and own hub the bootstrap created, are adopted with import blocks and updated in place
+          # (aif-tf-adopt.sh, at most AIF_TF_ADOPT_ROUNDS rounds, only ids in this subscription and these resource
+          # groups); a saved plan that would delete or replace an adopted resource is refused before apply.
           aif_tf_plan_apply() {
             rm -f "$TF_ROOT/tfplan"
             terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
+            aif_tf_check_plan "$TF_ROOT" tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
-          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
+          trap 'rm -f "$TF_ROOT/tfplan" "$TF_ROOT/aif_adopted_imports.tf"' EXIT
           aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
             --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
-            --label "terraform_plan_apply" -- aif_tf_plan_apply
+            --label "terraform_plan_apply" -- aif_tf_adopt --root "$TF_ROOT" --subscription "$ARM_SUBSCRIPTION_ID" \
+            --resource-group "$common_rg" --resource-group "${vnetResourceGroup_param:-}" -- aif_tf_plan_apply
 
       - name: Reconcile common persona access (mandatory)
         shell: bash
@@ -702,10 +708,8 @@ jobs:
           # One state per factory and environment: subscription, common resource group (13-rgLevel
           # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
           # still gives each environment its own state.
-          common_rg="${commonResourceGroup_param:-}"
-          if [ -z "$common_rg" ]; then
-            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
-          fi
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
           backend=(
             -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
@@ -722,6 +726,7 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
           # "existing": that would plan its destroy.
@@ -737,15 +742,22 @@ jobs:
           export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          # Bicep parity (create-or-update): resources of this factory that already exist, such as the common resource
+          # group, VNet, subnets and own hub the bootstrap created, are adopted with import blocks and updated in place
+          # (aif-tf-adopt.sh, at most AIF_TF_ADOPT_ROUNDS rounds, only ids in this subscription and these resource
+          # groups); a saved plan that would delete or replace an adopted resource is refused before apply.
           aif_tf_plan_apply() {
             rm -f "$TF_ROOT/tfplan"
             terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
+            aif_tf_check_plan "$TF_ROOT" tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
-          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
+          trap 'rm -f "$TF_ROOT/tfplan" "$TF_ROOT/aif_adopted_imports.tf"' EXIT
           aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
             --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
-            --label "terraform_plan_apply" -- aif_tf_plan_apply
+            --label "terraform_plan_apply" -- aif_tf_adopt --root "$TF_ROOT" --subscription "$ARM_SUBSCRIPTION_ID" \
+            --resource-group "$common_rg" --resource-group "${vnetResourceGroup_param:-}" -- aif_tf_plan_apply
 
       - name: Reconcile common persona access (mandatory)
         shell: bash
@@ -1066,10 +1078,8 @@ jobs:
           # One state per factory and environment: subscription, common resource group (13-rgLevel
           # commonResourceGroupName) and environment, so a commonResourceGroup_param shared by all environments
           # still gives each environment its own state.
-          common_rg="${commonResourceGroup_param:-}"
-          if [ -z "$common_rg" ]; then
-            common_rg="${admin_aifactoryPrefixRG:-}${vnetResourceGroupBase:-esml-common}-${admin_locationSuffix:-}-${{ env.dev_test_prod }}${admin_aifactorySuffixRG:-}"
-          fi
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
           backend=(
             -backend-config="subscription_id=${TFSTATE_SUBSCRIPTION_ID:-$ARM_SUBSCRIPTION_ID}"
             -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP"
@@ -1086,6 +1096,7 @@ jobs:
         run: |
           set -euo pipefail
           source azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/modules/aif-retry.sh
+          source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh
           # An existing admin VM is never PUT again (Gen1 DSVM cannot switch image in place): read-only detection.
           # A VM this state already manages stays managed (its lifecycle ignores changes), so it is never counted as
           # "existing": that would plan its destroy.
@@ -1101,15 +1112,22 @@ jobs:
           export TF_VAR_admin_password
           # Idempotent: every attempt plans again from the refreshed state, then applies exactly that plan.
           # A run cancelled mid-apply leaves its lease: -lock-timeout waits for a run that is still active.
+          # Bicep parity (create-or-update): resources of this factory that already exist, such as the common resource
+          # group, VNet, subnets and own hub the bootstrap created, are adopted with import blocks and updated in place
+          # (aif-tf-adopt.sh, at most AIF_TF_ADOPT_ROUNDS rounds, only ids in this subscription and these resource
+          # groups); a saved plan that would delete or replace an adopted resource is refused before apply.
           aif_tf_plan_apply() {
             rm -f "$TF_ROOT/tfplan"
             terraform -chdir="$TF_ROOT" plan -input=false -no-color -lock-timeout=20m -out=tfplan || return $?
+            aif_tf_check_plan "$TF_ROOT" tfplan || return $?
             terraform -chdir="$TF_ROOT" apply -input=false -no-color -lock-timeout=20m tfplan
           }
-          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"
+          trap 'rm -f "$TF_ROOT/tfplan" "$TF_ROOT/aif_adopted_imports.tf"' EXIT
           aif_retry --attempts "${AIF_DEPLOY_RETRY_ATTEMPTS:-4}" --base-delay "${AIF_DEPLOY_RETRY_BASE_DELAY:-30}" \
             --max-delay "${AIF_DEPLOY_RETRY_MAX_DELAY:-300}" --also 'context deadline exceeded|RetryableError|Code="?Conflict' \
-            --label "terraform_plan_apply" -- aif_tf_plan_apply
+            --label "terraform_plan_apply" -- aif_tf_adopt --root "$TF_ROOT" --subscription "$ARM_SUBSCRIPTION_ID" \
+            --resource-group "$common_rg" --resource-group "${vnetResourceGroup_param:-}" -- aif_tf_plan_apply
 
       - name: Reconcile common persona access (mandatory)
         shell: bash

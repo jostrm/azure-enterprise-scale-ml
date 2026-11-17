@@ -146,10 +146,17 @@ set and environment, also when `commonResourceGroup_param` is the same for every
 
 ## Differences from the Bicep deployment
 
-* **Existing factories.** Terraform manages only what its state holds. A factory first deployed with Bicep has to
-  be imported (`terraform import`, or `import` blocks) before Terraform takes it over. Otherwise the first apply
-  fails on resources that already exist. This slice targets new factories. Import support is a candidate for
-  slice 2.
+* **Existing resources (adopt, then update in place).** Bicep PUTs a resource that exists; Terraform refuses
+  to create it ("already exists - ... needs to be imported into the State"). The Registered Full bootstrap
+  creates the common resource group, VNet, subnets, NSGs and own hub before the common workflow runs, so each
+  job of `infra-common-terraform.yml` runs plan-and-apply inside `tools/aif-tf-adopt.sh`: after a failed apply,
+  `tools/tf_adopt.py` writes an `import` block (`aif_adopted_imports.tf`, on the runner only) for every such
+  resource and the job plans and applies again, at most `AIF_TF_ADOPT_ROUNDS` rounds (default 10). Only ids in
+  the target subscription and the common resource group (and `vnetResourceGroup_param` when set) are adopted;
+  any other id stops the run without importing. A plan that would delete or replace an adopted resource is
+  refused before apply. A factory first deployed fully with Bicep is adopted the same way, round by round.
+  With the bootstrap's preserve-v1 profile the common configuration has `runNetworkingVar=false`, so stage 12 is
+  skipped as in the Bicep workflow and the VNet is only read.
 * **Removal.** Bicep `if` and `for` never delete. In Terraform, a setting that turns a module off destroys what it
   had created. Plans are printed before apply: read them.
 * **Admin VM.** As in the Bicep, an existing VM is never PUT again (`admin_vm_exists`). A VM this state created

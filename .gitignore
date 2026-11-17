@@ -152,4 +152,6 @@ documentation/gh-io/site/
 *.tfstate
 *.tfstate.*
 *.tfplan
+# import blocks tools/tf_adopt.py writes on the runner (adopted existing resources)
+aif_adopted_imports.tf
 crash.log

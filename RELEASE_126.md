@@ -372,6 +372,12 @@ Added on top of the compaction. It is the first Terraform slice of the AI Factor
 * **Still Bicep only.** Projects (`esml-genai-1`, the next slice), the AI gateway, Kong, FinOps, policies and
   dashboards. A factory deployed with Bicep must be imported before Terraform manages it.
 
+* **Adopt existing resources (2026-11-17).** `infra-common-terraform.yml` no longer fails when the bootstrap
+  already created the common resource group (aif-164: "already exists - ... needs to be imported into the
+  State"). Each job runs plan-and-apply in `terraform/tools/aif-tf-adopt.sh`, which adopts such resources with
+  `import` blocks (only in the target subscription and this factory's common resource group), plans and applies
+  again (at most 10 rounds), and refuses a plan that would delete or replace an adopted resource.
+
 * **The `iac` switch (2026-11-17).** `variables.json` has `"iac": "bicep"` (default) or `"terraform"`, plus the
   state keys `tfstateResourceGroup`, `tfstateStorageAccount`, `tfstateContainer` and `tfstateSubscriptionId`.
   The SDK (`esaf.init_factory(..., iac=...)`, `esaf.add_scale_set(..., iac=...)`) and the CLI (`--iac`) pass it on

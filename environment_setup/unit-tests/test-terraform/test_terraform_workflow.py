@@ -85,6 +85,29 @@ def test_terraform_is_pinned_authenticated_with_oidc_and_planned_before_apply_wi
         assert apply.index("admin-vm-exists.sh") < apply.index("aif_tf_plan_apply()")
 
 
+def test_every_job_adopts_existing_resources_of_this_factory_and_guards_the_plan():
+    """aif-164 (2026-11-17): the bootstrap had created the common resource group; terraform apply refused it
+    ("already exists - ... needs to be imported"). Each job runs plan-and-apply inside the shared adoption loop
+    (terraform/tools/aif-tf-adopt.sh, test_terraform_adopt.py), scoped to this run's subscription and common
+    resource group, and checks the saved plan between plan and apply, under the same retry wrapper."""
+    for name, job in load(TERRAFORM_WORKFLOW)["jobs"].items():
+        apply = steps(job)["01-03 terraform plan and apply (11-rgCommon, 12-networkCommon, 13-rgLevel)"]["run"]
+        assert "source azure-enterprise-scale-ml/environment_setup/aifactory/terraform/tools/aif-tf-adopt.sh" in apply
+        plan_at, check_at, apply_at = (apply.index(" plan -input=false"), apply.index("aif_tf_check_plan "),
+                                       apply.index(" apply -input=false"))
+        assert plan_at < check_at < apply_at, name
+        assert 'aif_tf_check_plan "$TF_ROOT" tfplan || return $?' in apply, "a refused plan is never applied"
+        assert 'common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"' in apply
+        loop = apply[apply.index("aif_retry --attempts"):]
+        assert ('-- aif_tf_adopt --root "$TF_ROOT" --subscription "$ARM_SUBSCRIPTION_ID" '
+                '--resource-group "$common_rg" --resource-group "${vnetResourceGroup_param:-}" -- aif_tf_plan_apply'
+                in " ".join(loop.replace("\\\n", " ").split())), name
+        assert 'rm -f "$TF_ROOT/tfplan" "$TF_ROOT/aif_adopted_imports.tf"' in apply, "generated imports never linger"
+        init = steps(job)["Terraform init (remote state)"]["run"]
+        assert 'common_rg="$(aif_tf_common_resource_group "${{ env.dev_test_prod }}")"' in init, \
+            "the state key and the adoption scope name the same common resource group"
+
+
 def test_the_admin_vm_state_address_the_workflow_checks_exists():
     """The workflow keeps a VM this state manages (never `admin_vm_exists=true` for it); the address it looks for
     must be the real one, or the VM would be planned for destroy on the next run."""
