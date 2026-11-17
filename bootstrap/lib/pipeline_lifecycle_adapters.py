@@ -174,6 +174,25 @@ def _selected_binding(snapshot, scale):
     return effective, target
 
 
+def published_consumer_commit(cloud, route):
+    """Exact published consumer commit. A private ADO consumer is read with the provider
+    credential (the job checkout persists no git credential); GitHub keeps git ls-remote."""
+    if route["kind"] == "ado":
+        org, project, _, repository = unquote(urlsplit(route["repository"]).path).strip("/").split("/")
+        require(route["ref"].startswith("refs/heads/"), "exact-published-consumer-ref-required")
+        url = ("https://dev.azure.com/" + quote(org) + "/" + quote(project) + "/_apis/git/repositories/"
+               + quote(repository) + "/refs?filter=" + quote(route["ref"].removeprefix("refs/"), safe="")
+               + "&api-version=7.1")
+        _, _, page = cloud.state_request("ado", "GET", url, None, (200,))
+        rows = [row for row in (page or {}).get("value", []) if isinstance(row, dict) and row.get("name") == route["ref"]]
+        remote = [rows[0].get("objectId"), route["ref"]] if len(rows) == 1 else []
+    else:
+        remote = cloud.command(["git", "ls-remote", "--exit-code", route["repository"], route["ref"]]).split()
+    require(len(remote) == 2 and remote[1] == route["ref"] and isinstance(remote[0], str)
+            and re.fullmatch(r"[a-f0-9]{40}", remote[0]), "exact-published-consumer-ref-required")
+    return remote[0]
+
+
 def operation_identity(cloud, scale):
     raw = json.loads(cloud.command(["az", "account", "get-access-token", "--resource", fl.ARM,
                                     "--subscription", scale["subscription_id"], "--output", "json"]))
@@ -282,10 +301,7 @@ class NativePlanner:
             document["identity"]["object_id"] = oid
             cloud.document, cloud.expected_object_id = document, oid
             cloud.verify_identity()
-            remote = cloud.command(["git", "ls-remote", "--exit-code", route["repository"], route["ref"]]).split()
-            require(len(remote) == 2 and remote[1] == route["ref"] and re.fullmatch(r"[a-f0-9]{40}", remote[0]),
-                    "exact-published-consumer-ref-required")
-            route["commit"] = remote[0]
+            route["commit"] = published_consumer_commit(cloud, route)
             require(origin.get("commit") == route["commit"], "provider-consumer-commit-mismatch")
             if route["kind"] == "gha":
                 actor = json.loads(cloud.command(["gh", "api", "user", "--hostname", "github.com", "--method", "GET"]))

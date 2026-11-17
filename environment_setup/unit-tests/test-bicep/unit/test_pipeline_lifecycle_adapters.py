@@ -365,3 +365,35 @@ def test_native_nested_binding_schema_is_not_bypassed(adapters):
     data["binding"]["targets"][0]["script"] = "run-anything.sh"
     with pytest.raises(ValueError, match="binding"):
         adapters.selected_binding(data, data["scales"][0])
+
+
+def test_private_ado_consumer_ref_is_read_with_provider_credentials_not_anonymous_git(adapters):
+    """Live 2026-11-17: git ls-remote of the private ADO consumer failed (no git credential) after enrollment."""
+    route = {"kind": "ado", "ref": "refs/heads/main",
+             "repository": "https://dev.azure.com/org/Project One/_git/consumer repo"}
+    cloud = Mock()
+    cloud.command.side_effect = AssertionError("anonymous git must not be used for a private ADO consumer")
+    cloud.state_request.return_value = (200, {}, {"count": 2, "value": [
+        {"name": "refs/heads/main-old", "objectId": "c" * 40}, {"name": "refs/heads/main", "objectId": "b" * 40}]})
+    assert adapters.published_consumer_commit(cloud, route) == "b" * 40
+    cloud.state_request.assert_called_once_with(
+        "ado", "GET", "https://dev.azure.com/org/Project%20One/_apis/git/repositories/consumer%20repo"
+        "/refs?filter=heads%2Fmain&api-version=7.1", None, (200,))
+
+
+def test_github_consumer_ref_still_uses_exact_git_ls_remote(adapters):
+    route = {"kind": "gha", "ref": "refs/heads/main", "repository": "https://github.com/org/consumer"}
+    cloud = Mock()
+    cloud.command.return_value = "b" * 40 + "\trefs/heads/main"
+    assert adapters.published_consumer_commit(cloud, route) == "b" * 40
+    cloud.command.assert_called_once_with(["git", "ls-remote", "--exit-code", route["repository"], route["ref"]])
+    cloud.state_request.assert_not_called()
+
+
+def test_missing_ado_consumer_ref_is_refused(adapters):
+    route = {"kind": "ado", "ref": "refs/heads/main", "repository": "https://dev.azure.com/org/p/_git/r"}
+    cloud = Mock()
+    cloud.state_request.return_value = (200, {}, {"count": 1, "value": [{"name": "refs/heads/main2", "objectId": "c" * 40}]})
+    with pytest.raises(Exception) as raised:
+        adapters.published_consumer_commit(cloud, route)
+    assert "exact-published-consumer-ref-required" in str(raised.value.args)

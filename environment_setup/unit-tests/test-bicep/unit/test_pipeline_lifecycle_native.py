@@ -439,6 +439,11 @@ def production_fixture(monkeypatch, scenario, network_group, provider="ado"):
             self.compilations = []
             self.arm_writes = []
 
+        def state_request(self, kind, method, endpoint, body, allowed):
+            # The private ADO consumer ref is read with the provider credential, never anonymous git.
+            assert kind == "ado" and method == "GET" and "/refs?filter=heads%2Fmain&" in endpoint
+            return 200, {}, {"count": 1, "value": [{"name": "refs/heads/main", "objectId": "b" * 40}]}
+
         def command(self, argv, **kwargs):
             if argv[:2] == ["git", "ls-remote"]:
                 return "b" * 40 + "\trefs/heads/main"
@@ -672,6 +677,8 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
             body = {"value": [{"name": "factory", "authorization": {"scheme": "WorkloadIdentityFederation",
                      "parameters": {"tenantid": data_snapshot["scales"][0]["tenant_id"]}},
                      "data": {"subscriptionId": data_snapshot["scales"][0]["subscription_id"]}}]}
+        elif method == "GET" and path.startswith("/git/repositories/repo/refs?filter=heads%2Fmain&"):
+            body = {"count": 1, "value": [{"name": "refs/heads/main", "objectId": "b" * 40}]}
         elif method == "GET" and path.startswith("/git/repositories/repo/items?"):
             body = {"content": source_template}
         elif method == "GET" and path.startswith("/build/definitions?"):
