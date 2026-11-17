@@ -1227,6 +1227,7 @@ class Cloud:
 
     def command(self, argv, cwd=None, data=None):
         command = list(argv)
+        label = command_label(command)
         if command[0] == "git":
             executable = shutil.which("git")
             if not executable and sys.platform == "win32":
@@ -1252,6 +1253,10 @@ class Cloud:
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=LOCAL_COMMAND_TIMEOUT_SECONDS)
         except (OSError, subprocess.SubprocessError):
             raise Blocked("command-unavailable-or-timed-out") from None
+        if result.returncode != 0:
+            # The error code stays generic; the operator log names the command and a sanitized stderr tail.
+            print(json.dumps({"event": "command-failed", "command": label, "returncode": result.returncode,
+                              "stderr": sanitized_stderr(result.stderr)}, sort_keys=True), file=sys.stderr, flush=True)
         require(result.returncode == 0, "command-failed")
         require(len(result.stdout.encode("utf-8")) <= MAX_DOCUMENT, "command-response-too-large")
         return result.stdout.strip()
@@ -1670,6 +1675,33 @@ class Cloud:
         template = json.loads(self.command(["az", "bicep", "build", "--file", str(path), "--stdout"], cwd=str(source_root)))
         require(isinstance(template, dict) and isinstance(template.get("parameters"), dict), "invalid-compiled-template")
         return template
+
+
+def command_label(argv):
+    """Executable plus its first two verbs; option values (e.g. git -c key=value) never appear."""
+    words, skip = [str(argv[0])], False
+    for token in argv[1:]:
+        if skip:
+            skip = False
+        elif token == "-c":
+            skip = True
+        elif not str(token).startswith("-") and len(words) < 3:
+            words.append(str(token))
+    return " ".join(words)
+
+
+SECRET_PATTERNS = (
+    (re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*"), "<jwt>"),
+    (re.compile(r"(?i)(bearer|basic)\s+\S+"), r"\1 <redacted>"),
+    (re.compile(r"(https?://)[^/\s@]+@"), r"\1<redacted>@"),
+)
+
+
+def sanitized_stderr(text, limit=600):
+    value = " ".join(str(text or "").split())
+    for pattern, replacement in SECRET_PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value[-limit:]
 
 
 def resource_references(body, tolerant=False):

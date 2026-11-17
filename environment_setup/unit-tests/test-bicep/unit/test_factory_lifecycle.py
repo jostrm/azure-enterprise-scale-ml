@@ -3076,3 +3076,20 @@ def test_closure_walk_inventories_platform_managed_tables_from_their_list_withou
     changed.tables[0]["properties"]["plan"] = "Basic"
     assert fl.collect_resource_closure(changed, [GROUP])[0]["resources"] != closure["resources"]
     assert closure == fl.collect_resource_closure(WorkspaceTablesCloud(), [GROUP])[0]
+
+
+def test_failed_command_names_the_command_and_sanitized_stderr(capsys):
+    """Live 2026-11-17: Prepare showed only command-failed; the operator could not tell which command failed."""
+    jwt = "eyJ" + "a" * 20 + "." + "b" * 20 + "." + "c" * 20
+    result = SimpleNamespace(returncode=1, stdout="", stderr=(
+        "ERROR: AADSTS700016 token " + jwt + " for https://user:secret@dev.azure.com/org failed\n"))
+    cloud = fl.Cloud(manifest(), command_runner=lambda *args, **kwargs: result, opener=Mock())
+    with pytest.raises(fl.Blocked) as raised:
+        cloud.command(["az", "account", "get-access-token", "--resource", "https://management.azure.com",
+                       "--subscription", "s"])
+    assert raised.value.args[0] == "command-failed"
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    event = [item for item in events if item.get("event") == "command-failed"][0]
+    assert event["command"] == "az account get-access-token" and event["returncode"] == 1
+    assert "AADSTS700016" in event["stderr"]
+    assert jwt not in event["stderr"] and "secret" not in event["stderr"] and len(event["stderr"]) <= 600
