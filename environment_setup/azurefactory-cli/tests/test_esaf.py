@@ -168,3 +168,31 @@ def test_the_cli_runs_each_scenario_and_prints_the_job(monkeypatch, capsys):
     assert second[2] == {"folder": FOLDER, "approved": True, "scale_set": "003", "environment": "dev",
                          "cidr": "10.142.0.0/16"}
     assert cli.main(["esaf", "job", JOB]) == 0
+
+# The iac switch (Joakim, 2026-11-16): a key of the scale set's settings, passed on, checked by the Factory API.
+def test_iac_travels_as_a_scale_set_setting_and_is_left_out_by_default(api):
+    esaf.init_factory(creation_request={"factory": "f"}, scale_set_settings={"byoVnetName": "v"}, iac="terraform")
+    esaf.add_scale_set("002", "dev", iac="terraform")
+    esaf.add_scale_set("003", "dev", settings={"cidr": "x"})
+    bodies = [call[2] for call in api.calls if call[0] == "POST"]
+    assert bodies[0]["scale_set_settings"] == {"byoVnetName": "v", "iac": "terraform"}
+    assert bodies[1]["settings"] == {"iac": "terraform"}
+    assert bodies[2]["settings"] == {"cidr": "x"}
+
+
+def test_the_cli_passes_iac_and_offers_only_bicep_or_terraform(monkeypatch, capsys):
+    transport = Transport()
+    monkeypatch.setattr(cli, "AzureFactoryClient", lambda *args, **kwargs: transport)
+    monkeypatch.setenv("ESAF_FOLDER", FOLDER)
+    assert cli.main(["esaf", "add-scale-set", "002", "dev", "--iac", "terraform"]) == 0
+    assert posted(transport)[1]["settings"] == {"iac": "terraform"}
+    with pytest.raises(SystemExit):
+        cli.main(["esaf", "add-scale-set", "002", "dev", "--iac", "pulumi"])
+
+
+def test_variables_json_defaults_iac_to_bicep_with_empty_terraform_state_keys():
+    from pathlib import Path
+    dev = json.loads((Path(__file__).resolve().parents[2] / "aifactory" / "variables.json").read_text("utf-8-sig"))["dev"]
+    assert (dev["iac"], dev["tfstateResourceGroup"], dev["tfstateStorageAccount"], dev["tfstateContainer"],
+            dev["tfstateSubscriptionId"]) == ("bicep", "", "", "tfstate", "")
+

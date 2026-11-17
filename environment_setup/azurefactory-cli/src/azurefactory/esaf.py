@@ -150,9 +150,14 @@ def _submit(scenario: str, route: str, fields: dict, *, wait: bool, poll: float,
 
 
 # The six scenarios -------------------------------------------------------------------------------------------------
+def _with_iac(settings: dict | None, iac: str | None) -> dict | None:
+    """iac (bicep or terraform) is a scale-set setting; the Factory API checks it, the SDK only passes it on."""
+    return settings if iac is None else {**(settings or {}), "iac": iac}
+
+
 def init_factory(*, creation_request: dict | None = None, scale_set_settings: dict | None = None,
-                 project_settings: dict | None = None, retries: int | None = None, wait: bool = False,
-                 poll: float = 1, session: Session | None = None) -> EsafJob:
+                 project_settings: dict | None = None, iac: str | None = None, retries: int | None = None,
+                 wait: bool = False, poll: float = 1, session: Session | None = None) -> EsafJob:
     """Scenario 1: submit the connected folder's saved factory draft as one whole-workflow approval.
 
     creation_request (the creation API's full-bootstrap body) saves the factory and starts it in one call instead.
@@ -165,16 +170,21 @@ def init_factory(*, creation_request: dict | None = None, scale_set_settings: di
     byoVnetName. BYO subnets: also enableByoSubnets=True and the subnet names (subnetCommon, subnetProjGenAI, ...).
     The Factory API maps the three friendly names to the wizard's keys (vnetResourceGroup_param, vnetNameFull_param,
     BYO_subnets), which still work.
+
+    iac: "bicep" (the default) or "terraform", which deploys the factory common with infra-common-terraform.yml
+    (accelerator release/v1.26 or later, GitHub Actions, the tfstate* settings); projects stay Bicep until the
+    Terraform project slice ships. One IaC tool per factory.
     """
     return _submit("init_factory", "init-factory", {
-        "creation_request": creation_request, "scale_set_settings": scale_set_settings,
+        "creation_request": creation_request, "scale_set_settings": _with_iac(scale_set_settings, iac),
         "project_settings": project_settings, "retries": retries}, wait=wait, poll=poll, session=session)
 
 
 def add_scale_set(scale_set: str, environment: str, *, cidr: str | None = None, max_projects: int | None = None,
                   subscription_id: str | None = None, tenant_id: str | None = None, orchestrator: str | None = None,
-                  settings: dict | None = None, version_ref: str | None = None, retries: int | None = None,
-                  wait: bool = False, poll: float = 1, session: Session | None = None) -> EsafJob:
+                  settings: dict | None = None, iac: str | None = None, version_ref: str | None = None,
+                  retries: int | None = None, wait: bool = False, poll: float = 1,
+                  session: Session | None = None) -> EsafJob:
     """Scenario 2: register scale set <scale_set> in <environment> (if new), enroll it and deploy its common.
 
     cidr is the new scale set's VNet range; the pipeline computes the subnets (with BYOSubnet they already exist).
@@ -182,11 +192,12 @@ def add_scale_set(scale_set: str, environment: str, *, cidr: str | None = None, 
     settings (flat wizard keys, e.g. byoVnetResourcegroupName, byoVnetName, enableByoSubnets, the subnet names,
     byoASEv3, byoAseFullResourceId) are saved at scale-set scope before the deploy. The Factory API maps the three
     friendly BYO names to vnetResourceGroup_param, vnetNameFull_param and BYO_subnets, which still work.
+    iac ("bicep" or "terraform") defaults to the factory's own; the Factory API refuses a different one.
     """
     return _submit("add_scale_set", "add-scale-set", {
         "scale_set": scale_set, "environment": _environment(environment), "cidr": cidr,
         "max_projects": max_projects, "subscription_id": subscription_id, "tenant_id": tenant_id,
-        "orchestrator": orchestrator, "settings": settings, "version_ref": version_ref, "retries": retries},
+        "orchestrator": orchestrator, "settings": _with_iac(settings, iac), "version_ref": version_ref, "retries": retries},
         wait=wait, poll=poll, session=session)
 
 

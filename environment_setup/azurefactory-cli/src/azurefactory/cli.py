@@ -961,10 +961,12 @@ def add_esaf_commands(sub) -> None:
     created.add_argument("--request-json",
                          help="One JSON file with creation_request and, optionally, scale_set_settings and "
                               "project_settings; instead of the three separate files.")
+    created.add_argument("--iac", choices=IAC_CHOICES, help=IAC_HELP)
     added = scenario("add-scale-set", "Scenario 2: add (or resume) a scale set and deploy its common.", scale_set=True)
     added.add_argument("--cidr", help="The new scale set's VNet range; the pipeline computes the subnets.")
     added.add_argument("--max-projects", type=int)
     added.add_argument("--settings-json", help="Optional JSON file of scale-set settings (BYO VNet, subnets, ASE v3).")
+    added.add_argument("--iac", choices=IAC_CHOICES, help=IAC_HELP)
     upsert = scenario("upsert-project", "Scenario 3: add or update a project and deploy it.", project=True)
     upsert.add_argument("--scale-set", help="Only when the environment has more than one scale set.")
     upsert.add_argument("--settings-json", help="Optional JSON file of project settings to replace.")
@@ -988,6 +990,10 @@ def _esaf_session(args):
         raise ConfigError("Set ESAF_FOLDER or pass --folder (the azurefactory folder on the API host).")
     return esaf.Session(args.folder, client(args, default_timeout=POLL_TIMEOUT_SECONDS), getattr(args, "factory", None))
 
+
+IAC_CHOICES = ("bicep", "terraform")
+IAC_HELP = ("Infrastructure as code for the scale set's common: bicep (default) or terraform "
+            "(accelerator release/v1.26+, GitHub Actions, tfstate* settings). One tool per factory.")
 
 _ESAF_INIT_FILES = {"creation_request": "--creation-request-json", "scale_set_settings": "--scale-set-settings-json",
                     "project_settings": "--project-settings-json"}
@@ -1036,11 +1042,12 @@ def cmd_esaf(args):
     common = {"version_ref": args.version_ref, "retries": args.retries, "wait": args.wait, "session": session}
     route = args.esaf_route
     if route == "init-factory":
-        job = esaf.init_factory(**_esaf_init_request(args), retries=args.retries, wait=args.wait, session=session)
+        job = esaf.init_factory(**_esaf_init_request(args), iac=args.iac, retries=args.retries, wait=args.wait,
+                                session=session)
     elif route == "add-scale-set":
         settings = read_json_file(args.settings_json) if args.settings_json else None
         job = esaf.add_scale_set(args.scale_set, args.environment, cidr=args.cidr, max_projects=args.max_projects,
-                                 settings=settings, **common)
+                                 settings=settings, iac=args.iac, **common)
     elif route == "upsert-project":
         settings = read_json_file(args.settings_json) if args.settings_json else None
         job = esaf.upsert_project(args.project, args.environment, scale_set=args.scale_set, settings=settings, **common)
