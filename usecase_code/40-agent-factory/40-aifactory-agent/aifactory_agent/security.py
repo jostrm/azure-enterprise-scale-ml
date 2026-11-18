@@ -2,11 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Literal
 from uuid import UUID
 
 import jwt
 
 from .config import Scope, Settings
+
+
+def read_tool_permissions(name: str) -> tuple[str, ...]:
+    if name == "graph_query":
+        return ("graph.read",)
+    if name.startswith("knowledge_"):
+        return ("knowledge.read",)
+    return ("factory.read", "cost.read") if name.startswith("cost_") else ("factory.read",)
 
 
 class AuthenticationError(PermissionError):
@@ -24,6 +33,9 @@ class Principal:
     scopes: frozenset[str] = field(default_factory=frozenset)
     permissions: frozenset[str] = field(default_factory=frozenset)
     client_id: str | None = None
+    permission_ceiling: frozenset[str] | None = None
+    scope_ceiling: frozenset[str] | None = None
+    authorization_context: Literal["teams_meeting"] | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "tenant_id", str(UUID(str(self.tenant_id))))
@@ -32,9 +44,18 @@ class Principal:
         object.__setattr__(self, "permissions", frozenset(self.permissions))
         if self.client_id is not None:
             object.__setattr__(self, "client_id", str(UUID(str(self.client_id))))
+        for name in ("permission_ceiling", "scope_ceiling"):
+            if getattr(self, name) is not None:
+                object.__setattr__(self, name, frozenset(getattr(self, name)))
 
 
 def authorize(settings: Settings, principal: Principal, scope_key: str, permission: str) -> Scope:
+    if ((principal.permission_ceiling is not None and permission not in principal.permission_ceiling)
+            or (principal.scope_ceiling is not None and scope_key not in principal.scope_ceiling)):
+        raise PermissionError("The requesting channel does not permit this scope or operation.")
+    if principal.authorization_context == "teams_meeting":
+        from .teams_meeting_routes import assert_meeting_policy
+        assert_meeting_policy(settings, principal, scope_key, permission)
     scope = settings.scopes.get(scope_key)
     if scope is None or principal.tenant_id != str(scope.tenant_id):
         raise PermissionError("The caller is not authorized for this exact scope.")

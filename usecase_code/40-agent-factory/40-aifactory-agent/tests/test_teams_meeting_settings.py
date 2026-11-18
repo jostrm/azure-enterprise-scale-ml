@@ -1,0 +1,121 @@
+import pytest
+from pydantic import ValidationError
+
+from aifactory_agent.teams_meeting_settings import TeamsMeetingSettings, validate_meeting_url
+
+
+HOST = "22222222-2222-4222-8222-222222222222"
+LISTENER = "33333333-3333-4333-8333-333333333333"
+URL = "https://teams.microsoft.com/meet/1234567890123?p=approved-secret"
+
+
+def enabled_config(**changes):
+    return {
+        "enabled": True,
+        "acs_endpoint": "https://meeting-bridge.communication.azure.com",
+        "allowed_host_object_ids": [HOST],
+        "connect_origins": ["https://calling.example.com", "wss://calling.example.com"],
+        "policies": [{
+            "id": "review",
+            "scope_key": "project001-dev",
+            "meeting_url": URL,
+            "meeting_safe_knowledge": True,
+            "allowed_participant_object_ids": [HOST, LISTENER],
+        }],
+        **changes,
+    }
+
+
+def test_disabled_by_default_and_enabled_policy_is_explicit():
+    assert TeamsMeetingSettings().enabled is False
+    for missing in ("acs_endpoint", "allowed_host_object_ids", "policies", "connect_origins"):
+        config = enabled_config()
+        del config[missing]
+        with pytest.raises(ValidationError):
+            TeamsMeetingSettings.model_validate(config)
+    config = enabled_config()
+    config["policies"][0]["meeting_safe_knowledge"] = False
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(config)
+    assert TeamsMeetingSettings.model_validate(enabled_config()).max_session_seconds <= 3600
+
+
+@pytest.mark.parametrize("listeners", [
+    [], [LISTENER, LISTENER], ["00000000-0000-0000-0000-000000000000"],
+    ["not-an-object-id"], [f"{number:08x}-1111-4111-8111-111111111111" for number in range(33)],
+])
+def test_enabled_policy_requires_bounded_distinct_nonzero_listener_ids(listeners):
+    config = enabled_config()
+    config["policies"][0]["allowed_participant_object_ids"] = listeners
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(config)
+
+
+def test_listener_approval_is_required_and_preserved_as_uuid_values():
+    config = enabled_config()
+    settings = TeamsMeetingSettings.model_validate(config)
+    assert [str(value) for value in settings.policies[0].allowed_participant_object_ids] == [HOST, LISTENER]
+    del config["policies"][0]["allowed_participant_object_ids"]
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(config)
+
+
+@pytest.mark.parametrize("url", [
+    "http://teams.microsoft.com/meet/123",
+    "https://teams.microsoft.com.evil.example/meet/123",
+    "https://teams.microsoft.com@evil.example/meet/123",
+    "https://user@teams.microsoft.com/meet/123",
+    "https://teams.microsoft.com:444/meet/123",
+    "https://teams.microsoft.com/meet/123#fragment",
+    "https://teams.microsoft.com/../../meet/123",
+    "https://teams.microsoft.com/meet/123\n",
+    "https://teams.microsoft.com/l/channel/123",
+    "https://teams.live.com/meet/123",
+    "https://127.0.0.1/meet/123",
+])
+def test_rejects_non_meeting_and_ambiguous_urls(url):
+    with pytest.raises(ValueError):
+        validate_meeting_url(url)
+
+
+def test_accepts_exact_teams_meeting_links_without_fetching():
+    assert validate_meeting_url(URL) == URL
+    link = ("https://teams.microsoft.com/l/meetup-join/"
+            "19%3ameeting_abc123%40thread.v2/0?context=%7B%22Tid%22%3A%22tenant%22%7D")
+    assert validate_meeting_url(link) == link
+
+
+@pytest.mark.parametrize("endpoint", [
+    "https://evil.example", "https://x.communication.azure.com/path",
+    "https://x.communication.azure.com?secret=1", "http://x.communication.azure.com",
+])
+def test_acs_endpoint_cannot_be_used_as_an_arbitrary_fetch_target(endpoint):
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(enabled_config(acs_endpoint=endpoint))
+
+
+@pytest.mark.parametrize("origin", [
+    "https:", "wss:", "*", "https://*.skype.com", "https://teams.microsoft.com; script-src *",
+    "https://teams.microsoft.com:80", "https://teams.microsoft.com/path",
+    "https://user@teams.microsoft.com", "https://*.com", "https://teams.microsoft.com\n",
+    "https://teams.microsoft.com?query=1", "https://teams.microsoft.com#fragment",
+    "https://teams.microsoft.com?", "https://teams.microsoft.com#", "https://@teams.microsoft.com",
+    "https://teams.microsoft.com:", "https://teams.microsoft.com:444", "http://teams.microsoft.com",
+    "https://[::1]extra", "https://[fe80::1%25interface]",
+])
+def test_csp_cannot_be_broadened_or_injected_through_connection_origins(origin):
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(enabled_config(connect_origins=[origin]))
+
+
+def test_csp_origins_are_exact_operator_data_not_guessed_service_families():
+    settings = TeamsMeetingSettings.model_validate(enabled_config(connect_origins=[
+        "https://Calling.Custom-Deployment.example:443/", "wss://calling.custom-deployment.example",
+    ]))
+    assert settings.connect_origins == [
+        "https://calling.custom-deployment.example", "wss://calling.custom-deployment.example",
+    ]
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(enabled_config(connect_origins=[
+            "https://calling.example", "https://calling.example:443/",
+        ]))

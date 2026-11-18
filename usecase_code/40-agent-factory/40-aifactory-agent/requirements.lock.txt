@@ -4,6 +4,7 @@ anyio==4.15.1
 asgiref==3.12.1
 azure-ai-projects==2.7.0
 azure-common==1.1.28
+azure-communication-identity==1.5.0
 azure-core==1.41.0
 azure-core-tracing-opentelemetry==1.0.0b13
 azure-identity==1.26.0

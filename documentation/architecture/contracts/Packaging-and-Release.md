@@ -10,11 +10,13 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/readme.md
   - usecase_code/40-agent-factory/40-aifactory-agent/infra/voice-roles.bicep
   - usecase_code/40-agent-factory/40-aifactory-agent/infra/application.bicep
+  - usecase_code/40-agent-factory/40-aifactory-agent/infra/teams-meeting-acs.bicep
 tests:
   - environment_setup/azurefactory-cli/tests/test_enrollment_packaging.py
   - esml-v2/tests/test_esml_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_skill_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_packaging.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_application_revisions.py
 graph_symbols:
   - esml-v2/esml_build.py::function:_source
@@ -41,6 +43,16 @@ Live voice adds the pinned `websockets` wheel to the locked, offline-installable
 `infra/application.bicep` runs the agent Container App in `Single` revision mode: each deploy creates one new revision, which takes all traffic once ready, and the previous one is deactivated (kept for rollback, no replicas). Until 2026-10-27 it used `Multiple` mode with `minReplicas: 1`, so every earlier revision kept an idle replica running and billed; on project001 Dev 18 such revisions cost about $7 a day before they were deactivated.
 
 The SDK, Agent Factory operator and grounded application have different dependency/runtime requirements. Do not share environments based on similar directory names. Installed packages should be tested through their declared public surfaces, not accidental source-path imports.
+
+The attended Teams pilot adds a locked ACS identity SDK and locally bundled
+Calling SDK assets with supplier notices. Packaging excludes development
+`node_modules`. The generated browser SDK lives under `static/vendor`,
+outside structural graph input. Enabling meetings forces a single Container App
+replica and ASGI worker because tickets and cleanup state are process-local;
+disabled deployments preserve existing scale defaults. Active meetings are
+terminated by restart or deployment. ACS provisioning/RBAC is a separate,
+explicitly reviewed operation; no Teams app package, public backend, Windows
+media VM or implicit Graph tenant grant is added by the attended route.
 
 Release notes explicitly distinguish branch snapshots from GA/publication. The current dirty working tree includes changes after those snapshots. A release label, successful build or local source test cannot establish installed API support or live compatibility.
 

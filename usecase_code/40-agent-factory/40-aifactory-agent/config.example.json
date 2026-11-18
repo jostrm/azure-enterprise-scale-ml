@@ -72,6 +72,9 @@
     "voice_name": "en-US-Ava:DragonHDLatestNeural",
     "input_languages": ["en-US"]
   },
+  "teams_meetings": {
+    "enabled": false
+  },
   "auth": {
     "client_id": null,
     "audience": null,

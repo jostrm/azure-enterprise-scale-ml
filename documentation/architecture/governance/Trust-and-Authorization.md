@@ -6,6 +6,8 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_settings.py
   - mcp/src/aifactory_mcp/auth.py
   - mcp/src/aifactory_mcp/server.py
   - mcp/src/aifactory_mcp/access.py
@@ -15,6 +17,8 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_security.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_routes.py
   - mcp/tests/test_auth.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
@@ -32,6 +36,24 @@ Agent delegated-token validation checks signature, issuer, audience, lifetime, t
 The optional live voice relay reuses these checks: the Entra token sent in the first WebSocket frame is validated by `principal_from_token`, the exact-scope `knowledge.read` grant by `authorize`, and the session ends no later than token expiry. Speech, transcripts and spoken text are not authorization, and the Voice Live roles held by the application identity are service-level rights that never authorize a user.
 
 Model-facing tools intersect canonical safe definitions with backend availability. Closed schemas cannot carry arbitrary endpoints, filesystem paths, scopes or shell commands. Approval and execution remain outside the ordinary model answer loop.
+
+## Attended meeting boundary (source observation, 2026-11-18)
+
+The attended Teams pilot adds a channel ceiling, never permissions. A meeting
+ticket is one-use and bound to the authenticated host, exact meeting, scope and
+audience. The backend rechecks the approved meeting policy, host and listener
+grants. A meeting principal can read only explicitly meeting-safe knowledge;
+Factory/graph/cost reads and mutations remain unavailable even if the host has
+those grants. Revocation and expiry deny further authorization.
+
+ACS identity, attendee display name, spoken identity and client-observed roster
+are not Entra delegated tokens. The browser checks the explicitly allowed
+same-tenant roster and leaves on uncertainty, but cannot atomically prevent
+new listeners hearing already-sent speech. The controlled test requires
+organizer-managed admission, consent, and knowledge approved for everyone.
+It must not be presented as a confidential arbitrary-meeting access mechanism.
+The existing backend remains private. ACS token-broker RBAC is a separately
+approved resource-scoped prerequisite, not a new tenant-wide Graph grant.
 
 ## Mandatory evidence trust rule
 

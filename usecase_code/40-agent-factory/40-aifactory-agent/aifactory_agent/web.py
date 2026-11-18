@@ -189,6 +189,11 @@ def create_app(settings: Settings, *, services: AgentServices | None = None,
         "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; "
         "form-action 'none'"
     )
+    if settings.teams_meetings.enabled:
+        origins = " ".join(settings.teams_meetings.connect_origins)
+        csp = csp.replace("connect-src 'self' https://login.microsoftonline.com;",
+                          f"connect-src 'self' https://login.microsoftonline.com {origins};")
+        csp += "; worker-src 'self' blob:; media-src 'self' blob:"
     headers = {"Content-Security-Policy": csp, "X-Content-Type-Options": "nosniff",
                "Referrer-Policy": "no-referrer", "Cache-Control": "no-store",
                "Permissions-Policy": ("microphone=(self), camera=(), geolocation=()" if settings.voice.enabled
@@ -569,6 +574,10 @@ def create_app(settings: Settings, *, services: AgentServices | None = None,
     if settings.voice.enabled:
         from .voice_routes import register_voice
         register_voice(app)
+
+    if settings.teams_meetings.enabled:
+        from .teams_meeting_routes import register_teams_meetings
+        register_teams_meetings(app)
 
     @app.get("/")
     def frontend():

@@ -30,13 +30,15 @@ services. **Double encryption** must be supported, explicitly configured and
 verified for each relevant service; it is not an end-to-end guarantee or an
 automatic default of this application.
 
-**Teams extension:** the solution can be extended with an approved **Microsoft
-Teams** integration and an authenticated **reverse proxy** to the private backend.
-The goal is an additional AI colleague in Teams, including meetings. Joining a
-meeting and speaking in it additionally requires a Teams calling/media bot
-integration and tenant approval; neither a reverse proxy nor this browser
-template alone provides meeting participation. Teams integration is separate
-from enabling [browser live voice](#live-voice-optional).
+**Teams meeting audio:** the opt-in [attended ACS bridge](#teams-meeting-audio-attended-preview)
+joins a real Teams meeting as a visibly named external AI participant, sends
+incoming meeting audio through the existing governed voice relay, and publishes
+returned speech into the meeting. It requires an authorized operator to keep a
+supported browser open. This is separate from ordinary
+[browser live voice](#live-voice-optional), a reverse proxy, and the unattended
+Graph application-hosted media-bot architecture. The implementation and local
+contracts are not evidence of a deployed, audible Teams conversation; live
+acceptance remains required.
 
 <table>
 <tr>
@@ -637,6 +639,205 @@ The bootstrap needs Blob-role propagation and private DNS. The startup probe
 allows bounded initialization time. `/health/live` means process alive;
 `/health/ready` includes prerequisites and must not be interpreted as operational
 readiness while sign-in or knowledge is blocked.
+
+## Teams meeting audio (attended preview)
+
+**Status (2026-11-18): implemented development pilot, not live-accepted.** No
+Spider project001 meeting-audio success is asserted by this source change.
+Mock tests, an ARM deployment, application health, successful sign-in, a Foundry
+agent definition, or generated PCM are not substitutes for a participant hearing
+the answer inside Teams.
+
+The transport follows the
+[Microsoft ACS meeting delegate sample](https://github.com/Azure-Samples/voicelive-webapp/tree/main/samples/teams-meeting-delegate):
+
+```text
+Teams meeting (visible external AI participant)
+    <-> ACS Calling SDK in attended Edge/Chrome
+    <-> authenticated private ESAF /api/voice/ws
+    <-> existing Voice Live + Conversation.answer/prepare
+    <-> existing exact-scope knowledge, grants and grounding
+```
+
+Only the remote Teams stream enters the relay. The outgoing `LocalAudioStream`
+contains generated audio, never the operator's microphone. No public reverse
+proxy, Windows media VM, Graph calling application permission, Teams-native bot
+registration, or Teams app package is required for this external ACS participant
+route. It is **not** an unattended bot: closing the tab, losing the connection,
+changing account/scope, or expiry ends the session. A Teams app manifest alone
+would not add media functionality.
+
+The [Voice Agent community hub](https://github.com/microsoft/voice-agent) also
+describes delegation, inline subagents and a hosted conversation engine. Those
+are different voice orchestration options, not Teams transports. This bridge
+reuses the existing ESAF voice orchestration; it does **not** deploy or prove the
+new managed Voice Agent hosted-conversation-engine feature. That separate PG
+experiment needs a compatible hosted adapter, supported private connectivity,
+authenticated session binding and an enabled regional
+[`voice_conversation_engine:1.0.0` route](https://learn.microsoft.com/azure/foundry/how-to/voice-first-with-hosted-agent).
+An arbitrary private HTTP endpoint cannot replace that protocol.
+
+### Prerequisites and authorization
+
+- An existing private Agent Chat deployment with working browser sign-in,
+  grounding, approved knowledge and enabled Voice Live. Ordinary chat remains
+  unchanged when `teams_meetings.enabled` is false.
+- A separately approved Azure Communication Services resource. Its trusted token
+  broker is the existing runtime managed identity; no connection string, key or
+  Foundry credential is sent to the browser. The browser receives a short-lived
+  ACS VoIP token, which is **not** itself meeting-bound.
+- A dedicated work/school Teams test meeting, explicitly approved meeting link,
+  informed consenting participants, and an organizer who controls admission.
+  The organizer's policy must allow ACS/anonymous participation and audio.
+  Do not disable tenant protections, E2EE, lobby rules or other policies silently.
+- A small, controlled same-tenant roster: at most 32 approved remote users, one
+  endpoint each. Anonymous, PSTN, room/shared-device, other bots, unknown
+  identities, incomplete rosters and unapproved users are rejected.
+- Every allowed listener must already have the exact scope's `knowledge.read`
+  grant. The application rechecks those grants. A roster ID or a spoken name is
+  not an authenticated user token; this attended pilot relies additionally on
+  organizer-controlled same-tenant admission and an explicitly meeting-safe
+  knowledge scope. It is not a general confidential multi-tenant meeting solution.
+
+The meeting principal has only `knowledge.read` for the one approved scope.
+Factory, costs, graph and write capabilities are excluded even when the host
+has broader permissions. Neither the voice model nor a participant can approve
+Factory changes. `meeting_safe_knowledge` explicitly approves **all knowledge
+readable in that scope** for this meeting, not merely a harmless example question.
+Do not set it for an unrestricted project corpus containing private material.
+
+**Admission race:** Teams roster notifications cannot recall audio already sent.
+Pause/leave **before** admitting anyone new. Any observed participant, endpoint
+or count uncertainty immediately closes processing/output and leaves; rejoining
+requires explicit approval again. This is not an atomic pre-admission guarantee.
+
+### Configuration and deployment
+
+Merge an explicitly reviewed block into the existing application configuration:
+
+```json
+{
+  "teams_meetings": {
+    "enabled": true,
+    "acs_endpoint": "https://<acs-resource>.communication.azure.com",
+    "allowed_host_object_ids": ["<authenticated-operator-object-id>"],
+    "connect_origins": [
+      "https://<reviewed-acs-signaling-host>",
+      "wss://<reviewed-acs-signaling-host>"
+    ],
+    "policies": [{
+      "id": "approved-synthetic-test",
+      "scope_key": "project001-dev",
+      "meeting_url": "<exact-approved-https-Teams-meeting-link>",
+      "meeting_safe_knowledge": true,
+      "allowed_participant_object_ids": ["<approved-listener-object-id>"]
+    }],
+    "display_name": "ESAF AI meeting assistant",
+    "max_session_seconds": 900
+  }
+}
+```
+
+Replace every placeholder; the closed schema rejects arbitrary URLs, wildcard
+origins and missing policy. `connect_origins` is an exact operator-reviewed CSP
+allowlist for the selected ACS deployment, not a generic wildcard workaround.
+Use [ACS network requirements](https://learn.microsoft.com/azure/communication-services/concepts/voice-video-calling/network-requirements)
+and actual SDK connection diagnostics to resolve required origins; never make the
+private backend public to fix a browser signaling failure. The browser needs both
+its approved private ESAF route and ACS/Teams media connectivity.
+
+`infra/teams-meeting-acs.bicep` is a separate resource-group-scoped template for
+an approved new ACS resource. It disables local/key authentication and changes
+no existing app or network. Its optional `grantTokenBrokerContributor` flag is
+**false by default**. Contributor at the single ACS resource is a documented
+pilot option but grants resource-management rights and is **not a token-only
+least-privilege role**. Require explicit approval or an independently validated
+narrower role; never grant it at subscription scope for convenience.
+
+```powershell
+# Set these from the approved project's configuration and existing runtime identity.
+az deployment group what-if --subscription $subscriptionId --resource-group $resourceGroup `
+  --template-file .\infra\teams-meeting-acs.bicep `
+  --parameters communicationServiceName=$acsName runtimePrincipalId=$runtimePrincipalId `
+    dataLocation=Europe grantTokenBrokerContributor=false
+```
+
+Only after reviewing the exact resource and RBAC changes, deploy using the same
+parameters with `az deployment group create`. Existing ACS resources should be
+reviewed and reused rather than overwritten by this creation template. Use the
+returned host name in `acs_endpoint`. The normal application `deploy.py --config`
+flow consumes the meeting settings and includes the browser bundle and locked
+identity SDK; it does not provision ACS or silently grant its roles.
+
+Meeting tickets and cleanup state are process-local. Enabled deployments enforce
+**one replica and one ASGI worker**; ordinary browser deployments keep their
+existing scale defaults. Restarts and deployments end active meetings. This is a
+non-HA pilot, not distributed session coordination.
+
+The ACS Calling SDK 1.46.1 and Communication Common 2.5.0 are locally bundled under
+`static/vendor`; supplier licenses are preserved in `static/teams-meeting-frontend`.
+No runtime CDN is needed. To rebuild with the locked development dependencies,
+run `npm ci` and `npm run build` in that frontend folder, then remove its
+`node_modules` after development. Application packaging excludes that directory
+while retaining the generated SDK and supplier notices.
+
+### Join, mute, stop and leave
+
+In supported desktop Edge/Chrome, sign in to the private Agent Chat page, select
+the approved scope, enter the exact approved meeting link and acknowledge consent.
+Select **Join with AI audio** and have the organizer admit **ESAF AI meeting
+assistant**. The tab must stay open and attended; use headphones if the operator
+also attends through a separate Teams client. WebView2 is not the supported host
+for this pilot.
+
+**Mute assistant** suppresses new capture/output, flushes queued speech and ends
+the current governed voice session while keeping the ACS participant connected.
+**Resume assistant** uses a fresh one-use ticket and a new voice-service
+connection, only while the roster remains approved. Generation checks prevent
+the previous session's cleanup or delayed output from affecting the new one;
+expiry is never extended. Already-submitted synchronous reads may finish, but
+their canceled output cannot resume playback.
+**Stop speaking** similarly replaces the voice session before listening again.
+This adds a new voice handshake, not another Teams participant. **Leave meeting**
+immediately tears down local media, closes the relay and attempts ACS identity
+cleanup. The bridge never calls `stopAudio()`, which can fall back to the device
+microphone. Failed remote cleanup is shown explicitly; token revocation alone
+does not instantly disconnect a participant.
+
+The current transport suppresses incoming audio while the assistant speaks to
+avoid echo loops. Use **Stop speaking** to interrupt; natural full-duplex barge-in
+is **not** established by this half-duplex pilot. Reconnect is fail-closed:
+the assistant leaves and requires a fresh explicit join, rather than silently
+capturing again. These limitations must be included in the live test report.
+
+No recording, transcript storage or meeting recap is implemented by this bridge.
+It refuses or leaves when Teams recording/transcription or additional Teams
+consent is active, with a visible notice; it never grants consent automatically.
+Check downstream Voice Live/model tracing and retention independently. A muted
+incoming playback device does not mean the SDK stopped receiving audio.
+
+### Live acceptance and rollback
+
+Use synthetic, non-sensitive questions and record only non-content evidence:
+approved call/session identifiers, configured backend/scope, nonzero inbound and
+outbound audio counts, response timing, lifecycle outcome and a participant's
+confirmation of hearing the expected answer **in Teams**. Do not save raw audio,
+transcripts, tokens, meeting links or content-bearing diagnostics by default.
+
+Demonstrate the visible roster entry, real inbound speech, grounding through the
+intended project001 backend, audible answer, mute/resume, Stop speaking, Leave,
+expiry, connection loss, duplicate-join rejection, denied host/scope/listener,
+recording-state changes and newcomer handling. Verify that stop/leave ends audio
+forwarding and that stale output cannot replay after rejoining. Browser-only
+playback and a green readiness endpoint do not pass these criteria.
+
+Rollback: leave active meetings, disable `teams_meetings`, redeploy the previous
+approved application revision/configuration, and remove only this pilot's
+explicitly created ACS resource/role assignment after confirming no consumers.
+The existing private browser chat and voice remain available. No Windows VM
+cost is required for this route; ACS usage, existing voice/model inference,
+Search and Container Apps still incur their applicable metered costs. No fixed
+price or measured latency is asserted here.
 
 ## Live voice (optional)
 
