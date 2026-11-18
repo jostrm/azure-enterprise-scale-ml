@@ -51,19 +51,18 @@ The six scenarios are: 1 Init AI Factory, 2 Add scale set, 3 Add or update proje
 
 ## Download and verify
 
-This is the **local-preview** installer, version **0.2.3**. Its invitation is
+This is the **private-preview** installer, version **0.2.5**. Its invitation is
 checked locally and its guides are bundled. This convenience gate is not a content
 security boundary. The code is requested on every launch; there is no remembered login.
 
 Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-1.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-2.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-3.cab)
-- [ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned-4.cab)
+- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned.msi](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned.msi)
+- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-1.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-2.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-3.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-4.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-4.cab)
 - [SHA256SUMS.txt](SHA256SUMS.txt)
-- [Build receipt](ESAF-Tutorials-0.2.3-win-x64-local-preview-unsigned.msi.json)
 
 Paste the **whole block** into PowerShell, then press **Enter** after the final `}`.
 The `>>` prompt means PowerShell is still collecting a multiline command; if it remains after the
@@ -85,7 +84,7 @@ download, followed by a separate checksum-verification message. It does not inst
     $Index = 0
     foreach ($Entry in $Entries) {
         $Expected, $File = $Entry.Trim() -split '\s+', 2
-        if ($File -notmatch '^ESAF-Tutorials-[0-9.]+-win-x64-local-preview-(signed|unsigned)(-[0-9]+\.cab|\.msi)$') {
+        if ($File -notmatch '^ESAF-Tutorials-[0-9.]+-win-x64-(local-preview|protected)-(signed|unsigned)(-[0-9]+\.cab|\.msi)$') {
             throw 'Unexpected download filename.'
         }
         $Index++
@@ -121,7 +120,7 @@ controls to get past the warning.
 ## Start your first tutorial
 
 1. Enter your private-preview code and select **Unlock private preview**.
-2. Open **Settings (⚙)**. Fill in your tenant, subscription, repository, factory prefix, region and networks,
+2. Open **Settings (⚙)**. Fill in your tenant, subscription, repository (`https://github.com/OWNER/REPO`, or GitHub Enterprise `https://COMPANY.ghe.com/OWNER/REPO` after `gh auth login --hostname COMPANY.ghe.com`), factory prefix, region and networks,
    then select **Save**. Settings are saved only on this computer.
 3. Under **Tutorial to open at start**, choose **ESAF Python SDK - scenarios 1-6**, save, and restart the app.
 4. In the bar at the top, select **Start API**. Wait until it shows **Running** with a port number.
