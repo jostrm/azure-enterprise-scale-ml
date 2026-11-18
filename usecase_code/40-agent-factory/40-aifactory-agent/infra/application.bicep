@@ -12,6 +12,8 @@ param bundleSha256 string
 param bootstrapCommand string
 @description('Set by a pipeline integration that created the app; empty for operator deployments.')
 param integration string = ''
+@description('Attended meeting tickets and cleanup are per-process; the pilot requires one replica and worker.')
+param attendedMeetingsEnabled bool = false
 param minReplicas int = 1
 param maxReplicas int = 2
 param cpu string = '0.5'
@@ -60,7 +62,7 @@ resource application 'Microsoft.App/containerApps@2025-01-01' = {
         image: image
         command: ['/bin/sh', '-c']
         args: [bootstrapCommand]
-        env: [
+        env: concat([
           { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
           { name: 'BUNDLE_ACCOUNT', value: storageAccount }
           { name: 'BUNDLE_CONTAINER', value: storageContainer }
@@ -68,7 +70,9 @@ resource application 'Microsoft.App/containerApps@2025-01-01' = {
           { name: 'BUNDLE_SHA256', value: bundleSha256 }
           { name: 'PYTHONUNBUFFERED', value: '1' }
           { name: 'PIP_DISABLE_PIP_VERSION_CHECK', value: '1' }
-        ]
+        ], attendedMeetingsEnabled ? [
+          { name: 'WEB_CONCURRENCY', value: '1' }
+        ] : [])
         resources: {
           cpu: json(cpu)
           memory: memory
@@ -90,8 +94,8 @@ resource application 'Microsoft.App/containerApps@2025-01-01' = {
         ]
       }]
       scale: {
-        minReplicas: minReplicas
-        maxReplicas: maxReplicas
+        minReplicas: attendedMeetingsEnabled ? 1 : minReplicas
+        maxReplicas: attendedMeetingsEnabled ? 1 : maxReplicas
       }
     }
   }

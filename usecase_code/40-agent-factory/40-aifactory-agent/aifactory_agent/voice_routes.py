@@ -26,7 +26,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocketState
 from . import security, web
 from .config import Settings
 from .knowledge import IndexingError, OwnershipError
-from .security import Principal, authorize
+from .security import Principal, authorize, read_tool_permissions
 from .services import AgentServices
 from .telemetry import VOICE_FAILURES, VOICE_SESSIONS, VOICE_SESSION_SECONDS, VOICE_TURNS
 from .tools import ToolError
@@ -65,6 +65,7 @@ class HelloMessage(BaseModel):
     scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     audience: Literal["platform", "project"]
     language: str | None = Field(default=None, pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+    meeting_session: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{32,128}$")
 
 
 class StarletteChannel:
@@ -73,11 +74,24 @@ class StarletteChannel:
     def __init__(self, websocket: WebSocket):
         self._socket = websocket
         self._lock = asyncio.Lock()
+        self.policy_guard = None
+        self.on_policy_denied = None
 
-    async def _send(self, **frame) -> None:
+    async def check_policy(self) -> None:
+        if self.policy_guard is not None:
+            try:
+                self.policy_guard()
+            except PermissionError:
+                if self.on_policy_denied is not None:
+                    await self.on_policy_denied()
+                raise ClientGone() from None
+
+    async def _send(self, *, check_policy=True, **frame) -> None:
         async with self._lock:
             if self._socket.application_state != WebSocketState.CONNECTED:
                 raise ClientGone()
+            if check_policy:
+                await self.check_policy()
             try:
                 if "data" in frame:
                     await self._socket.send_bytes(frame["data"])
@@ -87,7 +101,8 @@ class StarletteChannel:
                 raise ClientGone() from exc
 
     async def send_json(self, message: dict) -> None:
-        await self._send(text=json.dumps(message, separators=(",", ":")))
+        await self._send(text=json.dumps(message, separators=(",", ":")),
+                         check_policy=message.get("type") not in {"closed", "error", "interrupted"})
 
     async def send_audio(self, data: bytes) -> None:
         await self._send(data=data)
@@ -127,7 +142,9 @@ def _answerer(app: FastAPI, principal: Principal, scope_key: str, audience: str)
 
     def work(text: str) -> dict:
         services = _services(app)
-        return services.conversation(services.knowledge()).answer(text, audience, principal, scope_key)
+        result = services.conversation(services.knowledge()).answer(text, audience, principal, scope_key)
+        authorize(_services(app).settings, principal, scope_key, "knowledge.read")
+        return result
 
     async def answer(text: str) -> dict:
         try:
@@ -163,6 +180,7 @@ def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audienc
     def prepare_work(text):
         services = _services(app)
         prepared = services.conversation(services.knowledge()).prepare(text, audience, principal, scope_key)
+        authorize(_services(app).settings, principal, scope_key, "knowledge.read")
 
         def finish(text, response_id, tokens=None):
             authorize(_services(app).settings, principal, scope_key, "knowledge.read")
@@ -177,12 +195,14 @@ def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audienc
         # A live configuration change must not leave a formerly granted call authorized.
         current = _services(app).settings
         authorize(current, principal, scope_key, "knowledge.read")
-        permission = ("graph.read" if name == "graph_query" else
-                      "knowledge.read" if isinstance(name, str) and name.startswith("knowledge_") else "factory.read")
-        authorize(current, principal, scope_key, permission)
-        if isinstance(name, str) and name.startswith("cost_"):
-            authorize(current, principal, scope_key, "cost.read")
-        return context.execute(name, identifier, arguments)
+        if not isinstance(name, str):
+            raise PermissionError("A known read-only tool is required.")
+        for permission in read_tool_permissions(name):
+            authorize(current, principal, scope_key, permission)
+        result = context.execute(name, identifier, arguments)
+        for permission in read_tool_permissions(name):
+            authorize(_services(app).settings, principal, scope_key, permission)
+        return result
 
     async def execute(context, name, identifier, arguments):
         return await _native_work(execute_work, context, name, identifier, arguments)
@@ -226,6 +246,7 @@ async def _relay_client(websocket: WebSocket, session: VoiceSession, channel: St
             await session.end("client_closed")
             return
         try:
+            await channel.check_policy()
             if kind == "audio":
                 await session.handle_audio(payload)
             else:
@@ -299,6 +320,8 @@ def register_voice(app: FastAPI) -> None:
         await websocket.accept()
         channel = StarletteChannel(websocket)
         entry = None
+        meeting_id = None
+        meeting_generation = None
         state.voice_pre_auth += 1
         try:
             try:
@@ -315,6 +338,14 @@ def register_voice(app: FastAPI) -> None:
                 return
             try:
                 principal = await _authenticate(websocket.app, hello)
+                if hello.meeting_session is not None:
+                    from .teams_meeting_routes import consume_meeting_session
+                    principal = consume_meeting_session(
+                        websocket.app, principal, hello.meeting_session, hello.scope_key, hello.audience)
+                    meeting_id = principal.meeting_session_id
+                    meeting_generation = principal.meeting_generation
+                    channel.policy_guard = lambda: authorize(
+                        state.settings, principal, hello.scope_key, "knowledge.read")
             except security.AuthenticationUnavailable:
                 await _refuse(websocket, channel, "authentication_unavailable")
                 return
@@ -336,6 +367,11 @@ def register_voice(app: FastAPI) -> None:
             entry, previous = reservation
         finally:
             state.voice_pre_auth -= 1
+            if entry is None and meeting_id is not None:
+                from .teams_meeting_routes import end_meeting_session
+                await end_meeting_session(websocket.app, meeting_id, expected_generation=meeting_generation)
+        upstream = None
+        runner = None
         try:
             if previous is not None and previous.session is not None:
                 await previous.session.end("replaced")
@@ -347,6 +383,10 @@ def register_voice(app: FastAPI) -> None:
                 await _refuse(websocket, channel, "voice_unavailable")
                 return
             options = {"session_id": uuid.uuid4().hex, "max_duration": _session_seconds(current.voice, hello.token)}
+            if meeting_id is not None:
+                from .teams_meeting_routes import meeting_session_seconds
+                options["max_duration"] = min(
+                    options["max_duration"], meeting_session_seconds(websocket.app, principal))
             if selected_voice.mode == "realtime":
                 prepare, execute = _native_handlers(websocket.app, principal, hello.scope_key, hello.audience)
                 session = RealtimeVoiceSession(selected_voice, upstream, channel, prepare, execute,
@@ -355,6 +395,10 @@ def register_voice(app: FastAPI) -> None:
                 session = VoiceSession(selected_voice, upstream, channel,
                                        _answerer(websocket.app, principal, hello.scope_key, hello.audience), **options)
             entry.session = session
+            if meeting_id is not None:
+                from .teams_meeting_routes import bind_meeting_voice_session
+                bind_meeting_voice_session(websocket.app, principal, session)
+                channel.on_policy_denied = lambda: session.end("meeting_policy_changed")
             if entry.replaced:
                 await session.end("replaced")
             VOICE_SESSIONS.add(1, {"scope": hello.scope_key})
@@ -372,5 +416,14 @@ def register_voice(app: FastAPI) -> None:
                 await websocket.close(code=1008 if reason == "protocol_error" else 1000)
             except (RuntimeError, WebSocketDisconnect):
                 pass
+        except PermissionError:
+            await _refuse(websocket, channel, "forbidden")
         finally:
-            state.voice_registry.release(entry)
+            try:
+                if upstream is not None and runner is None:
+                    await upstream.close()
+            finally:
+                state.voice_registry.release(entry)
+                if meeting_id is not None:
+                    from .teams_meeting_routes import end_meeting_session
+                    await end_meeting_session(websocket.app, meeting_id, expected_generation=meeting_generation)
