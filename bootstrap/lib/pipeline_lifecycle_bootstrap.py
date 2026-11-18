@@ -20,6 +20,7 @@ import factory_enrollment as enrollment
 import pipeline_inputs
 import registered_personas
 import registered_prerequisites as prerequisites
+from pipeline_dispatch import github_path as _github_path
 from pipeline_lifecycle import bound_plan, canonical, digest, identifier, require
 from pipeline_lifecycle_parameters import expand
 
@@ -361,7 +362,7 @@ class BootstrapAdapter:
         expected_input_hash = digest(snapshot) if input_snapshot_hash is None else input_snapshot_hash
         request = self._inputs(snapshot, operation_id)
         origin = self.review.origin(snapshot)
-        repository = (request["route"]["repository"].removeprefix("https://github.com/")
+        repository = (_github_path(request["route"]["repository"])
                       if request["route"]["kind"] == "gha" else request["route"]["repository"])
         require(origin["provider"] == request["route"]["kind"] and origin["repository"] == repository
                 and origin["ref"] == request["route"]["ref"] and origin["attempt"] == 1,

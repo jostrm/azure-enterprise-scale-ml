@@ -9,6 +9,7 @@ import hashlib
 import re
 from urllib.parse import quote, unquote, urlsplit
 
+import github_host
 from lifecycle_admission import RECORD, PROTOCOL
 from pipeline_lifecycle import PipelineError, bound_plan, digest, identifier, require
 from provider_repository_state import ado_job_name
@@ -43,10 +44,19 @@ def _get(request, provider, path):
     return body
 
 
+def _state_host(state):
+    """The GitHub host of the authenticated state's repository; the origin's OWNER/REPO carries no host."""
+    try:
+        return github_host.parse_github_repository(state.get("repository")).host
+    except github_host.GitHubHostError:
+        return github_host.DOTCOM
+
+
 def _released(record, state):
     from pipeline_approvals import ENVIRONMENT, TEMPLATES
     origin = _origin(record["plan"]["origin"])
-    repository = "https://github.com/" + origin["repository"] if origin["provider"] == "gha" else origin["repository"]
+    repository = ("https://" + _state_host(state) + "/" + origin["repository"] if origin["provider"] == "gha"
+                  else origin["repository"])
     require(state.get("repository") == repository, "ancestor-repository-mismatch")
     proof = record.get("finalization", {}).get("proof", {})
     expected_hash = hashlib.sha256((TEMPLATES / f"pipelines-only-{origin['provider']}.yml")

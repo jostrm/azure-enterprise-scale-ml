@@ -17,12 +17,13 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 from urllib.request import Request, build_opener
 from uuid import UUID
 
+import github_host
 from pipeline_dispatch import DispatchError, ProviderTransport, _NoRedirect
 from provider_repository_state import ado_job_name
 
 
 ENVIRONMENT = "esaf-pipelines-execute"
-ISSUER = "https://token.actions.githubusercontent.com"
+ISSUER = github_host.DOTCOM_ISSUER  # github.com; a GHE.com or GHES consumer uses github_host.oidc_issuer_for(host)
 JWKS_URL = ISSUER + "/.well-known/jwks"
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 MAX_BYTES = 256 * 1024
@@ -88,7 +89,28 @@ def _uuid(value):
         return False
 
 
-def verify_github_jwt(token, jwks, expected_audience, *, clock=time.time):
+def _review_host(record, environ):
+    """The consumer's GitHub host: the reviewed binding URL, else the job's GITHUB_SERVER_URL, else github.com."""
+    snapshot = record.get("snapshot")
+    binding = snapshot.get("binding") if isinstance(snapshot, dict) else None
+    bound = binding.get("repository") if isinstance(binding, dict) else None
+    server = environ.get("GITHUB_SERVER_URL") or ""
+    try:
+        if isinstance(bound, str) and bound.startswith("https://"):
+            host = github_host.parse_github_repository(bound).host
+            require(not server or urlsplit(server).hostname == host, "github-current-job-mismatch")
+            return host
+        if server:
+            parts = urlsplit(server)
+            require(parts.scheme == "https" and parts.path in ("", "/") and github_host.is_valid_host(parts.hostname),
+                    "github-repository-required")
+            return github_host.normalize_host(parts.hostname)
+    except github_host.GitHubHostError:
+        raise ApprovalError("github-repository-required") from None
+    return github_host.DOTCOM
+
+
+def verify_github_jwt(token, jwks, expected_audience, *, clock=time.time, issuer=ISSUER):
     """Verify issuer keys with the existing cryptography package, not JWT decoding."""
     require(isinstance(token, str) and len(token) <= 32768, "bounded-oidc-token-required")
     parts = token.split(".")
@@ -120,7 +142,7 @@ def verify_github_jwt(token, jwks, expected_audience, *, clock=time.time):
     except (ValueError, InvalidSignature):
         raise ApprovalError("provider-oidc-signature-invalid") from None
     now = clock()
-    require(claims.get("iss") == ISSUER and claims.get("aud") == expected_audience
+    require(claims.get("iss") == issuer and claims.get("aud") == expected_audience
             and all(type(claims.get(key)) is int for key in ("iat", "nbf", "exp"))
             and now - 600 <= claims["iat"] <= now + 60 and claims["nbf"] <= now + 60
             and now < claims["exp"] <= claims["iat"] + 600, "provider-oidc-time-or-audience-invalid")
@@ -128,9 +150,11 @@ def verify_github_jwt(token, jwks, expected_audience, *, clock=time.time):
 
 
 class GitHubOIDC:
-    def __init__(self, environ=None, *, opener=None):
+    def __init__(self, environ=None, *, opener=None, host=github_host.DOTCOM):
         self.environ = os.environ if environ is None else environ
         self.opener = opener or build_opener(_NoRedirect())
+        self.host = github_host.normalize_host(host)
+        self.jwks_url = github_host.oidc_issuer_for(self.host) + "/.well-known/jwks"
 
     def _get(self, url, headers):
         try:
@@ -149,7 +173,7 @@ class GitHubOIDC:
         token = self.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
         parsed = urlsplit(self.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL", ""))
         require(token and parsed.scheme == "https"
-                and re.fullmatch(r"[a-z0-9-]+\.actions\.githubusercontent\.com", parsed.hostname or "")
+                and github_host.is_actions_token_request_host(self.host, parsed.hostname or "")
                 and not parsed.username and not parsed.password and parsed.port in (None, 443)
                 and not parsed.fragment and "/_apis/distributedtask/hubs/build/plans/" in parsed.path,
                 "authenticated-github-oidc-endpoint-required")
@@ -161,7 +185,7 @@ class GitHubOIDC:
         return value["value"]
 
     def jwks(self):
-        return self._get(JWKS_URL, {"Accept": "application/json"})
+        return self._get(self.jwks_url, {"Accept": "application/json"})
 
 
 class _Review:
@@ -183,7 +207,9 @@ class _Review:
         if self.provider == "gha":
             require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]+", repository),
                     "github-repository-required")
-            self.base = "https://api.github.com/repos/" + repository
+            self.host = _review_host(record, environ)
+            self.issuer = github_host.oidc_issuer_for(self.host)
+            self.base = github_host.api_base_for(self.host) + "/repos/" + repository
             transport_base = self.base
         else:
             parsed = urlsplit(repository)
@@ -196,7 +222,7 @@ class _Review:
             self.base = transport_base + "/" + quote(parts[1], safe="") + "/_apis"
             self.tasks_base = transport_base + "/_apis/distributedtask/tasks/"
         self.transport = transport or ProviderTransport(self.provider, transport_base)
-        self.oidc = oidc or GitHubOIDC(environ)
+        self.oidc = oidc or GitHubOIDC(environ, host=getattr(self, "host", github_host.DOTCOM))
 
     def get(self, url):
         status, headers, body = self.transport.request("GET", url)
@@ -293,7 +319,7 @@ class _Review:
                 "authenticated-current-provider-job-required")
         requested_audience = finalizer_audience(self.record) if finalize else audience(self.record)
         claims = verify_github_jwt(self.oidc.token(requested_audience), self.oidc.jwks(),
-                                   requested_audience, clock=self.clock)
+                                   requested_audience, clock=self.clock, issuer=self.issuer)
         expected = {"repository": origin["repository"], "repository_id": str(run["repository"]["id"]),
                     "sha": origin["commit"], "ref": origin["ref"], "run_id": self.run_id, "run_attempt": "1",
                     "environment": ENVIRONMENT, "sub": "repo:" + origin["repository"] + ":environment:" + ENVIRONMENT,

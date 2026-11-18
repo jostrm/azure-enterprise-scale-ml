@@ -130,7 +130,7 @@ Change these values in `creation_request` before you use the file:
 | `factory_prefix` | Starts every resource name. Keep it to six characters or fewer. |
 | `dev_vnet_cidr` | Sets the Factory's private address range. It must not overlap your hub or a peered network. |
 | `team_member_email`, `team_group_name` | Create or reuse the Microsoft Entra group that gets access to project 001. |
-| `github_repository` | Names the consumer repository that runs the pipelines. |
+| `github_repository` | Names the consumer repository that runs the pipelines: `OWNER/REPO` on github.com, or `HOST/OWNER/REPO` on GitHub Enterprise (GHE.com `contoso.ghe.com/OWNER/REPO`, or a GitHub Enterprise Server host). Sign in to that host first with `gh auth login --hostname HOST`. |
 | `access_hub_mode`, `setup_hub_access`, `network_mode` | Set the topology. See [the values for each hub mode](../concepts/hub-and-network-modes.md#settings-behind-the-choices). |
 
 The `project_settings` in this example turn on API Management, the Factory MCP and its publication in API

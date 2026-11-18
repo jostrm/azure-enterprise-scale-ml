@@ -16,6 +16,7 @@ from urllib.request import Request
 
 import factory_enrollment as en
 import factory_lifecycle as fl
+import github_host
 from pipeline_lifecycle import PipelineError, canonical, require
 
 
@@ -28,17 +29,28 @@ class _ProviderTransport:
         require(method in ("GET", "HEAD", "POST", "PUT", "PATCH"), "provider-method-forbidden")
         require(isinstance(endpoint, str) and not any(ord(char) < 33 for char in endpoint),
                 "untrusted-provider-endpoint")
-        url = "https://api.github.com/" + endpoint if kind == "gha" else endpoint
-        parsed, route = urlsplit(url), urlsplit(self._provider_route["repository"])
+        route = urlsplit(self._provider_route["repository"])
+        host = None
+        if kind == "gha":
+            # The route's GitHub host picks the REST API and the token: github.com, GHE.com or GHES /api/v3.
+            try:
+                host = github_host.parse_github_repository(self._provider_route["repository"]).host
+            except github_host.GitHubHostError:
+                raise PipelineError("untrusted-provider-endpoint") from None
+            api = github_host.api_base_for(host)
+        url = api + "/" + endpoint if kind == "gha" else endpoint
+        parsed = urlsplit(url)
         decoded = unquote(parsed.path)
         require(parsed.scheme == "https" and parsed.netloc == (
-                    "api.github.com" if kind == "gha" else "dev.azure.com")
+                    github_host.api_hostname_for(host) if kind == "gha" else "dev.azure.com")
                 and not parsed.fragment and not parsed.username and not parsed.password
                 and "\\" not in decoded and not {".", ".."}.intersection(decoded.split("/"))
                 and all(ord(char) >= 32 for char in unquote(url)), "untrusted-provider-endpoint")
-        prefix = "/repos/" + route.path.strip("/") if kind == "gha" else "/" + unquote(route.path).strip("/").split("/")[0]
+        prefix = (urlsplit(api).path + "/repos/" + route.path.strip("/") if kind == "gha"
+                  else "/" + unquote(route.path).strip("/").split("/")[0])
         require(decoded == prefix or decoded.startswith(prefix + "/"), "provider-repository-scope-mismatch")
-        name = "GH_TOKEN" if kind == "gha" else "AIFACTORY_STATE_TOKEN"
+        # A github.com token is never sent to a GitHub Enterprise Server (GH_ENTERPRISE_TOKEN there).
+        name = github_host.token_variables(host)[0] if kind == "gha" else "AIFACTORY_STATE_TOKEN"
         token = self._provider_environ.get(name, "")
         require(isinstance(token, str) and 1 <= len(token) <= 32768
                 and all(33 <= ord(char) <= 126 for char in token)

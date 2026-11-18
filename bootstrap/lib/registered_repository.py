@@ -36,6 +36,14 @@ class Repository:
         self.runner = command_runner or enrollment._run_cli
         self.cloud = enrollment.Cloud({"target": target, "ado_tenant_id": config.get("ado_tenant_id") or target["tenant_id"]},
                                       command_runner=self.runner)
+        # github_repository = [HOST/]OWNER/REPO: gh talks to that host and REST paths use OWNER/REPO.
+        if provider == "gha" and config.get("github_repository"):
+            self.cloud.github_host = self.github.host
+
+    @property
+    def github(self):
+        """The configured repository on its GitHub host (github.com, SUB.ghe.com or GitHub Enterprise Server)."""
+        return github_repository(self.config)
 
     def git(self, root, *args, data=None, environment=None, missing=False, raw=False):
         env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="Never")
@@ -87,7 +95,7 @@ class Repository:
 
     def discover(self):
         if self.provider == "gha":
-            status, _, value = self.cloud.gh("GET", "repos/" + self.config["github_repository"], allowed=(200, 404))
+            status, _, value = self.cloud.gh("GET", "repos/" + self.github.path, allowed=(200, 404))
             return value if status == 200 else None
         url = self.config["ado_organization"].rstrip("/") + "/" + quote(self.config["ado_project"], safe="")
         status, _, value = self.cloud.http("GET", url + "/_apis/git/repositories/" +
@@ -110,11 +118,11 @@ class Repository:
     def create(self):
         self.cloud.read_only = False
         if self.provider == "gha":
-            owner, name = self.config["github_repository"].split("/")
-            user = enrollment.parse_json(self.cloud.command(["gh", "api", "--hostname", "github.com", "user"]))
+            owner, name = self.github.owner, self.github.name
+            user = enrollment.parse_json(self.cloud.command(["gh", "api", "--hostname", self.github.host, "user"]))
             endpoint = "user/repos" if user["login"].casefold() == owner.casefold() else "orgs/" + owner + "/repos"
             return enrollment.parse_json(self.cloud.command(
-                ["gh", "api", "--hostname", "github.com", "--method", "POST", endpoint, "--input", "-"],
+                ["gh", "api", "--hostname", self.github.host, "--method", "POST", endpoint, "--input", "-"],
                 enrollment.canonical({"name": name, "private": self.config.get("github_visibility", "private") == "private",
                                       "auto_init": False})))
         url = self.config["ado_organization"].rstrip("/") + "/" + quote(self.config["ado_project"], safe="")
@@ -124,8 +132,8 @@ class Repository:
 
     def set_initial_default_branch(self):
         if self.provider == "gha":
-            self.cloud.command(["gh", "api", "--hostname", "github.com", "--method", "PATCH",
-                                "repos/" + self.config["github_repository"], "--input", "-"],
+            self.cloud.command(["gh", "api", "--hostname", self.github.host, "--method", "PATCH",
+                                "repos/" + self.github.path, "--input", "-"],
                                enrollment.canonical({"default_branch": "main"}))
         else:
             self.cloud.command(["az", "repos", "update", "--organization", self.config["ado_organization"],
@@ -137,7 +145,7 @@ class Repository:
 
     def environment(self, name):
         status, _, value = self.cloud.gh(
-            "GET", "repos/" + self.config["github_repository"] + "/environments/" + quote(name, safe=""),
+            "GET", "repos/" + self.github.path + "/environments/" + quote(name, safe=""),
             allowed=(200, 404))
         return value if status == 200 else None
 
@@ -154,7 +162,7 @@ class Repository:
                     "{repositoryId:$repository,name:$name}){environment{id name}}}")
         self.cloud.read_only = False
         result = enrollment.parse_json(self.cloud.command(
-            ["gh", "api", "--hostname", "github.com", "--method", "POST", "graphql", "--input", "-"],
+            ["gh", "api", "--hostname", self.github.host, "--method", "POST", "graphql", "--input", "-"],
             enrollment.canonical({"query": mutation, "variables": {
                 "repository": repository["node_id"], "name": name}})))
         require(not result.get("errors"), "github-environment-create-not-verified")
@@ -193,11 +201,17 @@ class Repository:
         return created
 
 
+def github_repository(config):
+    """github_repository = [HOST/]OWNER/REPO: OWNER/REPO is github.com, HOST/OWNER/REPO a GitHub Enterprise host."""
+    try:
+        return enrollment._github_host_module().parse_github_repository(config["github_repository"])
+    except (KeyError, ValueError):
+        raise enrollment.EnrollmentError("exact-github-repository-required") from None
+
+
 def repository_url(provider, config):
     if provider == "gha":
-        require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", config["github_repository"]),
-                "exact-github-repository-required")
-        return "https://github.com/" + config["github_repository"]
+        return github_repository(config).url
     require(re.fullmatch(r"https://dev\.azure\.com/[A-Za-z0-9_-]+", config["ado_organization"]),
             "exact-ado-organization-required")
     return (config["ado_organization"] + "/" + quote(config["ado_project"], safe="") + "/_git/" +

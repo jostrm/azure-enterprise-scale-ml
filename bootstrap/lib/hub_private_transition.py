@@ -44,6 +44,7 @@ from uuid import uuid4
 from xml.etree import ElementTree
 
 import factory_enrollment as enrollment
+import github_host
 import hub_lock_foundation as foundation
 
 
@@ -78,6 +79,25 @@ class TransitionError(ValueError):
 def require(condition, code):
     if not condition:
         raise TransitionError(code)
+
+
+def _github_repository(value, *, url_only=False):
+    """[HOST/]OWNER/REPO or https://HOST/OWNER/REPO[.git] of a GitHub writer (github.com, GHE.com or GHES)."""
+    text = str(value or "")
+    require(not url_only or text.startswith("https://"), "github-repository-required")
+    try:
+        return github_host.parse_github_repository(text)
+    except github_host.GitHubHostError:
+        raise TransitionError("github-repository-required") from None
+
+
+def _repository_key(value):
+    """Writer selection key: GitHub (host, owner/repo) case-insensitively, else the lower-cased URL."""
+    try:
+        repository = github_host.parse_github_repository(value)
+        return repository.host, repository.path.lower()
+    except github_host.GitHubHostError:
+        return str(value).lower().removesuffix(".git").rstrip("/")
 
 
 def source_fingerprint(source_root):
@@ -597,8 +617,7 @@ class Cloud(foundation.Cloud):
                         vm.get("properties", {}).get("osProfile", {}).get("computerName"),
                         vm_id.rsplit("/", 1)[1]) if value}
         if provider == "gha":
-            slug = target["repository"].removeprefix("https://github.com/").removesuffix(".git")
-            require(re.fullmatch(r"[\w.-]+/[\w.-]+", slug), "github-repository-required")
+            slug = _github_repository(target["repository"]).path
             base = "repos/" + slug
             repository = self.provider_read(target, base)
             target["repository_id"] = repository["id"]
@@ -652,9 +671,7 @@ class Cloud(foundation.Cloud):
     def attest_writer(self, writer, source_hash):
         repo = writer["repository"]
         if writer["provider"] == "gha":
-            require(re.fullmatch(r"https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?", repo),
-                    "github-repository-required")
-            slug = repo.removeprefix("https://github.com/").removesuffix(".git")
+            slug = _github_repository(repo, url_only=True).path
             base = "repos/" + slug
             repository = self.provider_read(writer, base)
             require(str(repository.get("id")) == str(writer["repository_id"])
@@ -1378,9 +1395,8 @@ class _WorkflowAdapter:
                           if name in selected_ids and writer.get("deployment_object_id") == selected_principal]
             repository = (provider_serialization or {}).get("repository")
             if repository:
-                normalize = lambda value: value.lower().removeprefix("https://github.com/").removesuffix(".git").rstrip("/")
                 candidates = [(name, writer) for name, writer in candidates
-                              if normalize(writer["repository"]) == normalize(repository)]
+                              if _repository_key(writer["repository"]) == _repository_key(repository)]
             require(len(candidates) == 1, "selected-factory-writer-ambiguous")
             writer_id, writer = candidates[0]
             require(bindings.get("hub_private_endpoint_subnet_id"), "hub-private-endpoint-subnet-binding-required")

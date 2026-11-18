@@ -13,10 +13,15 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.parse import urlsplit
+
+import github_host
 
 
+# GitHub Enterprise Server tokens have their own names (gh), so a github.com token never reaches that host.
 DISPATCH_ENV_GROUPS = (frozenset({"GH_TOKEN", "GITHUB_TOKEN"}),
-                       frozenset({"SYSTEM_ACCESSTOKEN", "AZURE_DEVOPS_EXT_PAT"}))
+                       frozenset({"SYSTEM_ACCESSTOKEN", "AZURE_DEVOPS_EXT_PAT"}),
+                       frozenset({"GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}))
 DISPATCH_ENV_KEYS = frozenset().union(*DISPATCH_ENV_GROUPS)
 MAX_ENV_BYTES = 64 * 1024
 SECRET_ID = re.compile(
@@ -43,6 +48,17 @@ def _token(value):
     require(isinstance(value, str) and 1 <= len(value) <= 32768
             and all(33 <= ord(char) <= 126 for char in value), "provider-token-invalid")
     return value
+
+
+def _github_token_variable(environment):
+    """GH_TOKEN on github.com and GHE.com; GH_ENTERPRISE_TOKEN for the job's GitHub Enterprise Server."""
+    server = _setting(environment, "GITHUB_SERVER_URL")
+    if not server:
+        return "GH_TOKEN"
+    parts = urlsplit(server)
+    require(parts.scheme == "https" and parts.path in ("", "/") and github_host.is_valid_host(parts.hostname),
+            "github-server-url-invalid")
+    return github_host.token_variables(parts.hostname)[0]
 
 
 def _secret_identity(value, code):
@@ -72,6 +88,7 @@ def provider_environment(provider, *, environ=None, runner=None):
     """
     require(provider in ("gha", "ado"), "credential-provider-invalid")
     environment = dict(os.environ if environ is None else environ)
+    github_token = _github_token_variable(environment) if provider == "gha" else None
     source = _setting(environment, "ESAF_PROVIDER_CREDENTIAL_SOURCE") or "protected-secret"
     reference = _setting(environment, "ESAF_PROVIDER_TOKEN_SECRET_ID")
     require(source in ("protected-secret", "keyvault"), "credential-source-invalid")
@@ -98,12 +115,12 @@ def provider_environment(provider, *, environ=None, runner=None):
     else:
         require(not reference, "keyvault-opt-in-required")
         token = _setting(environment, "ESAF_PROVIDER_TOKEN") or _setting(
-            environment, "GH_TOKEN" if provider == "gha" else "SYSTEM_ACCESSTOKEN")
+            environment, github_token if provider == "gha" else "SYSTEM_ACCESSTOKEN")
         require(bool(token), "provider-token-required")
         token = _token(token)
     environment.pop("ESAF_PROVIDER_TOKEN", None)
     if provider == "gha":
-        environment["GH_TOKEN"] = token
+        environment[github_token] = token
     else:
         environment["AIFACTORY_STATE_TOKEN"] = token
         environment["SYSTEM_ACCESSTOKEN"] = token

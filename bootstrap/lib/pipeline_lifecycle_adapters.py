@@ -19,6 +19,7 @@ from uuid import uuid4
 
 import factory_enrollment
 import factory_lifecycle as fl
+import github_host
 import provider_repository_state
 from pipeline_lifecycle import PipelineError, LifecycleService, bound_plan, digest, identifier, require
 from pipeline_lifecycle_parameters import parameters
@@ -173,7 +174,7 @@ def _selected_binding(snapshot, scale):
     path = unquote(parsed.path)
     pattern = (r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+" if provider == "gha"
                else r"/[A-Za-z0-9_. -]+/[A-Za-z0-9_. -]+/_git/[A-Za-z0-9_. -]+")
-    require(parsed.scheme == "https" and parsed.netloc == ("github.com" if provider == "gha" else "dev.azure.com")
+    require(parsed.scheme == "https" and provider_route_host(provider, parsed.netloc)
             and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
             and re.fullmatch(pattern, path) and not any(part in (".", "..") for part in path.split("/"))
             and fl.valid_ref(binding["ref"]), "native-binding-route-invalid")
@@ -335,7 +336,7 @@ class NativePlanner:
             route["commit"] = published_consumer_commit(cloud, route)
             require(origin.get("commit") == route["commit"], "provider-consumer-commit-mismatch")
             if route["kind"] == "gha":
-                actor = json.loads(cloud.command(["gh", "api", "user", "--hostname", "github.com", "--method", "GET"]))
+                actor = json.loads(cloud.command(github_user_command(route["repository"])))
                 require(type(actor.get("id")) is int and actor["id"] > 0, "authenticated-github-identity-required")
                 route["github_user_id"] = actor["id"]
             require(cloud.command(["git", "rev-parse", "HEAD"], cwd=str(self.source_root))
@@ -856,6 +857,19 @@ class RuntimeAdapters:
         return self.native_executor.cancel(stage, record)
 
 
+def provider_route_host(provider, netloc):
+    """A consumer route's exact netloc: any GitHub host (github.com, GHE.com, GHES) for gha, dev.azure.com for ado."""
+    if provider == "gha":
+        return netloc == github_host.normalize_host(netloc) and github_host.is_valid_host(netloc)
+    return provider == "ado" and netloc == "dev.azure.com"
+
+
+def github_user_command(repository):
+    """gh reads the authenticated user on the route's own host, never github.com for an enterprise route."""
+    host = github_host.parse_github_repository(repository).host
+    return ["gh", "api", "user", "--hostname", host, "--method", "GET"]
+
+
 def build_service(snapshot, *, repo_root, source_root, state_root, provider_context=None):
     from pipeline_lifecycle_review import ProtectedJobReview
     from pipeline_lifecycle_bootstrap import BootstrapAdapter
@@ -866,7 +880,7 @@ def build_service(snapshot, *, repo_root, source_root, state_root, provider_cont
         parsed = urlsplit(binding.get("repository", ""))
         provider_kind = snapshot["request"]["provider"]
         require(parsed.scheme == "https"
-                and parsed.netloc == {"gha": "github.com", "ado": "dev.azure.com"}.get(provider_kind)
+                and provider_route_host(provider_kind, parsed.netloc)
                 and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment,
                 "bootstrap-consumer-route-required")
     else:

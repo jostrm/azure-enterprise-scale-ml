@@ -146,6 +146,35 @@ def _single_writer_module():
     return module
 
 
+_GITHUB_HOST = None
+
+
+def _github_host_module():
+    """github_host.py next to this file: the one rule for github.com, GHE.com (SUB.ghe.com) and GitHub Enterprise
+    Server hosts (github_repository = [HOST/]OWNER/REPO, decided 2026-11-18)."""
+    global _GITHUB_HOST
+    if _GITHUB_HOST is None:
+        spec = importlib.util.spec_from_file_location("github_host", Path(__file__).with_name("github_host.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _GITHUB_HOST = module
+    return _GITHUB_HOST
+
+
+def safe_route_repository(provider, value):
+    """A credential-free https route repository: https://HOST/OWNER/REPO on a GitHub host (github.com, SUB.ghe.com or
+    GitHub Enterprise Server) or https://dev.azure.com/ORG/PROJECT/_git/REPO; no port, user info, query or dot path."""
+    if not isinstance(value, str):
+        return False
+    if provider == "gha":
+        match = re.fullmatch(r"https://([a-z0-9.-]+)/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value)
+        if not match or not _github_host_module().is_valid_host(match[1]):
+            return False
+    elif not re.fullmatch(r"https://dev\.azure\.com/[A-Za-z0-9_.%-]+/[A-Za-z0-9_.%-]+/_git/[A-Za-z0-9_.%-]+", value):
+        return False
+    return all(x not in (".", "..") for x in unquote(value).split("/"))
+
+
 def _single_writer(request):
     return request.get("coordination_mode") == "single-writer"
 
@@ -496,11 +525,7 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
         route[key] = options.get(key, (old or {}).get(key))
     for key in ("writer_id", "auth_namespace", "runner"):
         route[key] = options.get(key, execution.get(key))
-    pattern = (r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+" if provider == "gha" else
-               r"https://dev\.azure\.com/[A-Za-z0-9_.%-]+/[A-Za-z0-9_.%-]+/_git/[A-Za-z0-9_.%-]+")
-    require(isinstance(route["repository"], str) and re.fullmatch(pattern, route["repository"])
-            and all(x not in (".", "..") for x in unquote(route["repository"]).split("/")),
-            "explicit-safe-repository-required")
+    require(safe_route_repository(provider, route["repository"]), "explicit-safe-repository-required")
     require(isinstance(route["ref"], str) and re.fullmatch(r"refs/(heads|tags)/[A-Za-z0-9_./-]+", route["ref"])
             and ".." not in route["ref"], "explicit-consumer-ref-required")
     require(type(route["shared_remote"]) is bool, "explicit-shared-remote-required")
@@ -694,6 +719,19 @@ class Cloud:
         self.serialized_provisioning = False
         self.tokens = {}
         self.operator_id = None
+        self.github_host = None
+
+    def github_hostname(self):
+        """The host gh talks to: an explicit github_host, else the gha route repository's host, else github.com."""
+        if self.github_host:
+            return self.github_host
+        route = (self.request_config or {}).get("route") or {}
+        if route.get("kind") == "gha" and isinstance(route.get("repository"), str):
+            try:
+                return _github_host_module().parse_github_repository(route["repository"]).host
+            except ValueError:
+                raise EnrollmentError("explicit-safe-repository-required") from None
+        return "github.com"
 
     def command(self, argv, data=None):
         try:
@@ -868,7 +906,7 @@ class Cloud:
             and isinstance(body, dict) and body.get("force") is False), "delete-or-replacement-forbidden")
         require(not self.read_only or method == "GET", "plan-mutation-forbidden")
         require(endpoint.startswith("repos/") and "://" not in endpoint, "untrusted-github-endpoint")
-        argv = ["gh", "api", "--hostname", "github.com", "--include", "--method", method, endpoint]
+        argv = ["gh", "api", "--hostname", self.github_hostname(), "--include", "--method", method, endpoint]
         if body is not None:
             argv += ["--input", "-"]
         # gh exits nonzero on HTTP errors; unlike generic CLI errors an explicit
@@ -922,7 +960,11 @@ def github_subject_prefix(repository, repo, customization):
     repositories created after 2026-07-15 (GitHub cannot turn those immutable IDs off). GitHub's own sub_claim_prefix is
     used only when it names exactly this repository, so the federated credential matches the tokens byte for byte.
     create-new-aifactory-scaleset.sh federates with the same rule."""
-    require(repo.get("full_name", "").lower() == repository.lower(), "github-repository-mismatch")
+    try:
+        path = _github_host_module().parse_github_repository(repository).path    # OWNER/REPO on every host
+    except ValueError:
+        raise EnrollmentError("github-repository-mismatch") from None
+    require(repo.get("full_name", "").lower() == path.lower(), "github-repository-mismatch")
     require(customization.get("use_default") is True, "github-custom-oidc-subject-unsupported")
     expected = "repo:" + repo["full_name"]
     if customization.get("use_immutable_subject") is True:
@@ -962,7 +1004,8 @@ def _github_environment_map(route, target, saved):
 def _provider(cloud, request, identity):
     route, target = request["route"], request["target"]
     if route["kind"] == "gha":
-        repository = route["repository"].removeprefix("https://github.com/").removesuffix(".git")
+        github = _github_host_module().parse_github_repository(route["repository"])
+        repository = github.path
         base = "repos/" + repository
         _, _, repo = cloud.gh("GET", base)
         _, _, customization = cloud.gh("GET", base + "/actions/oidc/customization/sub")
@@ -982,7 +1025,7 @@ def _provider(cloud, request, identity):
                     require(expected is not None and variables[name]["body"].get("value") == expected,
                             "github-variable-conflict")
         return {"kind": "gha", "environment": environment, "variables": variables, "path": path,
-                "environment_map": environment_map, "issuer": "https://token.actions.githubusercontent.com",
+                "environment_map": environment_map, "issuer": github.oidc_issuer,
                 "subject": prefix + ":environment:" + route["auth_namespace"]}
     parts = unquote(urlsplit(route["repository"]).path).strip("/").split("/")
     organization, project = parts[:2]

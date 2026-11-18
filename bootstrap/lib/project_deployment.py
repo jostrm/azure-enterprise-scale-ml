@@ -31,6 +31,9 @@ _version_spec.loader.exec_module(release_version)
 _environment_spec = importlib.util.spec_from_file_location("aifactory_project_environment", Path(__file__).with_name("project_environment.py"))
 project_environment = importlib.util.module_from_spec(_environment_spec)
 _environment_spec.loader.exec_module(project_environment)
+_github_spec = importlib.util.spec_from_file_location("aifactory_github_host", Path(__file__).with_name("github_host.py"))
+github_host = importlib.util.module_from_spec(_github_spec)
+_github_spec.loader.exec_module(github_host)
 GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ADO_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
 # Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
@@ -324,6 +327,14 @@ class Deployment:
     def read_json(self, argv):
         return json.loads(self.command(argv, capture=True))
 
+    def _github_hostname_arguments(self):
+        host = getattr(self, "github_hostname", github_host.DOTCOM)
+        return [] if github_host.is_dotcom(host) else ["--hostname", host]
+
+    def github_user_command(self):
+        """The authenticated gh user on the consumer's host (unchanged argv on github.com)."""
+        return ["gh", "api", "user"] + self._github_hostname_arguments()
+
     def verify_predecessor(self):
         if self.deployment_scope == "azure-mcp":
             return None
@@ -400,15 +411,19 @@ class Deployment:
         self.account = {key: account.get(key) for key in ("id", "tenantId", "user")}
         self.origin = self.command(["git", "remote", "get-url", "origin"], capture=True)
         if self.route == "gha":
-            match = re.fullmatch(r"(?:https://github\.com/|git@github\.com:)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?", self.origin)
-            if not match:
-                raise ValueError("A credential-free GitHub consumer origin is required.")
-            self.repository = match[1]
-            configured = str(self.selected["values"].get("GITHUB_NEW_REPO", "")).removeprefix("https://github.com/").removesuffix(".git")
-            if configured.lower() != self.repository.lower():
+            try:
+                if not self.origin.startswith(("https://", "git@")):
+                    raise github_host.GitHubHostError(self.origin)
+                origin = github_host.parse_github_repository(self.origin)
+            except github_host.GitHubHostError:
+                raise ValueError("A credential-free GitHub consumer origin is required.") from None
+            # [HOST/]OWNER/REPO: gh --repo and --hostname follow the consumer's host; github.com stays OWNER/REPO.
+            self.repository, self.github_hostname = origin.slug, origin.host
+            configured = str(self.selected["values"].get("GITHUB_NEW_REPO", ""))
+            if not github_host.same_repository(configured, self.repository):
                 raise ValueError("Selected project GitHub destination differs from the consumer origin.")
-            self.command(["gh", "auth", "status"])
-            self.github_identity = self.read_json(["gh", "api", "user"]).get("id")
+            self.command(["gh", "auth", "status"] + self._github_hostname_arguments())
+            self.github_identity = self.read_json(self.github_user_command()).get("id")
             if type(self.github_identity) is not int:
                 raise ValueError("GitHub authenticated identity could not be bound.")
         else:
@@ -612,7 +627,7 @@ def main():
                 or ("state" in account and account["state"] != "Enabled")):
             raise ValueError("Azure identity/target changed during refresh.")
         if args.route == "gha":
-            if deployment.read_json(["gh", "api", "user"]).get("id") != deployment.github_identity:
+            if deployment.read_json(deployment.github_user_command()).get("id") != deployment.github_identity:
                 raise ValueError("GitHub authenticated identity changed during refresh.")
             deployment.github()
         else:

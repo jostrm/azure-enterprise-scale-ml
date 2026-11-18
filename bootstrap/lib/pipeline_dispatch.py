@@ -23,6 +23,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import uuid4
 import zipfile
 
+import github_host
 from pipeline_credentials import CredentialError, environment_file_path, load_dispatch_env
 from provider_repository_state import same_repository  # noqa: F401  (one shared rule)
 
@@ -81,6 +82,32 @@ def local_file(root, value):
     return path
 
 
+def github_path(repository):
+    """OWNER/REPO of a bound https://HOST/OWNER/REPO (on github.com exactly what removeprefix gave)."""
+    parts = urlsplit(repository)
+    if parts.scheme == "https" and parts.netloc == parts.netloc.lower() and github_host.is_valid_host(parts.netloc):
+        return parts.path[1:]
+    return repository
+
+
+def _github_api_host(base):
+    """The GitHub host whose REST API root ``base`` is under (github.com when it is none of them)."""
+    parts = urlsplit(base)
+    hostname = parts.hostname or ""
+    if hostname.startswith("api.") and github_host.is_data_residency(hostname[4:]):
+        return hostname[4:]
+    if (parts.path == "/api/v3" or parts.path.startswith("/api/v3/")) and github_host.is_valid_host(hostname) \
+            and github_host.is_enterprise_server(hostname):
+        return hostname
+    return github_host.DOTCOM
+
+
+def _actions_repository(env):
+    """The running GitHub Actions job's repository URL: GITHUB_SERVER_URL (github.com if unset) + GITHUB_REPOSITORY."""
+    server = (env.get("GITHUB_SERVER_URL") or "https://github.com").rstrip("/")
+    return server + "/" + env.get("GITHUB_REPOSITORY", "")
+
+
 def validate_binding(canonical, binding):
     require(isinstance(binding, dict), "provider-binding-required")
     common = {"schema", "provider", "repository", "consumer_commit"}
@@ -103,10 +130,11 @@ def validate_binding(canonical, binding):
         consumer_ref(canonical, binding)
     require(isinstance(repository, str), "repository-invalid")
     if provider == "gha":
-        require(re.fullmatch(r"https://github\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]+",
-                             repository) is not None and repository.rsplit("/", 1)[1] not in (".", ".."),
-                "repository-invalid")
-        base = "https://api.github.com/repos/" + repository.removeprefix("https://github.com/")
+        # [HOST/]OWNER/REPO contract: https://HOST/OWNER/REPO with any GitHub host (github.com, GHE.com, GHES).
+        match = re.fullmatch(r"https://([a-z0-9.-]+)/([A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]+)", repository)
+        require(match is not None and github_host.is_valid_host(match[1])
+                and repository.rsplit("/", 1)[1] not in (".", ".."), "repository-invalid")
+        base = github_host.api_base_for(match[1]) + "/repos/" + match[2]
     else:
         require(re.fullmatch(r"https://dev\.azure\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_.% -]+/_git/[A-Za-z0-9_.% -]+",
                              repository) is not None, "repository-invalid")
@@ -141,6 +169,8 @@ class ProviderTransport:
     """Credentials stay in the environment and HTTP headers, never artifacts/argv."""
     def __init__(self, provider, base, *, opener=None, max_bytes=MAX_BYTES):
         self.provider, self.base = provider, base
+        # The GitHub host decides the token variable and artifact hosts: a github.com token never leaves github.com.
+        self.host = _github_api_host(base) if provider == "gha" else None
         require(type(max_bytes) is int and 1 <= max_bytes <= 65 * 1024 * 1024, "response-limit-invalid")
         self.max_bytes = max_bytes
         self.opener = opener or build_opener(_NoRedirect())
@@ -149,8 +179,8 @@ class ProviderTransport:
         require(method in ("GET", "POST") and (url == self.base or url.startswith(self.base + "/")),
                 "provider-url-outside-binding")
         if self.provider == "gha":
-            token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-            require(bool(token), "GH_TOKEN-or-GITHUB_TOKEN-required")
+            token = github_host.token_from_environment(self.host, os.environ)
+            require(bool(token), "-or-".join(github_host.token_variables(self.host)) + "-required")
             authorization = "Bearer " + token
         else:
             token = os.environ.get("SYSTEM_ACCESSTOKEN")
@@ -174,8 +204,9 @@ class ProviderTransport:
                     parsed = urlsplit(target)
                     require(parsed.scheme == "https" and not parsed.username and not parsed.password
                             and parsed.port in (None, 443) and parsed.hostname is not None
-                            and any(parsed.hostname.endswith(suffix) for suffix in
-                                    (".blob.core.windows.net", ".githubusercontent.com", ".vsassets.io")),
+                            and (any(parsed.hostname.endswith(suffix) for suffix in
+                                     (".blob.core.windows.net", ".githubusercontent.com", ".vsassets.io"))
+                                 or self._enterprise_artifact_host(parsed.hostname)),
                             "artifact-redirect-outside-provider")
                     url, headers = target, {"Accept": "application/octet-stream"}
                     continue
@@ -192,6 +223,13 @@ class ProviderTransport:
                     raise DispatchError("provider-response-invalid") from None
                 return response.status, response_headers, value
         raise DispatchError("artifact-redirect-limit")
+
+    def _enterprise_artifact_host(self, hostname):
+        """A GHE.com or GHES host serves artifacts from its own domain; github.com keeps only the list above."""
+        host = self.host
+        if self.provider != "gha" or not host or github_host.is_dotcom(host):
+            return False
+        return hostname == host or hostname.endswith("." + host)
 
 
 def _pages(transport, url, collection, *, max_pages=10):
@@ -213,7 +251,7 @@ def _gha_identity(run, *, binding, workflow, correlation, run_id=None):
             and run.get("display_title") == f"pipelines-only [{correlation}]"
             and run.get("head_sha") == binding["consumer_commit"] and run.get("run_attempt") == 1
             and run.get("repository", {}).get("full_name", "").lower() ==
-            binding["repository"].removeprefix("https://github.com/").lower(), "provider-run-identity-mismatch")
+            github_path(binding["repository"]).lower(), "provider-run-identity-mismatch")
 
 
 def _ado_identity(run, *, binding, correlation, request_digest, run_id=None):
@@ -339,6 +377,8 @@ class ProviderReceiptReader:
         binding = {"schema": 1, "provider": self.provider, "repository": expected["repository"],
                    "consumer_commit": expected["consumer_commit"]}
         self.base = validate_binding({"provider": self.provider}, binding)
+        self.api_root = (github_host.api_base_for(urlsplit(expected["repository"]).hostname)
+                         if self.provider == "gha" else None)
         self.transport = transport or ProviderTransport(self.provider, self.base, max_bytes=65 * 1024 * 1024)
         self.journal = RepositoryJournal(ProviderState(
             self, {"kind": self.provider, "repository": expected["repository"]}, DispatchError))
@@ -346,7 +386,7 @@ class ProviderReceiptReader:
     def state_request(self, provider, method, path, body=None, allowed=(200,)):
         require(provider == self.provider and method == "GET" and body is None,
                 "provider-receipt-reader-is-read-only")
-        url = "https://api.github.com/" + path if provider == "gha" else path
+        url = self.api_root + "/" + path if provider == "gha" else path
         status, headers, value = self.transport.request("GET", url)
         require(status in allowed, "provider-receipt-read-failed")
         return status, headers, value
@@ -655,8 +695,8 @@ def preflight(root, request_path, canonical, binding, provider, output):
         require(os.environ.get("GITHUB_SHA") == binding["consumer_commit"]
                 and os.environ.get("GITHUB_WORKFLOW_SHA") == binding["consumer_commit"]
                 and os.environ.get("GITHUB_REF") == selected_ref
-                and os.environ.get("GITHUB_REPOSITORY", "").lower() ==
-                binding["repository"].removeprefix("https://github.com/").lower()
+                and os.environ.get("GITHUB_REPOSITORY", "").lower() == github_path(binding["repository"]).lower()
+                and same_repository(_actions_repository(os.environ), binding["repository"])
                 and os.environ.get("GITHUB_RUN_ATTEMPT") == "1", "provider-execution-context-mismatch")
         run_id = os.environ.get("GITHUB_RUN_ID", "")
     else:
@@ -704,12 +744,13 @@ def operational_binding(root, canonical):
 
 def _origin_repository(root):
     origin = _git(root, "remote", "get-url", "origin").removesuffix(".git")
-    if origin.startswith("git@github.com:"):
-        origin = "https://github.com/" + origin.removeprefix("git@github.com:")
-    elif origin.startswith("git@ssh.dev.azure.com:v3/"):
+    ssh = re.fullmatch(r"git@([^:/\s]+):(.+)", origin)
+    if origin.startswith("git@ssh.dev.azure.com:v3/"):
         parts = origin.removeprefix("git@ssh.dev.azure.com:v3/").split("/")
         require(len(parts) == 3, "consumer-origin-required")
         origin = f"https://dev.azure.com/{parts[0]}/{parts[1]}/_git/{parts[2]}"
+    elif ssh and github_host.is_valid_host(ssh[1]):
+        origin = "https://" + github_host.normalize_host(ssh[1]) + "/" + ssh[2]
     return origin
 
 
@@ -721,7 +762,7 @@ def _producer_run(transport, base, provider, source):
                 and run.get("run_attempt") == 1 and run.get("status") == "completed"
                 and run.get("conclusion") == "success"
                 and run.get("repository", {}).get("full_name", "").lower() ==
-                source["repository"].removeprefix("https://github.com/").lower(),
+                github_path(source["repository"]).lower(),
                 "input-artifact-producer-mismatch-or-unsuccessful")
     else:
         _, _, run = transport.request("GET", f"{base}/build/builds/{identifier}?api-version=7.1")
@@ -842,7 +883,7 @@ def download_input(repo_root, request_path, *, provider=None, transport=None, en
     base = validate_binding(request, binding)
     env = os.environ if environ is None else environ
     if provider == "gha" and env.get("GITHUB_ACTIONS") == "true":
-        actual_repository = "https://github.com/" + env.get("GITHUB_REPOSITORY", "")
+        actual_repository = _actions_repository(env)
         require(env.get("GITHUB_SHA") == commit and env.get("GITHUB_WORKFLOW_SHA") == commit
                 and env.get("GITHUB_RUN_ATTEMPT") == "1", "input-download-consumer-context-mismatch")
     elif provider == "ado" and env.get("TF_BUILD", "").lower() == "true":
