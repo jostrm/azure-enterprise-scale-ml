@@ -10,6 +10,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/web.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/browser_auth.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/app.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_realtime.py
@@ -61,6 +62,23 @@ acquire tokens, submit feedback to a service or mutate operation history.
 `test_companion.py` covers bare-root wiring, static asset delivery, origin/host
 guards and the current template's DOM contract. Source parity does not prove a
 deployed Container App revision; live rollout is a separate observation.
+
+## Browser session continuity (source observation, 2026-11-18)
+
+Access tokens remain in memory. After the API validates the browser principal,
+tab-scoped session storage retains only a versioned digest of the principal and
+configured public client/audience. A reload with that marker starts a fresh PKCE
+authorization with `prompt=none`, reusing the Entra browser session when policy
+allows. The returned `/api/context` identity must match before the restored
+session is exposed to the UI or additional API reads begin.
+
+Explicit sign-out removes the marker. Missing/corrupt markers, account changes,
+consent or account-selection requirements, and recovery failures leave the page
+signed out without a redirect loop. No access/refresh token, email or raw object
+ID is persisted. This is not a promise of indefinite login: conditional access
+and Entra session expiry may require interaction. The embedded MAUI token bridge
+retains its existing independent lifecycle. `test_web.py` exercises these paths
+with controlled Entra/API responses; source coverage does not prove deployment.
 
 ## Observed baseline flow
 

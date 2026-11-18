@@ -963,7 +963,10 @@ Configure `auth.client_id`, `auth.audience`, `required_scope` and exact object-I
 grants before web use. Entra tokens are checked for the configured tenant,
 issuer, audience, validity and delegated scope. No browser-provided user ID,
 audience toggle, model argument or managed identity establishes user authority.
-Tokens stay in browser memory; the frontend uses authorization-code PKCE.
+Tokens stay in browser memory; the frontend uses authorization-code PKCE. After
+the backend validates a browser principal, tab-scoped session storage retains
+only a versioned SHA-256 binding of that principal and the configured public
+client/audience. It stores no token, refresh secret, email or raw object ID.
 
 The operator can plan and configure a **dedicated** single-tenant browser identity:
 
@@ -1000,9 +1003,14 @@ The owner tag, exclusive directory ownership and drift checks apply to both. Set
 `config.local.json`; use it for the next approved `deploy.py --apply`.
 
 The standalone browser may reuse the Microsoft sign-in session already on the
-machine. It never borrows ARM or other Azure CLI tokens: those target different
-APIs. The embedded MAUI host below requests a separate Azure CLI token for this
-Agent API's own audience only, after the explicit pre-authorization it describes.
+machine. On page refresh it may request a new PKCE code with `prompt=none`, but
+publishes the restored session only after `/api/context` matches the prior
+principal/configuration binding. Account changes, missing/corrupt bindings,
+explicit sign-out and recovery failures clear the marker and require interactive
+sign-in; tenant or consent policy may also require interaction. It never borrows
+ARM or other Azure CLI tokens: those target different APIs. The embedded MAUI
+host below requests a separate Azure CLI token for this Agent API's own audience
+only, after the explicit pre-authorization it describes.
 For v2 access tokens the backend `auth.audience` is the API's client-ID UUID;
 the requested scope remains `api://<client-id>/access_as_user`. Your tenant may
 require an administrator to approve consent to this Agent-specific permission.

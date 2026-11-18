@@ -5,6 +5,8 @@
   const answerRenderer = new window.FactoryMarkdownRenderer({parser: window.markdownit, document});
   const STATE_KEY = "aifactory.oauth.state";
   const VERIFIER_KEY = "aifactory.oauth.verifier";
+  const SESSION_KEY = "aifactory.oauth.session";
+  const SESSION_BINDING_VERSION = "v1";
   const callbackParams = new URLSearchParams(location.search);
   const callback = {
     present: callbackParams.has("code") || callbackParams.has("error"),
@@ -44,6 +46,7 @@
     hostNextRenewalAt: 0,
   };
   const moduleListeners = new Set();
+  let authorizationStarted = false;
   const HOST_PROTOCOL = "esaif.agentChat";
   const HOST_RENEWAL_MARGIN_MS = 4 * 60 * 1000;
   const statusLabels = {
@@ -372,6 +375,7 @@
     const rejected = outcome.state === "rejected";
     const report = Boolean(hostBridge) && (rejected || Boolean(state.token && state.context));
     const issuanceId = outcome.issuanceId || state.hostIssuanceId;
+    const storageCleared = Boolean(hostBridge) || removeAuthStorage([SESSION_KEY, STATE_KEY, VERIFIER_KEY]);
     confirmations.cancel();
     state.sessionVersion += 1;
     state.token = null;
@@ -404,6 +408,7 @@
     renderSkills();
     updateControls();
     if (report) hostBridge.notify(rejected ? "rejected" : "disconnected", rejected ? issuanceId : undefined);
+    return storageCleared;
   }
 
   function validContext(context, requirePrincipal) {
@@ -593,6 +598,65 @@
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
+  function removeAuthStorage(keys) {
+    let removed = true;
+    for (const key of keys) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        removed = false;
+      }
+    }
+    return removed;
+  }
+
+  function storedSessionBinding(required = false) {
+    let binding;
+    try {
+      binding = sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      throw new Error("Browser session storage is unavailable. Enable it and select Sign in with Microsoft.");
+    }
+    if (binding === null && !required) return null;
+    if (typeof binding !== "string" || !/^v1\.[A-Za-z0-9_-]{43}$/.test(binding)) {
+      removeAuthStorage([SESSION_KEY]);
+      throw new Error("The previous browser session cannot be restored. Select Sign in with Microsoft to continue.");
+    }
+    return binding;
+  }
+
+  async function principalBinding(principal) {
+    const audience = uuid(state.config.audience)
+      ? "api://" + state.config.audience.toLowerCase()
+      : state.config.audience.replace(/\/+$/, "").toLowerCase();
+    const canonical = JSON.stringify([
+      SESSION_BINDING_VERSION,
+      principal.tenant_id.toLowerCase(),
+      principal.object_id.toLowerCase(),
+      state.config.tenant_id.toLowerCase(),
+      state.config.client_id.toLowerCase(),
+      audience,
+    ]);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    return SESSION_BINDING_VERSION + "." + base64url(new Uint8Array(digest));
+  }
+
+  function takeAuthTransaction() {
+    let expected;
+    let verifier;
+    try {
+      expected = sessionStorage.getItem(STATE_KEY);
+      verifier = sessionStorage.getItem(VERIFIER_KEY);
+    } catch {
+      removeAuthStorage([STATE_KEY, VERIFIER_KEY]);
+      throw new Error("Sign-in state could not be read securely. Enable browser session storage and start sign-in again.");
+    }
+    if (!removeAuthStorage([STATE_KEY, VERIFIER_KEY])) {
+      throw new Error("Sign-in state could not be cleared securely. Close this tab and start sign-in again.");
+    }
+    return {expected, verifier};
+  }
+
   async function signIn() {
     showError("");
     if (hostBridge) {
@@ -603,73 +667,122 @@
       showError("Sign-in requires approved Entra configuration and HTTPS (or localhost). Ask the operator to finish setup.");
       return;
     }
-    ui("sign-in").disabled = true;
     try {
-      const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-      // Carry non-secret view preferences in the state transaction, not extra browser storage.
-      const scopePreference = /^[A-Za-z0-9_-]{1,80}$/.test(state.scopeKey) ? state.scopeKey : "";
-      const oauthState = base64url(crypto.getRandomValues(new Uint8Array(32))) + "." + state.audience + "." + scopePreference
-        + "." + state.palette;
-      const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-      sessionStorage.setItem(STATE_KEY, oauthState);
-      sessionStorage.setItem(VERIFIER_KEY, verifier);
-      const authorize = new URL("https://login.microsoftonline.com/" + state.config.tenant_id + "/oauth2/v2.0/authorize");
-      authorize.search = new URLSearchParams({
-        client_id: state.config.client_id, response_type: "code", response_mode: "query",
-        redirect_uri: location.origin + "/", scope: apiScope(), state: oauthState,
-        code_challenge: challenge, code_challenge_method: "S256",
-      });
-      location.assign(authorize.href);
-    } catch {
-      showError("The secure sign-in transaction could not be saved. Enable browser session storage and try again.");
+      await beginAuthorization(false);
+    } catch (error) {
+      showError(error.message);
       ui("sign-in").disabled = false;
     }
   }
 
+  async function beginAuthorization(silent) {
+    if (authorizationStarted) return;
+    authorizationStarted = true;
+    ui("sign-in").disabled = true;
+    try {
+      const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+      // Carry only non-secret view preferences and flow type in the verified state transaction.
+      const scopePreference = /^[A-Za-z0-9_-]{1,80}$/.test(state.scopeKey) ? state.scopeKey : "";
+      const flow = silent ? "silent" : "interactive";
+      const oauthState = base64url(crypto.getRandomValues(new Uint8Array(32))) + "." + state.audience + "." + scopePreference
+        + "." + state.palette + "." + flow;
+      const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      sessionStorage.setItem(STATE_KEY, oauthState);
+      sessionStorage.setItem(VERIFIER_KEY, verifier);
+      const authorize = new URL("https://login.microsoftonline.com/" + state.config.tenant_id + "/oauth2/v2.0/authorize");
+      const parameters = {
+        client_id: state.config.client_id, response_type: "code", response_mode: "query",
+        redirect_uri: location.origin + "/", scope: apiScope(), state: oauthState,
+        code_challenge: challenge, code_challenge_method: "S256",
+      };
+      if (silent) parameters.prompt = "none";
+      authorize.search = new URLSearchParams(parameters);
+      location.assign(authorize.href);
+    } catch {
+      authorizationStarted = false;
+      removeAuthStorage(silent ? [SESSION_KEY, STATE_KEY, VERIFIER_KEY] : [STATE_KEY, VERIFIER_KEY]);
+      throw new Error(silent
+        ? "Your Microsoft session could not be restored. Select Sign in with Microsoft to continue."
+        : "The secure sign-in transaction could not be saved. Enable browser session storage and try again.");
+    }
+  }
+
   async function finishSignIn() {
-    const expected = sessionStorage.getItem(STATE_KEY);
-    const verifier = sessionStorage.getItem(VERIFIER_KEY);
-    sessionStorage.removeItem(STATE_KEY);
-    sessionStorage.removeItem(VERIFIER_KEY);
+    const {expected, verifier} = takeAuthTransaction();
     if (!expected || !verifier || !callback.state || callback.state !== expected) {
       throw new Error("Sign-in state verification failed. Start a new sign-in from this page; no callback was accepted.");
     }
+    const preferences = expected.split(".");
+    const silent = preferences.length === 5 && preferences[4] === "silent";
     if (callback.error || !callback.code) {
+      if (silent) {
+        removeAuthStorage([SESSION_KEY]);
+        const messages = {
+          access_denied: "Microsoft sign-in was cancelled. Select Sign in with Microsoft when you are ready.",
+          account_selection_required: "Microsoft needs you to choose an account. Select Sign in with Microsoft to continue.",
+          consent_required: "Microsoft consent is required. Select Sign in with Microsoft to review the approved delegated scope.",
+          interaction_required: "Your Microsoft session needs interaction. Select Sign in with Microsoft to continue.",
+          login_required: "Your Microsoft session could not be restored. Select Sign in with Microsoft to continue.",
+        };
+        throw new Error(messages[callback.error]
+          || "Microsoft could not restore this session. Select Sign in with Microsoft to continue.");
+      }
       throw new Error("Microsoft did not complete sign-in. Confirm registration approval, API consent and the exact SPA redirect URI.");
     }
-    const preferences = expected.split(".");
-    if ([3, 4].includes(preferences.length) && ["platform", "project"].includes(preferences[1])) {
+    const expectedBinding = silent ? storedSessionBinding(true) : null;
+    if ([3, 4, 5].includes(preferences.length) && ["platform", "project"].includes(preferences[1])) {
       state.audience = preferences[1];
       if (/^[A-Za-z0-9_-]{1,80}$/.test(preferences[2])) state.scopeKey = preferences[2];
       applyPalette(preferences[3]);
     }
-    const response = await fetch(
-      "https://login.microsoftonline.com/" + state.config.tenant_id + "/oauth2/v2.0/token",
-      {
-        method: "POST", credentials: "omit", cache: "no-store", redirect: "error",
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: new URLSearchParams({
-          client_id: state.config.client_id, grant_type: "authorization_code", code: callback.code,
-          redirect_uri: location.origin + "/", code_verifier: verifier, scope: apiScope(),
-        }),
-      },
-    );
-    callback.code = null;
-    const token = await response.json();
+    let response;
+    let token;
+    try {
+      response = await fetch(
+        "https://login.microsoftonline.com/" + state.config.tenant_id + "/oauth2/v2.0/token",
+        {
+          method: "POST", credentials: "omit", cache: "no-store", redirect: "error",
+          headers: {"Content-Type": "application/x-www-form-urlencoded"},
+          body: new URLSearchParams({
+            client_id: state.config.client_id, grant_type: "authorization_code", code: callback.code,
+            redirect_uri: location.origin + "/", code_verifier: verifier, scope: apiScope(),
+          }),
+        },
+      );
+      callback.code = null;
+      token = await response.json();
+    } catch {
+      if (silent) removeAuthStorage([SESSION_KEY]);
+      throw new Error("The API access token could not be acquired. Check the Entra SPA platform, delegated scope and consent.");
+    }
     if (!response.ok || token.token_type?.toLowerCase() !== "bearer" || typeof token.access_token !== "string"
       || !token.access_token || token.access_token.length > 32768
       || !Number.isFinite(token.expires_in) || token.expires_in <= 0 || token.expires_in > 86400) {
+      if (silent) removeAuthStorage([SESSION_KEY]);
       throw new Error("The API access token could not be acquired. Check the Entra SPA platform, delegated scope and consent.");
     }
-    await startSession(token.access_token, Date.now() + token.expires_in * 1000 - 15000);
+    await startSession(token.access_token, Date.now() + token.expires_in * 1000 - 15000, expectedBinding);
   }
 
-  async function startSession(accessToken, expiresAt) {
+  async function startSession(accessToken, expiresAt, expectedBinding = null) {
     state.token = accessToken;
     state.expiresAt = expiresAt;
     const context = await api("/api/context");
-    if (!validContext(context, Boolean(hostBridge))) {
+    if (!validContext(context, true)) {
       throw new Error("The Agent returned an incomplete session context. No session was started; check the deployment and sign in or connect again.");
+    }
+    if (!hostBridge) {
+      const binding = await principalBinding(context.principal);
+      if (expectedBinding && binding !== expectedBinding) {
+        clearSession();
+        throw new Error("Account changed while restoring the browser session. Select Sign in with Microsoft to continue.");
+      }
+      try {
+        sessionStorage.setItem(SESSION_KEY, binding);
+      } catch {
+        clearSession();
+        throw new Error("The signed-in browser session could not be recorded securely. Enable browser session storage and sign in again.");
+      }
     }
     state.context = context;
     hostBridge?.notify("connected");
@@ -1316,8 +1429,7 @@
         ui("setup-message").textContent = "Sign-in is disabled. An approved operator must configure tenant/client ID, API audience and delegated scope, and register this exact SPA redirect URI: "
           + location.origin + "/. No identity is created by this page; tokens cannot be pasted as a workaround.";
         if (callback.present) {
-          sessionStorage.removeItem(STATE_KEY);
-          sessionStorage.removeItem(VERIFIER_KEY);
+          removeAuthStorage([STATE_KEY, VERIFIER_KEY]);
           callback.code = null;
         }
         return;
@@ -1330,7 +1442,11 @@
       }
       ui("sign-in").disabled = !window.isSecureContext || !crypto.subtle;
       if (ui("sign-in").disabled) throw new Error("Secure browser cryptography is unavailable. Serve this frontend over HTTPS or localhost.");
-      if (callback.present) await finishSignIn();
+      if (callback.present) {
+        await finishSignIn();
+      } else if (storedSessionBinding()) {
+        await beginAuthorization(true);
+      }
     } catch (error) {
       callback.code = null;
       if (state.token && !state.context) clearSession();
@@ -1344,7 +1460,11 @@
     if (applyPalette(ui("color-theme").value)) saveSelection();
   });
   ui("sign-in").addEventListener("click", () => { void signIn(); });
-  ui("sign-out").addEventListener("click", () => clearSession());
+  ui("sign-out").addEventListener("click", () => {
+    if (!clearSession()) {
+      showError("Signed out from this page, but browser session storage could not be cleared. Close this tab before using it again.");
+    }
+  });
   ui("question-form").addEventListener("submit", (event) => { void ask(event); });
   ui("proposal-form").addEventListener("submit", (event) => { void propose(event); });
   ui("skill-form").addEventListener("submit", (event) => { void runSkill(event); });
@@ -1391,7 +1511,7 @@
       clearSession();
       showError(hostBridge
         ? "The Chat token expired. Use Login to Azure in the app if needed, then select Connect."
-        : "Your access token expired. Sign in again; tokens are not persisted or silently refreshed.");
+        : "Your access token expired. Sign in again; tokens are not persisted.");
     } else if (state.operations.some((operation) => ["executing", "continuing", "running"].includes(operation.status))) {
       void refresh().catch((error) => showError(error.message));
     }

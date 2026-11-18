@@ -672,7 +672,14 @@ def test_frontend_confirmation_and_shortcuts_accessibility():
 
 
 @pytest.mark.parametrize("mode", [
-    "blocked", "pkce", "bad-state", "authenticated", "approval", "cancel-disabled",
+    "blocked", "pkce", "pkce-race", "bad-state", "authenticated", "logout-marker", "approval", "cancel-disabled",
+    "refresh-active", "refresh-logged-out", "refresh-storage-unavailable", "silent-success",
+    "silent-different-oid", "silent-different-tenant", "silent-different-config",
+    "silent-missing-marker", "silent-corrupt-marker", "silent-missing-principal", "silent-network-failure",
+    "silent-token-network-failure",
+    "silent-login-required", "silent-consent-required",
+    "silent-account-selection-required", "silent-cancelled",
+    "interactive-other-account",
     "discard", "out-of-sync", "reindex", "user-proposal", "proposal-blocked", "proposal-api-unavailable",
     "skill-cost", "skill-action", "skill-delete",
     "markdown-answer", "fallback-blocked", "fallback-failed", "fallback-stale",
@@ -696,12 +703,27 @@ const mode = process.argv[3];
 const confirmationAction = mode.startsWith("confirm-") ? mode.split("-")[1] : null;
 const confirmationScenario = mode.startsWith("confirm-") ? mode.split("-")[2] : null;
 const clientId = "11111111-1111-4111-8111-111111111111";
-const config = {
+const otherClientId = "55555555-5555-4555-8555-555555555555";
+const originalPrincipal = {
   tenant_id: "44444444-4444-4444-8444-444444444444",
-  client_id: mode === "blocked" ? null : clientId,
-  audience: mode === "blocked" ? null : "api://" + clientId,
+  object_id: "22222222-2222-4222-8222-222222222222",
+};
+const config = {
+  tenant_id: originalPrincipal.tenant_id,
+  client_id: mode === "blocked" ? null : mode === "silent-different-config" ? otherClientId : clientId,
+  audience: mode === "blocked" ? null : "api://" + (mode === "silent-different-config" ? otherClientId : clientId),
   required_scope: "access_as_user",
 };
+const principal = mode === "silent-different-oid" || mode === "interactive-other-account"
+  ? {...originalPrincipal, object_id: "33333333-3333-4333-8333-333333333333"}
+  : mode === "silent-different-tenant"
+    ? {...originalPrincipal, tenant_id: "66666666-6666-4666-8666-666666666666"} : originalPrincipal;
+const bindingFor = (identity, client = clientId, audience = "api://" + clientId) => "v1."
+  + createHash("sha256").update(JSON.stringify([
+    "v1", identity.tenant_id.toLowerCase(), identity.object_id.toLowerCase(),
+    originalPrincipal.tenant_id.toLowerCase(), client.toLowerCase(), audience.toLowerCase(),
+  ])).digest("base64url");
+const originalBinding = bindingFor(originalPrincipal);
 const elements = new Map();
 class Element {
   constructor(tag) {
@@ -739,21 +761,32 @@ function ui(id) {
   return elements.get(id);
 }
 ui("sign-in").disabled = true;
-const callbackMode = !["blocked", "pkce"].includes(mode);
+const silentFlow = mode.startsWith("silent-");
+const silentProtocolFailure = ["silent-login-required", "silent-consent-required",
+  "silent-account-selection-required", "silent-cancelled"].includes(mode);
+const callbackMode = !["blocked", "pkce", "pkce-race", "refresh-active", "refresh-logged-out",
+  "refresh-storage-unavailable"].includes(mode);
 // palette-callback returns from sign-in with the view, scope and color theme carried in the OAuth state.
-const expectedState = mode === "palette-callback" ? "nonce.platform.project001-dev.purple" : "expected";
-let current = new URL("https://factory.example/" + (callbackMode
-  ? "?code=UNIT_TEST_CODE&state=" + (mode === "bad-state" ? "invalid" : expectedState)
-  : mode === "pkce" ? "#scope=project001-dev&view=platform" : ""));
-let assigned;
+const expectedState = mode === "palette-callback" ? "nonce.platform.project001-dev.purple"
+  : silentFlow ? "nonce.project.project001-dev.gray-blue.silent" : "expected";
+const silentError = mode === "silent-cancelled" ? "access_denied"
+  : silentProtocolFailure ? mode.slice(7).replaceAll("-", "_") : "";
+let current = new URL("https://factory.example/" + (silentProtocolFailure
+  ? "?error=" + silentError + "&state=" + expectedState
+  : callbackMode ? "?code=UNIT_TEST_CODE&state=" + (mode === "bad-state" ? "invalid" : expectedState)
+  : ["pkce", "pkce-race"].includes(mode) ? "#scope=project001-dev&view=platform" : ""));
+let assigned, assignmentCount = 0;
 const historyCalls = [];
 const location = {
   get origin() { return current.origin; }, get pathname() { return current.pathname; },
   get search() { return current.search; }, get hash() { return current.hash; },
-  assign(url) { assigned = url; },
+  assign(url) { assigned = url; assignmentCount++; },
 };
-const storage = new Map(callbackMode
-  ? [["aifactory.oauth.state", expectedState], ["aifactory.oauth.verifier", "v".repeat(43)]] : []);
+const storage = new Map([
+  ...(callbackMode ? [["aifactory.oauth.state", expectedState], ["aifactory.oauth.verifier", "v".repeat(43)]] : []),
+  ...(["refresh-active", ...(silentFlow ? [mode] : [])].includes(mode) && mode !== "silent-missing-marker"
+    ? [["aifactory.oauth.session", mode === "silent-corrupt-marker" ? "corrupt" : originalBinding]] : []),
+]);
 const calls = [];
 let operationStatus = confirmationAction === "execute" ? "approved"
   : confirmationAction === "continue" ? "awaiting_continuation" : "pending";
@@ -778,6 +811,7 @@ const operation = () => ({
     continuation_allowed: true, observation_hash: "b".repeat(64)},
 });
 const context = {
+  ...(mode === "silent-missing-principal" ? {} : {principal}),
   scopes: [{key: "project001-dev", label: "factory / 001 / dev",
     scope: {factory: "factory", project: "001", environment: "dev", tenant_id: config.tenant_id,
       subscription_id: clientId, resource_group: "project-rg"},
@@ -835,7 +869,10 @@ const sandbox = {
   location, history: {replaceState(_, __, url) { historyCalls.push(url); current = new URL(url, current); }},
   crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder, TextDecoder,
   Event: class { constructor(type) { this.type = type; } },
-  sessionStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value),
+  sessionStorage: {getItem: key => {
+      if (mode === "refresh-storage-unavailable" && key === "aifactory.oauth.session") throw new Error("PRIVATE_BROWSER_DETAIL");
+      return storage.get(key) || null;
+    }, setItem: (key, value) => storage.set(key, value),
     removeItem: key => storage.delete(key)},
   btoa: value => Buffer.from(value, "binary").toString("base64"),
   atob: value => Buffer.from(value, "base64").toString("binary"),
@@ -844,10 +881,14 @@ const sandbox = {
   fetch: async (url, options = {}) => {
     calls.push({url, options, body: options.body ? String(options.body) : null, location: current.href});
     if (url === "/api/public-config") return response(config);
-    if (url.endsWith("/oauth2/v2.0/token")) return response({
-      token_type: "Bearer", access_token: "UNIT_TEST_ACCESS_TOKEN", expires_in: 3600,
-    });
-    if (url === "/api/context") return response(context);
+    if (url.endsWith("/oauth2/v2.0/token")) {
+      if (mode === "silent-token-network-failure") throw new Error("PRIVATE_TOKEN_NETWORK_DETAIL");
+      return response({token_type: "Bearer", access_token: "UNIT_TEST_ACCESS_TOKEN", expires_in: 3600});
+    }
+    if (url === "/api/context") {
+      if (mode === "silent-network-failure") throw new Error("PRIVATE_NETWORK_DETAIL");
+      return response(context);
+    }
     if (url === "/api/voice/status") {
       if (mode === "voice-status-401-fallback") return {ok: false, status: 401, json: async () => ({})};
       return response({enabled: true, ready: true, mode: "realtime", voice: {languages: ["en-US"]}});
@@ -919,16 +960,20 @@ async function consent() {
   await dispatch(ui("confirmation-accept"), "click");
 }
 (async () => {
-  await waitFor(() => calls.length && (ui("sign-in").disabled === false || mode === "blocked"
-    || ui("error-message").textContent.includes("state verification")));
+  await waitFor(() => calls.length && (!silentFlow && ui("sign-in").disabled === false || mode === "blocked"
+    || assigned
+    || ui("error-message").textContent.includes("state verification")
+    || mode === "refresh-storage-unavailable" && ui("error-message").textContent
+    || silentFlow && (ui("error-message").textContent || calls.some(call => call.url === "/api/operations"))));
   if (mode === "blocked") {
     assert.equal(ui("sign-in").disabled, true);
     assert.equal(ui("propose").disabled, true);
     await waitFor(() => ui("setup-message").textContent.includes("tokens cannot be pasted"));
     assert.equal(ui("setup-blocker").hidden, false, "a blocked setup stays visible");
     assert.equal(calls.length, 1);
-  } else if (mode === "pkce") {
+  } else if (["pkce", "pkce-race"].includes(mode)) {
     await dispatch(ui("sign-in"), "click");
+    if (mode === "pkce-race") await dispatch(ui("sign-in"), "click");
     await waitFor(() => assigned);
     const url = new URL(assigned);
     assert.equal(url.hostname, "login.microsoftonline.com");
@@ -937,11 +982,75 @@ async function consent() {
     assert.equal(url.searchParams.get("response_type"), "code");
     assert.equal(url.searchParams.get("code_challenge_method"), "S256");
     assert.equal(url.searchParams.get("state"), storage.get("aifactory.oauth.state"));
-    assert.equal(url.searchParams.get("state").split(".").slice(1).join("."), "platform.project001-dev.gray-blue");
+    assert.equal(url.searchParams.get("state").split(".").slice(1).join("."), "platform.project001-dev.gray-blue.interactive");
     assert.equal(url.searchParams.get("code_challenge"), createHash("sha256")
       .update(storage.get("aifactory.oauth.verifier")).digest("base64url"));
     assert.deepEqual([...storage.keys()].sort(), ["aifactory.oauth.state", "aifactory.oauth.verifier"]);
     assert.equal(url.searchParams.has("client_secret"), false);
+    assert.equal(url.searchParams.has("prompt"), false);
+    assert.equal(assignmentCount, 1, "concurrent sign-in starts one authorization transaction");
+  } else if (mode === "refresh-active") {
+    await waitFor(() => assigned);
+    const url = new URL(assigned);
+    assert.equal(url.hostname, "login.microsoftonline.com");
+    assert.equal(url.searchParams.get("prompt"), "none");
+    assert.equal(url.searchParams.get("scope"), "api://" + clientId + "/access_as_user");
+    assert.equal(url.searchParams.get("state").split(".").at(-1), "silent");
+    assert.equal(storage.get("aifactory.oauth.session"), originalBinding);
+    assert.match(storage.get("aifactory.oauth.session"), /^v1\.[A-Za-z0-9_-]{43}$/);
+    assert.deepEqual([...storage.keys()].sort(),
+      ["aifactory.oauth.session", "aifactory.oauth.state", "aifactory.oauth.verifier"]);
+    assert.equal(calls.length, 1, "silent recovery sends no API request before Entra returns");
+  } else if (mode === "refresh-logged-out") {
+    assert.equal(assigned, undefined);
+    assert.equal(storage.size, 0);
+    assert.equal(ui("sign-in").disabled, false);
+    assert.equal(calls.length, 1, "an explicitly ended session stays signed out after refresh");
+  } else if (mode === "refresh-storage-unavailable") {
+    assert.equal(assigned, undefined);
+    assert.match(ui("error-message").textContent, /session storage is unavailable/i);
+    assert(!ui("error-message").textContent.includes("PRIVATE_BROWSER_DETAIL"));
+    assert.equal(ui("sign-in").hidden, false);
+    assert.equal(ui("sign-out").hidden, true);
+    assert.equal(calls.length, 1);
+  } else if (silentProtocolFailure) {
+    assert.equal(assigned, undefined);
+    assert.equal(storage.size, 0, "failed silent recovery clears transaction and session markers");
+    assert.equal(ui("sign-in").hidden, false);
+    assert.equal(ui("sign-out").hidden, true);
+    assert.equal(ui("sign-in").disabled, false);
+    assert.match(ui("error-message").textContent, /select sign in|cancelled/i);
+    assert(!current.search.includes("error") && !current.search.includes("state"));
+    assert.equal(calls.length, 1, "policy, consent, cancellation and account ambiguity never fake a session");
+  } else if (silentFlow && mode !== "silent-success") {
+    assert.equal(assigned, undefined);
+    assert.equal(storage.size, 0, "failed identity continuity clears transaction and session markers");
+    assert.equal(ui("sign-in").hidden, false);
+    assert.equal(ui("sign-out").hidden, true);
+    assert.equal(ui("sign-in").disabled, false);
+    assert(!ui("error-message").textContent.includes("PRIVATE_"));
+    if (["silent-missing-marker", "silent-corrupt-marker"].includes(mode)) {
+      assert.match(ui("error-message").textContent, /session cannot be restored.*select sign in/i);
+      assert.equal(calls.length, 1, "missing or corrupt binding stops before token exchange");
+    } else if (["silent-network-failure", "silent-token-network-failure"].includes(mode)) {
+      if (mode === "silent-token-network-failure") {
+        assert.match(ui("error-message").textContent, /access token could not be acquired/i);
+        assert(!calls.some(call => call.url === "/api/context"));
+      } else {
+        assert.match(ui("error-message").textContent, /could not be reached/i);
+        assert(calls.some(call => call.url === "/api/context"));
+      }
+      assert(calls.some(call => call.url.endsWith("/oauth2/v2.0/token")));
+    } else if (mode === "silent-missing-principal") {
+      assert.match(ui("error-message").textContent, /incomplete session context/i);
+      assert(calls.some(call => call.url === "/api/context"));
+    } else {
+      assert.match(ui("error-message").textContent, /account changed.*select sign in/i);
+      assert(calls.some(call => call.url === "/api/context"));
+    }
+    assert(!calls.some(call => call.url === "/api/operations" || call.url.startsWith("/api/knowledge/")
+      || call.url.startsWith("/api/skills?")), "failed continuity makes no post-context API calls");
+    assert.equal(assignmentCount, 0, "a failed callback never starts a restore loop");
   } else if (mode === "bad-state") {
     assert.equal(calls.length, 1);
     assert.equal(storage.size, 0);
@@ -954,7 +1063,11 @@ async function consent() {
       await waitFor(() => ui("knowledge-status").textContent === "Ready · refresh time not reported", "short ready status");
       assert(ui("knowledge-status").title.includes("indexed: 10"), "detail stays in the tooltip");
     }
-    assert.equal(storage.size, 0);
+    const expectedBinding = bindingFor(principal, config.client_id, config.audience);
+    assert.deepEqual([...storage.entries()], [["aifactory.oauth.session", expectedBinding]],
+      "only a non-secret browser-session marker survives token exchange");
+    assert(!storage.get("aifactory.oauth.session").includes(principal.tenant_id));
+    assert(!storage.get("aifactory.oauth.session").includes(principal.object_id));
     assert(!current.search.includes("code"));
     assert(!calls[0].location.includes("code"));
     const exchange = calls.find(call => call.url.endsWith("/oauth2/v2.0/token"));
@@ -965,6 +1078,15 @@ async function consent() {
     assert.equal(exchangeBody.has("client_secret"), false);
     assert(calls.filter(call => call.url.startsWith("/api/") && call.url !== "/api/public-config")
       .every(call => call.options.headers.Authorization === "Bearer UNIT_TEST_ACCESS_TOKEN"));
+    if (mode === "logout-marker") {
+      await dispatch(ui("sign-out"), "click");
+      assert.equal(storage.size, 0, "explicit sign-out removes the refresh recovery marker");
+      assert.equal(ui("sign-in").hidden, false);
+      assert.equal(ui("sign-out").hidden, true);
+      assert(![...elements.values()].some(element => element.textContent.includes("UNIT_TEST_ACCESS_TOKEN")));
+      console.log("Mocked browser behavior passed: " + mode);
+      return;
+    }
     if (mode === "color-theme") {
       assert.equal(sandbox.document.documentElement["data-palette"], "gray-blue", "Gray and Blue is the default");
       assert.equal(ui("color-theme").value, "gray-blue");
