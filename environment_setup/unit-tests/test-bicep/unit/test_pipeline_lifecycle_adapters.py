@@ -397,3 +397,33 @@ def test_missing_ado_consumer_ref_is_refused(adapters):
     with pytest.raises(Exception) as raised:
         adapters.published_consumer_commit(cloud, route)
     assert "exact-published-consumer-ref-required" in str(raised.value.args)
+
+
+
+def test_journal_reports_verified_common_only_factory_creation_per_scale_set(adapters):
+    from pipeline_lifecycle import bound_plan, digest
+
+    def record(operation, project_ids, *, scale=SCALE, status="succeeded", verified=True):
+        manifest = {"operation": "create-factory",
+                    "target": {"factory_id": FACTORY, "scaleset_id": scale, "project_ids": project_ids}}
+        value = {"schema": 1, "operation_id": operation, "status": status, "prepared_at": "2026-01-01",
+                 "snapshot": snapshot(), "plan": {"stages": [{"id": "lifecycle", "kind": "lifecycle",
+                                                              "manifests": [manifest]}]},
+                 "stages": [{"status": status, "receipt": {"status": status, "verified": verified, "children": []}}]}
+        value["snapshot_hash"] = digest(value["snapshot"])
+        value["plan_hash"] = digest(bound_plan(value))
+        return value
+
+    def journal(*records):
+        remote = ProviderStore()
+        for value in records:
+            remote.value["records"][adapters.RepositoryJournal.key(value["operation_id"])] = value
+        return adapters.RepositoryJournal(remote)
+
+    common = "33333333-3333-3333-3333-333333333333"
+    assert journal(record(common, [], status="continuation-required")).common_deployed(FACTORY, SCALE)
+    assert not journal().common_deployed(FACTORY, SCALE)
+    assert not journal(record(common, ["001"])).common_deployed(FACTORY, SCALE)
+    assert not journal(record(common, [], scale="other")).common_deployed(FACTORY, SCALE)
+    assert not journal(record(common, [], status="reconciliation-required")).common_deployed(FACTORY, SCALE)
+    assert not journal(record(common, [], verified=False)).common_deployed(FACTORY, SCALE)

@@ -744,3 +744,41 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
     counts = len(provider_runs), len(cloud.arm_writes), len(cloud.deleted)
     assert service.reconcile(completed["operation_id"])["status"] == "succeeded"
     assert counts == (len(provider_runs), len(cloud.arm_writes), len(cloud.deleted))
+
+
+
+class CommonJournal:
+    def __init__(self, deployed):
+        self.deployed, self.asked = deployed, []
+
+    def ownership(self, factory_id, baseline=None):
+        return dict(baseline or {})
+
+    def common_deployed(self, factory_id, scaleset_id):
+        self.asked.append((factory_id, scaleset_id))
+        return self.deployed
+
+
+def test_scenario_one_deploys_common_first_and_requires_a_reviewed_project_continuation(monkeypatch):
+    """Live 2026-11-18 (aif-163): common + project in one nested deployment exceeded ARM's 4 MB template limit."""
+    from .test_pipeline_lifecycle_adapters import FACTORY, SCALE
+    data, cloud, _, planner, _ = production_fixture(monkeypatch, 1, COMMON.rsplit("/", 1)[1])
+    planner.journal = CommonJournal(deployed=False)
+    plan = planner.prepare(data, "11111111-1111-1111-1111-111111111111")
+    document = plan["stages"][0]["manifests"][0]
+    fl.validate_manifest(document)
+    assert plan["continuation_required"] is True
+    assert document["operation"] == "create-factory" and document["target"]["project_ids"] == []
+    assert {step["template"] for step in document["deployment"]["steps"]} <= set(fl.COMMON_TEMPLATES.values())
+    assert planner.journal.asked == [(FACTORY, SCALE)]
+
+
+def test_scenario_one_continuation_deploys_only_the_project_after_verified_common(monkeypatch):
+    data, cloud, _, planner, _ = production_fixture(monkeypatch, 1, COMMON.rsplit("/", 1)[1])
+    planner.journal = CommonJournal(deployed=True)
+    plan = planner.prepare(data, "11111111-1111-1111-1111-111111111111")
+    document = plan["stages"][0]["manifests"][0]
+    fl.validate_manifest(document)
+    assert not plan.get("continuation_required")
+    assert document["operation"] == "deploy-project" and document["target"]["project_ids"] == ["001"]
+    assert {step["template"] for step in document["deployment"]["steps"]} <= fl.PROJECT_TEMPLATES

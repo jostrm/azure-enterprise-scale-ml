@@ -77,6 +77,28 @@ class RepositoryJournal:
         new_head = self.store.replace(head, state)
         return new_head, digest(record)
 
+    def common_deployed(self, factory_id, scaleset_id):
+        """A verified common-only create-factory (project_ids []) already ran for this scale set."""
+        _, state = self.store.read()
+        for key, value in (state or {}).get("records", {}).items():
+            if not key.startswith("pipeline-lifecycle/") or value.get("status") not in (
+                    "succeeded", "continuation-required"):
+                continue
+            manifests = [manifest for stage in value.get("plan", {}).get("stages", [])
+                         for manifest in stage.get("manifests", [])]
+            if not any(manifest.get("operation") == "create-factory" and manifest.get("target", {}).get("project_ids") == []
+                       and manifest.get("target", {}).get("factory_id") == factory_id
+                       and manifest.get("target", {}).get("scaleset_id") == scaleset_id for manifest in manifests):
+                continue
+            require(digest(value["snapshot"]) == value["snapshot_hash"]
+                    and digest(bound_plan(value)) == value["plan_hash"], "journal-evidence-binding-mismatch")
+            if value.get("stages") and all(
+                    stage.get("status") in ("succeeded", "continuation-required")
+                    and (stage.get("observation") if stage.get("observation", {}).get("verified") is True
+                         else stage.get("receipt", {})).get("verified") is True for stage in value["stages"]):
+                return True
+        return False
+
     def ownership(self, factory_id, baseline=None):
         _, state = self.store.read()
         operations = [value for key, value in (state or {}).get("records", {}).items()
@@ -269,13 +291,20 @@ class NativePlanner:
                     and self.provider_context["run_attempt"] == origin["attempt"]
                     and self.provider_context["consumer_commit"] == origin["commit"],
                     "provider-context-binding-mismatch")
-        manifests = []
+        manifests, continuation = [], False
         for scale, (binding, physical) in zip(snapshot["scales"], bindings):
             projects = projects_for(snapshot, scale)
             operation = {1: "create-factory", 2: "create-scaleset", 3: "deploy-project",
                          4: "delete", 5: "delete", 6: "delete"}[scenario]
             if scenario in (1, 3, 4):
                 require(len(projects) == 1, "one-exact-project-placement-required")
+            if scenario == 1 and self.journal is not None and not coordination_only:
+                # Common and a whole project exceed ARM's 4 MB nested template limit together:
+                # deploy common first, then the project as a continuation with a fresh review.
+                if self.journal.common_deployed(factory["id"], scale["id"]):
+                    operation = "deploy-project"
+                else:
+                    projects, continuation = [], True
             target = {"factory_id": factory["id"], "factory_type": factory.get("kind", "ai"),
                       "scaleset_id": scale["id"], "prefix": factory["prefix"], "region": factory["region"],
                       **{key: scale[key] for key in ("environment", "tenant_id", "subscription_id", "suffix")},
@@ -327,6 +356,7 @@ class NativePlanner:
             no_secret_material(document)
             manifests.append(document)
         return {"stages": [{"id": "lifecycle", "kind": "lifecycle", "manifests": manifests}],
+                **({"continuation_required": True} if continuation else {}),
                 "provider_context": self.provider_context,
                 "origin": origin, "review": {
                     "scenario": scenario, "factory_id": factory["id"],
