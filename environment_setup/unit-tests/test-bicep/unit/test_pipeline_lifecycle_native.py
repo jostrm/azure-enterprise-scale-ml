@@ -764,6 +764,18 @@ def test_scenario_one_deploys_common_first_and_requires_a_reviewed_project_conti
     from .test_pipeline_lifecycle_adapters import FACTORY, SCALE
     data, cloud, _, planner, _ = production_fixture(monkeypatch, 1, COMMON.rsplit("/", 1)[1])
     planner.journal = CommonJournal(deployed=False)
+    # Common phases still read the requested project's variables (the seeding vault lives there).
+    from .test_pipeline_lifecycle_adapters import PROJECT
+    data["variables"][PROJECT]["dev"]["inputKeyvault"] = "kvseedaif"
+    compile_template = cloud.compile_template
+
+    def with_seeding_vault(root, path):
+        template = compile_template(root, path)
+        if path in fl.COMMON_TEMPLATES.values():
+            template["parameters"]["inputKeyvault"] = {"type": "string"}
+        return template
+
+    monkeypatch.setattr(cloud, "compile_template", with_seeding_vault)
     plan = planner.prepare(data, "11111111-1111-1111-1111-111111111111")
     document = plan["stages"][0]["manifests"][0]
     fl.validate_manifest(document)
@@ -771,6 +783,7 @@ def test_scenario_one_deploys_common_first_and_requires_a_reviewed_project_conti
     assert document["operation"] == "create-factory" and document["target"]["project_ids"] == []
     assert {step["template"] for step in document["deployment"]["steps"]} <= set(fl.COMMON_TEMPLATES.values())
     assert planner.journal.asked == [(FACTORY, SCALE)]
+    assert {step["parameters"]["inputKeyvault"] for step in document["deployment"]["steps"]} == {"kvseedaif"}
 
 
 def test_scenario_one_continuation_deploys_only_the_project_after_verified_common(monkeypatch):

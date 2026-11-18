@@ -304,11 +304,12 @@ class NativePlanner:
                 if self.journal.common_deployed(factory["id"], scale["id"]):
                     operation = "deploy-project"
                 else:
-                    projects, continuation = [], True
+                    continuation = True
             target = {"factory_id": factory["id"], "factory_type": factory.get("kind", "ai"),
                       "scaleset_id": scale["id"], "prefix": factory["prefix"], "region": factory["region"],
                       **{key: scale[key] for key in ("environment", "tenant_id", "subscription_id", "suffix")},
-                      "project_ids": [project["number"] for project in projects] if scenario != 2 else []}
+                      "project_ids": [project["number"] for project in projects]
+                      if scenario != 2 and not continuation else []}
             route = {"kind": request["provider"], "scoped_contract": 1,
                      **{key: binding[key] for key in ("writer_id", "repository", "ref", "shared_remote",
                                                      "auth_namespace", "runner")}}
@@ -393,7 +394,8 @@ class NativePlanner:
         byo = str(base.get("BYO_subnets", "false")).lower() == "true"
         if byo:
             paths = [item for item in paths if item[0] != fl.COMMON_TEMPLATES["12-networkCommon"]]
-        for project in projects:
+        # The requested project still supplies variables to a common-only phase; only target projects deploy.
+        for project in [row for row in projects if row["number"] in document["target"]["project_ids"]]:
             paths.extend((path, project) for path in sorted(
                 fl.PROJECT_TEMPLATES, key=lambda value: (0 if Path(value).stem == "31-network" else 1, value)))
         steps, networks = [], {}

@@ -190,7 +190,7 @@ def test_planner_feeds_project_steps_the_allocated_network_and_the_planned_commo
     scope = f"/subscriptions/{SUB}/resourceGroups/{VNET_RG}"
     document = {"operation": "create-factory", "run_id": "r" * 32, "prepared_at": "2026-11-18T00:00:00+00:00",
                 "target": dict(TARGET, region="swedencentral", prefix="aif63-", suffix="001",
-                               factory_id="f", scaleset_id="s"),
+                               factory_id="f", scaleset_id="s", project_ids=["001"]),
                 "locks": {"scopes": [scope]}}
     planner = adapters.NativePlanner(ROOT, ROOT, review=None)
     plan = planner.deployment(snapshot, {"id": "s", "environment": "dev", "subscription_id": SUB},
