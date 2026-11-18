@@ -16,6 +16,9 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_settings.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_settings.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/teams-meeting.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout-loader.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout.js
@@ -32,6 +35,8 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_realtime.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_frontend.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_companion.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
@@ -138,6 +143,46 @@ An optional hello `language` selects only a configured server-owned BCP-47 local
 `host=esaif-maui` stays text-only by default. An explicit `voice=on` embedded page may enable native voice only when the authenticated status declares `mode: realtime`, relay `protocol: 1` and `embedded_voice_version: 1`. Speech-shell and incompatible deployments remain text-only. The page requests a microphone only on Start talking; the compatible desktop host must independently enforce exact-origin permission and current document binding. This backend capability is not proof that an installed desktop build implements it. `voice=off` always denies microphone use.
 
 Live voice needs Cognitive Services User and Foundry User on the project Foundry account (assigned from `infra/voice-roles.bicep` only when voice is enabled) and private reachability of the account's `services.ai.azure.com` endpoint from the application. Offline tests with fake backends, mutation checks of the relay's safety properties and real-browser runs cover the relay and UI. A live Voice Live session in a tenant is a separate observation (region, DNS, roles); passing tests do not establish it.
+
+## Attended Teams media pilot (source observation, 2026-11-18)
+
+An opt-in ACS browser Adapter joins a Teams meeting as a visibly named external
+AI participant. Remote meeting audio is forwarded to the existing authenticated
+voice relay; relay output feeds an ACS custom local audio stream, not the
+operator's microphone or browser speakers. It reuses `Conversation.answer` or
+`Conversation.prepare`, not a separately privileged reasoning implementation.
+This is actual meeting transport code, but no live meeting acceptance is asserted.
+
+Admission binds an explicitly approved host, exact meeting URL, scope, explanation
+audience and expiry to a one-use opaque voice ticket. The derived principal has
+only the scope's `knowledge.read`; canonical read-tool permission filtering and
+per-call authorization enforce that restriction. Approved listener grants are
+rechecked. Scope-wide meeting-safe disclosure approval remains mandatory.
+
+The browser checks a small approved same-tenant roster and endpoint set, refuses
+unknown/anonymous participants, and leaves on changes or uncertainty. This
+client-side observation is not cryptographic listener authentication; the pilot
+also requires controlled admission and content safe for all approved attendees.
+Pause before admitting anyone because already-transmitted audio cannot be recalled.
+Teams recording/transcription or additional consent requirements stop this
+no-recording pilot; the application does not grant recording consent.
+
+Mute suppresses new capture/output and rotates a generation-bound one-use voice
+ticket. Resume opens a fresh provider connection; delayed input/output from the
+old connection cannot enter the new turn. Stop speaking also replaces the voice
+session while retaining the ACS participant. A local `pong` is not a provider-input
+drain guarantee. Old-session cleanup cannot revoke a newer generation, and reset
+never extends admission expiry. Leave tears down media immediately while
+server/ACS cleanup reports its separate outcome. The browser never uses
+`stopAudio()`, which would select the default microphone. Echo protection is
+half-duplex; natural barge-in is not established. Reconnect requires a fresh
+explicit join. Single-replica/single-worker deployment is mandatory because
+tickets and cleanup ownership are process-local.
+
+The PG's managed Voice Agent hosted-conversation-engine path is a separate
+integration, not implied by this ACS transport or the existing Voice Live relay.
+No Windows media host or Teams-native app package is required for this attended
+external participant; unattended Graph media uses a different adapter.
 
 ## Separation of operations
 

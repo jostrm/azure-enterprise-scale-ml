@@ -18,7 +18,7 @@ from azure.core.exceptions import ResourceNotFoundError
 
 from .config import Settings, credential
 from .ports import AuditPort, DualGraphPort, FactoryToolPort, KnowledgePort, ModelGateway, ModelResponse, ModelSession
-from .security import Principal
+from .security import Principal, authorize, read_tool_permissions
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from agent_factory.catalog import validate_agent_name
@@ -214,6 +214,7 @@ class Conversation:
                 from openai import OpenAIError
                 from .telemetry import MODEL_FAILURES
                 try:
+                    authorize(self.settings, principal, scope_key, "knowledge.read")
                     response = session.respond(messages, reference)
                 except OpenAIError:
                     MODEL_FAILURES.add(1, {"scope": scope_key})
@@ -236,8 +237,6 @@ class Conversation:
 
     def prepare(self, question: str, audience: str, principal: Principal, scope_key: str) -> PreparedTurn:
         """Prepare governed evidence and read tools without making an answer-model request."""
-        from .security import authorize
-
         if audience not in {"platform", "project"}:
             raise ValueError("Audience must be platform or project.")
         if not question.strip() or len(question) > 8000:
@@ -258,6 +257,7 @@ class Conversation:
         graph_ids: set[str] = set()
 
         def evidence(query: str) -> dict:
+            authorize(self.settings, principal, scope_key, "knowledge.read")
             from azure.core.exceptions import HttpResponseError
             from .telemetry import RETRIEVAL_REQUESTS, RETRIEVAL_FAILURES
             RETRIEVAL_REQUESTS.add(1, {"scope": scope_key})
@@ -268,6 +268,7 @@ class Conversation:
                     RETRIEVAL_FAILURES.add(1, {"scope": scope_key})
                     raise
                 event["outcome"] = "completed"
+            authorize(self.settings, principal, scope_key, "knowledge.read")
             result = []
             for document in documents:
                 key = document["id"]
@@ -333,6 +334,11 @@ class Conversation:
         })
         if self.settings.dual_graph:
             allowed_tools.update({descriptor["name"]: descriptor for descriptor in graph_tools()})
+        if principal.permission_ceiling is not None:
+            allowed_tools = {
+                name: descriptor for name, descriptor in allowed_tools.items()
+                if set(read_tool_permissions(name)) <= principal.permission_ceiling
+            }
         messages = [
             {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": json.dumps({
                 "audience": audience, "active_scope": self.settings.scopes[scope_key].model_dump(mode="json"),
@@ -366,11 +372,8 @@ class Conversation:
                     raise ValueError("Tool arguments exceed the approved bound.")
                 arguments = json.loads(raw_arguments)
                 validate_tool_arguments(arguments, allowed_tools[name]["parameters"])
-                permission = ("graph.read" if name == "graph_query" else
-                              "knowledge.read" if name.startswith("knowledge_") else "factory.read")
-                authorize(self.settings, principal, scope_key, permission)
-                if name.startswith("cost_"):
-                    authorize(self.settings, principal, scope_key, "cost.read")
+                for permission in read_tool_permissions(name):
+                    authorize(self.settings, principal, scope_key, permission)
                 if name == "graph_query":
                     output = graph_evidence(**arguments)
                 elif name == "knowledge_search":
@@ -381,6 +384,8 @@ class Conversation:
                     output = self.live_state_reader(self.settings, scope_key)
                 else:
                     output = tools.execute(name, arguments)
+                for permission in read_tool_permissions(name):
+                    authorize(self.settings, principal, scope_key, permission)
                 event["outcome"] = "failed" if output.get("ok") is False else "completed"
             observed_tools.append({"name": name, "call_id": call_id})
             from .telemetry import TOOL_CALLS, TOOL_FAILURES
@@ -420,6 +425,7 @@ class Conversation:
                 result["citation_validation"] = "sources_attached" if citations and not references else "passed"
             return result
 
+        authorize(self.settings, principal, scope_key, "knowledge.read")
         return PreparedTurn(messages, list(allowed_tools.values()), execute, finish)
 
 

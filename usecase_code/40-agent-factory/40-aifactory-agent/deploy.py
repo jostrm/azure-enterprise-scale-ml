@@ -52,11 +52,28 @@ def identity_permissions(settings) -> list[str]:
     if settings.voice.enabled:
         permissions.append("Azure Voice Live on the Foundry account: Cognitive Services User and Foundry User (Azure AI User); "
                            "live voice only, broader than the project-scoped runtime role, never removed by turning it off")
+    if settings.teams_meetings.enabled:
+        permissions.append("ACS identity issuance/deletion on the separately approved ACS resource; "
+                           "prerequisite only, not granted by this application deployment")
     return permissions
 
 
 def voice_role_arguments(identity_name: str, names: dict) -> list[str]:
     return [f"identityName={identity_name}", f"foundryAccount={names['foundryAccount']}"]
+
+
+def application_scale_parameters(settings) -> dict:
+    meetings = settings.teams_meetings.enabled
+    return {"minReplicas": 1, "maxReplicas": 1 if meetings else 2, "attendedMeetingsEnabled": meetings}
+
+
+def meeting_runtime_limitation(settings) -> dict | None:
+    if not settings.teams_meetings.enabled:
+        return None
+    return {"replicas": 1, "asgi_workers": 1,
+            "reason": "Meeting tickets and cleanup are per-process state. This attended pilot "
+                      "requires one replica and one ASGI worker. Restart or deployment ends "
+                      "active sessions; the pilot is not highly available."}
 
 
 def graph_bundle(settings) -> dict | None:
@@ -120,7 +137,7 @@ def package(settings, client_id: str, destination: Path) -> dict:
     config.write_text(json.dumps(cloud, indent=2), encoding="utf-8")
     members = []
     def normalize(info):
-        if "__pycache__" in info.name:
+        if "__pycache__" in info.name or "node_modules" in info.name.split("/"):
             return None
         info.uid = info.gid = 0
         info.uname = info.gname = ""
@@ -200,7 +217,9 @@ def main():
             "identity_permissions": identity_permissions(settings),
             "refresh_job": {"schedule_utc": args.refresh_schedule, "source": "approved immutable repository snapshot",
                             "permissions": ["Search schema read/documents write", "Owned Blob state", "Embeddings"]},
-            "entra_changes": False, "factory_api_host": False}
+            "entra_changes": False, "factory_api_host": False,
+            "application_scale": application_scale_parameters(settings),
+            "attended_meeting_pilot": meeting_runtime_limitation(settings)}
     if not args.apply:
         print(json.dumps(plan, indent=2))
         return
@@ -240,6 +259,7 @@ def main():
         "image": IMAGE, "storageAccount": names["storageName"],
         "storageContainer": names["storageContainer"], "bundleBlob": blob_name,
         "bundleSha256": result["sha256"], "integration": args.integration,
+        **application_scale_parameters(settings),
         "bootstrapCommand": (BASE / "infra" / "bootstrap.sh").read_text(encoding="utf-8"),
     }
     parameter_file = BASE / ".build" / "app.parameters.json"

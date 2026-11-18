@@ -1,0 +1,16 @@
+{
+  "name": "esaf-attended-teams-meeting-sdk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Locally bundled ACS Calling SDK; no browser CDN or direct model connection",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@azure/communication-calling": "1.46.1",
+    "@azure/communication-common": "2.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

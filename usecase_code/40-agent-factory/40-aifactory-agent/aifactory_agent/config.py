@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .actions import ActionSettings
 from .costs import CostSettings
+from .teams_meeting_settings import TeamsMeetingSettings
 from .voice_settings import VoiceSettings
 from .workloads import WorkloadSettings
 
@@ -150,6 +151,7 @@ class Settings(ClosedModel):
     costs: CostSettings = Field(default_factory=CostSettings)
     workloads: WorkloadSettings = Field(default_factory=WorkloadSettings)
     voice: VoiceSettings = Field(default_factory=VoiceSettings)
+    teams_meetings: TeamsMeetingSettings = Field(default_factory=TeamsMeetingSettings)
     agent_name: str = Field(default="enterprise-scale-ai-factory", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,62}$")
     agent_version: str | None = None
     agent_invocation: Literal["project_reference", "agent_endpoint"] = "project_reference"
@@ -159,10 +161,14 @@ class Settings(ClosedModel):
 
     @model_validator(mode="after")
     def valid_grants(self):
+        if self.teams_meetings.enabled and not self.voice.enabled:
+            raise ValueError("Teams meeting participation requires the existing live voice relay.")
         if self.agent_invocation == "agent_endpoint" and self.agent_version is not None:
             raise ValueError("Agent endpoint mode uses its existing version selector; an agent_version override is not supported.")
         if not self.scopes:
             raise ValueError("At least one explicitly configured scope is required.")
+        if any(policy.scope_key not in self.scopes for policy in self.teams_meetings.policies):
+            raise ValueError("Meeting policy references an unknown application scope.")
         tenants = {s.tenant_id for s in self.scopes.values()}
         if len(tenants) != 1:
             raise ValueError("One tenant per deployment; deploy separately for another tenant.")
