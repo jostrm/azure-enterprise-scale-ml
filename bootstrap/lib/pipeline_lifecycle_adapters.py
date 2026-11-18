@@ -22,6 +22,7 @@ import factory_lifecycle as fl
 import provider_repository_state
 from pipeline_lifecycle import PipelineError, LifecycleService, bound_plan, digest, identifier, require
 from pipeline_lifecycle_parameters import parameters
+import pipeline_project_network as project_network
 from pipeline_lifecycle_keyvault import CONTRACT as KEYVAULT_TRANSPORT, is_reference, validate_reference
 
 
@@ -365,7 +366,7 @@ class NativePlanner:
         for project in projects:
             paths.extend((path, project) for path in sorted(
                 fl.PROJECT_TEMPLATES, key=lambda value: (0 if Path(value).stem == "31-network" else 1, value)))
-        steps = []
+        steps, networks = [], {}
         for path, project in paths:
             values = copy.deepcopy(base)
             if project:
@@ -373,6 +374,15 @@ class NativePlanner:
                 values.update(projection["dev"])
                 values.update(projection[section])
             template = cloud.compile_template(self.source_root, path)
+            if project and project_network.required(template, values):
+                # Managed project subnets: the legacy allocator decides; a common network in this plan is its VNet.
+                if project["id"] not in networks:
+                    planned = next((step["parameters"] for step in steps
+                                    if step["template"] == fl.COMMON_TEMPLATES.get("12-networkCommon")), None)
+                    networks[project["id"]] = project_network.allocate(
+                        cloud, self.source_root, values, document["target"], project["number"],
+                        planned_common=planned)
+                values.update(networks[project["id"]])
             resolved = parameters(template, values, document["target"],
                                   project=project["number"] if project else None,
                                   prepared_at=parameter_run["prepared_at"])

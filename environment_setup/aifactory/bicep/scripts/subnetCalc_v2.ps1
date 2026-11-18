@@ -42,6 +42,9 @@ param (
     [string]$logicAppType = 'Standard',
     [string]$byoASEv3 = 'false',
     [string]$enablePublicAccessWithPerimeter = 'false',
+    # Pipelines-only planner: VNet inventory read by the caller (az network vnet show shape); no Azure call here
+    [Parameter(Mandatory = $false, HelpMessage = "VNet inventory JSON supplied by the caller; the allocator then makes no Azure call")][string]$vnetInventoryFile,
+    [Parameter(Mandatory = $false, HelpMessage = "Also write vnetName, vnetResourceGroup and the allocated subnet CIDRs to this JSON file")][string]$planFile,
 
     # Optional subnet CIDR overrides (defaults match legacy values for projectTypeADO=all)
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for GenAI subnet when projectType=all")][string]$genaiSubnetCidrAll = '25',
@@ -192,7 +195,9 @@ function New-SubnetScheme {
 }
 
 Import-Module -Name (Join-Path $PSScriptRoot 'modules/pipelineFunctions.psm1')
-Import-Dependencies
+if (-not $vnetInventoryFile) {
+    Import-Dependencies
+}
 
 # This function will convert the parameters nest of the arm tempate parameters file to global variables
 if (($bicepPar1 -or $bicepPar2 -or $bicepPar3 -or $bicepPar4 -or $bicepPar5) -and
@@ -275,13 +280,16 @@ else
 }
 $vnetObj = $null
 
-$hasAzureContext = $useAzureCli
+$hasAzureContext = $useAzureCli -or [bool]$vnetInventoryFile
 if (-not $hasAzureContext) {
     $context = Get-AzContext
     $hasAzureContext = $null -ne $context.Subscription -and $context.Subscription.Id -eq $subscriptionId
 }
 if ($hasAzureContext) {
-    if ($useAzureCli) {
+    if ($vnetInventoryFile) {
+        Write-Host "Using caller-supplied VNet inventory for subscription '$subscriptionId'."
+    }
+    elseif ($useAzureCli) {
         Write-Host "Using Azure CLI subscription '$subscriptionId'."
     }
     else {
@@ -392,7 +400,11 @@ if ($hasAzureContext) {
 
     Write-Host "vnetName: $($vnetName)"
     Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
-    if ($useAzureCli) {
+    if ($vnetInventoryFile) {
+        Write-Host "Using caller-supplied VNet inventory '$vnetInventoryFile' (no Azure call)."
+        $vnetObj = Get-Content -Raw -Path $vnetInventoryFile | ConvertFrom-Json
+    }
+    elseif ($useAzureCli) {
         $vnetJson = & az network vnet show `
             --subscription $subscriptionId `
             --resource-group $vnetResourceGroup `
@@ -597,6 +609,10 @@ if ($hasAzureContext) {
     }
     
     $template | Out-File (Join-Path $filePath $templateName)
+    if ($planFile) {
+        [ordered]@{ vnetName = $vnetName; vnetResourceGroup = $vnetResourceGroup; subnets = $result } |
+            ConvertTo-Json -Depth 5 | Out-File $planFile -Encoding utf8
+    }
     $fullPath = (Join-Path $filePath $templateName)
     $resolvedPath = Resolve-Path $fullPath
     Write-host "Template written to $resolvedPath"

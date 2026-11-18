@@ -204,6 +204,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_pipeline_lifecycle_reconciliation.py",
         "unit/test_pipeline_lifecycle_recovery.py",
         "unit/test_pipeline_lifecycle_setup.py",
+        "unit/test_pipeline_project_network.py",
         "unit/test_platform_child_of_retained_parent.py",
         "unit/test_platform_dropped_delegation.py",
         "unit/test_platform_refused_child.py",

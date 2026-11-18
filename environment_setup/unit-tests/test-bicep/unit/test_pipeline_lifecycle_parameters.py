@@ -35,3 +35,42 @@ def test_unresolved_insecure_or_conflicting_parameters_block(schema, variables, 
     from pipeline_lifecycle_parameters import parameters
     with pytest.raises(ValueError, match=code):
         parameters({"parameters": schema}, variables, target())
+
+
+def test_arm_expression_defaults_are_frozen_from_prepare_time_and_resolved_parameters():
+    """Live 2026-11-18 (aif-163): 05/08/08b defaults use utcNow() and parameters() and were refused."""
+    from pipeline_lifecycle_parameters import parameters
+    template = {"parameters": {
+        "webappSKUAce": {"type": "object", "defaultValue": {
+            "name": "[parameters('aseSkuCode')]", "tier": "[parameters('aseSku')]", "family": "Iv2",
+            "capacity": "[parameters('aseSkuWorkers')]"}},
+        "aseSkuCode": {"type": "string", "defaultValue": "I1v2"}, "aseSku": {"type": "string"},
+        "aseSkuWorkers": {"type": "int", "defaultValue": 1},
+        "deploymentId": {"type": "string", "defaultValue": "[utcNow('yyyyMMddHHmmss')]"}}}
+    result = parameters(template, {"aseSku": "IsolatedV2"}, target(), prepared_at="2026-11-18T09:08:07+00:00")
+    assert result["webappSKUAce"] == {"name": "I1v2", "tier": "IsolatedV2", "family": "Iv2", "capacity": 1}
+    assert result["deploymentId"] == "20261118090807"
+
+
+@pytest.mark.parametrize("default", ["[parameters('absent')]", "[utcNow('yyyy-MM-ddTHH:mm:ssK')]",
+                                     "[concat(parameters('a'), 'b')]"])
+def test_other_arm_expression_defaults_still_block(default):
+    from pipeline_lifecycle_parameters import parameters
+    with pytest.raises(ValueError, match="unresolved-arm-parameter"):
+        parameters({"parameters": {"a": {"type": "string", "defaultValue": "x"},
+                                   "value": {"type": "string", "defaultValue": default}}},
+                   {}, target(), prepared_at="2026-11-18T09:08:07+00:00")
+
+
+def test_every_admin_password_template_parameter_is_secure():
+    """A clear-text password parameter cannot travel through the reviewed pipelines-only plan."""
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[4] / "environment_setup" / "aifactory" / "bicep"
+    found = []
+    for path in list((root / "esml-genai-1").glob("*.bicep")) + list((root / "esml-common" / "main").glob("*.bicep")):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"(?m)^param adminPassword\s", text):
+            before = text[:match.start()].rstrip().splitlines()[-3:]
+            found.append((path.name, any(line.strip().startswith("@secure()") for line in before)))
+    assert found and all(secure for _, secure in found), found

@@ -134,6 +134,7 @@ param vmSKU array = [
   'standard_D2as_v5'
 ]
 param adminUsername string ='aifactoryadmin'
+@secure()
 param adminPassword string
 param hybridBenefit bool = false
 

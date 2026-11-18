@@ -59,6 +59,39 @@ def definition(value, definitions):
     return value
 
 
+PARAMETER_REFERENCE = re.compile(r"\[parameters\('([A-Za-z0-9_]+)'\)\]")
+UTC_NOW = re.compile(r"\[utcNow\('([yMdHms]+)'\)\]")
+DOTNET_TIME = {"yyyy": "%Y", "MM": "%m", "dd": "%d", "HH": "%H", "mm": "%M", "ss": "%S"}
+
+
+def _frozen_default(value, prepared_at):
+    """Freeze utcNow('<digits format>') defaults at the reviewed prepare time; ARM would differ per run."""
+    if isinstance(value, str) and (match := UTC_NOW.fullmatch(value)) and prepared_at:
+        tokens = re.findall(r"yyyy|MM|dd|HH|mm|ss|.", match[1])
+        if all(token in DOTNET_TIME for token in tokens):
+            return datetime.fromisoformat(prepared_at).strftime("".join(DOTNET_TIME[token] for token in tokens))
+    return value
+
+
+def _references(value):
+    if isinstance(value, dict):
+        return {name for item in value.values() for name in _references(item)}
+    if isinstance(value, list):
+        return {name for item in value for name in _references(item)}
+    return {match[1]} if isinstance(value, str) and (match := PARAMETER_REFERENCE.fullmatch(value)) else set()
+
+
+def _substitute(value, resolved):
+    if isinstance(value, dict):
+        return {key: _substitute(item, resolved) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_substitute(item, resolved) for item in value]
+    if isinstance(value, str) and (match := PARAMETER_REFERENCE.fullmatch(value)):
+        require(match[1] in resolved, "unresolved-arm-parameter")
+        return copy.deepcopy(resolved[match[1]])
+    return value
+
+
 def parameters(template, variables, target, *, project=None, prepared_at=None):
     schema, definitions = template["parameters"], template.get("definitions", {})
     env = "test" if target["environment"] == "stage" else target["environment"]
@@ -80,10 +113,11 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
         if variables.get(env + "_" + name):
             aliases[parameter] = env + "_" + name
     normalize = lambda name: re.sub(r"[^a-z0-9]", "", name.lower().removeprefix("admin_"))
-    result = {}
+    result, deferred = {}, []
     for name, raw in schema.items():
         spec = definition(raw, definitions)
         kind = str(spec.get("type", "")).lower()
+        defaulted = False
         if name in ("tags", "tagsProject"):
             value = variables.get(name, spec.get("defaultValue", {}))
         elif name in required:
@@ -98,7 +132,7 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
             if candidates:
                 value = candidates[0]
             elif "defaultValue" in spec:
-                value = spec["defaultValue"]
+                value, defaulted = spec["defaultValue"], True
             elif spec.get("nullable") is True:
                 value = None
             else:
@@ -124,9 +158,22 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
                 value = int(moment.replace(year=moment.year + 1).timestamp())
             except ValueError:
                 value = int(moment.replace(year=moment.year + 1, day=28).timestamp())
+        if defaulted:
+            value = _frozen_default(value, prepared_at)
+            if _references(value):
+                # Template defaults built only from other parameters take those parameters' frozen values.
+                deferred.append((name, spec, kind, value))
+                continue
+        _finish(result, variables, name, spec, kind, value)
+    for name, spec, kind, value in deferred:
+        _finish(result, variables, name, spec, kind, _substitute(value, result))
+    return result
+
+
+def _finish(result, variables, name, spec, kind, value):
         if kind.startswith("secure") and is_reference(value):
             result[name] = validate_reference(value)
-            continue
+            return
         require(not kind.startswith("secure") or value in ("", None), "secure-parameter-transport-required:" + name)
         value = expand(value, variables)
         if kind == "bool" and isinstance(value, str) and value.lower() in ("true", "false"):
@@ -148,4 +195,3 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
             if field in spec and value is not None:
                 require(check(spec[field]), "arm-parameter-constraint:" + name)
         result[name] = value
-    return result
