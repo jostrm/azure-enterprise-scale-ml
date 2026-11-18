@@ -601,6 +601,41 @@ def repository_state_module():
     return module
 
 
+_GITHUB_HOST = None
+
+
+def github_host_module():
+    """github_host.py next to this file: the one rule for github.com, GHE.com (SUB.ghe.com) and GitHub Enterprise
+    Server hosts (github_repository = [HOST/]OWNER/REPO, decided 2026-11-18)."""
+    global _GITHUB_HOST
+    if _GITHUB_HOST is None:
+        spec = importlib.util.spec_from_file_location("github_host", Path(__file__).with_name("github_host.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _GITHUB_HOST = module
+    return _GITHUB_HOST
+
+
+def github_route_repository(repository):
+    """The bound gha route repository (https://HOST/OWNER/REPO) parsed on its GitHub host."""
+    try:
+        return github_host_module().parse_github_repository(repository)
+    except ValueError:
+        raise Blocked("unsupported-repository") from None
+
+
+def supported_route_repository(kind, repository):
+    """gha: https://HOST/OWNER/REPO on a GitHub host (github.com, SUB.ghe.com or GitHub Enterprise Server; lowercase
+    host, no port); ado: https://dev.azure.com/ORG/PROJECT/_git/REPO."""
+    parsed = urlsplit(repository)
+    if kind == "gha":
+        return (parsed.netloc == (parsed.hostname or "") and github_host_module().is_valid_host(parsed.netloc)
+                and bool(re.fullmatch(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", parsed.path)))
+    return (kind == "ado" and parsed.netloc == "dev.azure.com"
+            and bool(re.fullmatch(r"/[A-Za-z0-9_. -]+/[A-Za-z0-9_. -]+/_git/[A-Za-z0-9_. -]+", unquote(parsed.path)))
+            and len(parsed.path.split("/")) == len(unquote(parsed.path).split("/")))
+
+
 def factory_deletion_module():
     spec = importlib.util.spec_from_file_location(
         "factory_deletion_pipeline", Path(__file__).with_name("factory_deletion_pipeline.py"))
@@ -700,12 +735,7 @@ def _validate_manifest(document):
     parsed = urlsplit(repository)
     require(parsed.scheme == "https" and not parsed.username and not parsed.password and not parsed.query
             and not parsed.fragment and parsed.port in (None, 443), "credential-free-repository-required")
-    require((route["kind"] == "gha" and parsed.netloc == "github.com"
-             and re.fullmatch(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", parsed.path))
-            or (route["kind"] == "ado" and parsed.netloc == "dev.azure.com"
-                and re.fullmatch(r"/[A-Za-z0-9_. -]+/[A-Za-z0-9_. -]+/_git/[A-Za-z0-9_. -]+", unquote(parsed.path))
-                and len(parsed.path.split("/")) == len(unquote(parsed.path).split("/"))),
-            "unsupported-repository")
+    require(supported_route_repository(route["kind"], repository), "unsupported-repository")
     require(isinstance(route.get("commit"), str) and re.fullmatch(r"[0-9a-f]{40}", route["commit"])
             and valid_ref(route.get("ref")), "exact-consumer-version-required")
     locks = document["locks"]
@@ -1309,8 +1339,11 @@ class Cloud:
         url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL", "")
         credential = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "")
         parsed = urlsplit(url)
+        hosts, github = github_host_module(), github_route_repository(self.document["route"]["repository"])
         require(os.environ.get("GITHUB_ACTIONS") == "true" and credential and parsed.scheme == "https"
-                and parsed.hostname and parsed.hostname.endswith(".actions.githubusercontent.com")
+                and parsed.hostname and (parsed.hostname.endswith(".actions.githubusercontent.com")
+                                         if github.host == hosts.DOTCOM else
+                                         hosts.is_actions_token_request_host(github.host, parsed.hostname))
                 and parsed.port in (None, 443) and not parsed.username and not parsed.password and not parsed.fragment,
                 "trusted-github-oidc-context-required")
         query = parse_qs(parsed.query)
@@ -1327,7 +1360,7 @@ class Cloud:
             raise Blocked("invalid-github-oidc-assertion") from None
         route = self.document["route"]
         repository = urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
-        require(claims.get("iss") == "https://token.actions.githubusercontent.com"
+        require(claims.get("iss") == github.oidc_issuer
                 and claims.get("aud") == requested_audience and claims.get("repository") == repository
                 and claims.get("sha") == route["commit"]
                 and claims.get("ref") == "refs/tags/aifactory-runs/" + self.document["run_id"]
@@ -1459,15 +1492,18 @@ class Cloud:
     def state_request(self, kind, method, endpoint, body, allowed):
         require(single_writer(self.document), "single-writer-not-selected")
         if kind == "gha":
-            url = "https://api.github.com/" + endpoint
-            token = (os.environ.get("GH_TOKEN", "") if self.pipeline_identity else
-                     self.command(["gh", "auth", "token", "--hostname", "github.com"]))
+            # The route's own host: api.github.com, api.SUB.ghe.com or HOST/api/v3, with the token gh would use for
+            # it (GH_ENTERPRISE_TOKEN on GitHub Enterprise Server), so a github.com token never leaves github.com.
+            hosts = github_host_module()
+            host = github_route_repository(self.document["route"]["repository"]).host
+            url, api_host = hosts.api_base_for(host) + "/" + endpoint, hosts.api_hostname_for(host)
+            token = (os.environ.get(hosts.token_variables(host)[0], "") if self.pipeline_identity else
+                     self.command(["gh", "auth", "token", "--hostname", host]))
         else:
-            url = endpoint
+            url, api_host = endpoint, "dev.azure.com"
             token = (os.environ.get("AIFACTORY_STATE_TOKEN", "") if self.pipeline_identity else
                      self.token("499b84ac-1321-427f-aa17-267ca6975798"))
-        require(token and urlsplit(url).hostname == ("api.github.com" if kind == "gha" else "dev.azure.com"),
-                "single-writer-provider-auth-required")
+        require(token and urlsplit(url).hostname == api_host, "single-writer-provider-auth-required")
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json",
                    "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"}
         # A state read is sent again after a failed transport or a cut-short body (aif-138, 2026-11-01: one 20 MB
@@ -1560,13 +1596,12 @@ class Cloud:
             require(not parsed.query and not parsed.fragment and not parsed.username and not parsed.password
                     and parsed.scheme == "https", "invalid-enrolled-repository")
             if writer.get("kind") == "gha":
-                require(parsed.netloc == "github.com" and re.fullmatch(
-                    r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", parsed.path), "invalid-enrolled-repository")
+                require(supported_route_repository("gha", repository), "invalid-enrolled-repository")
                 name = parsed.path.strip("/").removesuffix(".git")
                 for status in ("queued", "in_progress", "waiting", "pending", "requested"):
                     page = json.loads(self.command([
                         "gh", "api", "repos/" + name + "/actions/runs?per_page=1&status=" + status,
-                        "--hostname", "github.com",
+                        "--hostname", parsed.hostname,
                     ]))
                     require(isinstance(page, dict) and isinstance(page.get("workflow_runs"), list)
                             and type(page.get("total_count")) is int, "incomplete-remote-run-inventory")
@@ -6889,16 +6924,17 @@ def failed_worker_diagnostic(locks, document):
 
 def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time.sleep):
     route = document["route"]
-    repository = urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
+    github_repository = github_route_repository(route["repository"])
+    repository = github_repository.path
 
     def github(method, endpoint, body=None):
-        argv = ["gh", "api", "--method", method, "repos/" + repository + endpoint, "--hostname", "github.com"]
+        argv = ["gh", "api", "--method", method, "repos/" + repository + endpoint, "--hostname", github_repository.host]
         if body is not None:
             argv += ["--input", "-"]
         raw = cloud.command(argv, data=canonical(body).decode("utf-8") if body is not None else None)
         return json.loads(raw) if raw else {}
 
-    actor = json.loads(cloud.command(["gh", "api", "user", "--hostname", "github.com"]))
+    actor = json.loads(cloud.command(["gh", "api", "user", "--hostname", github_repository.host]))
     require(type(route.get("github_user_id")) is int and actor.get("id") == route["github_user_id"],
             "github-authenticated-identity-mismatch")
     item = github("GET", "/contents/" + SCOPED_GHA + "?ref=" + route["commit"])
@@ -6923,7 +6959,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     persist()
     github("POST", "/git/refs", {"ref": "refs/tags/" + tag, "sha": route["commit"]})
     for index, chunk in enumerate(chunks):
-        cloud.command(["gh", "secret", "set", secret + "_" + str(index), "--repo", "github.com/" + repository,
+        cloud.command(["gh", "secret", "set", secret + "_" + str(index), "--repo", github_repository.gh_repo,
                        "--env", route["auth_namespace"]], data=chunk)
     github("POST", "/actions/workflows/factory-lifecycle.yml/dispatches", {"ref": tag, "inputs": {
         "run_id": document["run_id"], "manifest_hash": document["manifest_hash"], "expected_commit": route["commit"],
@@ -6964,7 +7000,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     else:
         raise Blocked("scoped-github-completion-unverified")
     for index in range(len(chunks)):
-        cloud.command(["gh", "secret", "delete", secret + "_" + str(index), "--repo", "github.com/" + repository,
+        cloud.command(["gh", "secret", "delete", secret + "_" + str(index), "--repo", github_repository.gh_repo,
                        "--env", route["auth_namespace"]])
     ref = github("GET", "/git/ref/tags/" + tag)
     require(ref.get("object", {}).get("sha") == route["commit"], "run-tag-changed-reconciliation-required")

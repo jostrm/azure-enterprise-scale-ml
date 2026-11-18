@@ -5,11 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from urllib.parse import quote
 
-from factory_enrollment import Cloud, EnrollmentError, canonical, parse_json, require
+from factory_enrollment import Cloud, EnrollmentError, _github_host_module, canonical, parse_json, require
 
 
 VARIABLE = "AIFACTORY_GITHUB_ENVIRONMENTS"
@@ -20,12 +19,19 @@ class Repository:
     """Only gh authentication is needed; no registered factory or enrollment."""
 
     def __init__(self, repository):
-        self.config = {"github_repository": repository}
+        # [HOST/]OWNER/REPO: gh talks to HOST (github.com when omitted); REST paths use OWNER/REPO.
+        try:
+            github = _github_host_module().parse_github_repository(repository)
+        except ValueError:
+            raise EnrollmentError("github-repository-slug-required") from None
+        self.config = {"github_repository": github.slug}
+        self.path, self.host = github.path, github.host
         self.cloud = Cloud({})
+        self.cloud.github_host = github.host
 
     def environment(self, name):
         status, _, value = self.cloud.gh(
-            "GET", "repos/" + self.config["github_repository"] + "/environments/" + quote(name, safe=""),
+            "GET", "repos/" + self.path + "/environments/" + quote(name, safe=""),
             allowed=(200, 404))
         return value if status == 200 else None
 
@@ -35,14 +41,14 @@ class Repository:
             require(current == expected, "reviewed-github-environment-changed")
         if current is not None:
             return current
-        _, _, repository = self.cloud.gh("GET", "repos/" + self.config["github_repository"])
+        _, _, repository = self.cloud.gh("GET", "repos/" + self.path)
         require(isinstance(repository.get("node_id"), str), "github-repository-node-required")
         # GraphQL creates or returns unchanged; REST PUT can overwrite protection rules.
         mutation = ("mutation($repository:ID!,$name:String!){createEnvironment(input:"
                     "{repositoryId:$repository,name:$name}){environment{id name}}}")
         self.cloud.read_only = False
         result = parse_json(self.cloud.command(
-            ["gh", "api", "--hostname", "github.com", "--method", "POST", "graphql", "--input", "-"],
+            ["gh", "api", "--hostname", self.host, "--method", "POST", "graphql", "--input", "-"],
             canonical({"query": mutation, "variables": {"repository": repository["node_id"], "name": name}})))
         require(not result.get("errors"), "github-environment-create-not-verified")
         created = result.get("data", {}).get("createEnvironment", {}).get("environment") or {}
@@ -80,9 +86,9 @@ def resolve(names, saved=None, requested=None):
 
 
 def ensure(repository, selected, requested=None):
-    endpoint = "repos/" + repository.config["github_repository"]
+    endpoint = "repos/" + repository.path
     inventory = parse_json(repository.cloud.command([
-        "gh", "api", "--hostname", "github.com", "--paginate", "--slurp",
+        "gh", "api", "--hostname", repository.host, "--paginate", "--slurp",
         endpoint + "/environments?per_page=100",
     ]))
     names = [item["name"] for page in inventory for item in page["environments"]]
@@ -110,8 +116,6 @@ def main():
     parser.add_argument("--ensure", nargs="+", choices=tuple(DEFAULTS), required=True)
     args = parser.parse_args()
     try:
-        require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repository),
-                "github-repository-slug-required")
         requested = os.environ.get(VARIABLE)
         mapping = ensure(Repository(args.repository),
                          args.ensure, parse_json(requested) if requested else None)

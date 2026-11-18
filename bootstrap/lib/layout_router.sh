@@ -22,6 +22,7 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   factory_enrollment_entry.py
   factory_lifecycle.py
   github_environments.py
+  github_host.py
   layout_router.sh
   project_deployment.py
   project_environment.py

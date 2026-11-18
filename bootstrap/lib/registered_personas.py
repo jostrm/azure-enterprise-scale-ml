@@ -143,9 +143,13 @@ def seeds(manifest, *, source_root=None, cli=None):
 def remote_manifest(cloud, route, values):
     path = relative_manifest(values)
     if route["kind"] == "gha":
-        repository = urlsplit(route["repository"]).path.strip("/")
-        raw = cloud.command(["gh", "api", "--method", "GET", "repos/" + repository
-                             + "/contents/" + quote(path, safe="/") + "?ref=" + route["commit"]])
+        parsed = urlsplit(route["repository"])
+        repository = parsed.path.strip("/")
+        argv = ["gh", "api", "--method", "GET", "repos/" + repository
+                + "/contents/" + quote(path, safe="/") + "?ref=" + route["commit"]]
+        if parsed.hostname and parsed.hostname != "github.com":
+            argv += ["--hostname", parsed.hostname]     # GHE.com / GitHub Enterprise Server route; github.com argv unchanged
+        raw = cloud.command(argv)
         item = json.loads(raw)
         if item.get("type") != "file" or item.get("encoding") != "base64":
             raise ValueError("Persona manifest must be an ordinary file in the reviewed consumer commit")

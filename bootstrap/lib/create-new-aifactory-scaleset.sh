@@ -510,11 +510,34 @@ aif_resolve_repo_root() {
   fi
 }
 
+aif_github_repository_fields() {
+  # github_repository = [HOST/]OWNER/REPO (github.com when HOST is omitted, decided 2026-11-18); github_host.py owns
+  # the host rules. REST calls use gh api --hostname "$AIF_GITHUB_HOST" "repos/$AIF_GITHUB_PATH"; gh subcommands keep
+  # --repo "$GITHUB_REPOSITORY" (gh reads HOST/OWNER/REPO itself).
+  local output
+  local -a fields
+  output="$("${AIF_PYTHON[@]}" -B "$AIF_SCALESET_LIB_DIR/github_host.py" fields "$GITHUB_REPOSITORY")" || return 1
+  mapfile -t fields <<< "${output//$'\r'/}"
+  [[ ${#fields[@]} == 5 ]] || return 1
+  AIF_GITHUB_HOST="${fields[0]}"
+  AIF_GITHUB_PATH="${fields[1]}"
+  GITHUB_REPOSITORY="${fields[2]}"
+  AIF_GITHUB_URL="${fields[3]}"
+  AIF_GITHUB_OIDC_ISSUER="${fields[4]}"
+}
+
+aif_require_github_repository_fields() {
+  [[ -n "${AIF_GITHUB_HOST:-}" ]] && return 0
+  aif_github_repository_fields && return 0
+  aif_error "GitHub repository must use owner/name (github.com) or HOST/owner/name (GitHub Enterprise) format." >&2
+  return 1
+}
+
 aif_current_origin_slug() {
   local origin
   origin="$(git -C "$AIF_REPO_ROOT" remote get-url origin 2>/dev/null || true)"
   [[ -n "$origin" ]] || return 0
-  "${AIF_PYTHON[@]}" - "$origin" <<'PY'
+  "${AIF_PYTHON[@]}" -B - "$origin" "$AIF_SCALESET_LIB_DIR" <<'PY'
 import re
 import sys
 from urllib.parse import unquote, urlparse
@@ -523,9 +546,14 @@ url = sys.argv[1].rstrip("/")
 if "/_git/" in url:
     print(unquote(url.rsplit("/_git/", 1)[1]).removesuffix(".git"))
 else:
-    match = re.search(r"github\.com[/:]([^/]+/[^/]+?)(?:\.git)?$", url)
-    if match:
-        print(match.group(1))
+    sys.path.insert(0, sys.argv[2])
+    from github_host import GitHubHostError, parse_github_repository
+    try:
+        print(parse_github_repository(url).slug)   # [HOST/]OWNER/REPO on github.com, GHE.com and GHES
+    except GitHubHostError:
+        match = re.search(r"github\.com[/:]([^/]+/[^/]+?)(?:\.git)?$", url)
+        if match:
+            print(match.group(1))
 PY
 }
 
@@ -917,12 +945,10 @@ aif_collect_answers() {
     if [[ "$GITHUB_REPOSITORY" != */* ]]; then
       GITHUB_REPOSITORY="${github_owner:+$github_owner/}${AIF_PREFIX%-}aifactory-${AIF_SCALESET_SUFFIX}"
     fi
-    aif_prompt_value GITHUB_REPOSITORY "GitHub repository (owner/name)" \
+    aif_prompt_value GITHUB_REPOSITORY "GitHub repository (owner/name, or HOST/owner/name on GitHub Enterprise)" \
       "$GITHUB_REPOSITORY"
-    if [[ ! "$GITHUB_REPOSITORY" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
-      aif_error "GitHub repository must use owner/name format." >&2
-      exit 1
-    fi
+    AIF_GITHUB_HOST=""
+    aif_require_github_repository_fields || exit 1
   fi
 
   if [[ "$AIF_RUNNER_MODE" != self-hosted && "$AIF_NETWORK_MODE" == priv ]]; then
@@ -1466,7 +1492,8 @@ aif_ensure_target_repository() {
     elif ! gh repo view "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
       aif_mutate gh repo create "$GITHUB_REPOSITORY" --private
     fi
-    AIF_REMOTE_URL="https://github.com/$GITHUB_REPOSITORY.git"
+    aif_require_github_repository_fields || exit 1
+    AIF_REMOTE_URL="$AIF_GITHUB_URL.git"
   fi
 
   local current_origin
@@ -3223,8 +3250,9 @@ aif_github_oidc_subject_prefix() {
   # GitHub signs repo:OWNER@OWNER_ID/REPO@REPO_ID for repositories created after 2026-07-15; factory_enrollment owns
   # the rule, so this path federates the same subject as the registered bootstrap.
   local repository customization
-  repository="$(gh api "repos/$GITHUB_REPOSITORY")" || return
-  customization="$(gh api "repos/$GITHUB_REPOSITORY/actions/oidc/customization/sub")" || return
+  aif_require_github_repository_fields || return
+  repository="$(gh api --hostname "$AIF_GITHUB_HOST" "repos/$AIF_GITHUB_PATH")" || return
+  customization="$(gh api --hostname "$AIF_GITHUB_HOST" "repos/$AIF_GITHUB_PATH/actions/oidc/customization/sub")" || return
   AIF_GITHUB_REPOSITORY_JSON="$repository" AIF_GITHUB_OIDC_SUBJECT_JSON="$customization" \
     "${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$GITHUB_REPOSITORY" <<'PY'
 import json
@@ -3245,6 +3273,7 @@ aif_configure_github_identity() {
   aif_section "13 / GitHub deployment identity"
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
   local github_environment logical_environment credential_name subject subject_prefix existing_credential
+  aif_require_github_repository_fields || return
   AIFACTORY_GITHUB_ENVIRONMENTS="$("${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/github_environments.py" \
     --repository "$GITHUB_REPOSITORY" --ensure dev stage prod)" || return
   export AIFACTORY_GITHUB_ENVIRONMENTS
@@ -3287,9 +3316,9 @@ import json, sys
 value = json.load(sys.stdin)
 if not value:
     raise SystemExit(3)
-if len(value) != 1 or value[0].get("subject") != sys.argv[1] or value[0].get("issuer") != "https://token.actions.githubusercontent.com" or value[0].get("audiences") != ["api://AzureADTokenExchange"]:
+if len(value) != 1 or value[0].get("subject") != sys.argv[1] or value[0].get("issuer") != sys.argv[2] or value[0].get("audiences") != ["api://AzureADTokenExchange"]:
     raise SystemExit("Existing GitHub federation differs; review migration explicitly. No credential was changed.")
-' "$subject"; then
+' "$subject" "$AIF_GITHUB_OIDC_ISSUER"; then
         # Missing is safe to create; a different deployed subject is not safe to replace.
         [[ "$existing_credential" =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]] || return 1
         az identity federated-credential create \
@@ -3297,7 +3326,7 @@ if len(value) != 1 or value[0].get("subject") != sys.argv[1] or value[0].get("is
           --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
           --identity-name "$AIF_IDENTITY_NAME" \
           --name "$credential_name" \
-          --issuer "https://token.actions.githubusercontent.com" \
+          --issuer "$AIF_GITHUB_OIDC_ISSUER" \
           --subject "$subject" \
           --audiences api://AzureADTokenExchange \
           --output none
@@ -3747,7 +3776,8 @@ aif_ensure_github_self_hosted_agent() {
   aif_section "16 / Self-hosted GitHub Actions runner"
   aif_prepare_runner_vm || return
   local runners_file="$AIF_STATE_DIR/github-runners.json" remote_exists
-  gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners?per_page=100" --jq '.runners[]' > "$runners_file"
+  aif_require_github_repository_fields || return
+  gh api --hostname "$AIF_GITHUB_HOST" --paginate "repos/$AIF_GITHUB_PATH/actions/runners?per_page=100" --jq '.runners[]' > "$runners_file"
   remote_exists="$("${AIF_PYTHON[@]}" - "$runners_file" "$GHA_RUNNER_NAME" "$GHA_RUNNER_LABEL" <<'PY'
 import json
 from pathlib import Path
@@ -3801,14 +3831,14 @@ PY
   [[ $- != *x* ]] || { trace=true; set +x; }
   AIF_RUNNER_REGISTRATION_TOKEN=''
   if [[ "$remote_exists" != true ]]; then
-    AIF_RUNNER_REGISTRATION_TOKEN="$(gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runners/registration-token" --jq .token)"
+    AIF_RUNNER_REGISTRATION_TOKEN="$(gh api --hostname "$AIF_GITHUB_HOST" --method POST "repos/$AIF_GITHUB_PATH/actions/runners/registration-token" --jq .token)"
   fi
   AIF_RUNNER_REGISTRATION_TOKEN="${AIF_RUNNER_REGISTRATION_TOKEN//$'\r'/}"
-  aif_invoke_runner_registration gha "https://github.com/$GITHUB_REPOSITORY" "" "$GHA_RUNNER_NAME" \
+  aif_invoke_runner_registration gha "$AIF_GITHUB_URL" "" "$GHA_RUNNER_NAME" \
     "${package[0]//$'\r'/}" "${package[1]//$'\r'/}" "${remote_exists//$'\r'/}" "$GHA_RUNNER_LABEL" || return
   [[ "$trace" != true ]] || set -x
   for attempt in {1..60}; do
-    if gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners?per_page=100" \
+    if gh api --hostname "$AIF_GITHUB_HOST" --paginate "repos/$AIF_GITHUB_PATH/actions/runners?per_page=100" \
       --jq ".runners[] | select(.name == \"$GHA_RUNNER_NAME\" and .status == \"online\") | .labels[].name" |
       grep -qxF "$GHA_RUNNER_LABEL"; then
       aif_success "GitHub runner '$GHA_RUNNER_NAME' is online with label '$GHA_RUNNER_LABEL'."

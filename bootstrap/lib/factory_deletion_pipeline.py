@@ -5,10 +5,16 @@ and offline consumers use the same validation, identities, leases and receipts.
 """
 
 import copy
+import importlib.util
 import json
+from pathlib import Path
 import re
 import time
 from urllib.parse import quote, unquote, urlsplit
+
+_github_spec = importlib.util.spec_from_file_location("aifactory_github_host", Path(__file__).with_name("github_host.py"))
+github_host = importlib.util.module_from_spec(_github_spec)
+_github_spec.loader.exec_module(github_host)
 
 
 CONTRACT = "ordered-project-pipelines-v1"
@@ -1079,6 +1085,14 @@ def run_worker(envelope, source_root, expected_run, expected_hash, cloud=None, s
     return receipt
 
 
+def _github_route(repository, code):
+    """The route's GitHub repository: gh api --hostname HOST with repos/OWNER/REPO, gh --repo HOST/OWNER/REPO."""
+    try:
+        return github_host.parse_github_repository(repository)
+    except github_host.GitHubHostError:
+        fl.require(False, code)
+
+
 def resume_dispatch(cloud, locks, document, receipt, persist, sleep=time.sleep):
     remote = receipt.get("remote_run")
     if not remote:
@@ -1091,9 +1105,9 @@ def resume_dispatch(cloud, locks, document, receipt, persist, sleep=time.sleep):
     for _ in range(PROVIDER_RUN_POLLS):
         locks.assert_held()
         if route["kind"] == "gha":
-            repo = urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
+            github = _github_route(route["repository"], "factory-delete-run-identity-unverified")
             result = json.loads(cloud.command(["gh", "api", "--method", "GET",
-                f"repos/{repo}/actions/runs/{remote['run_id']}", "--hostname", "github.com"]))
+                f"repos/{github.path}/actions/runs/{remote['run_id']}", "--hostname", github.host]))
             fl.require(result.get("id") == remote["run_id"] and result.get("head_sha") == route["commit"]
                        and result.get("display_title") == "factory-lifecycle [" + document["run_id"] + "]",
                        "factory-delete-run-identity-unverified")
@@ -1134,8 +1148,9 @@ def cleanup_resumed_artifacts(cloud, document, receipt, persist):
                and artifacts.get("auth_namespace") == namespace
                and type(artifacts.get("chunks")) is int and 1 <= artifacts["chunks"] <= 16,
                "factory-delete-remote-artifacts-unverified")
-    repo = urlsplit(document["route"]["repository"]).path.strip("/").removesuffix(".git")
-    existing = json.loads(cloud.command(["gh", "secret", "list", "--repo", "github.com/" + repo,
+    github = _github_route(document["route"]["repository"], "factory-delete-remote-artifacts-unverified")
+    repo = github.path
+    existing = json.loads(cloud.command(["gh", "secret", "list", "--repo", github.gh_repo,
                                         "--env", namespace, "--json", "name"]))
     fl.require(isinstance(existing, list) and all(isinstance(row, dict) and isinstance(row.get("name"), str)
                                                 for row in existing), "factory-delete-secret-inventory-unverified")
@@ -1143,16 +1158,16 @@ def cleanup_resumed_artifacts(cloud, document, receipt, persist):
     for index in range(artifacts["chunks"]):
         name = prefix + "_" + str(index)
         if name in names:
-            cloud.command(["gh", "secret", "delete", name, "--repo", "github.com/" + repo, "--env", namespace])
+            cloud.command(["gh", "secret", "delete", name, "--repo", github.gh_repo, "--env", namespace])
     refs = json.loads(cloud.command(["gh", "api", "--method", "GET", "repos/" + repo
-        + "/git/matching-refs/" + ref.removeprefix("refs/"), "--hostname", "github.com"]))
+        + "/git/matching-refs/" + ref.removeprefix("refs/"), "--hostname", github.host]))
     fl.require(isinstance(refs, list), "factory-delete-run-tag-unverified")
     matches = [row for row in refs if row.get("ref") == ref]
     fl.require(len(matches) <= 1 and all(row.get("object", {}).get("sha") == document["route"]["commit"]
                                        for row in matches), "factory-delete-run-tag-changed")
     if matches:
         cloud.command(["gh", "api", "--method", "DELETE", "repos/" + repo + "/git/" + ref,
-                       "--hostname", "github.com"])
+                       "--hostname", github.host])
     receipt["remote_artifacts_cleaned"] = True
     persist()
 

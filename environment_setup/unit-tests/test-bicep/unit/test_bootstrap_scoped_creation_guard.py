@@ -20,7 +20,7 @@ CONTROL_LIBRARIES = (
     "agent_chat_entry.py", "aifactory_private_dns.py", "aifactory_scaleset_config.py",
     "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
     "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
-    "github_environments.py",
+    "github_environments.py", "github_host.py",
     "layout_router.sh", "project_deployment.py", "project_environment.py",
     "registered_creation.py", "registered_personas.py",
     "release_version.py", "release_version.sh",

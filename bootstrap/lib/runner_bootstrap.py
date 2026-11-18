@@ -24,7 +24,7 @@ from uuid import uuid4
 from urllib.parse import quote
 
 from factory_enrollment import (
-    ADO_AUDIENCE, Cloud, EnrollmentError, canonical, guid, parse_json, require,
+    ADO_AUDIENCE, Cloud, EnrollmentError, _github_host_module, canonical, guid, parse_json, require,
 )
 
 LIB = Path(__file__).resolve().parent
@@ -32,6 +32,24 @@ FLAGS = ("useSelfHostedBuildAgent", "USE_SELF_HOSTED_BUILD_AGENT")
 FORMATS = ("variables.yaml", "variables.yml", "variables.json", ".env")
 ENVIRONMENTS = {"dev": "dev", "stage": "test", "prod": "prod"}
 COMPUTE_API = "2024-03-01"
+
+
+def github_runner_repository(value):
+    """[HOST/]OWNER/REPO of a GitHub origin, route URL or slug (github.com, SUB.ghe.com or GitHub Enterprise Server),
+    or None when the value is not a GitHub repository."""
+    try:
+        return _github_host_module().parse_github_repository(value).slug
+    except ValueError:
+        return None
+
+
+def _comparable_repository(value):
+    slug = github_runner_repository(value)
+    return slug if slug is not None else value.removesuffix(".git")
+
+
+def _github_host(repository):
+    return _github_host_module().parse_github_repository(repository).host if repository else "github.com"
 DISK_API = "2024-03-02"
 # Time budgets (doubled 2026-10-27; pinned in test_time_budgets.py).
 RESOURCE_PROVISIONING_POLLS = 360       # x 10 s = 60 min
@@ -270,8 +288,7 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
             require(config_source, "ambiguous-registered-variables-select-config-source")
         binding = document.get("bindings", {}).get(factory["id"], {}).get(provider, {})
         if repository and binding.get("repository") and not separate_github:
-            require(repository.removeprefix("https://github.com/").removesuffix(".git") ==
-                    binding["repository"].removeprefix("https://github.com/").removesuffix(".git"),
+            require(_comparable_repository(repository) == _comparable_repository(binding["repository"]),
                     "registered-repository-mismatch")
         if not repository and provider == "gha" and binding:
             repository = binding.get("repository")
@@ -371,13 +388,10 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
         remote = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"],
                                 capture_output=True, text=True, check=False)
         if remote.returncode == 0:
-            match = re.fullmatch(r"(?:https://github\.com/|git@github\.com:)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?",
-                                remote.stdout.strip())
-            repository = match[1] if match else None
+            repository = github_runner_repository(remote.stdout.strip())
     if repository:
-        repository = repository.removeprefix("https://github.com/").removesuffix(".git")
-        require(re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*", repository),
-                "explicit-github-repository-required")
+        repository = github_runner_repository(repository)
+        require(repository, "explicit-github-repository-required")
     organization = (ado_organization or pick(sources, "ADO_ORGANIZATION")) if provider == "ado" and not prereqs_only else None
     if organization:
         require(re.fullmatch(r"https://dev\.azure\.com/[A-Za-z0-9_-]+", organization.rstrip("/")),
@@ -800,7 +814,7 @@ def register_agent(request, cloud, *, python_executable=None):
                AIF_RUNNER_VM_NAME=request["vm_name"], AIF_RUNNER_VM_RESOURCE_GROUP=request["common_rg"],
                AIF_RUNNER_VM_LOCATION=request["location"], AIF_RUNNER_OS=request["vm_os"].title(),
                AIF_DEV_SUBSCRIPTION_ID=request["target"]["subscription_id"], AIF_STATE_DIR=str(state),
-               AIF_RUNNER_PYTHON=python_executable or sys.executable, GH_HOST="github.com", GITHUB_REPOSITORY=request["repository"] or "",
+               AIF_RUNNER_PYTHON=python_executable or sys.executable, GH_HOST=_github_host(request["repository"]), GITHUB_REPOSITORY=request["repository"] or "",
                GHA_RUNNER_NAME=request["agent_name"], GHA_RUNNER_LABEL=request["runner_label"],
                ADO_AGENT_NAME=request["agent_name"], ADO_AGENT_POOL=request["pool"],
                ADO_ORGANIZATION=request["ado_organization"] or "", ADO_TENANT=request["ado_tenant_id"] or "",
