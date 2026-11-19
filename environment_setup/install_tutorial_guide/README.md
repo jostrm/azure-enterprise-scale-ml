@@ -37,18 +37,19 @@ The six scenarios are: 1 Init AI Factory, 2 Add scale set, 3 Add or update proje
 
 ## Download and verify
 
-This is the **private-preview** installer, version **0.2.5**. Its invitation is
+This is the **local-preview** installer, version **0.2.6** (with videos). Its invitation is
 checked locally and its guides are bundled. This convenience gate is not a content
 security boundary. The code is requested on every launch; there is no remembered login.
 
 Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned.msi](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned.msi)
-- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-1.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-1.cab)
-- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-2.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-2.cab)
-- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-3.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-3.cab)
-- [ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-4.cab](ESAF-Tutorials-0.2.5-win-x64-protected-unsigned-4.cab)
+- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi)
+- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-4.cab)
 - [SHA256SUMS.txt](SHA256SUMS.txt)
+- [Build receipt](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi.json)
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'
