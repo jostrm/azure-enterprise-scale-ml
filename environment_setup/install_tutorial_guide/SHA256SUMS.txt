@@ -1,5 +1,5 @@
-18fca7fa0ec609d702532d4c47f536eb327d128cc8d1e909d2d3a6eda3029816  ESAF-Tutorials-0.2.8-win-x64-local-preview-unsigned.msi
-98bfe2b00e2ad435ee4cfd4b0a42ab71d7b09e6ebd305d7aded720a513c9cc8d  ESAF-Tutorials-0.2.8-win-x64-local-preview-unsigned-1.cab
-22ecef73b1b1dac69582b872c2e6c62b2855f61842e7ab701f700eadd627c953  ESAF-Tutorials-0.2.8-win-x64-local-preview-unsigned-2.cab
-3ba9c3d31c15a1db9d2daeb73103a7bfe8e3e3797ab1afcdc21ca7daaf7d38cc  ESAF-Tutorials-0.2.8-win-x64-local-preview-unsigned-3.cab
-cd94e69d4e7b9370c278c15e1c2fd3e95a3c91dca9ba6d9474d20e5f873bba6d  ESAF-Tutorials-0.2.8-win-x64-local-preview-unsigned-4.cab
+0eff5ecefa0389f7f015ba6f602c801f5502f2df24102f333d95cbb9ebd45a9d  ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned.msi
+5fe04a1f55dad383e49a9b5b7439d8c98cd1559592b483f52d495200fb29bc14  ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-1.cab
+30f7d708462a65111177d3d8d536eef56e7999af6905d98be5fe633a88ca0622  ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-2.cab
+80478e003b8c6593fcc1eb3c5069b01520f29349eac54ccf28055da192e2d45f  ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-3.cab
+3be2e1b9782d4bc24d53b68c94863dfd8f3065b00508f8d52fbdca781d92dd7a  ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-4.cab
