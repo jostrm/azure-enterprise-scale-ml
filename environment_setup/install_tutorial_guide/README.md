@@ -1,7 +1,7 @@
 # ESAF Tutorial Guide
 
 Learn Enterprise Scale Azure Factory (ESAF) step by step with a guide that sits beside your terminal.
-The **ESAF Tutorial Guide** is a Windows app (installed as **ESAF Tutorials**). It docks at the right edge
+The **ESAF Tutorial Guide** is a Windows app (in Start: **ESAF Tutorial Guide**). It docks at the right edge
 of your screen while you work in PowerShell, VS Code or the Azure portal. It shows each step and checks
 that you actually did it. It also plays narrated walkthrough videos.
 
@@ -51,19 +51,19 @@ The six scenarios are: 1 Init AI Factory, 2 Add scale set, 3 Add or update proje
 
 ## Download and verify
 
-This is the **local-preview** installer, version **0.2.6** (with videos). Its invitation is
+This is the **local-preview** installer, version **0.2.7** (with videos; the version is shown under **?** in the app). Its invitation is
 checked locally and its guides are bundled. This convenience gate is not a content
 security boundary. The code is requested on every launch; there is no remembered login.
 
 Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi)
-- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-1.cab)
-- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-2.cab)
-- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-3.cab)
-- [ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned-4.cab)
+- [ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned.msi)
+- [ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned-4.cab)
 - [SHA256SUMS.txt](SHA256SUMS.txt)
-- [Build receipt](ESAF-Tutorials-0.2.6-win-x64-local-preview-unsigned.msi.json)
+- [Build receipt](ESAF-Tutorials-0.2.7-win-x64-local-preview-unsigned.msi.json)
 
 Paste the **whole block** into PowerShell, then press **Enter** after the final `}`.
 The `>>` prompt means PowerShell is still collecting a multiline command; if it remains after the
@@ -103,16 +103,18 @@ download, followed by a separate checksum-verification message. It does not inst
 }
 ```
 
-Close the app before upgrading. Same-version reinstallations are supported.
+The installer closes a running guide, removes the previous version (and any file it left behind) and
+then installs the new one; settings and progress are kept. Same-version reinstallations are supported.
 To deliberately install an older version, first uninstall the newer app in
 **Windows Settings > Apps > Installed apps**, then run the older MSI. Settings
 and progress are retained. The installer never silently removes a newer version.
 ## Install
 
 1. Open the download folder: `explorer "$HOME\Downloads\ESAF-Tutorials"`.
-2. Double-click the `.msi` file. It installs for your Windows account in `%LOCALAPPDATA%\ESAF Tutorials`;
+2. Double-click the `.msi` file. It installs for your Windows account in `%LOCALAPPDATA%\ESAF Tutorials`; it shows
+   only a progress bar and opens **ESAF Tutorial Guide** when it finishes (about a minute);
    you normally don't need administrator rights.
-3. From **Start**, open **ESAF Tutorials**.
+3. Later, open it from **Start** > **ESAF Tutorial Guide**.
 
 This preview installer isn't code-signed yet, so Windows SmartScreen or your organization's app policy may warn
 you or block it. Verify the files, follow your organization's approval process, and don't turn off security
@@ -166,7 +168,7 @@ Options without a recording are turned off. Which videos you see depends on your
 
 - **Update:** close the app, then install the newer `.msi` with its `.cab` parts. Your settings and progress
   are kept.
-- **Remove:** select **Settings** > **Apps** > **Installed apps** > **ESAF Tutorials** > **Uninstall**.
+- **Remove:** select **Settings** > **Apps** > **Installed apps** > **ESAF Tutorial Guide** > **Uninstall**.
   Your settings and progress stay in `%LOCALAPPDATA%\ESAIF\com.esaif.tutorialapp\Data`; delete that folder too
   if you want a clean removal.
 
