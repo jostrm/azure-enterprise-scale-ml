@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from starlette.websockets import WebSocketState
 
 from aifactory_agent import security, voice_routes
@@ -15,7 +16,7 @@ from aifactory_agent.teams_meeting_routes import consume_meeting_session
 from aifactory_agent.voice import ClientGone, VoiceAnswerError
 from test_conversation import FakeKnowledge, injected
 from test_teams_meeting_routes import app_for_meetings, create, reset_voice
-from test_teams_meeting_settings import HOST, LISTENER
+from test_teams_meeting_settings import EXTERNAL_LISTENERS, EXTERNAL_TENANT, HOST, LISTENER, external_policy
 from test_voice_routes import GOOD, PCM, collect, ended, got, hello
 
 
@@ -35,9 +36,12 @@ def admitted(app, client):
                                    body["meeting_session"], SCOPE, "project")
 
 
+@pytest.mark.parametrize("explicit_tenant", [False, True])
 @pytest.mark.parametrize("grant_kind", ["missing", "other_scope", "other_permission", "split_grants"])
-def test_every_listener_needs_existing_exact_scope_knowledge_grant(grant_kind):
+def test_every_listener_needs_existing_exact_scope_knowledge_grant(grant_kind, explicit_tenant):
     app = app_for_meetings()
+    if explicit_tenant:
+        replace_external_policy(app, meeting_tenant_id=UUID(app.state.settings.tenant_id))
     revoke_listener(app)
     current = app.state.settings
     if grant_kind != "missing":
@@ -126,8 +130,9 @@ def test_changing_listener_roster_policy_invalidates_existing_ticket():
             security.authorize(current, principal, SCOPE, "knowledge.read")
 
 
-def test_broad_host_grants_never_widen_meeting_tools_or_authorizations():
-    app = app_for_meetings()
+@pytest.mark.parametrize("external", [False, True])
+def test_broad_host_grants_never_widen_meeting_tools_or_authorizations(external):
+    app = app_for_meetings(**({"policies": [external_policy()]} if external else {}))
     current = app.state.settings
     permissions = ["knowledge.read", "factory.read", "cost.read", "graph.read", "config.write",
                    "knowledge.refresh", "factory.create", "factory.delete", "project.add", "agent.create", "model.create"]
@@ -150,6 +155,128 @@ def test_broad_host_grants_never_widen_meeting_tools_or_authorizations():
             security.authorize(app.state.settings, principal, "other", "knowledge.read")
         graph.query.assert_not_called()
         assert not harness.tools.executions and not harness.live_requests
+
+
+def replace_external_policy(app, **changes):
+    current = app.state.settings
+    policy = current.teams_meetings.policies[0].model_copy(update=changes)
+    app.state.settings = current.model_copy(update={"teams_meetings": current.teams_meetings.model_copy(
+        update={"policies": [policy]})})
+
+
+@pytest.mark.parametrize("change", ["tenant", "approval", "safe", "roster", "host"])
+@pytest.mark.parametrize("operation", ["consume", "authorize", "prepare", "execute", "finish", "reset"])
+def test_external_disclosure_revocation_blocks_active_sessions_and_reset_even_with_stale_settings(change, operation):
+    app = app_for_meetings(policies=[external_policy()])
+    with TestClient(app) as client:
+        body = create(client).json()
+        host = app.state.services.authenticate(GOOD)
+        entry = app.state.teams_meeting_registry.sessions[body["session_id"]]
+        digest = entry.ticket_hash
+        if operation != "consume":
+            principal = consume_meeting_session(app, host, body["meeting_session"], SCOPE, "project")
+            harness = injected(app.state.settings)
+            prepared = harness.conversation.prepare("Setup?", "project", principal, SCOPE)
+        original_settings = app.state.settings
+        if change == "host":
+            app.state.settings = original_settings.model_copy(update={"auth": original_settings.auth.model_copy(update={
+                "grants": [grant for grant in original_settings.auth.grants if str(grant.object_id) != HOST],
+            })})
+        else:
+            updates = {
+                "tenant": {"meeting_tenant_id": UUID("99999999-9999-4999-8999-999999999999")},
+                "approval": {"external_audience_disclosure_approved": False},
+                "safe": {"meeting_safe_knowledge": False},
+                "roster": {"allowed_participant_object_ids": [UUID(EXTERNAL_LISTENERS[0])]},
+            }
+            replace_external_policy(app, **updates[change])
+        if operation == "reset":
+            if change == "safe":
+                # This unvalidated model_copy is rejected by service configuration reload before the route.
+                with pytest.raises(ValidationError, match="shared-knowledge approval"):
+                    reset_voice(client, entry.id)
+            else:
+                assert reset_voice(client, entry.id).status_code == 403
+            assert entry.ticket_hash == digest and entry.generation == 0
+        else:
+            with pytest.raises(PermissionError):
+                if operation == "consume":
+                    consume_meeting_session(app, host, body["meeting_session"], SCOPE, "project")
+                elif operation == "authorize":
+                    security.authorize(original_settings, principal, SCOPE, "knowledge.read")
+                elif operation == "prepare":
+                    harness.conversation.prepare("Setup again?", "project", principal, SCOPE)
+                elif operation == "execute":
+                    prepared.execute("knowledge_search", "read-again", '{"query":"More"}')
+                else:
+                    prepared.finish("Evidence [S1].", "response")
+        assert len(app.state.teams_meeting_token_service.issued) == 1
+
+
+def test_external_disclosure_mode_is_pinned_even_when_replacement_policy_is_independently_valid():
+    app = app_for_meetings()
+    with TestClient(app) as client:
+        principal = admitted(app, client)
+        original = app.state.settings
+        replace_external_policy(app, meeting_tenant_id=UUID(EXTERNAL_TENANT),
+                                external_audience_disclosure_approved=True)
+        assert client.get("/api/teams-meetings/status", headers={"Authorization": "Bearer " + GOOD}).json()["policies"]
+        with pytest.raises(PermissionError):
+            security.authorize(original, principal, SCOPE, "knowledge.read")
+        assert reset_voice(client, principal.meeting_session_id).status_code == 403
+
+
+def test_external_disclosure_does_not_change_auth_clients_or_create_listener_app_grants():
+    app = app_for_meetings(policies=[external_policy()])
+    before = app.state.settings.auth.model_dump(mode="json")
+    with TestClient(app) as client:
+        principal = admitted(app, client)
+        host = app.state.services.authenticate(GOOD)
+        assert (principal.tenant_id, principal.object_id, principal.client_id) == (
+            host.tenant_id, host.object_id, host.client_id)
+        for object_id in EXTERNAL_LISTENERS:
+            listener = security.Principal(EXTERNAL_TENANT, object_id)
+            with pytest.raises(PermissionError):
+                security.authorize(app.state.settings, listener, SCOPE, "knowledge.read")
+            with pytest.raises(PermissionError):
+                security.authorize(app.state.settings, replace(listener, tenant_id=host.tenant_id),
+                                   SCOPE, "knowledge.read")
+        assert app.state.settings.auth.model_dump(mode="json") == before
+
+
+@pytest.mark.parametrize("change", ["approval", "tenant"])
+def test_external_disclosure_revoked_during_voice_reset_cannot_return_reusable_ticket(change):
+    app = app_for_meetings(policies=[external_policy()])
+    with TestClient(app) as client:
+        principal = admitted(app, client)
+        entry = app.state.teams_meeting_registry.sessions[principal.meeting_session_id]
+
+        async def stop(_):
+            replace_external_policy(app, **(
+                {"external_audience_disclosure_approved": False} if change == "approval"
+                else {"meeting_tenant_id": UUID("99999999-9999-4999-8999-999999999999")}))
+
+        entry.voice_session = SimpleNamespace(end=stop)
+        assert reset_voice(client, entry.id).status_code == 403
+        assert not app.state.teams_meeting_registry.sessions
+        assert app.state.teams_meeting_token_service.deleted == ["user-0"]
+        assert reset_voice(client, entry.id, generation=1).status_code == 404
+
+
+def test_live_relay_stops_before_audio_after_external_disclosure_approval_revocation():
+    app = app_for_meetings(policies=[external_policy()])
+    with TestClient(app) as client:
+        body = create(client).json()
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(meeting_session=body["meeting_session"]))
+            collect(socket, got("ready"))
+            replace_external_policy(app, external_audience_disclosure_approved=False)
+            socket.send_bytes(PCM)
+            seen = collect(socket, ended)
+            assert not any("audio" in frame or frame.get("type") in {"answer", "transcript"} for frame in seen)
+            assert app.state.voice_gateway.upstreams[0].appends == 0
+        assert not app.state.teams_meeting_registry.sessions
+        assert app.state.teams_meeting_token_service.deleted == ["user-0"]
 
 
 def test_even_replaced_delegate_fields_cannot_widen_server_bound_guard():

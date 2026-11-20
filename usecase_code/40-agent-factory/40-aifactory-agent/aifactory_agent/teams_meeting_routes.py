@@ -160,6 +160,8 @@ class MeetingSession:
     meeting_url: str = field(repr=False)
     expires_at: float
     identity: MeetingIdentity = field(repr=False)
+    meeting_tenant_id: str
+    external_audience_disclosure_approved: bool
     allowed_participant_object_ids: frozenset[str] = field(default_factory=frozenset)
     generation: int = 0
     resetting: bool = False
@@ -258,27 +260,47 @@ def _policy(settings, principal, meeting_url, scope_key):
                    and policy.meeting_safe_knowledge), None)
     if policy is None:
         raise PermissionError("This exact meeting and disclosure scope are not approved.")
-    if not policy.allowed_participant_object_ids or any(
-        not any(str(grant.object_id) == str(listener) and scope_key in grant.scopes
-                and "knowledge.read" in grant.permissions for grant in settings.auth.grants)
-        for listener in policy.allowed_participant_object_ids
-    ):
-        raise PermissionError("Every approved listener must retain an existing exact-scope knowledge grant.")
-    context = parse_qs(urlsplit(meeting_url).query).get("context")
-    if context is not None:
+    listeners = policy.allowed_participant_object_ids
+    if (not 1 <= len(listeners) <= 32 or len(set(listeners)) != len(listeners)
+            or any(not listener.int for listener in listeners)):
+        raise PermissionError("Meeting disclosure requires a bounded, exact listener allowlist.")
+    if policy.meeting_tenant_id is not None and not policy.meeting_tenant_id.int:
+        raise PermissionError("The explicit meeting tenant must be nonzero.")
+    meeting_tenant_id = str(policy.meeting_tenant_id or settings.tenant_id)
+    if meeting_tenant_id == settings.tenant_id:
+        if policy.external_audience_disclosure_approved is not False:
+            raise PermissionError("External disclosure approval is not valid for a same-tenant meeting.")
+        if any(
+            not any(str(grant.object_id) == str(listener) and scope_key in grant.scopes
+                    and "knowledge.read" in grant.permissions for grant in settings.auth.grants)
+            for listener in listeners
+        ):
+            raise PermissionError("Every approved listener must retain an existing exact-scope knowledge grant.")
+    elif policy.meeting_tenant_id is None or policy.external_audience_disclosure_approved is not True:
+        raise PermissionError("External meeting disclosure requires explicit tenant and audience approval.")
+    # External approval permits disclosure only; the authenticated host and app grants remain unchanged.
+    parsed = urlsplit(meeting_url)
+    context = parse_qs(parsed.query, keep_blank_values=True).get("context")
+    if context is not None or parsed.path.startswith("/l/meetup-join/"):
         try:
-            if len(context) != 1 or str(UUID(json.loads(context[0])["Tid"])) != settings.tenant_id:
+            if context is None or len(context) != 1:
+                raise ValueError
+            tenant = json.loads(context[0])["Tid"]
+            if not isinstance(tenant, str) or str(UUID(tenant)) != meeting_tenant_id:
                 raise ValueError
         except (ValueError, KeyError, TypeError):
-            raise PermissionError("The meeting tenant does not match the deployment.") from None
+            raise PermissionError("The meeting URL tenant does not match the approved meeting tenant.") from None
     return policy
 
 
 def _check_session(app, entry, settings=None):
     if entry.revoked or entry.expires_at <= time.time():
         raise PermissionError("The meeting session has ended.")
-    policy = _policy(settings or app.state.settings, entry.principal, entry.meeting_url, entry.scope_key)
+    current = settings or app.state.settings
+    policy = _policy(current, entry.principal, entry.meeting_url, entry.scope_key)
     if (policy.id != entry.policy_id
+            or str(policy.meeting_tenant_id or current.tenant_id) != entry.meeting_tenant_id
+            or policy.external_audience_disclosure_approved != entry.external_audience_disclosure_approved
             or frozenset(map(str, policy.allowed_participant_object_ids)) != entry.allowed_participant_object_ids):
         raise PermissionError("The meeting policy changed.")
 
@@ -460,6 +482,8 @@ async def _reclaim_identity(app, principal, policy, body, identity) -> CleanupSt
     entry = MeetingSession(
         secrets.token_urlsafe(24), "", principal, policy.id, body.scope_key,
         body.audience, body.meeting_url, time.time(), identity, revoked=True,
+        meeting_tenant_id=str(policy.meeting_tenant_id or principal.tenant_id),
+        external_audience_disclosure_approved=policy.external_audience_disclosure_approved,
     )
     with app.state.teams_meeting_registry.lock:
         app.state.teams_meeting_registry.sessions[entry.id] = entry
@@ -481,7 +505,11 @@ def register_teams_meetings(app: FastAPI) -> None:
                 _policy(current, principal, policy.meeting_url, policy.scope_key)
             except PermissionError:
                 continue
-            policies.append({"id": policy.id, "scope_key": policy.scope_key})
+            policies.append({
+                "id": policy.id, "scope_key": policy.scope_key,
+                "meeting_tenant_id": str(policy.meeting_tenant_id or current.tenant_id),
+                "external_audience_disclosure_approved": policy.external_audience_disclosure_approved,
+            })
         return JSONResponse({"enabled": current.teams_meetings.enabled, "policies": policies,
                              "attended_only": True}, headers={"Cache-Control": "no-store"})
 
@@ -517,6 +545,8 @@ def register_teams_meetings(app: FastAPI) -> None:
             entry = MeetingSession(
                 secrets.token_urlsafe(24), hashlib.sha256(ticket.encode()).hexdigest(), principal,
                 policy.id, body.scope_key, body.audience, body.meeting_url, expires, identity,
+                meeting_tenant_id=str(policy.meeting_tenant_id or current.tenant_id),
+                external_audience_disclosure_approved=policy.external_audience_disclosure_approved,
                 allowed_participant_object_ids=frozenset(map(str, policy.allowed_participant_object_ids)),
             )
             with registry.lock:
@@ -534,6 +564,8 @@ def register_teams_meetings(app: FastAPI) -> None:
                 "scope_key": entry.scope_key, "audience": entry.audience, "acs_token": entry.identity.token,
                 "acs_expires_at": entry.identity.expires_at, "expires_at": entry.expires_at,
                 "display_name": current.teams_meetings.display_name,
+                "meeting_tenant_id": entry.meeting_tenant_id,
+                "external_audience_disclosure_approved": entry.external_audience_disclosure_approved,
                 "allowed_participant_object_ids": list(map(str, policy.allowed_participant_object_ids)),
                 "lobby_timeout_seconds": current.teams_meetings.lobby_timeout_seconds,
                 "audio": {"encoding": "pcm16", "sample_rate": 24000, "channels": 1},
