@@ -198,7 +198,7 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
         response = await call_next(request)
         response.headers.update(headers)
         embedded = request.query_params.get("host") == "esaif-maui"
-        native_embed = settings.voice.mode == "realtime" and request.query_params.getlist("voice") == ["on"]
+        native_embed = settings.voice.mode in {"realtime", "delegated"} and request.query_params.getlist("voice") == ["on"]
         if request.query_params.get("voice") == "off" or (embedded and not native_embed):
             response.headers["Permissions-Policy"] = "microphone=(), camera=(), geolocation=()"
         return response

@@ -102,6 +102,7 @@
     function levelTick() {
       const current = resources;
       if (!current || run.phase !== "active") return;
+      sendPlayback(current);
       let level = 0;
       const state = run.shown;
       const analyser = state === "listening" ? current.micAnalyser : state === "speaking" ? current.speakerAnalyser : null;
@@ -112,11 +113,55 @@
       emit("onLevel", level);
     }
 
+    function sendPlayback(current) {
+      if (!current.delegated || !current.socket || current.socket.readyState !== 1) return;
+      const context = current.context;
+      // Unsupported/suspended output clocks produce no receipt: truncation to an
+      // earlier confirmed position is safer than retaining unheard speech.
+      if (context.state !== "running" || typeof context.getOutputTimestamp !== "function") return;
+      const timestamp = context.getOutputTimestamp();
+      if (!timestamp || !Number.isFinite(timestamp.contextTime)) return;
+      const due = new Map();
+      current.receipts = current.receipts.filter(receipt => {
+        if (receipt.epoch !== current.playbackEpoch) return false;
+        if (receipt.context_time > timestamp.contextTime) return true;
+        due.set(receipt.playback_id, receipt);
+        return false;
+      });
+      for (const receipt of due.values()) {
+        if (receipt.played_samples <= (current.reported.get(receipt.playback_id) || 0)) continue;
+        current.reported.set(receipt.playback_id, receipt.played_samples);
+        current.socket.send(JSON.stringify({type: "playback", playback_id: receipt.playback_id,
+          item_id: receipt.item_id, played_samples: receipt.played_samples}));
+      }
+    }
+
+    function flushPlayback(current) {
+      sendPlayback(current);
+      current.playbackEpoch += 1;
+      current.receipts = [];
+      current.reported.clear();
+      current.audioMetadata = null;
+      current.playing = false;
+      current.playback.port.postMessage(null);
+    }
+
     function handleMessage(current, generation, event) {
       if (generation !== run.generation) return;
       if (typeof event.data !== "string") {
+        if (current.delegated && current.interruptPending) return;
+        if (current.delegated) {
+          const meta = current.audioMetadata;
+          current.audioMetadata = null;
+          if (!meta || event.data.byteLength !== (meta.end_sample - meta.start_sample) * 2) {
+            finish("error", "The voice audio stream could not be verified.", true);
+            return;
+          }
+          current.playback.port.postMessage({...meta, epoch: current.playbackEpoch, audio: event.data}, [event.data]);
+        } else {
+          current.playback.port.postMessage(event.data, [event.data]);
+        }
         current.playing = true;
-        current.playback.port.postMessage(event.data, [event.data]);
         show("speaking");
         return;
       }
@@ -124,7 +169,23 @@
       try { message = JSON.parse(event.data); } catch { return; }
       if (!message || typeof message.type !== "string") return;
       switch (message.type) {
+        case "voice_mode":
+          current.delegated = message.mode === "delegated" && message.playback_receipts === true;
+          break;
+        case "audio_chunk":
+          if (current.delegated) {
+            if (current.interruptPending) break;
+            if (current.audioMetadata || typeof message.playback_id !== "string" || typeof message.item_id !== "string"
+                || !Number.isSafeInteger(message.start_sample) || !Number.isSafeInteger(message.end_sample)
+                || message.start_sample < 0 || message.end_sample <= message.start_sample) {
+              finish("error", "The voice audio stream could not be verified.", true);
+              return;
+            }
+            current.audioMetadata = message;
+          }
+          break;
         case "ready":
+          current.delegated = message.mode === "delegated" && message.playback_receipts === true;
           run.phase = "active";
           current.ready = true;
           current.serverState = "listening";
@@ -143,8 +204,8 @@
           emit("onAnswer", message);
           break;
         case "interrupted":
-          current.playing = false;
-          current.playback.port.postMessage(null);
+          flushPlayback(current);
+          current.interruptPending = false;
           show(current.serverState || "listening");
           break;
         case "error":
@@ -179,7 +240,8 @@
       run.shown = undefined;
       show("connecting");
       const current = {nodes: [], playing: false, ready: false, serverState: "listening", samples: new Float32Array(512),
-        pending: [], timer: null};
+        pending: [], timer: null, delegated: false, receipts: [], reported: new Map(), playbackEpoch: 0,
+        audioMetadata: null};
       resources = current;
       try {
         const context = new env.AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "interactive"});
@@ -218,6 +280,17 @@
         current.speakerAnalyser.connect(context.destination);
         current.nodes.push(source, capture, silent, current.micAnalyser, current.playback, current.speakerAnalyser);
         current.playback.port.onmessage = (event) => {
+          if (generation !== run.generation) return;
+          const receipt = event.data;
+          if (current.delegated && receipt && receipt.playback_id && receipt.epoch === current.playbackEpoch
+              && Number.isFinite(receipt.context_time) && Number.isSafeInteger(receipt.played_samples)) {
+            if (current.receipts.length >= 4096) {
+              finish("error", "Voice playback stopped because the output device is not progressing.", true);
+              return;
+            }
+            current.receipts.push(receipt);
+            sendPlayback(current);
+          }
           if (event.data && event.data.drained && generation === run.generation) {
             current.playing = false;
             show(current.serverState || "listening");
@@ -273,9 +346,9 @@
     function interrupt() {
       const current = resources;
       if (!current || run.phase !== "active") return;
+      flushPlayback(current);
+      if (current.delegated) current.interruptPending = true;
       if (current.socket && current.socket.readyState === 1) current.socket.send(JSON.stringify({type: "interrupt"}));
-      current.playing = false;
-      current.playback.port.postMessage(null);
       show(current.serverState || "listening");
     }
 
@@ -452,7 +525,7 @@
         }
         const status = await response.json();
         if (generation !== probeGeneration) return;
-        const compatible = !embedded || (status.mode === "realtime"
+        const compatible = !embedded || (["realtime", "delegated"].includes(status.mode)
           && status.protocol === 1 && status.embedded_voice_version === 1);
         enabled = status.enabled === true && compatible;
         card.hidden = !enabled;
