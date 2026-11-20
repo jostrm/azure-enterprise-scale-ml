@@ -249,6 +249,7 @@ class VoiceSession:
             "audio": {"encoding": "pcm16", "sample_rate": SAMPLE_RATE, "channels": 1},
             "limits": {"max_session_seconds": int(self._max_duration), "idle_timeout_seconds": int(self._idle_timeout)},
             "voice": {"name": self.voice.voice_name, "languages": list(self.voice.input_languages)},
+            **({"mode": "delegated", "playback_receipts": True} if self.voice.mode == "delegated" else {}),
         })
         await self._set_state("listening")
         await self._greet()

@@ -35,6 +35,7 @@ from .voice import (
     VoiceProtocolError, VoiceSession, websockets_available,
 )
 from .voice_realtime import RealtimeVoiceSession
+from .voice_delegated import DelegatedVoiceSession, TranscriptDelegatedVoiceSession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -299,7 +300,9 @@ def register_voice(app: FastAPI) -> None:
                        "idle_timeout_seconds": current.voice.idle_timeout_seconds},
         }
         result["mode"] = current.voice.mode
-        result["embedded_voice_version"] = 1 if current.voice.mode == "realtime" else 0
+        result["embedded_voice_version"] = 1 if current.voice.mode in {"realtime", "delegated"} else 0
+        if current.voice.mode == "delegated":
+            result["delegation_trigger"] = current.voice.delegation_trigger
         if current.voice.language_profiles:
             result["voice"].update({
                 "languages": list(current.voice.language_profiles), "default_language": current.voice.default_language,
@@ -387,7 +390,15 @@ def register_voice(app: FastAPI) -> None:
                 from .teams_meeting_routes import meeting_session_seconds
                 options["max_duration"] = min(
                     options["max_duration"], meeting_session_seconds(websocket.app, principal))
-            if selected_voice.mode == "realtime":
+            if selected_voice.mode == "delegated":
+                delegated = (TranscriptDelegatedVoiceSession if selected_voice.delegation_trigger == "transcript"
+                             else DelegatedVoiceSession)
+                session = delegated(
+                    selected_voice, upstream, channel,
+                    _answerer(websocket.app, principal, hello.scope_key, hello.audience),
+                    authorize=lambda: authorize(state.settings, principal, hello.scope_key, "knowledge.read"),
+                    **options)
+            elif selected_voice.mode == "realtime":
                 prepare, execute = _native_handlers(websocket.app, principal, hello.scope_key, hello.audience)
                 session = RealtimeVoiceSession(selected_voice, upstream, channel, prepare, execute,
                                                max_tool_rounds=current.max_tool_rounds, **options)
