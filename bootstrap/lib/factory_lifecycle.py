@@ -7943,9 +7943,9 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         if not receipt["mutation_started"]:
             try:
                 locks.release()
-            except Blocked:
-                receipt["error_code"] = "lock-release-reconciliation-required"
-                receipt.pop("error_diagnostic", None)
+            except Blocked as release:
+                # Keep the cause; the retained claim is reported beside it, never instead of it.
+                receipt["release_error_code"] = release.code
         receipt["locks_retained"] = sorted(locks.held)
         try:
             persist()
