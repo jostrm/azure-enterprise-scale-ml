@@ -807,6 +807,13 @@ cleanup. The bridge never calls `stopAudio()`, which can fall back to the device
 microphone. Failed remote cleanup is shown explicitly; token revocation alone
 does not instantly disconnect a participant.
 
+For delegated voice, audio metadata must match its following PCM frame and
+cannot cross a reset. Browser speaker playback receipts are preserved for the
+ordinary browser interface. The Teams bridge does not turn its sender's render
+position into a claim that remote attendees heard the audio: it sends no playback
+receipts, so interrupted native history is truncated conservatively. Human
+confirmation in a Teams client remains the playback acceptance evidence.
+
 The current transport suppresses incoming audio while the assistant speaks to
 avoid echo loops. Use **Stop speaking** to interrupt; natural full-duplex barge-in
 is **not** established by this half-duplex pilot. Reconnect is fail-closed:
@@ -877,7 +884,7 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
 
 **Which voice technology does it use?**
 
-Both modes use the **Azure Voice Live API** (`wss://<foundry-account>.services.ai.azure.com/voice-live/realtime`,
+All three modes use the **Azure Voice Live API** (`wss://<foundry-account>.services.ai.azure.com/voice-live/realtime`,
 `api-version` `2026-04-10`) on the project Foundry account. No separate Azure Speech resource or Speech SDK
 pipeline (speech to text, then chat, then text to speech) is used. The mode decides who writes the answer and
 whose voice speaks it:
@@ -885,12 +892,22 @@ whose voice speaks it:
 | `voice.mode` | Speech in | Who writes the answer | Voice out |
 |---|---|---|---|
 | `speech_shell` (default; the pipeline baseline) | Voice Live transcription and turn detection | The same `Conversation.answer()` as typed chat (grounded, cited) | An Azure neural voice through Voice Live (`voice_type: "azure-standard"`, default `en-US-Ava:DragonHDLatestNeural`) |
-| `realtime` (opt-in, e.g. Spider project001 Dev) | The GPT realtime model hears the audio itself (`gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`) | The realtime model, with the evidence, read tools and citation checks from `Conversation.prepare` | The realtime model's own voice (`voice_type: "openai"`, for example `coral`) |
+| `realtime` (opt-in) | The GPT realtime model hears the audio itself (`gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`) | The realtime model, with the evidence, read tools and citation checks from `Conversation.prepare` | The realtime model's own voice (`voice_type: "openai"`, for example `coral`) |
+| `delegated` (opt-in; preserves the existing Spider browser deployment) | Voice Live audio and final transcription | The same authenticated `Conversation.answer()` as typed chat; the voice model is only a presentation layer | Native speech of the authoritative specialist result; spoken rephrasing remains provisional |
 
 Choose the mode in your configuration (or in the customer overlay named by `aifactoryAgentConfigFile`), for
 example `"voice": {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "coral"}`.
 `speech_shell` keeps typed and spoken answers identical; `realtime` answers faster and sounds more natural, with
 the verification trade-off described below.
+
+For `delegated`, `delegation_trigger: "model_tool"` forces the transcribed question
+through `ask_specialist` before speech; `"transcript"` calls the same specialist
+directly after transcription, avoiding that preliminary model-tool response.
+Neither trigger grants permissions or delegates business reasoning to the voice
+model. Preserve the deployed mode and trigger during a Teams rollout rather than
+silently switching an existing browser to `speech_shell` or `realtime`.
+This compatibility mode is direct Voice Live orchestration, **not** a managed
+Foundry Voice Agent or the hosted conversation-engine protocol.
 
 **How it works**
 
@@ -975,6 +992,7 @@ reuse the current text session rather than acquiring a separate token.
 |---|---|---|
 | `enabled` | `false` | Registers the voice routes and shows the voice card. |
 | `mode` | `speech_shell` | Set `realtime` with a supported native model to remove the external answer-model/TTS chain. |
+| `delegation_trigger` | `model_tool` | In `delegated` mode, `transcript` invokes the authenticated specialist directly from the final transcript. Other modes reject this override. |
 | `endpoint` | derived | `https://<foundry-account>.services.ai.azure.com` from `azure.foundry_account`; only Foundry/Cognitive Services hosts are accepted. |
 | `model` | `gpt-4.1-nano` | Shell billing tier; native mode requires `gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`. Approve regional availability and processing scope separately. |
 | `voice_name` | `en-US-Ava:DragonHDLatestNeural` | Fixed for the whole session. |

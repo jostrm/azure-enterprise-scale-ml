@@ -227,6 +227,8 @@
     }
 
     function relay(current) {
+      current.audioMetadata = null;
+      current.delegated = false;
       const protocol = env.location.protocol === "https:" ? "wss:" : "ws:";
       const socket = new env.WebSocket(`${protocol}//${env.location.host}/api/voice/ws`);
       current.socket = socket;
@@ -249,8 +251,16 @@
             void stop("failed"); return;
           }
           if (current.paused) return;
+          if (current.delegated) {
+            const metadata = current.audioMetadata;
+            current.audioMetadata = null;
+            if (!metadata || event.data.byteLength !== (metadata.end_sample - metadata.start_sample) * 2) {
+              void stop("failed"); return;
+            }
+          }
           current.playing = true;
           current.pending = [];
+          // ACS sender rendering does not prove remote hearing. Do not send playback receipts.
           current.playback.port.postMessage(event.data, [event.data]);
           show("speaking");
           return;
@@ -258,9 +268,24 @@
         let message;
         try { message = JSON.parse(event.data); } catch { void stop("failed"); return; }
         if (message.type === "ready") {
+          current.delegated = message.mode === "delegated" && message.playback_receipts === true;
           current.ready = true; env.clearTimeout(readyTimer); show("listening");
+        } else if (message.type === "voice_mode") {
+          current.delegated = message.mode === "delegated" && message.playback_receipts === true;
+        } else if (message.type === "audio_chunk" && current.delegated) {
+          if (current.paused) return;
+          if (current.audioMetadata || typeof message.playback_id !== "string"
+              || typeof message.item_id !== "string" || typeof message.response_id !== "string"
+              || message.content_index !== 0 || !Number.isSafeInteger(message.start_sample)
+              || !Number.isSafeInteger(message.end_sample) || message.start_sample < 0
+              || message.end_sample <= message.start_sample) {
+            void stop("failed"); return;
+          }
+          current.audioMetadata = message;
         } else if (message.type === "interrupted") {
+          current.audioMetadata = null;
           current.playback.port.postMessage(null);
+          current.audioMetadata = null;
           current.playing = false; current.echoUntil = now() + 500;
           show(current.paused ? "paused" : "listening");
         } else if (message.type === "closed" || (message.type === "error" && message.fatal)) {

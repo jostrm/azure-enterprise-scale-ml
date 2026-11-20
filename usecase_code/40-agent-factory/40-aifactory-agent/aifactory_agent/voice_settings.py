@@ -31,7 +31,8 @@ class VoiceSettings(BaseModel):
 
     # Code-level mirror of the pipeline switch enableAIFactoryAgentLiveVoice / ENABLE_AI_FACTORY_AGENT_LIVE_VOICE.
     enabled: bool = False
-    mode: Literal["speech_shell", "realtime"] = "speech_shell"
+    mode: Literal["speech_shell", "realtime", "delegated"] = "speech_shell"
+    delegation_trigger: Literal["model_tool", "transcript"] = "model_tool"
     # Realtime only, opt-in: understand any spoken language (input_languages become hints, the first one the fallback),
     # reply in the user's language and use multilingual semantic VAD unless turn_detection is server_vad.
     multilingual: bool = False
@@ -110,15 +111,17 @@ class VoiceSettings(BaseModel):
             raise ValueError("Language profile keys must be BCP-47 locale codes.")
         if self.language_profiles and self.default_language not in self.language_profiles:
             raise ValueError("The default language must have a configured profile.")
-        if self.mode == "realtime" and self.model not in {"gpt-realtime", "gpt-realtime-mini", "gpt-realtime-datazone"}:
+        if self.mode in {"realtime", "delegated"} and self.model not in {"gpt-realtime", "gpt-realtime-mini", "gpt-realtime-datazone"}:
             raise ValueError("Realtime mode requires a native speech-to-speech model.")
-        if self.multilingual and self.mode != "realtime":
+        if self.delegation_trigger != "model_tool" and self.mode != "delegated":
+            raise ValueError("Transcript delegation requires delegated voice mode.")
+        if self.multilingual and self.mode not in {"realtime", "delegated"}:
             raise ValueError("Multilingual voice is a realtime mode option.")
-        if self.mode == "realtime" and len(self.input_languages) != 1 and not self.multilingual:
+        if self.mode in {"realtime", "delegated"} and len(self.input_languages) != 1 and not self.multilingual:
             raise ValueError("Realtime mode requires one selected profile language unless multilingual is enabled.")
         for name, kind in [(self.voice_name, self.voice_type)] + [
                 (profile.voice_name, profile.voice_type) for profile in self.language_profiles.values()]:
-            if kind == "openai" and (self.mode != "realtime" or name not in {
+            if kind == "openai" and (self.mode not in {"realtime", "delegated"} or name not in {
                     "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"}):
                 raise ValueError("Native OpenAI voices require realtime mode and an approved voice name.")
         return self
@@ -140,13 +143,13 @@ class VoiceSettings(BaseModel):
                     "turn_detection": self.native_turn_detection()})
             if language is not None and language != self.input_languages[0]:
                 raise ValueError("Language is not configured.")
-            return self.model_copy(update={"turn_detection": "server_vad"}) if self.mode == "realtime" else self
+            return self.model_copy(update={"turn_detection": "server_vad"}) if self.mode in {"realtime", "delegated"} else self
         selected = language or self.default_language
         if selected not in self.language_profiles:
             raise ValueError("Language is not configured.")
         profile = self.language_profiles[selected]
         # Do not apply English semantic VAD to an operator-configured non-English language.
-        if self.mode == "realtime":
+        if self.mode in {"realtime", "delegated"}:
             detection = self.native_turn_detection()
         else:
             detection = "server_vad" if not selected.lower().startswith("en-") else self.turn_detection

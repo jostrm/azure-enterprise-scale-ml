@@ -428,3 +428,48 @@ def test_leave_during_reset_discards_late_ticket_and_concurrent_controls_do_not_
   assert.ok(agents[0].call.hungUp);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 """, STATIC / "teams-meeting.js")
+
+
+def test_delegated_meeting_audio_is_metadata_bound_without_claiming_remote_playback():
+    node(HARNESS + r"""
+(async () => {
+  await join(); const ws = sockets[0]; ws.open();
+  ws.receive({type: "ready", mode: "delegated", playback_receipts: true});
+  const playback = find("voice-playback");
+  ws.receive({type: "audio_chunk", playback_id: "p1", item_id: "i1", response_id: "r1",
+    content_index: 0, start_sample: 0, end_sample: 480});
+  ws.receive(new ArrayBuffer(960));
+  assert.equal(playback.port.posts.length, 1);
+  playback.port.onmessage({data: {playback_id: "p1", item_id: "i1", epoch: 0,
+    played_samples: 480, context_time: 1}});
+  assert.ok(!ws.sent.some(v => typeof v === "string" && JSON.parse(v).type === "playback"),
+    "rendering into an ACS sender does not prove remote hearing");
+  ws.receive(new ArrayBuffer(960));
+  for(let i=0; i<12; i++) await tick();
+  assert.ok(agents[0].call.hungUp, "delegated PCM without metadata fails closed");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""", STATIC / "teams-meeting.js")
+
+
+def test_delegated_metadata_must_match_pcm_and_never_survives_voice_reset():
+    node(HARNESS + r"""
+(async () => {
+  await join(); const first = sockets[0]; first.open();
+  first.receive({type: "ready", mode: "delegated", playback_receipts: true});
+  first.receive({type: "audio_chunk", playback_id: "p1", item_id: "i1", response_id: "r1",
+    content_index: 0, start_sample: 0, end_sample: 480});
+  await client.interrupt();
+  const second = sockets[1]; second.open();
+  second.receive({type: "ready", mode: "delegated", playback_receipts: true});
+  second.receive(new ArrayBuffer(960));
+  for(let i=0; i<12; i++) await tick();
+  assert.ok(agents[0].call.hungUp, "metadata from the previous provider cannot bind new PCM");
+  await join(); const third = sockets[2]; third.open();
+  third.receive({type: "ready", mode: "delegated", playback_receipts: true});
+  third.receive({type: "audio_chunk", playback_id: "p2", item_id: "i2", response_id: "r2",
+    content_index: 0, start_sample: 0, end_sample: 480});
+  third.receive(new ArrayBuffer(480));
+  for(let i=0; i<12; i++) await tick();
+  assert.ok(agents[1].call.hungUp, "PCM length must match its metadata");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""", STATIC / "teams-meeting.js")

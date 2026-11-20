@@ -180,19 +180,22 @@ def test_status_requires_sign_in_and_reports_capabilities(app):
     assert body["embedded_voice_version"] == 0
 
 
-@pytest.mark.parametrize("mode,enabled", [("speech_shell", True), ("realtime", True), ("realtime", False)])
+@pytest.mark.parametrize("mode,enabled", [
+    ("speech_shell", True), ("realtime", True), ("realtime", False),
+    ("delegated", True), ("delegated", False),
+])
 def test_embedded_voice_requires_explicit_opt_in_and_native_backend(conversation, mode, enabled):
     app = build(make_settings(mode=mode, enabled=enabled,
-                              model="gpt-realtime-mini" if mode == "realtime" else "gpt-4.1-nano"),
+                              model="gpt-realtime-mini" if mode in {"realtime", "delegated"} else "gpt-4.1-nano"),
                 conversation, FakeGateway())
     with TestClient(app) as client:
         for query in ("host=esaif-maui", "host=esaif-maui&voice=off", "voice=off"):
             assert client.get("/?" + query).headers["permissions-policy"].startswith("microphone=()")
         policy = client.get("/?host=esaif-maui&voice=on").headers["permissions-policy"]
-        assert policy.startswith("microphone=(self)" if mode == "realtime" and enabled else "microphone=()")
+        assert policy.startswith("microphone=(self)" if mode in {"realtime", "delegated"} and enabled else "microphone=()")
         if enabled:
             status = client.get("/api/voice/status", headers={"Authorization": "Bearer " + GOOD}).json()
-            assert status["embedded_voice_version"] == (1 if mode == "realtime" else 0)
+            assert status["embedded_voice_version"] == (1 if mode in {"realtime", "delegated"} else 0)
 
 
 def test_language_selection_is_allowlisted_server_profile_and_text_auth_survives_voice_failure(conversation):

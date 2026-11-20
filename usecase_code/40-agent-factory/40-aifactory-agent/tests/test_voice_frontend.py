@@ -841,6 +841,28 @@ def test_embedded_native_page_uses_server_profiles_and_requires_explicit_start()
 """, STATIC / "voice.js")
 
 
+def test_embedded_delegated_page_preserves_explicit_start_and_server_profiles():
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const rig = page({...capabilities, mode: "delegated"});
+  rig.grant(true);
+  await tick();
+  assert.equal(rig.element("voice-card").hidden, false);
+  assert.equal(rig.element("voice-toggle").disabled, false);
+  assert.deepEqual(rig.element("voice-language").children.map(item => item.value), ["fr-FR", "de-DE", "ja-JP"]);
+  assert.equal(rig.env.navigator.mediaDevices.requests.length, 0);
+  rig.element("voice-toggle").handlers.click();
+  await tick();
+  const socket = FakeSocket.instances.at(-1);
+  socket.open();
+  assert.equal(JSON.parse(socket.sent[0]).language, "fr-FR");
+  assert.equal(JSON.parse(socket.sent[0]).token, session.token);
+  await rig.controller.client.stop();
+  assert.equal(session.token, "TOKEN-ABC-123");
+})().catch(error => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
 def test_embedded_host_revocation_stops_capture_and_preserves_text_session():
     node(PAGE_HARNESS + r"""
 (async () => {

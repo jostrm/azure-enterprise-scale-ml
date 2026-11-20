@@ -14,6 +14,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_realtime.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_delegated.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_settings.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
@@ -34,6 +35,8 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_session.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_realtime.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_delegated.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_delegated_transcript.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_routes.py
@@ -163,6 +166,19 @@ An optional hello `language` selects only a configured server-owned BCP-47 local
 Live voice needs Cognitive Services User and Foundry User on the project Foundry account (assigned from `infra/voice-roles.bicep` only when voice is enabled) and private reachability of the account's `services.ai.azure.com` endpoint from the application. Offline tests with fake backends, mutation checks of the relay's safety properties and real-browser runs cover the relay and UI. A live Voice Live session in a tenant is a separate observation (region, DNS, roles); passing tests do not establish it.
 
 ## Attended Teams media pilot (source observation, 2026-11-18)
+
+The existing Spider browser deployment was observed on 2026-11-20 using direct
+Voice Live `delegated` mode with transcript-triggered `Conversation.answer`.
+Its deployed voice modules matched the committed consumer implementation; the
+shared source now preserves that mode instead of downgrading an existing
+deployment. `model_tool` first forces `ask_specialist`; `transcript` invokes the
+same authenticated specialist directly. Both keep the authoritative answer and
+citations in the governed backend and treat native spoken rephrasing as
+provisional. This is not a managed Voice Agent hosted conversation engine.
+The browser retains device-timestamp playback receipts; the Teams sender does
+not claim remote hearing from local render progress. It validates metadata/PCM
+framing, discards metadata across provider resets and conservatively leaves
+remote-playback positions unacknowledged.
 
 An opt-in ACS browser Adapter joins a Teams meeting as a visibly named external
 AI participant. Remote meeting audio is forwarded to the existing authenticated
