@@ -1849,6 +1849,10 @@ def _collect_resource_closure(reader, scopes, resource_versions):
     ahead = reader.pool is not None
     derived = set()  # resources whose api-version came from the provider schema, not a pin
     referenced = set()  # resources only another body names; they may already be deleted (dangling reference)
+    # Resources a group listing or a parent's child list named. ARM's lists lag a deletion (aif-165 2026-11-19, run
+    # e0267f20: a private DNS zone the run had just deleted and proven gone was still listed), so the listing is a hint
+    # and the resource's own read decides: a 404 there is absent (gone), left out as if the list had not named it.
+    listed_ids, gone = set(), set()
     planned = set()  # queued resources whose child reads were already started
 
     def arm_read(path, api, allowed=None):
@@ -1858,7 +1862,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         # A dashboard tile or an alert rule still names a resource a project deletion removed: its 404 is a
         # dangling reference (recorded in closure["references"], never walked), not a failed inventory.
         # A listed or referenced child may answer 409; only PLATFORM_REFUSED_READ is accepted (see the walk).
-        allowed = (200, *((404,) if resource_id.lower() in referenced else ()),
+        allowed = (200, *((404,) if resource_id.lower() in referenced or resource_id.lower() in listed_ids else ()),
                    *((409,) if resource_id.lower() in listed_rows or resource_id.lower() in referenced else ()))
         return arm_read(resource_id, api, allowed if len(allowed) > 1 else None)
 
@@ -2092,6 +2096,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         closure["collections"][path.lower()] = entry
         for row in rows:
             resource_id = row["id"].lower()
+            listed_ids.add(resource_id)
             if resource_id not in versions:
                 adopt(resource_id, resource_versions.get(resource_id, api),
                       kind is not None and resource_id not in resource_versions)
@@ -2129,6 +2134,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         for row in roots:
             resource_id = row["id"]
             require(arm_scope(resource_id) == scope.lower(), "inventory-escaped-resource-group")
+            listed_ids.add(resource_id.lower())
             api = resource_versions.get(resource_id.lower()) or version(resource_type_from_id(resource_id))
             if resource_id.lower() not in versions:
                 adopt(resource_id, api, not resource_versions.get(resource_id.lower()))
@@ -2154,6 +2160,8 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         api, (status, headers, body) = served(lambda value: reader.get(resource_read(resource_id, value)), versions[key],
                                               kind if key in derived else None)
         if status == 404:
+            if key in listed_ids:
+                gone.add(key)  # a lagging list named it; its own read proves it absent
             continue
         if status == 409:
             error = body.get("error") if isinstance(body, dict) else None
@@ -2210,6 +2218,13 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             else:
                 add_collection(path, value, single=single, kind=child_kind)
         extensions(resource_id)
+    for entry in closure["collections"].values():
+        # The closure a caught-up listing gives: what a lagging list still named, and its own read proved absent, is
+        # left out of that list, so every later comparison of the inventory sees no change from the lag.
+        if isinstance(entry.get("ids"), list) and gone & set(entry["ids"]):
+            entry["ids"] = [identifier for identifier in entry["ids"] if identifier not in gone]
+            entry["items"] = [row for row in entry["items"] if row["id"].lower() not in gone]
+            entry["body_hash"] = digest(entry["items"])
     for reference, metadata in closure["inline"].items():
         parent = metadata["parent_id"]
         if parent not in bodies and parent in referenced:

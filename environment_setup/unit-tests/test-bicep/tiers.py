@@ -208,6 +208,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "unit/test_platform_child_of_retained_parent.py",
         "unit/test_platform_dropped_delegation.py",
         "unit/test_platform_refused_child.py",
+        "unit/test_stale_listing_absent_resource.py",
         "unit/test_prefix_bootstrap.py",
         "unit/test_private_endpoint_connection_reverse_link.py",
         "unit/test_private_endpoint_disconnect_churn.py",
