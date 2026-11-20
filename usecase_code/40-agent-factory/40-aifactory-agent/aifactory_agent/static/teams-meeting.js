@@ -279,7 +279,7 @@
             }
           }
           current.playing = true;
-          current.pending = [];
+          if (!current.fullDuplex) current.pending = [];
           // ACS sender rendering does not prove remote hearing. Do not send playback receipts.
           current.playback.port.postMessage(event.data, [event.data]);
           show("speaking");
@@ -305,7 +305,6 @@
         } else if (message.type === "interrupted") {
           current.audioMetadata = null;
           current.playback.port.postMessage(null);
-          current.audioMetadata = null;
           current.playing = false; current.echoUntil = now() + 500;
           show(current.paused ? "paused" : "listening");
         } else if (message.type === "closed" || (message.type === "error" && message.fatal)) {
@@ -346,6 +345,7 @@
         const admission = await response.json();
         if (!alive(current)) { await revoke(current, admission); return; }
         current.admission = admission;
+        current.fullDuplex = admission.full_duplex === true;
         if (admission.meeting_url !== meetingUrl || admission.scope_key !== session.scopeKey
             || admission.audience !== session.audience || !admission.meeting_session || !admission.acs_token
             || admission.voice_generation !== 0
@@ -387,7 +387,8 @@
           if (!alive(current) || !current.ready) return;
           if (!sameSession(current)) { void stop("changed"); return; }
           if (!safe(current)) return;
-          if (current.paused || current.resetting || current.playing || now() < current.echoUntil || current.socket.readyState !== 1
+          const suppressEcho = !current.fullDuplex && (current.playing || now() < current.echoUntil);
+          if (current.paused || current.resetting || suppressEcho || current.socket.readyState !== 1
               || current.socket.bufferedAmount > 96000) { current.pending = []; return; }
           current.pending.push(event.data);
           if (current.pending.length === 3) {

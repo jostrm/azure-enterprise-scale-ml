@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from ipaddress import IPv6Address
+from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -87,6 +88,12 @@ class TeamsMeetingSettings(BaseModel):
     allowed_host_object_ids: list[UUID] = Field(default_factory=list, max_length=100)
     policies: list[MeetingPolicy] = Field(default_factory=list, max_length=100)
     display_name: str = Field(default="ESAF AI meeting assistant", min_length=1, max_length=100)
+    voice_mode: Literal["inherit", "realtime"] = Field(
+        default="inherit", description="Meeting-only profile; realtime reuses the configured native model and governed grounding.",
+    )
+    full_duplex: bool = Field(
+        default=False, strict=True, description="Keep meeting input capture active during playback for server-owned interruption.",
+    )
     max_session_seconds: int = Field(default=900, ge=60, le=3600)
     lobby_timeout_seconds: int = Field(default=120, ge=10, le=300)
     max_concurrent_sessions: int = Field(default=4, ge=1, le=32)

@@ -174,7 +174,8 @@ establish full lifecycle acceptance, latency targets or the managed Voice Agent
 hosted-conversation-engine path. No meeting media/transcript is stored as evidence.
 The test reported delayed self-monitoring; the ACS local speaker is now explicitly
 muted with `muteIncomingAudio`, while raw input capture and outgoing replies
-remain separate. Follow-up human listening is still needed for that fix.
+remain separate. The participant subsequently confirmed the delayed self-audio
+was gone.
 
 Admission binds an explicitly approved host, exact meeting URL, scope, explanation
 audience and expiry to a one-use opaque voice ticket. The derived principal has
@@ -204,7 +205,14 @@ drain guarantee. Old-session cleanup cannot revoke a newer generation, and reset
 never extends admission expiry. Leave tears down media immediately while
 server/ACS cleanup reports its separate outcome. The browser never uses
 `stopAudio()`, which would select the default microphone. Echo protection is
-half-duplex; natural barge-in is not established. Reconnect requires a fresh
+half-duplex by default. Explicit `full_duplex` admission allows remote capture
+during playback so upstream speech detection can interrupt; it does not mix
+the assistant's outgoing media into its input. An optional meeting-only realtime
+profile uses the shared `Conversation.prepare` path instead of serial
+`Conversation.answer` plus voice presentation, without changing browser defaults
+or permissions. Both settings are server-owned and pinned to the meeting session;
+changing them invalidates the session. Human-perceived full-duplex behavior
+remains separate live evidence. Reconnect requires a fresh
 explicit join. Single-replica/single-worker deployment is mandatory because
 tickets and cleanup ownership are process-local.
 
