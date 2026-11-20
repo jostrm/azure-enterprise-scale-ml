@@ -26,6 +26,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -92,6 +93,9 @@ HELD_RECHECK_SECONDS = 60               # a read-only absence wait proves the he
 WHAT_IF_POLLS = 240                     # 20 min
 FOUNDRY_READINESS_POLLS = 360           # 30 min
 ARM_DEPLOYMENT_POLLS = 2880             # 4 h
+# Pipelines-only: each frozen step is its own `az deployment ... --template-file <step>.bicep` (design B).
+PER_STEP_TRANSPORT = "per-step-bicep-v1"
+AZ_DEPLOYMENT_COMMAND_TIMEOUT_SECONDS = 1200   # one step's az what-if, or its create submission
 GITHUB_DISPATCH_DISCOVERY_POLLS = 120   # x 2 s = 4 min
 # Not doubled: x 15 s = 6 h, GitHub's 360-minute job maximum; a longer wait would only hang the end-to-end run.
 PROVIDER_RUN_POLLS = 1440
@@ -813,6 +817,7 @@ def validate_deployment_plan(document):
             and plan.get("configuration_hash") == digest(document["config"]), "frozen-deployment-plan-required")
     require(plan.get("parameter_transport") in (None, "arm-keyvault-reference-v1"),
             "unsupported-arm-parameter-transport")
+    require(plan.get("deployment_transport") in (None, PER_STEP_TRANSPORT), "unsupported-deployment-transport")
     require(guid(document["identity"].get("deployment_object_id")), "bound-deployment-principal-required")
     require(route.get("scoped_contract") == 1 and isinstance(route.get("auth_namespace"), str)
             and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", route["auth_namespace"]), "namespaced-route-required")
@@ -1255,7 +1260,7 @@ class Cloud:
         self.pipeline_identity = expected_object_id is not None
         self.workload_client_id = None
 
-    def command(self, argv, cwd=None, data=None):
+    def command(self, argv, cwd=None, data=None, timeout=None):
         command = list(argv)
         label = command_label(command)
         if command[0] == "git":
@@ -1280,7 +1285,8 @@ class Cloud:
             command[0] = executable
         try:
             result = self.runner(command, cwd=cwd, input=data, shell=False, text=True, encoding="utf-8",
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=LOCAL_COMMAND_TIMEOUT_SECONDS)
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=timeout or LOCAL_COMMAND_TIMEOUT_SECONDS)
         except (OSError, subprocess.SubprocessError):
             raise Blocked("command-unavailable-or-timed-out") from None
         if result.returncode != 0:
@@ -4103,8 +4109,8 @@ def tags_only_delta(change):
                     for entry in delta))
 
 
-def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
-                     resource_payloads=None, source_changes=None, phase_receipt=None, tag_updates=None):
+def rest_what_if_response(cloud, document, step, payload, sleep=time.sleep):
+    """One ARM REST what-if of a (combined) payload."""
     endpoint = deployment_endpoint(document, step)
     body = json.loads(canonical(payload))
     body["properties"]["whatIfSettings"] = {"resultFormat": "FullResourcePayloads"}
@@ -4127,6 +4133,15 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
                 break
         else:
             raise Blocked("arm-what-if-incomplete")
+    return response
+
+
+def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
+                     resource_payloads=None, source_changes=None, phase_receipt=None, tag_updates=None,
+                     response=None):
+    """Reviewed rows from one preview; a per-step transport hands in its merged `response`."""
+    if response is None:
+        response = rest_what_if_response(cloud, document, step, payload, sleep)
     foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
     resources = (foundation["resources"] if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT else {})
     if unchanged_resources:
@@ -4222,6 +4237,145 @@ def combined_plan_payload(cloud, document, source_root, step_ids=None):
         from pipeline_lifecycle_keyvault import lift_combined_payload
         return lift_combined_payload(payload)
     return payload
+
+
+def per_step_transport(document):
+    return document.get("deployment", {}).get("deployment_transport") == PER_STEP_TRANSPORT
+
+
+STEP_CHANGE_RANK = {"Ignore": 0, "NoChange": 1, "Modify": 2, "Deploy": 2, "Create": 3}
+
+
+def merge_step_what_if_rows(step_rows):
+    """One preview row per resource across the ordered per-step previews.
+
+    The strongest change wins (Ignore < NoChange < Modify < Create; anything else, such as Delete or
+    Unsupported, outranks them, so the reviewed-row gates still stop it). `before` comes from the first
+    written row (every preview reads the same pre-deployment state), `after` and the rest from the last
+    written row: incremental deployments run in order and the last writer leaves the result.
+    """
+    grouped = {}
+    for rows in step_rows:
+        for row in rows:
+            require(isinstance(row, dict) and isinstance(row.get("resourceId"), str), "invalid-arm-what-if-resource")
+            grouped.setdefault(row["resourceId"].lower(), []).append(row)
+    merged = []
+    for rows in grouped.values():
+        written = [row for row in rows if row.get("changeType") != "Ignore"]
+        if not written:
+            merged.append(copy.deepcopy(rows[-1]))
+            continue
+        strongest = max(written, key=lambda row: STEP_CHANGE_RANK.get(row.get("changeType"), 9))
+        result = copy.deepcopy(written[-1])
+        result["changeType"] = strongest["changeType"]
+        result["before"] = copy.deepcopy(written[0].get("before"))
+        merged.append(result)
+    return merged
+
+
+def step_parameter_file(payload):
+    """ARM parameter file of a compiled step payload: literal values and Key Vault references, no secrets."""
+    return {"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+            "contentVersion": "1.0.0.0", "parameters": payload["properties"]["parameters"]}
+
+
+def step_deployment_argv(document, step, action, template_file, parameter_file):
+    """`az deployment sub|group what-if|create` of one frozen step, named like its reviewed child deployment."""
+    target = document["target"]
+    if step["scope"] == "subscription":
+        argv = ["az", "deployment", "sub", action, "--location", target["region"]]
+    else:
+        match = RG_ID.fullmatch(str(step.get("resource_group", "")))
+        require(match is not None and match[1].lower() == target["subscription_id"].lower(),
+                "per-step-resource-group-outside-target")
+        argv = ["az", "deployment", "group", action, "--resource-group", match[2]]
+    argv += ["--name", deployment_endpoint(document, step).rsplit("/", 1)[-1],
+             "--subscription", target["subscription_id"],
+             "--template-file", str(template_file), "--parameters", "@" + str(parameter_file)]
+    if action == "what-if":
+        return argv + ["--result-format", "FullResourcePayloads", "--no-pretty-print",
+                       "--output", "json", "--only-show-errors"]
+    require(action == "create", "unsupported-per-step-action")
+    return argv + ["--no-wait", "--output", "none", "--only-show-errors"]
+
+
+def run_step_command(cloud, document, step, source_root, payload, action, workdir):
+    """The step's own .bicep (az compiles the reviewed source); a Foundry-bound template goes as its JSON."""
+    source_root = clean_path(source_root)
+    name = "step-" + hashlib.sha256(step["id"].encode("utf-8")).hexdigest()[:16]
+    if document["deployment"].get("foundry_identity_continuation"):
+        template_file = Path(workdir) / (name + ".json")
+        template_file.write_bytes(canonical(payload["properties"]["template"]))
+    else:
+        template_file = clean_path(source_root / Path(step["template"]))
+        require(template_file.is_relative_to(source_root) and template_file.is_file(), "canonical-template-unavailable")
+    parameter_file = Path(workdir) / (name + ".parameters.json")
+    parameter_file.write_bytes(canonical(step_parameter_file(payload)))
+    return cloud.command(step_deployment_argv(document, step, action, template_file, parameter_file),
+                         cwd=str(source_root), timeout=AZ_DEPLOYMENT_COMMAND_TIMEOUT_SECONDS)
+
+
+def per_step_what_if_response(cloud, document, source_root, step_ids=None):
+    """Merged rows of one `az deployment ... what-if` per selected step: no combined template, no 4 MB limit."""
+    rows = []
+    with tempfile.TemporaryDirectory(prefix="aif-what-if-") as workdir:
+        for step in document["deployment"]["steps"]:
+            if step_ids is not None and step["id"] not in step_ids:
+                continue
+            payload = compiled_plan_step(cloud, document, step, source_root)
+            raw = run_step_command(cloud, document, step, source_root, payload, "what-if", workdir)
+            try:
+                result = json.loads(raw)
+            except ValueError:
+                raise Blocked("arm-what-if-failed-or-incomplete") from None
+            result = result.get("properties", result) if isinstance(result, dict) else None
+            require(isinstance(result, dict) and not result.get("error")
+                    and result.get("status") in (None, "Succeeded"), "arm-what-if-failed")
+            require(isinstance(result.get("changes"), list), "arm-what-if-failed-or-incomplete")
+            rows.append(result["changes"])
+    return {"changes": merge_step_what_if_rows(rows)}
+
+
+def plan_what_if(cloud, document, source_root, root_step, step_ids=None, sleep=time.sleep, **options):
+    """Reviewed preview rows of the selected steps through the manifest's deployment transport."""
+    if not per_step_transport(document):
+        return evaluate_what_if(cloud, document, root_step,
+                                combined_plan_payload(cloud, document, source_root, step_ids), sleep, **options)
+    return evaluate_what_if(cloud, document, root_step, None, sleep,
+                            response=per_step_what_if_response(cloud, document, source_root, step_ids), **options)
+
+
+def wait_arm_deployment(cloud, locks, endpoint, sleep):
+    for _ in range(ARM_DEPLOYMENT_POLLS):
+        locks.assert_held()
+        _, _, state = cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM)
+        provisioned = state.get("properties", {}).get("provisioningState")
+        if provisioned in ("Succeeded", "Failed", "Canceled"):
+            require(provisioned == "Succeeded", "arm-deployment-failed")
+            return state
+        require(provisioned in ("Accepted", "Running", "Creating", "Updating"), "arm-deployment-state-unverified")
+        sleep(5)
+    raise Blocked("arm-deployment-completion-unverified")
+
+
+def deploy_steps_per_step(cloud, locks, document, source_root, steps, receipt, persist, sleep, on_deployed=None):
+    """Each frozen step is its own `az deployment ... create`; it must succeed before the next one starts."""
+    with tempfile.TemporaryDirectory(prefix="aif-deploy-") as workdir:
+        for step in steps:
+            payload = compiled_plan_step(cloud, document, step, source_root)
+            endpoint = deployment_endpoint(document, step)
+            locks.assert_held()
+            locks.authorize(document)
+            receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
+            persist()
+            run_step_command(cloud, document, step, source_root, payload, "create", workdir)
+            result = wait_arm_deployment(cloud, locks, endpoint, sleep)
+            receipt["deployments"].append({"step_id": step["id"], "id": endpoint.removeprefix(ARM),
+                                           "status": "succeeded"})
+            receipt.pop("pending_deployment", None)
+            persist()
+            if on_deployed is not None:
+                on_deployed(step, result)
 
 
 FOUNDRY_TEMPLATE = "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep"
@@ -5258,10 +5412,9 @@ def freeze_foundry_lifecycle(cloud, document, source_root):
     cumulative, preceding, payloads = [], {}, []
     for phase in data["phases"]:
         cumulative.extend(phase["step_ids"])
-        payload = combined_plan_payload(cloud, document, source_root, cumulative)
         captured, source_changes = {}, {}
-        changes = evaluate_what_if(cloud, document, {"id": phase["id"], "scope": "subscription"}, payload,
-                                  resource_payloads=captured, source_changes=source_changes)
+        changes = plan_what_if(cloud, document, source_root, {"id": phase["id"], "scope": "subscription"},
+                               list(cumulative), resource_payloads=captured, source_changes=source_changes)
         payloads.append(captured)
         verify_bootstrap_preservation(document, changes)
         require(all(RG_ID.fullmatch(row["resource_id"]) or NESTED_ID.fullmatch(row["resource_id"])
@@ -5793,9 +5946,8 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         cumulative.extend(phase["step_ids"])
         locks.assert_held()
         captured, source_changes = {}, {}
-        observed = evaluate_what_if(cloud, document, {"id": phase["id"], "scope": "subscription"},
-            combined_plan_payload(cloud, document, source_root, cumulative), sleep,
-            resource_payloads=captured, source_changes=source_changes)
+        observed = plan_what_if(cloud, document, source_root, {"id": phase["id"], "scope": "subscription"},
+            list(cumulative), sleep, resource_payloads=captured, source_changes=source_changes)
         require(observed == phase["changes"], "native-foundry-preview-changed")
         verify_bootstrap_preservation(document, observed)
         payloads.append(captured)
@@ -5816,15 +5968,18 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
             verify_foundry_provider_readiness_receipt(document, receipt)
             verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
         root_step = {"id": phase["id"], "scope": "subscription"}
-        payload = combined_plan_payload(cloud, document, source_root, phase["step_ids"])
+        phase_steps = [step for step in document["deployment"]["steps"] if step["id"] in phase["step_ids"]]
+        payload = (None if per_step_transport(document)
+                   else combined_plan_payload(cloud, document, source_root, phase["step_ids"]))
         for identifier, proof in observations.items():
             status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
             require(status == 200 and resource_digest(body) == proof["body_hash"],
                     "native-foundry-phase-instance-changed")
         source_changes = {}
-        current = evaluate_what_if(cloud, document, root_step, payload, sleep,
-                                   unchanged_resources=observations, source_changes=source_changes,
-                                   phase_receipt=receipt)
+        what_if = {"unchanged_resources": observations, "source_changes": source_changes, "phase_receipt": receipt}
+        if payload is None:
+            what_if["response"] = per_step_what_if_response(cloud, document, source_root, phase["step_ids"])
+        current = evaluate_what_if(cloud, document, root_step, payload, sleep, **what_if)
         verify_bootstrap_preservation(document, current)
         verify_foundry_phase_changes(current, phase["changes"], preceding, observations)
         if phase["id"] == "foundry-prerequisites":
@@ -5844,7 +5999,7 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
             require(status == 404, "native-foundry-first-run-account-already-exists")
         locks.assert_held()
         locks.authorize(document)
-        endpoint = deployment_endpoint(document, root_step)
+        endpoint = deployment_endpoint(document, root_step if payload is not None else phase_steps[0])
         receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
         persist()
         verify_foundry_identity_current(cloud, locks, document)
@@ -5856,22 +6011,29 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
             verify_foundry_live_readiness(cloud, locks, document, receipt, sleep)
         verify_foundry_live_inventory(cloud, locks, document, observations)
         locks.authorize(document)
-        cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
-        wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
-            lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
-            sleep, attempts=ARM_DEPLOYMENT_POLLS, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
-            document=document)
-        for step in document["deployment"]["steps"]:
-            if step["id"] not in phase["step_ids"]:
-                continue
-            child = deployment_endpoint(document, step).removeprefix(ARM)
-            result = wait_foundry_resource(cloud, locks, child,
+        if payload is None:
+            def account_readiness(step, result):
+                if step["id"] == data["account_step"]:
+                    foundry_readiness(cloud, locks, document, receipt, persist, result, sleep)
+            deploy_steps_per_step(cloud, locks, document, source_root, phase_steps, receipt, persist, sleep,
+                                  on_deployed=account_readiness)
+        else:
+            cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
+            wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
                 lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
-                sleep, attempts=1, read=lambda: cloud.request(
-                    "GET", ARM + child + "?api-version=2022-09-01", ARM), document=document)
-            receipt["deployments"].append({"step_id": step["id"], "id": child, "status": "succeeded"})
-            if step["id"] == data["account_step"]:
-                foundry_readiness(cloud, locks, document, receipt, persist, result, sleep)
+                sleep, attempts=ARM_DEPLOYMENT_POLLS, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
+                document=document)
+            for step in document["deployment"]["steps"]:
+                if step["id"] not in phase["step_ids"]:
+                    continue
+                child = deployment_endpoint(document, step).removeprefix(ARM)
+                result = wait_foundry_resource(cloud, locks, child,
+                    lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+                    sleep, attempts=1, read=lambda: cloud.request(
+                        "GET", ARM + child + "?api-version=2022-09-01", ARM), document=document)
+                receipt["deployments"].append({"step_id": step["id"], "id": child, "status": "succeeded"})
+                if step["id"] == data["account_step"]:
+                    foundry_readiness(cloud, locks, document, receipt, persist, result, sleep)
         observation = observe_foundry_phase(cloud, document, phase, current, observations, receipt)
         receipt["foundry_phases"].append({"id": phase["id"], "status": "succeeded",
                                          "changes_hash": digest(phase["changes"])})
@@ -6631,8 +6793,7 @@ def _freeze_deployment_contents(cloud, document, source_root):
     if freeze_foundry_identity_stage(cloud, draft, source_root):
         result["configuration_hash"] = digest(document["config"])
         return result
-    payload = combined_plan_payload(cloud, draft, source_root)
-    result["changes"] = evaluate_what_if(cloud, draft, {"id": "factory", "scope": "subscription"}, payload)
+    result["changes"] = plan_what_if(cloud, draft, source_root, {"id": "factory", "scope": "subscription"})
     verify_bootstrap_preservation(draft, result["changes"])
     freeze_foundry_lifecycle(cloud, draft, source_root)
     result["configuration_hash"] = digest(document["config"])
@@ -6763,12 +6924,15 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         locks.assert_held()
         cloud.verify_identity(require_default=True)
         verify_foundry_identity_current(cloud, locks, document)
-        payload = combined_plan_payload(cloud, document, source_root)
         root_step = {"id": "factory", "scope": "subscription"}
+        payload = None if per_step_transport(document) else combined_plan_payload(cloud, document, source_root)
         reviewed = sorted(({**row, "resource_id": row["resource_id"].lower()}
                            for row in document["deployment"]["changes"]), key=lambda row: row["resource_id"])
-        require(evaluate_what_if(cloud, document, root_step, payload, sleep) == reviewed,
-                "arm-what-if-changed-since-prepare")
+        # Every per-step preview is re-run before the first write, against the same unchanged state.
+        current = (evaluate_what_if(cloud, document, root_step, payload, sleep) if payload is not None else
+                   evaluate_what_if(cloud, document, root_step, None, sleep,
+                                    response=per_step_what_if_response(cloud, document, source_root)))
+        require(current == reviewed, "arm-what-if-changed-since-prepare")
         locks.assert_held()
         locks.authorize(document)
         require(bootstrap_ownership_snapshot(cloud, document) == bootstrap_owners,
@@ -6778,6 +6942,9 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         if "foundry_lifecycle" in document["deployment"]:
             run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep)
             verify_foundry_phase_receipts(document, receipt)
+        elif payload is None:
+            deploy_steps_per_step(cloud, locks, document, source_root, document["deployment"]["steps"],
+                                  receipt, persist, sleep)
         else:
             endpoint = deployment_endpoint(document, root_step)
             receipt["pending_deployment"] = endpoint.removeprefix(ARM)

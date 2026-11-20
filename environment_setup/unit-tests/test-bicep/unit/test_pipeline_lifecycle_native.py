@@ -438,6 +438,12 @@ def production_fixture(monkeypatch, scenario, network_group, provider="ado"):
                            for group in (GROUP, COMMON)}}
             self.compilations = []
             self.arm_writes = []
+            self.combined_requests = []
+
+        def what_if_changes(self):
+            selected = ([common_ip] if scenario == 2 else [RESOURCE] if scenario == 3 else [common_ip, RESOURCE])
+            return [{"resourceId": resource, "changeType": "Modify", "before": self.bodies[resource.lower()],
+                     "after": self.bodies[resource.lower()]} for resource in selected]
 
         def state_request(self, kind, method, endpoint, body, allowed):
             # The private ADO consumer ref is read with the provider credential, never anonymous git.
@@ -451,6 +457,15 @@ def production_fixture(monkeypatch, scenario, network_group, provider="ado"):
                 return "a" * 40
             if argv[:3] == ["gh", "api", "user"]:
                 return json.dumps({"id": 71})
+            if argv[:2] == ["az", "deployment"]:
+                # Pipelines-only previews and deploys each frozen step from its own .bicep file.
+                assert argv[3] in ("what-if", "create") and kwargs.get("timeout") == fl.AZ_DEPLOYMENT_COMMAND_TIMEOUT_SECONDS
+                assert argv[argv.index("--template-file") + 1].endswith(".bicep")
+                if argv[3] == "what-if":
+                    return json.dumps({"status": "Succeeded", "changes": self.what_if_changes()})
+                assert "--no-wait" in argv
+                self.arm_writes.append((argv, None))
+                return ""
             assert argv[:3] == ["az", "account", "get-access-token"]
             return commands({"source": data["source"], "identity": {"object_id": OBJECT},
                              "target": {"tenant_id": TENANT}})(argv)
@@ -476,12 +491,11 @@ def production_fixture(monkeypatch, scenario, network_group, provider="ado"):
                 "Factory API and unreviewed HTTP endpoints are forbidden: " + url)
             if url.startswith(fl.ARM) and "/whatIf?" in url:
                 assert method == "POST"
-                selected = ([common_ip] if scenario == 2 else [RESOURCE] if scenario == 3 else [common_ip, RESOURCE])
-                return 200, {}, {"properties": {"changes": [
-                    {"resourceId": resource, "changeType": "Modify", "before": self.bodies[resource.lower()],
-                     "after": self.bodies[resource.lower()]} for resource in selected]}}
+                self.combined_requests.append(url)
+                return 200, {}, {"properties": {"changes": self.what_if_changes()}}
             if url.startswith(fl.ARM) and "/providers/Microsoft.Resources/deployments/" in url:
                 if method == "PUT":
+                    self.combined_requests.append(url)
                     self.arm_writes.append((url, copy.deepcopy(data)))
                     return 201, {}, {"properties": {"provisioningState": "Succeeded"}}
                 assert method == "GET"
@@ -514,6 +528,8 @@ def test_production_planner_derives_all_six_native_plans_from_configuration_and_
     assert not cloud.deleted
     if scenario < 4:
         assert document["deployment"]["changes"]
+        assert document["deployment"]["deployment_transport"] == fl.PER_STEP_TRANSPORT
+        assert not cloud.combined_requests
         assert cloud.compilations
         assert all(step["template"] in fl.PROJECT_TEMPLATES | set(fl.COMMON_TEMPLATES.values())
                    for step in document["deployment"]["steps"])
@@ -593,6 +609,10 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
         cloud.request("GET", "http://localhost:8000/api/factory", "factory-api")
     source = workspace / "source"
     source.mkdir()
+    for template in fl.PROJECT_TEMPLATES | set(fl.COMMON_TEMPLATES.values()):
+        # Pipelines-only deploys each step from its own .bicep file in the source checkout.
+        (source / template).parent.mkdir(parents=True, exist_ok=True)
+        (source / template).write_text("// offline placeholder", encoding="utf-8")
     planner.source_root = source
     monkeypatch.setattr(fl, "verify_source", lambda cloud, root, source: root)
     monkeypatch.setattr(fl, "_verify_source", lambda cloud, root, source, **kwargs: root)
@@ -649,7 +669,7 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
             return None
         raise AssertionError((method, path))
 
-    def command(argv, cwd=None, data=None):
+    def command(argv, cwd=None, data=None, **kwargs):
         if argv[:2] == ["git", "show"]:
             assert argv[2] == "a" * 40 + ":bootstrap/templates/factory-lifecycle-" + provider + ".yml"
             return source_template
@@ -666,7 +686,7 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
             endpoint = next(value for value in argv if value.startswith("repos/"))
             response = github(method, endpoint, json.loads(data) if data else None)
             return json.dumps(response) if response is not None else ""
-        return original_command(argv, cwd=cwd)
+        return original_command(argv, cwd=cwd, **kwargs)
 
     def request(method, url, audience, data=None, headers=None, allowed=(200,)):
         base = "https://dev.azure.com/org/project/_apis"
@@ -718,6 +738,9 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
     assert store.records[completed["operation_id"]]["stages"][0]["receipt"] == proof
     assert not cloud.leases
     if scenario < 4:
+        # One az deployment create per frozen step; never the combined nested REST deployment.
+        assert not cloud.combined_requests
+        assert len(cloud.arm_writes) == len(manifest["deployment"]["steps"])
         assert cloud.arm_writes and proof["children"][0]["worker"]["resource_groups"]
         assert proof["children"][0]["worker"]["ownership"]
     else:

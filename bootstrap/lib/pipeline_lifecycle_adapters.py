@@ -452,7 +452,9 @@ class NativePlanner:
                                                              "adminVMBuildAgentName") if key in base}})
         document["deployment"] = {"contract": 1, "network_mode": "byo" if byo else "managed",
                                   "configuration_hash": fl.digest(document["config"]), "steps": steps,
-                                  "known_ownership": known}
+                                  "known_ownership": known,
+                                  # Bicep per step through the pipeline's az, never one nested 4 MB ARM template.
+                                  "deployment_transport": fl.PER_STEP_TRANSPORT}
         if any(is_reference(value) for step in steps for value in step["parameters"].values()):
             require(fl.capabilities().get("arm_parameter_transport") == KEYVAULT_TRANSPORT,
                     "native-keyvault-reference-transport-required")
