@@ -104,6 +104,13 @@ def _remote(document):
         "inventory_mode") == "ordered-project-pipelines-v1"
 
 
+def _never_dispatched(run, worker):
+    """A run receipt persisted as blocked before any mutation proves no worker dispatch was attempted:
+    ado_scoped and github_scoped persist mutation_started=True and pending_dispatch before the dispatch call."""
+    return (isinstance(run, dict) and run.get("status") == "blocked" and run.get("mutation_started") is False
+            and "remote_run" not in run and not any(key.startswith("pending_") for key in run) and worker is None)
+
+
 class RetainedClaimReconciliation:
     def __init__(self, provider, *, review, admission, evidence):
         require(callable(getattr(provider, "read", None)) and callable(getattr(provider, "replace", None))
@@ -227,8 +234,9 @@ class RetainedClaimReconciliation:
                 require(key not in run or run[key] == expected, "reconciliation-native-run-binding-mismatch")
             selected[prefix + ".claim.json"], selected[prefix + ".json"] = claim, run
             worker = records.get(prefix + ".worker.json")
-            if _remote(document):
+            if _remote(document) and not _never_dispatched(run, worker):
                 # Missing dispatch acknowledgement is NOT evidence that no worker ran.
+                # Only a blocked pre-mutation receipt is (aif-163 run 2478).
                 remote = run.get("remote_run")
                 require(isinstance(remote, dict) and remote.get("kind") == document["route"]["kind"]
                         and type(remote.get("run_id")) is int and remote["run_id"] > 0
@@ -294,7 +302,10 @@ class RetainedClaimReconciliation:
                     and isinstance(child.get("resources"), list) and isinstance(child.get("dependencies"), list)
                     and isinstance(child.get("permissions"), list) and child["permissions"]
                     and fl.guid(child.get("observer_object_id"))
-                    and (not _remote(document) or child.get("worker", {}).get("status") == "completed"),
+                    and (not _remote(document) or (child.get("worker") or {}).get("status") == "completed"
+                         or child.get("worker") is None and _never_dispatched(
+                             proposal["native_records"].get("runs/" + document["run_id"] + ".json"),
+                             proposal["native_records"].get("runs/" + document["run_id"] + ".worker.json"))),
                     "reconciliation-native-observations-incomplete")
             if proposal.get("completed_outcome"):
                 identity_only = "foundry_identity_stage" in document.get("deployment", {})
@@ -916,8 +927,10 @@ class NativeReconciliationEvidence:
             require("parent" not in result or result["parent"] == parent, "reconciliation-provider-parent-changed")
             result["parent"] = parent
             native = proposal["native_records"]["runs/" + document["run_id"] + ".json"]
+            dispatched = _remote(document) and not _never_dispatched(
+                native, proposal["native_records"].get("runs/" + document["run_id"] + ".worker.json"))
             worker = self._terminal(cloud, document["route"], proposal["prior_origin"], document,
-                                    native["remote_run"]) if _remote(document) else None
+                                    native["remote_run"]) if dispatched else None
             receipts = [native, proposal["native_records"].get("runs/" + document["run_id"] + ".worker.json", {})]
             pending = self._pending(cloud, document, receipts)
             present, absent, permissions = [], [], []

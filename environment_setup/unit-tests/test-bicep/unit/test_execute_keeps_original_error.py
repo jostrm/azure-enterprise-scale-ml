@@ -35,3 +35,40 @@ def test_pre_mutation_failure_keeps_its_error_code_when_the_claim_is_retained(mo
     assert result["release_error_code"] == "single-writer-claim-retained-reconciliation-required"
     assert result["locks_retained"] == ["scope"]
     assert locks[0].stored[-1]["error_code"] == "active-or-queued-remote-run"
+
+
+class AbortingLocks(RetainingLocks):
+    """A single-writer claim that proves no effect started is released through abort, not release."""
+
+    def __init__(self, cloud, document, refuse=False):
+        super().__init__(cloud, document)
+        self.refuse, self.aborted = refuse, []
+
+    def abort(self, receipt):
+        self.aborted.append(dict(receipt))
+        if self.refuse:
+            raise fl.Blocked("single-writer-claim-retained-reconciliation-required")
+        self.held.clear()
+
+
+def test_pre_mutation_failure_releases_the_claim_through_abort(monkeypatch, workspace):
+    source, execution, receipt = setup_execute(monkeypatch, workspace)
+    cloud = FakeCloud()
+    cloud.active_run = True
+    locks = []
+    result = fl.execute(manifest(), source, execution, receipt, cloud=cloud,
+                        lock_factory=lambda cloud, document: locks.append(AbortingLocks(cloud, document)) or locks[-1])
+    assert result["status"] == "blocked" and result["error_code"] == "active-or-queued-remote-run"
+    assert locks[0].aborted[0]["status"] == "blocked" and locks[0].aborted[0]["mutation_started"] is False
+    assert result["locks_retained"] == [] and "release_error_code" not in result
+
+
+def test_a_refused_abort_keeps_the_original_error_and_reports_the_retained_claim(monkeypatch, workspace):
+    source, execution, receipt = setup_execute(monkeypatch, workspace)
+    cloud = FakeCloud()
+    cloud.active_run = True
+    result = fl.execute(manifest(), source, execution, receipt, cloud=cloud,
+                        lock_factory=lambda cloud, document: AbortingLocks(cloud, document, refuse=True))
+    assert result["error_code"] == "active-or-queued-remote-run"
+    assert result["release_error_code"] == "single-writer-claim-retained-reconciliation-required"
+    assert result["locks_retained"] == ["scope"]

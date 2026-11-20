@@ -3653,12 +3653,39 @@ class RepositoryCoordination:
         if self.execution_claim is not None:
             receipt["execution_claim"] = json.loads(self.execution_claim.proof)
         if self.closed:
-            # The successful receipt is already durable; do not rewrite it after
+            # The successful (or aborted pre-mutation) receipt is already durable; do not rewrite it after
             # releasing the claim or overwrite another run's active state.
-            require(receipt["status"] == "succeeded", "single-writer-terminal-record-immutable")
+            require(receipt["status"] == "succeeded" or getattr(self, "aborted", False)
+                    and receipt["status"] == "blocked", "single-writer-terminal-record-immutable")
             return
         self.request("PUT", "runs/" + self.document["run_id"] + ".json", data=receipt,
                      headers={"If-Match": "*"}, allowed=(201,))
+
+    def abort(self, receipt):
+        """Release the claim of a run that stopped before any effect, in one compare-and-swap.
+
+        ado_scoped/github_scoped persist mutation_started=True and pending_dispatch before every dispatch,
+        so a blocked receipt without them, with no worker receipt, proves nothing ran (aif-163 run 2478)."""
+        if not self.held:
+            return
+        head, value = self.state()
+        self._active(value)
+        name = "runs/" + self.document["run_id"]
+        stored = value["records"].get(name + ".json", {})
+        require(receipt.get("status") == "blocked" and receipt.get("mutation_started") is False
+                and stored.get("mutation_started") is not True
+                and not any(key == "remote_run" or key.startswith("pending_") for row in (receipt, stored) for key in row)
+                and name + ".worker.json" not in value["records"]
+                and receipt.get("run_id") == self.document["run_id"]
+                and receipt.get("manifest_hash") == self.document["manifest_hash"],
+                "single-writer-claim-retained-reconciliation-required")
+        if self.execution_claim is not None:
+            receipt["execution_claim"] = json.loads(self.execution_claim.proof)
+        receipt.update(lock_retained=False, locks_retained=[])
+        value["records"][name + ".json"] = json.loads(canonical(receipt))
+        self.store.update(head, value, active=None)
+        self.held.clear()
+        self.closed = self.aborted = True
 
     def release(self):
         if not self.held:
@@ -7348,6 +7375,10 @@ class _RepositoryDeletionMember(RepositoryCoordination):
     def assert_held(self):
         self.cohort.assert_held()
 
+    def abort(self, receipt):
+        # The cohort owns the claim; it aborts all members together.
+        raise Blocked("single-writer-claim-retained-reconciliation-required")
+
     def claim_run(self):
         self.cohort.claim_runs()
         self.authorize(self.document)
@@ -7355,6 +7386,10 @@ class _RepositoryDeletionMember(RepositoryCoordination):
 
 class _RepositoryDeletionWorker(RepositoryCoordination):
     """A scoped deletion worker writes only inside its parent's single-writer deletion cohort."""
+
+    def abort(self, receipt):
+        # A worker never owns the parent's claim.
+        raise Blocked("single-writer-claim-retained-reconciliation-required")
 
     def _active(self, value):
         active = value["active"]
@@ -7942,7 +7977,9 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         receipt.update(failure_fields(error, "unexpected-runtime-failure"))
         if not receipt["mutation_started"]:
             try:
-                locks.release()
+                # A single-writer claim is released only when the receipt proves no effect started.
+                abort = getattr(locks, "abort", None)
+                abort(receipt) if callable(abort) else locks.release()
             except Blocked as release:
                 # Keep the cause; the retained claim is reported beside it, never instead of it.
                 receipt["release_error_code"] = release.code

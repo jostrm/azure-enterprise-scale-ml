@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from urllib.parse import quote, unquote, urlsplit
 from uuid import UUID, uuid5
 
 from pipeline_dispatch import DispatchError, dispatch_run, operation_selection, require
@@ -27,6 +28,22 @@ def invoke(command, output, *, expected, run=None, prepared=False):
     return value
 
 
+def descends_from(transport, base, provider, repository, ancestor, commit):
+    """Recovery may start from a newer consumer commit only when the stuck run's commit is its merge base."""
+    if provider == "gha":
+        _, _, value = transport.request("GET", f"{base}/compare/{ancestor}...{commit}")
+        valid = (isinstance(value, dict) and value.get("status") == "ahead" and value.get("behind_by") == 0
+                 and (value.get("merge_base_commit") or {}).get("sha") == ancestor)
+    else:
+        name = quote(unquote(urlsplit(repository).path).split("/")[4], safe="")
+        _, _, value = transport.request(
+            "GET", f"{base}/git/repositories/{name}/diffs/commits?baseVersion={ancestor}&baseVersionType=commit"
+                   f"&targetVersion={commit}&targetVersionType=commit&$top=1&api-version=7.1")
+        valid = (isinstance(value, dict) and value.get("commonCommit") == ancestor
+                 and value.get("behindCount") == 0)
+    require(valid, "recovery-consumer-commit-not-descendant")
+
+
 def wait_for_predecessor(operation_id, plan_hash, context, *, reader=None, transport=None,
                          max_polls=120, poll_seconds=15, sleep=time.sleep, recovery=False):
     """Continuation waits for its mutating finalizer; recovery waits for the old run."""
@@ -38,7 +55,10 @@ def wait_for_predecessor(operation_id, plan_hash, context, *, reader=None, trans
             and type(poll_seconds) in (int, float) and 0 <= poll_seconds <= 300, "poll-bounds-invalid")
     _, parent = (reader or ProviderReceiptReader(context))._load(identifier(operation_id))
     predecessor = parent["plan"].get("provider_context", {})
-    immutable = lambda value: {key: item for key, item in value.items() if key not in ("run_id", "correlation_id")}
+    # A recovery may run from a newer consumer commit (for example one that adds a missing worker pipeline);
+    # descends_from proves the stuck run's commit is its ancestor. A continuation keeps the exact commit.
+    mutable = ("run_id", "correlation_id") + (("consumer_commit",) if recovery else ())
+    immutable = lambda value: {key: item for key, item in value.items() if key not in mutable}
     require(parent["plan_hash"] == plan_hash
             and parent["status"] in (("running", "cancel-pending", "reconciliation-required",
                                      "succeeded", "continuation-required") if recovery
@@ -65,9 +85,13 @@ def wait_for_predecessor(operation_id, plan_hash, context, *, reader=None, trans
             sleep(poll_seconds)
         raise DispatchError("continuation-predecessor-finalizer-timeout")
     binding = {"schema": 1, "provider": provider, "repository": context["repository"],
-               "consumer_commit": context["consumer_commit"]}
+               "consumer_commit": predecessor.get("consumer_commit")}
     base = validate_binding({"provider": provider}, binding)
     transport = transport or ProviderTransport(provider, base)
+    if binding["consumer_commit"] != context["consumer_commit"]:
+        validate_binding({"provider": provider}, dict(binding, consumer_commit=context["consumer_commit"]))
+        descends_from(transport, base, provider, context["repository"], binding["consumer_commit"],
+                      context["consumer_commit"])
     workflow_id = None
     if provider == "gha":
         _, _, workflow = transport.request("GET", base + "/actions/workflows/pipelines-only-gha.yml")
@@ -85,7 +109,7 @@ def wait_for_predecessor(operation_id, plan_hash, context, *, reader=None, trans
             terminal = run.get("status") == "completed"
         else:
             _, _, run = transport.request("GET", f"{base}/build/builds/{run_id}?api-version=7.1")
-            require(run.get("id") == run_id and run.get("sourceVersion") == context["consumer_commit"]
+            require(run.get("id") == run_id and run.get("sourceVersion") == binding["consumer_commit"]
                     and run.get("sourceBranch") == parent["plan"]["origin"]["ref"]
                     and run.get("repository", {}).get("url", "").lower() == context["repository"].lower()
                     and run.get("repository", {}).get("type") == "TfsGit"
