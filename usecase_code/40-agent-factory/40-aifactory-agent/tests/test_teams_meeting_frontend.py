@@ -18,6 +18,7 @@ const listenerId = "22222222-2222-4222-8222-222222222222";
 let roster = [{identifier: {microsoftTeamsUserId: listenerId, isAnonymous: false}, endpointDetails: [{participantId: "endpoint-1"}], state: "Connected"}];
 let participantCount = 2, recording = false, transcribing = false, consentRequired = false;
 let resetStatus = 200, resetResolve = null, generation = 0;
+let incomingMuteError = false, incomingMuteResolve = null;
 let session = {token: "delegated-user-token", scopeKey: "project001-dev", audience: "project", expiresAt: now + 800000};
 const tracks = () => [{stopped: false, stop() { this.stopped = true; }}];
 const stream = () => { const own = tracks(); return {getTracks: () => own}; };
@@ -48,6 +49,7 @@ class Socket {
 class Call {
   constructor() {
     this.state = state; this.listeners = {};
+    this.isIncomingAudioMuted = false; this.incomingMuteCalls = 0;
     this.remoteParticipants = roster.map(p => ({...p, on() {}, off() {}}));
     this.totalParticipantCount = participantCount;
     this.features = {
@@ -58,8 +60,15 @@ class Call {
   }
   feature(name) { return this.features[name]; }
   stopAudio() { throw new Error("Never fall back to the operator microphone"); }
+  async muteIncomingAudio() {
+    this.incomingMuteCalls++;
+    if (incomingMuteError) throw new Error("SDK mute failure with private context");
+    if (incomingMuteResolve) await new Promise(resolve => { incomingMuteResolve = resolve; });
+    this.isIncomingAudioMuted = true;
+  }
+  mute() { throw new Error("Do not mute the agent's outgoing speech to fix local monitoring"); }
   on(event, handler) {
-    if(this.remoteAudioStreams && !["stateChanged", "remoteAudioStreamsUpdated", "remoteParticipantsUpdated", "totalParticipantCountChanged"].includes(event)) {
+    if(this.remoteAudioStreams && !["stateChanged", "remoteAudioStreamsUpdated", "remoteParticipantsUpdated", "totalParticipantCountChanged", "isIncomingAudioMutedChanged"].includes(event)) {
       throw new Error("Unsupported Call event: " + event);
     }
     (this.listeners[event] ||= new Set()).add(handler);
@@ -471,5 +480,57 @@ def test_delegated_metadata_must_match_pcm_and_never_survives_voice_reset():
   third.receive(new ArrayBuffer(480));
   for(let i=0; i<12; i++) await tick();
   assert.ok(agents[1].call.hungUp, "PCM length must match its metadata");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""", STATIC / "teams-meeting.js")
+
+
+def test_local_meeting_monitor_is_muted_without_stopping_remote_capture_or_outbound_speech():
+    node(HARNESS + r"""
+(async () => {
+  await join();
+  const call = agents[0].call;
+  assert.equal(call.incomingMuteCalls, 1);
+  assert.equal(call.isIncomingAudioMuted, true);
+  const ws = sockets[0]; ws.open(); ws.receive({type: "ready"});
+  for(let i=0; i<3; i++) find("voice-capture").port.onmessage({data:new ArrayBuffer(960)});
+  assert.equal(ws.sent.filter(value => typeof value !== "string").length, 1, "raw capture continues");
+  ws.receive(new ArrayBuffer(960));
+  assert.ok(find("voice-playback").targets.includes(find("outbound")), "reply goes to Teams, not local speakers");
+  assert.equal(agents[0].options.audioOptions.muted, false);
+  await client.stop();
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""", STATIC / "teams-meeting.js")
+
+
+def test_local_monitor_mute_failure_or_unexpected_unmute_leaves_and_releases_media():
+    node(HARNESS + r"""
+(async () => {
+  incomingMuteError = true;
+  await join();
+  assert.equal(sockets.length, 0);
+  assert.ok(agents[0].call.hungUp && contexts[0].closed);
+  incomingMuteError = false;
+  await join();
+  const call = agents[1].call;
+  call.isIncomingAudioMuted = false;
+  for(const handler of [...call.listeners.isIncomingAudioMutedChanged || []]) handler();
+  for(let i=0; i<12; i++) await tick();
+  assert.ok(call.hungUp && contexts[1].closed);
+  assert.ok(!errors.some(value => value.includes("private context")));
+})().catch(error => { console.error(error); process.exitCode = 1; });
+""", STATIC / "teams-meeting.js")
+
+
+def test_leave_during_local_monitor_mute_does_not_open_a_late_voice_connection():
+    node(HARNESS + r"""
+(async () => {
+  incomingMuteResolve = true;
+  const joining = join();
+  for(let i=0; i<12; i++) await tick();
+  assert.equal(typeof incomingMuteResolve, "function");
+  await client.stop();
+  incomingMuteResolve(); await joining;
+  assert.equal(sockets.length, 0);
+  assert.ok(agents[0].call.hungUp && contexts[0].closed);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 """, STATIC / "teams-meeting.js")
