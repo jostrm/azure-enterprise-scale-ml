@@ -185,7 +185,14 @@ AI participant. Remote meeting audio is forwarded to the existing authenticated
 voice relay; relay output feeds an ACS custom local audio stream, not the
 operator's microphone or browser speakers. It reuses `Conversation.answer` or
 `Conversation.prepare`, not a separately privileged reasoning implementation.
-This is actual meeting transport code, but no live meeting acceptance is asserted.
+On 2026-11-20 the authorized Spider project001 test established visible meeting
+participation, non-silent inbound PCM, one governed backend answer and a
+participant-confirmed clearly audible response inside Teams. This does not
+establish full lifecycle acceptance, latency targets or the managed Voice Agent
+hosted-conversation-engine path. No meeting media/transcript is stored as evidence.
+The test reported delayed self-monitoring; the ACS local speaker is now explicitly
+muted with `muteIncomingAudio`, while raw input capture and outgoing replies
+remain separate. Follow-up human listening is still needed for that fix.
 
 Admission binds an explicitly approved host, exact meeting URL, scope, explanation
 audience and expiry to a one-use opaque voice ticket. The derived principal has
