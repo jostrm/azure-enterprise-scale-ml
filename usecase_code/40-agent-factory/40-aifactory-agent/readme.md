@@ -642,11 +642,20 @@ readiness while sign-in or knowledge is blocked.
 
 ## Teams meeting audio (attended preview)
 
-**Status (2026-11-18): implemented development pilot, not live-accepted.** No
-Spider project001 meeting-audio success is asserted by this source change.
-Mock tests, an ARM deployment, application health, successful sign-in, a Foundry
-agent definition, or generated PCM are not substitutes for a participant hearing
-the answer inside Teams.
+**Status (2026-11-20): bidirectional meeting audio demonstrated in the authorized
+Spider project001 development test.** The visibly admitted ACS participant
+received non-silent Teams audio, the existing private project001 backend returned
+an authoritative answer, and a participant confirmed hearing its speech clearly
+inside Teams. No audio or transcript was retained as evidence.
+
+This is not full lifecycle or production acceptance. The test also exposed an
+authorization-denied turn that ended the session, exact SDK origins absent from
+the initial CSP, and delayed local self-monitoring. The local-speaker suppression
+fix described below requires a follow-up listening check. Natural full-duplex
+barge-in, all lifecycle negative cases and managed Voice Agent hosted-conversation-
+engine integration are not established by this successful audio loop.
+Mock tests, deployment health and generated PCM remain insufficient evidence
+without actual remote playback confirmation.
 
 The transport follows the
 [Microsoft ACS meeting delegate sample](https://github.com/Azure-Samples/voicelive-webapp/tree/main/samples/teams-meeting-delegate):
@@ -836,6 +845,13 @@ avoid echo loops. Use **Stop speaking** to interrupt; natural full-duplex barge-
 is **not** established by this half-duplex pilot. Reconnect is fail-closed:
 the assistant leaves and requires a fresh explicit join, rather than silently
 capturing again. These limitations must be included in the live test report.
+
+The ACS local speaker is muted separately with `muteIncomingAudio()`: otherwise
+an operator attending in Teams on the same computer can hear a delayed copy of
+their own speech from the assistant's browser. Raw remote capture and the
+assistant's outgoing speech remain active; this is not microphone mute, call
+hold, or evidence that AI processing has stopped. If local playback cannot be
+muted, the bridge leaves instead of introducing a second audible meeting path.
 
 No recording, transcript storage or meeting recap is implemented by this bridge.
 It refuses or leaves when Teams recording/transcription or additional Teams

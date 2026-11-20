@@ -226,6 +226,26 @@
       current.hasRemote = true;
     }
 
+    async function muteLocalMonitor(current) {
+      let timer;
+      const deadline = new Promise((resolve, reject) => {
+        timer = env.setTimeout(() => reject(new Error("timeout")), 10000);
+        current.cancel.push(() => reject(new Error("cancelled")));
+      });
+      current.timers.push(timer);
+      try {
+        // Silence the SDK's local speaker, not the remote stream or our outgoing reply.
+        await Promise.race([current.call.muteIncomingAudio(), deadline]);
+      } finally {
+        env.clearTimeout(timer);
+      }
+      if (!alive(current)) return;
+      if (!current.call.isIncomingAudioMuted) throw new Error("failed");
+      listen(current, current.call, "isIncomingAudioMutedChanged", () => {
+        if (alive(current) && !current.call.isIncomingAudioMuted) void stop("failed");
+      });
+    }
+
     function relay(current) {
       current.audioMetadata = null;
       current.delegated = false;
@@ -390,6 +410,8 @@
         listen(current, current.call, "stateChanged", () => {
           if (alive(current) && current.call.state !== "Connected") void stop("failed");
         });
+        await muteLocalMonitor(current);
+        if (!alive(current)) return;
         listen(current, current.call, "remoteAudioStreamsUpdated", event => {
           for (const removed of event.removed) {
             const old = current.remote.get(removed);
