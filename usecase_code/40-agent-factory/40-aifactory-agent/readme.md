@@ -841,6 +841,28 @@ incoming playback device does not mean the SDK stopped receiving audio.
 
 ### Live acceptance and rollback
 
+In a subsequent synthetic comparison through the actual private meeting relay
+(no Teams join, microphone capture or recording), two identical generated
+questions took **16.84 s and 11.99 s** from speech end to first returned audio in
+inherited delegated mode. The explicit native meeting profile took **6.87 s and
+6.37 s**, with one completed exact-scope answer and three validated citations in
+each run. That is about a **54% mean reduction across these two samples**, not an
+instant-response guarantee. A grounding timing of 5.17 s accounted for most of
+the remaining delay; authorization and snapshot validation were not skipped.
+Additional interruption runs returned first audio in 6.37 s, 11.65 s and 6.25 s.
+The slow outlier shows that response latency remains variable and is not solved
+to a consistently near-instant target.
+
+A separate synthetic overlapping utterance received the native interruption
+acknowledgement in **513 ms**, with no further audio bytes during the remaining
+utterance after acknowledgement. A repeat acknowledged interruption in **495 ms**,
+returned zero audio bytes during the remainder of the overlapping input, then
+completed a replacement exact-scope answer with three validated citations.
+All synthetic sessions were closed and their ACS identities cleaned up.
+This establishes live relay/model behavior plus the
+client's automated capture/flush contract; it does not replace a follow-up test
+of interruption and audible latency inside real Teams clients.
+
 Use synthetic, non-sensitive questions and record only non-content evidence:
 approved call/session identifiers, configured backend/scope, nonzero inbound and
 outbound audio counts, response timing, lifecycle outcome and a participant's
