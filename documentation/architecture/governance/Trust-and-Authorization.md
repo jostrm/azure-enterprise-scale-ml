@@ -41,14 +41,18 @@ Model-facing tools intersect canonical safe definitions with backend availabilit
 
 The attended Teams pilot adds a channel ceiling, never permissions. A meeting
 ticket is one-use and bound to the authenticated host, exact meeting, scope and
-audience. The backend rechecks the approved meeting policy, host and listener
-grants. A meeting principal can read only explicitly meeting-safe knowledge;
+audience. The backend rechecks the approved meeting policy and host grant.
+Same-tenant audiences also require existing listener grants. External audiences
+require explicit operator disclosure approval, a fixed meeting tenant and exact
+verified roster IDs; no guest account, app grant or Azure role is created.
+The tenant and disclosure mode are pinned, and revocation also blocks voice
+reset. A meeting principal can read only explicitly meeting-safe knowledge;
 Factory/graph/cost reads and mutations remain unavailable even if the host has
 those grants. Revocation and expiry deny further authorization.
 
 ACS identity, attendee display name, spoken identity and client-observed roster
 are not Entra delegated tokens. The browser checks the explicitly allowed
-same-tenant roster and leaves on uncertainty, but cannot atomically prevent
+meeting-tenant roster and leaves on uncertainty, but cannot atomically prevent
 new listeners hearing already-sent speech. The controlled test requires
 organizer-managed admission, consent, and knowledge approved for everyone.
 It must not be presented as a confidential arbitrary-meeting access mechanism.

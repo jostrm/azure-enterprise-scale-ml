@@ -1,12 +1,20 @@
+from uuid import UUID
+
 import pytest
 from pydantic import ValidationError
 
-from aifactory_agent.teams_meeting_settings import TeamsMeetingSettings, validate_meeting_url
+from aifactory_agent.teams_meeting_settings import MeetingPolicy, TeamsMeetingSettings, validate_meeting_url
 
 
 HOST = "22222222-2222-4222-8222-222222222222"
 LISTENER = "33333333-3333-4333-8333-333333333333"
 URL = "https://teams.microsoft.com/meet/1234567890123?p=approved-secret"
+EXTERNAL_TENANT = "88888888-8888-4888-8888-888888888888"
+EXTERNAL_LISTENERS = [
+    "55555555-5555-4555-8555-555555555555",
+    "66666666-6666-4666-8666-666666666666",
+    "77777777-7777-4777-8777-777777777777",
+]
 
 
 def enabled_config(**changes):
@@ -24,6 +32,56 @@ def enabled_config(**changes):
         }],
         **changes,
     }
+
+
+def external_policy(**changes):
+    return {
+        **enabled_config()["policies"][0],
+        "meeting_tenant_id": EXTERNAL_TENANT,
+        "external_audience_disclosure_approved": True,
+        "allowed_participant_object_ids": EXTERNAL_LISTENERS[:],
+        **changes,
+    }
+
+
+def test_meeting_tenant_and_external_disclosure_default_to_existing_same_tenant_policy():
+    policy = TeamsMeetingSettings.model_validate(enabled_config()).policies[0]
+    assert policy.meeting_tenant_id is None
+    assert policy.external_audience_disclosure_approved is False
+    assert policy.model_dump(mode="json")["meeting_tenant_id"] is None
+
+
+def test_external_disclosure_is_explicit_and_preserves_exact_roster_without_synthesizing_ids():
+    policy = MeetingPolicy.model_validate(external_policy())
+    assert policy.meeting_tenant_id == UUID(EXTERNAL_TENANT)
+    assert policy.external_audience_disclosure_approved is True
+    dumped = policy.model_dump(mode="json")
+    assert dumped["meeting_tenant_id"] == EXTERNAL_TENANT
+    assert dumped["allowed_participant_object_ids"] == EXTERNAL_LISTENERS
+
+
+@pytest.mark.parametrize("changes", [
+    {"meeting_tenant_id": None},
+    {"meeting_tenant_id": "00000000-0000-0000-0000-000000000000"},
+    {"meeting_tenant_id": "not-a-tenant"},
+    {"meeting_safe_knowledge": False},
+    {"allowed_participant_object_ids": []},
+    {"allowed_participant_object_ids": EXTERNAL_LISTENERS * 2},
+    {"allowed_participant_object_ids": [f"{number:08x}-1111-4111-8111-111111111111" for number in range(33)]},
+    {"allowed_participant_object_ids": ["00000000-0000-0000-0000-000000000000"]},
+    {"external_audience_disclosure_approved": "true"},
+    {"external_audience_disclosure_approved": 1},
+])
+def test_external_disclosure_requires_explicit_tenant_whole_scope_approval_and_bounded_roster(changes):
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(enabled_config(policies=[external_policy(**changes)]))
+
+
+def test_meeting_tenant_cannot_be_zero_even_without_external_disclosure():
+    policy = enabled_config()["policies"][0]
+    policy["meeting_tenant_id"] = "00000000-0000-0000-0000-000000000000"
+    with pytest.raises(ValidationError):
+        MeetingPolicy.model_validate(policy)
 
 
 def test_disabled_by_default_and_enabled_policy_is_explicit():

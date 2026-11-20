@@ -190,13 +190,19 @@ This is actual meeting transport code, but no live meeting acceptance is asserte
 Admission binds an explicitly approved host, exact meeting URL, scope, explanation
 audience and expiry to a one-use opaque voice ticket. The derived principal has
 only the scope's `knowledge.read`; canonical read-tool permission filtering and
-per-call authorization enforce that restriction. Approved listener grants are
-rechecked. Scope-wide meeting-safe disclosure approval remains mandatory.
+per-call authorization enforce that restriction. In the default same-tenant
+policy, approved listener grants are rechecked. An external meeting requires
+an explicit `meeting_tenant_id`, exact independently verified audience IDs and
+`external_audience_disclosure_approved`; this approves disclosure in that meeting,
+not backend sign-in or general app access. The original host's grant is always
+required. Scope-wide meeting-safe disclosure approval remains mandatory.
 
-The browser checks a small approved same-tenant roster and endpoint set, refuses
+The browser checks a small approved meeting-tenant roster and endpoint set, refuses
 unknown/anonymous participants, and leaves on changes or uncertainty. This
 client-side observation is not cryptographic listener authentication; the pilot
 also requires controlled admission and content safe for all approved attendees.
+Meeting tenant and disclosure mode are pinned with the session; changing either
+invalidates authorization and cannot be bypassed by resetting voice.
 Pause before admitting anyone because already-transmitted audio cannot be recalled.
 Teams recording/transcription or additional consent requirements stop this
 no-recording pilot; the application does not grant recording consent.

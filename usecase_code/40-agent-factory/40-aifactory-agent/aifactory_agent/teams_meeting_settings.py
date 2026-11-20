@@ -30,14 +30,28 @@ class MeetingPolicy(BaseModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     meeting_url: str = Field(max_length=4096, repr=False)
+    meeting_tenant_id: UUID | None = Field(
+        default=None, description="Explicit Teams meeting tenant; omitted means the deployment tenant.",
+    )
+    external_audience_disclosure_approved: bool = Field(
+        default=False, strict=True,
+        description="Operator approval to disclose this meeting-safe scope to the exact external roster; not app access.",
+    )
     meeting_safe_knowledge: bool = Field(
         default=False,
         description="Operator approval that ALL knowledge readable in this exact scope is safe for ALL meeting attendees.",
     )
     allowed_participant_object_ids: list[UUID] = Field(
         default_factory=list, max_length=32,
-        description="Explicit same-tenant listeners with existing exact-scope knowledge.read grants; not voice authentication.",
+        description="Exact operator-verified Teams roster IDs in the meeting tenant; not voice authentication or app grants.",
     )
+
+    @field_validator("meeting_tenant_id")
+    @classmethod
+    def nonzero_meeting_tenant(cls, value):
+        if value is not None and not value.int:
+            raise ValueError("An explicit meeting tenant must be a nonzero tenant ID.")
+        return value
 
     @field_validator("allowed_participant_object_ids")
     @classmethod
@@ -50,6 +64,15 @@ class MeetingPolicy(BaseModel):
     @classmethod
     def meeting_link(cls, value):
         return validate_meeting_url(value)
+
+    @model_validator(mode="after")
+    def explicit_external_disclosure(self):
+        if self.external_audience_disclosure_approved and (
+            self.meeting_tenant_id is None or not self.meeting_safe_knowledge
+            or not self.allowed_participant_object_ids
+        ):
+            raise ValueError("External meeting disclosure requires an explicit tenant, shared-knowledge approval and roster.")
+        return self
 
 
 class TeamsMeetingSettings(BaseModel):
