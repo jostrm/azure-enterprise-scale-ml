@@ -1,0 +1,11 @@
+{
+  "applicationVersion": "0.2.10",
+  "platform": "windows",
+  "runtime": "win-x64",
+  "mode": "local-preview",
+  "signed": false,
+  "signingCertificate": null,
+  "sourceCommit": "13ce91af8f5e637c9c914020de8ab83800eb78cc",
+  "builtAtUtc": "2026-11-20T21:36:09.1274372Z",
+  "sha256": "FDEB85661F46558786F4D2FA83B8059495998F7724897D320067A884E44178D2"
+}

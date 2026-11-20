@@ -37,19 +37,19 @@ The six scenarios are: 1 Init AI Factory, 2 Add scale set, 3 Add or update proje
 
 ## Download and verify
 
-This is the **local-preview** installer, version **0.2.9** (with videos; the version is shown under **?** in the app). Its invitation is
+This is the **local-preview** installer, version **0.2.10** (with videos; the version is shown under **?** in the app). Its invitation is
 checked locally and its guides are bundled. This convenience gate is not a content
 security boundary. The code is requested on every launch; there is no remembered login.
 
 Download the MSI and **all 4 CAB parts** into the same folder. Run only the MSI.
 
-- [ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned.msi)
-- [ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-1.cab)
-- [ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-2.cab)
-- [ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-3.cab)
-- [ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned-4.cab)
+- [ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned.msi](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned.msi)
+- [ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-1.cab](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-1.cab)
+- [ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-2.cab](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-2.cab)
+- [ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-3.cab](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-3.cab)
+- [ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-4.cab](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned-4.cab)
 - [SHA256SUMS.txt](SHA256SUMS.txt)
-- [Build receipt](ESAF-Tutorials-0.2.9-win-x64-local-preview-unsigned.msi.json)
+- [Build receipt](ESAF-Tutorials-0.2.10-win-x64-local-preview-unsigned.msi.json)
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'
@@ -124,26 +124,28 @@ On the **Resources** tab, **Videos** lists every finished video. Anyone who unlo
 there is no per-person access. **Scenarios** chooses what you see:
 
 - **All scenarios**: every video, grouped by scenario, with the filters off.
-- A guide, such as **ESAF Python SDK - scenarios 1-6**: its videos, filtered to the **Hub mode** and
-  **Networking mode** you saved in **Settings (⚙)**.
+- A guide, such as **ESAF Python SDK - scenarios 1-6**: its videos, filtered to the **Hub mode**,
+  **Networking mode** and **Infrastructure as code** (Bicep or Terraform; Bicep by default) you saved in **Settings (⚙)**.
 - **Settings & Networking**: the walkthroughs of the guide's settings (video 03) and the network topologies (video 04).
 
 The guide you chose under **Tutorial to open at start** opens when it has videos; otherwise **All scenarios** opens.
-You can set the **Hub mode** and **Networking mode** buttons at any time, or select **Clear filters**. Saving
+You can set the **Hub mode**, **Networking mode** and **Infrastructure as code** buttons at any time, or select
+**Clear filters**. Saving
 Settings updates the list at once. Select **Watch** to open a video in its own window, so you can keep following
 the guide.
 
-| Video | Hub mode | Networking | Scenarios | Driven by |
-|---|---|---|---|---|
-| 02 | A. Connected to an existing hub | Private | 1-4 | Python SDK (ESAF) |
-| 05 | B. Standalone, no hub | Public | 1-3 | Python SDK (ESAF) |
-| 06 | C. Standalone with its own hub | Private | 1-3 | Python SDK (ESAF) |
-| 07 | B. Standalone, no hub | Public | 1-3 | ConfigWizard app |
-| 08 | B. Standalone, no hub | Public | 1-3, then the Azure Function on | ConfigWizard app |
-| 08b | B. Standalone, no hub | Public | 1-3 with the JSON editor, then the Azure Function on | ConfigWizard app |
-| 10 | C. Standalone with its own hub | Private | 1-6 as one video, following the GitHub docs | CLI in PowerShell |
-| 03 | Every hub mode | Every networking mode | Settings walkthrough (under Settings & Networking) | The guide's Settings |
-| 04 | Every hub mode | Every networking mode | Network topologies walkthrough (under Settings & Networking) | Hub and networking modes |
+| Video | Hub mode | Networking | IaC | Scenarios | Driven by |
+|---|---|---|---|---|---|
+| 02 | A. Connected to an existing hub | Private | Bicep | 1-4 | Python SDK (ESAF) |
+| 05 | B. Standalone, no hub | Public | Bicep | 1-3 | Python SDK (ESAF) |
+| 06 | C. Standalone with its own hub | Private | Bicep | 1-3 | Python SDK (ESAF) |
+| 07 | B. Standalone, no hub | Public | Bicep | 1-3 | ConfigWizard app |
+| 08 | B. Standalone, no hub | Public | Bicep | 1-3, then the Azure Function on | ConfigWizard app |
+| 08b | B. Standalone, no hub | Public | Bicep | 1-3 with the JSON editor, then the Azure Function on | ConfigWizard app |
+| 10 | C. Standalone with its own hub | Private | Bicep | 1-6 as one video, following the GitHub docs | CLI in PowerShell |
+| 13 | C. Standalone with its own hub | Private | Terraform | 1-6 as one video, the factory common deployed with Terraform | Python SDK (ESAF) |
+| 03 | Every hub mode | Every networking mode | Both | Settings walkthrough (under Settings & Networking) | The guide's Settings |
+| 04 | Every hub mode | Every networking mode | Both | Network topologies walkthrough (under Settings & Networking) | Hub and networking modes |
 
 ## Update or remove the app
 
