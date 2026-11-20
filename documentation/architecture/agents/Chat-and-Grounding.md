@@ -216,6 +216,18 @@ remains separate live evidence. Reconnect requires a fresh
 explicit join. Single-replica/single-worker deployment is mandatory because
 tickets and cleanup ownership are process-local.
 
+Synthetic live relay observations on 2026-11-20 (not another Teams meeting)
+measured speech-end-to-first-audio at 16.84/11.99 s for inherited delegated mode
+and 6.87/6.37 s for the native meeting profile. Both native turns completed with
+exact-scope source citations; grounding remained about 5.17 s in the inspected
+turn. Overlapping generated speech produced an interruption acknowledgement in
+513 ms and no subsequent audio during that input; a later run acknowledged in
+495 ms and completed a replacement grounded answer. Additional first-audio
+samples included an 11.65 s outlier, so latency remains variable rather than
+consistently near-instant. These bounded samples do not
+establish end-user latency or remote playback cancellation; no microphone or
+meeting recording was used.
+
 The PG's managed Voice Agent hosted-conversation-engine path is a separate
 integration, not implied by this ACS transport or the existing Voice Live relay.
 No Windows media host or Teams-native app package is required for this attended
