@@ -650,8 +650,10 @@ inside Teams. No audio or transcript was retained as evidence.
 
 This is not full lifecycle or production acceptance. The test also exposed an
 authorization-denied turn that ended the session, exact SDK origins absent from
-the initial CSP, and delayed local self-monitoring. The local-speaker suppression
-fix described below requires a follow-up listening check. Natural full-duplex
+the initial CSP, and delayed local self-monitoring. The participant confirmed
+that local-speaker suppression removed the delayed copy of their voice.
+The initial half-duplex configuration also blocked spoken interruption and the
+inherited delegated answer chain added substantial response latency. Natural full-duplex
 barge-in, all lifecycle negative cases and managed Voice Agent hosted-conversation-
 engine integration are not established by this successful audio loop.
 Mock tests, deployment health and generated PCM remain insufficient evidence
@@ -743,6 +745,8 @@ Merge an explicitly reviewed block into the existing application configuration:
 {
   "teams_meetings": {
     "enabled": true,
+    "voice_mode": "inherit",
+    "full_duplex": false,
     "acs_endpoint": "https://<acs-resource>.communication.azure.com",
     "allowed_host_object_ids": ["<authenticated-operator-object-id>"],
     "connect_origins": [
@@ -840,9 +844,27 @@ position into a claim that remote attendees heard the audio: it sends no playbac
 receipts, so interrupted native history is truncated conservatively. Human
 confirmation in a Teams client remains the playback acceptance evidence.
 
-The current transport suppresses incoming audio while the assistant speaks to
-avoid echo loops. Use **Stop speaking** to interrupt; natural full-duplex barge-in
-is **not** established by this half-duplex pilot. Reconnect is fail-closed:
+The compatibility default `full_duplex: false` suppresses incoming audio while
+the assistant speaks; spoken interruption cannot work in that mode. With the
+explicit server-side `teams_meetings.full_duplex: true`, remote participant audio
+continues into the voice relay during playback, allowing Voice Live's speech
+detection to cancel the current response and flush unsent outgoing audio.
+The SDK local speaker remains muted; raw meeting input is never mixed with the
+assistant's outgoing speech. Pause, reset, consent and roster gates still apply.
+Remote acoustic echo conditions and interruption perceived by Teams participants
+require a live follow-up; this flag alone does not establish a latency guarantee.
+
+`teams_meetings.voice_mode: "inherit"` preserves ordinary browser voice behavior.
+An explicit `"realtime"` selects the existing governed native speech path for
+meeting tickets only: `Conversation.prepare` supplies scoped evidence and
+per-call authorization before native generation, and final citation validation
+still applies. It avoids waiting for a complete `Conversation.answer` from a
+second model before beginning speech. Model/voice/endpoint settings are inherited,
+not chosen by the browser; incompatible native model configuration fails closed.
+Ordinary browser voice remains unchanged. This is native Voice Live, not the
+separate managed Voice Agent hosted-conversation-engine feature.
+
+Use **Stop speaking** for explicit session-reset interruption. Reconnect is fail-closed:
 the assistant leaves and requires a fresh explicit join, rather than silently
 capturing again. These limitations must be included in the live test report.
 
@@ -852,6 +874,14 @@ their own speech from the assistant's browser. Raw remote capture and the
 assistant's outgoing speech remain active; this is not microphone mute, call
 hold, or evidence that AI processing has stopped. If local playback cannot be
 muted, the bridge leaves instead of introducing a second audible meeting path.
+
+For an independently authorized Windows Snipping Tool recording, enable its
+**microphone capture** and **system audio** separately, and choose the same
+working input device used by Teams in Snipping Tool's own recording toolbar.
+Changing Agent Chat's microphone affects browser-only voice, not Teams or the
+screen recorder. Do not restore local self-monitoring to make the recorder pick
+up your voice: that reintroduces echo and can create feedback. This application
+neither starts nor configures screen recordings.
 
 No recording, transcript storage or meeting recap is implemented by this bridge.
 It refuses or leaves when Teams recording/transcription or additional Teams

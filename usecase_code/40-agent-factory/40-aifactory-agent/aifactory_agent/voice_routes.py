@@ -377,6 +377,16 @@ def register_voice(app: FastAPI) -> None:
             except ValueError:
                 await _refuse(websocket, channel, "invalid_hello")
                 return
+            if meeting_id is not None:
+                from .teams_meeting_routes import meeting_voice_settings
+                try:
+                    selected_voice = meeting_voice_settings(websocket.app, principal, selected_voice)
+                except PermissionError:
+                    await _refuse(websocket, channel, "forbidden")
+                    return
+                except ValidationError:
+                    await _refuse(websocket, channel, "voice_unavailable")
+                    return
             reservation = state.voice_registry.reserve(principal.object_id)
             if reservation is None:
                 await _refuse(websocket, channel, "voice_busy")

@@ -31,6 +31,7 @@ from starlette.responses import JSONResponse
 from . import web
 from .security import Principal, authorize
 from .teams_meeting_settings import validate_meeting_url
+from .voice_settings import VoiceSettings
 
 LOGGER = logging.getLogger(__name__)
 CleanupStatus = Literal["complete", "pending", "expired_unconfirmed"]
@@ -162,6 +163,8 @@ class MeetingSession:
     identity: MeetingIdentity = field(repr=False)
     meeting_tenant_id: str
     external_audience_disclosure_approved: bool
+    voice_mode: Literal["inherit", "realtime"]
+    full_duplex: bool
     allowed_participant_object_ids: frozenset[str] = field(default_factory=frozenset)
     generation: int = 0
     resetting: bool = False
@@ -301,6 +304,8 @@ def _check_session(app, entry, settings=None):
     if (policy.id != entry.policy_id
             or str(policy.meeting_tenant_id or current.tenant_id) != entry.meeting_tenant_id
             or policy.external_audience_disclosure_approved != entry.external_audience_disclosure_approved
+            or current.teams_meetings.voice_mode != entry.voice_mode
+            or current.teams_meetings.full_duplex != entry.full_duplex
             or frozenset(map(str, policy.allowed_participant_object_ids)) != entry.allowed_participant_object_ids):
         raise PermissionError("The meeting policy changed.")
 
@@ -382,6 +387,25 @@ def meeting_session_seconds(app, principal):
             raise PermissionError("The meeting voice generation has ended.")
         _check_session(app, entry)
         return max(0.0, entry.expires_at - time.time())
+
+
+def meeting_voice_settings(app, principal, selected_voice: VoiceSettings) -> VoiceSettings:
+    """Apply the pinned server profile only to a consumed, currently authorized meeting ticket."""
+    registry = getattr(app.state, "teams_meeting_registry", None)
+    if registry is None or not isinstance(principal, MeetingPrincipal):
+        raise PermissionError("An admitted meeting principal is required.")
+    with registry.lock:
+        entry = registry.sessions.get(principal.meeting_session_id)
+        if entry is None or not entry.consumed or entry.resetting or entry.generation != principal.meeting_generation:
+            raise PermissionError("The meeting relay is no longer available.")
+        _check_session(app, entry)
+        authorize(app.state.settings, principal, entry.scope_key, "knowledge.read")
+        if entry.voice_mode == "inherit":
+            return selected_voice
+        # Revalidate the native model contract; never switch models or fall back on incompatibility.
+        return VoiceSettings.model_validate({
+            **selected_voice.model_dump(), "mode": "realtime", "delegation_trigger": "model_tool",
+        })
 
 
 def bind_meeting_voice_session(app, principal, voice_session):
@@ -478,12 +502,15 @@ async def end_meeting_session(app, session_id, *, expected_generation: int | Non
     return result
 
 
-async def _reclaim_identity(app, principal, policy, body, identity) -> CleanupStatus:
+async def _reclaim_identity(app, principal, policy, body, identity, *, meeting_settings=None) -> CleanupStatus:
+    meeting_settings = meeting_settings or app.state.settings.teams_meetings
     entry = MeetingSession(
         secrets.token_urlsafe(24), "", principal, policy.id, body.scope_key,
         body.audience, body.meeting_url, time.time(), identity, revoked=True,
         meeting_tenant_id=str(policy.meeting_tenant_id or principal.tenant_id),
         external_audience_disclosure_approved=policy.external_audience_disclosure_approved,
+        voice_mode=meeting_settings.voice_mode, full_duplex=meeting_settings.full_duplex,
+        allowed_participant_object_ids=frozenset(map(str, policy.allowed_participant_object_ids)),
     )
     with app.state.teams_meeting_registry.lock:
         app.state.teams_meeting_registry.sessions[entry.id] = entry
@@ -510,13 +537,18 @@ def register_teams_meetings(app: FastAPI) -> None:
                 "meeting_tenant_id": str(policy.meeting_tenant_id or current.tenant_id),
                 "external_audience_disclosure_approved": policy.external_audience_disclosure_approved,
             })
-        return JSONResponse({"enabled": current.teams_meetings.enabled, "policies": policies,
-                             "attended_only": True}, headers={"Cache-Control": "no-store"})
+        return JSONResponse({
+            "enabled": current.teams_meetings.enabled, "policies": policies, "attended_only": True,
+            "voice_mode": (current.voice.mode if current.teams_meetings.voice_mode == "inherit"
+                           else current.teams_meetings.voice_mode),
+            "full_duplex": current.teams_meetings.full_duplex,
+        }, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/teams-meetings/sessions")
     async def create(body: JoinRequest, principal: Annotated[Principal, Depends(web.get_principal)]):
         current = app.state.settings
         policy = _policy(current, principal, body.meeting_url, body.scope_key)
+        meeting_settings = current.teams_meetings
         host = (principal.tenant_id, principal.object_id)
         with registry.lock:
             if host in registry.pending or any((entry.principal.tenant_id, entry.principal.object_id) == host
@@ -526,7 +558,8 @@ def register_teams_meetings(app: FastAPI) -> None:
                 raise HTTPException(429, "Meeting capacity is exhausted.")
             registry.pending.add(host)
         identity = None
-        reclaim = lambda identity: _reclaim_identity(app, principal, policy, body, identity)
+        reclaim = lambda identity: _reclaim_identity(
+            app, principal, policy, body, identity, meeting_settings=meeting_settings)
         try:
             try:
                 identity = await _issue_identity(app.state.teams_meeting_token_service, reclaim)
@@ -535,7 +568,9 @@ def register_teams_meetings(app: FastAPI) -> None:
                                           "cleanup_pending": error.cleanup_pending}) from None
             # Policy may have changed while obtaining the external identity.
             current = app.state.settings
-            if _policy(current, principal, body.meeting_url, body.scope_key) != policy:
+            if (_policy(current, principal, body.meeting_url, body.scope_key) != policy
+                    or current.teams_meetings.voice_mode != meeting_settings.voice_mode
+                    or current.teams_meetings.full_duplex != meeting_settings.full_duplex):
                 raise PermissionError("The meeting policy changed during admission.")
             now = time.time()
             expires = min(now + current.teams_meetings.max_session_seconds, identity.expires_at - 15)
@@ -547,6 +582,7 @@ def register_teams_meetings(app: FastAPI) -> None:
                 policy.id, body.scope_key, body.audience, body.meeting_url, expires, identity,
                 meeting_tenant_id=str(policy.meeting_tenant_id or current.tenant_id),
                 external_audience_disclosure_approved=policy.external_audience_disclosure_approved,
+                voice_mode=meeting_settings.voice_mode, full_duplex=meeting_settings.full_duplex,
                 allowed_participant_object_ids=frozenset(map(str, policy.allowed_participant_object_ids)),
             )
             with registry.lock:
@@ -561,6 +597,8 @@ def register_teams_meetings(app: FastAPI) -> None:
             return JSONResponse({
                 "session_id": entry.id, "meeting_session": ticket, "meeting_url": entry.meeting_url,
                 "voice_generation": entry.generation,
+                "voice_mode": current.voice.mode if entry.voice_mode == "inherit" else entry.voice_mode,
+                "full_duplex": entry.full_duplex,
                 "scope_key": entry.scope_key, "audience": entry.audience, "acs_token": entry.identity.token,
                 "acs_expires_at": entry.identity.expires_at, "expires_at": entry.expires_at,
                 "display_name": current.teams_meetings.display_name,
