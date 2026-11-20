@@ -73,7 +73,8 @@ class TeamsMeetingSettings(BaseModel):
     def acs_url(cls, value):
         if value is None:
             return None
-        if not re.fullmatch(r"https://[a-z0-9][a-z0-9-]{0,62}\.communication\.azure\.com/?", value):
+        label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+        if not re.fullmatch(rf"https://{label}(?:\.{label})?\.communication\.azure\.com/?", value):
             raise ValueError("ACS must be an Azure Communication Services HTTPS resource endpoint.")
         return value.rstrip("/")
 

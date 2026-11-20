@@ -715,7 +715,10 @@ az deployment group what-if --subscription $subscriptionId --resource-group $res
 Only after reviewing the exact resource and RBAC changes, deploy using the same
 parameters with `az deployment group create`. Existing ACS resources should be
 reviewed and reused rather than overwritten by this creation template. Use the
-returned host name in `acs_endpoint`. The normal application `deploy.py --config`
+returned host name in `acs_endpoint`. The configuration accepts both global
+(`<name>.communication.azure.com`) and regional
+(`<name>.<geography>.communication.azure.com`) ACS hosts; use the actual deployed
+host name rather than constructing one. The normal application `deploy.py --config`
 flow consumes the meeting settings and includes the browser bundle and locked
 identity SDK; it does not provision ACS or silently grant its roles.
 

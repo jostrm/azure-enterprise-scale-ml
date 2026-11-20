@@ -88,10 +88,26 @@ def test_accepts_exact_teams_meeting_links_without_fetching():
 @pytest.mark.parametrize("endpoint", [
     "https://evil.example", "https://x.communication.azure.com/path",
     "https://x.communication.azure.com?secret=1", "http://x.communication.azure.com",
+    "https://x.europe.communication.azure.com.evil.example",
+    "https://user@x.europe.communication.azure.com",
+    "https://x.europe.communication.azure.com:444",
+    "https://x.region.extra.communication.azure.com",
+    "https://x..communication.azure.com",
+    "https://x.-europe.communication.azure.com",
 ])
 def test_acs_endpoint_cannot_be_used_as_an_arbitrary_fetch_target(endpoint):
     with pytest.raises(ValidationError):
         TeamsMeetingSettings.model_validate(enabled_config(acs_endpoint=endpoint))
+
+
+@pytest.mark.parametrize("endpoint", [
+    "https://meeting-bridge.communication.azure.com",
+    "https://meeting-bridge.europe.communication.azure.com",
+    "https://meeting-bridge.unitedstates.communication.azure.com/",
+])
+def test_acs_accepts_global_and_single_regional_service_hostnames(endpoint):
+    settings = TeamsMeetingSettings.model_validate(enabled_config(acs_endpoint=endpoint))
+    assert settings.acs_endpoint == endpoint.rstrip("/")
 
 
 @pytest.mark.parametrize("origin", [
