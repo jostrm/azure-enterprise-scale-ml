@@ -656,14 +656,29 @@ An arbitrary private HTTP endpoint cannot replace that protocol.
   informed consenting participants, and an organizer who controls admission.
   The organizer's policy must allow ACS/anonymous participation and audio.
   Do not disable tenant protections, E2EE, lobby rules or other policies silently.
-- A small, controlled same-tenant roster: at most 32 approved remote users, one
+- A small, controlled roster in one explicitly approved meeting tenant: at most 32 approved remote users, one
   endpoint each. Anonymous, PSTN, room/shared-device, other bots, unknown
   identities, incomplete rosters and unapproved users are rejected.
-- Every allowed listener must already have the exact scope's `knowledge.read`
-  grant. The application rechecks those grants. A roster ID or a spoken name is
+- By default the meeting and backend share a tenant, and every allowed listener
+  must already have the exact scope's `knowledge.read` grant. The application
+  rechecks those grants. An explicitly approved external audience instead needs
+  the meeting-only disclosure policy described below. A roster ID or a spoken name is
   not an authenticated user token; this attended pilot relies additionally on
-  organizer-controlled same-tenant admission and an explicitly meeting-safe
+  organizer-controlled admission in the approved meeting tenant and an explicitly meeting-safe
   knowledge scope. It is not a general confidential multi-tenant meeting solution.
+
+For a meeting in another tenant, set both `meeting_tenant_id` to its independently
+verified tenant ID and `external_audience_disclosure_approved: true` in that exact
+meeting policy. The operator must explicitly approve the entire readable scope
+for the exact verified Teams object IDs in `allowed_participant_object_ids`.
+This is permission to hear answers in this one meeting, **not** an application
+grant, guest invitation, tenant-wide permission, or Azure role. Do not copy
+foreign object IDs into the backend tenant's `auth.grants` or invent guest mappings.
+The host still authenticates to the backend and retains its existing exact-scope
+grant; meeting tools remain knowledge-only. Tenant, audience-list or approval
+changes invalidate active sessions, including voice resets. Without this explicit
+opt-in, cross-tenant disclosure is denied. Long join links must contain matching
+tenant context; short links are bound to the exact operator-approved policy.
 
 The meeting principal has only `knowledge.read` for the one approved scope.
 Factory, costs, graph and write capabilities are excluded even when the host
@@ -695,6 +710,8 @@ Merge an explicitly reviewed block into the existing application configuration:
       "id": "approved-synthetic-test",
       "scope_key": "project001-dev",
       "meeting_url": "<exact-approved-https-Teams-meeting-link>",
+      "meeting_tenant_id": null,
+      "external_audience_disclosure_approved": false,
       "meeting_safe_knowledge": true,
       "allowed_participant_object_ids": ["<approved-listener-object-id>"]
     }],

@@ -1,9 +1,12 @@
 import asyncio
+import json
 import threading
 import time
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
+from urllib.parse import urlencode
+from uuid import UUID
 
 import pytest
 from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
@@ -17,7 +20,9 @@ from aifactory_agent.teams_meeting_routes import (
     register_teams_meetings,
 )
 from aifactory_agent.teams_meeting_settings import TeamsMeetingSettings
-from test_teams_meeting_settings import HOST, URL, enabled_config
+from test_teams_meeting_settings import (
+    EXTERNAL_LISTENERS, EXTERNAL_TENANT, HOST, URL, enabled_config, external_policy,
+)
 from test_voice_routes import (
     GOOD, OTHER, PCM, Conversation, FakeGateway, build, collect, ended, finish, got, hello, make_settings, states,
 )
@@ -68,8 +73,134 @@ def reset_voice(client, session_id, generation=0, token=GOOD, **extra):
                        headers={"Authorization": "Bearer " + token})
 
 
-def test_voice_reset_rotates_ticket_and_generation_without_extending_identity_or_duration():
-    app = app_for_meetings()
+def long_meeting_url(tenant):
+    return ("https://teams.microsoft.com/l/meetup-join/19%3ameeting_approved%40thread.v2/0?"
+            + urlencode({"context": json.dumps({"Tid": tenant})}))
+
+
+@pytest.mark.parametrize("long_url", [False, True])
+def test_external_disclosure_admits_only_exact_policy_and_returns_effective_tenant_metadata(long_url):
+    url = long_meeting_url(EXTERNAL_TENANT) if long_url else URL
+    app = app_for_meetings(policies=[external_policy(meeting_url=url)])
+    original_auth = app.state.settings.auth.model_dump(mode="json")
+    with TestClient(app) as client:
+        assert create(client, meeting_url=url + "&other=meeting").status_code == 403
+        response = create(client, meeting_url=url)
+        assert response.status_code == 201
+        body = response.json()
+        assert body["meeting_tenant_id"] == EXTERNAL_TENANT
+        assert body["external_audience_disclosure_approved"] is True
+        assert body["allowed_participant_object_ids"] == EXTERNAL_LISTENERS
+        entry = app.state.teams_meeting_registry.sessions[body["session_id"]]
+        assert entry.meeting_tenant_id == EXTERNAL_TENANT
+        assert entry.external_audience_disclosure_approved is True
+        assert entry.allowed_participant_object_ids == frozenset(EXTERNAL_LISTENERS)
+        principal = consume_meeting_session(app, app.state.services.authenticate(GOOD),
+                                            body["meeting_session"], "project001-dev", "project")
+        security.authorize(app.state.settings, principal, "project001-dev", "knowledge.read")
+        assert principal.tenant_id == app.state.settings.tenant_id != EXTERNAL_TENANT
+        status = client.get("/api/teams-meetings/status", headers={"Authorization": "Bearer " + GOOD})
+        assert status.json()["policies"] == [{
+            "id": "review", "scope_key": "project001-dev", "meeting_tenant_id": EXTERNAL_TENANT,
+            "external_audience_disclosure_approved": True,
+        }]
+        assert "meeting_url" not in status.text and url not in status.text
+        assert status.headers["cache-control"] == "no-store"
+        assert app.state.settings.auth.model_dump(mode="json") == original_auth
+
+
+@pytest.mark.parametrize("explicit_tenant", [False, True])
+def test_same_tenant_admission_and_status_report_effective_tenant_without_external_approval(explicit_tenant):
+    policy = enabled_config()["policies"][0]
+    tenant = make_settings().tenant_id
+    if explicit_tenant:
+        policy["meeting_tenant_id"] = tenant
+    app = app_for_meetings(policies=[policy])
+    with TestClient(app) as client:
+        body = create(client).json()
+        status = client.get("/api/teams-meetings/status", headers={"Authorization": "Bearer " + GOOD}).json()
+        for metadata in [body, status["policies"][0]]:
+            assert metadata["meeting_tenant_id"] == tenant
+            assert metadata["external_audience_disclosure_approved"] is False
+
+
+@pytest.mark.parametrize("tenant", [None, EXTERNAL_TENANT])
+def test_foreign_listener_ids_without_external_disclosure_are_rejected(tenant):
+    policy = external_policy(meeting_tenant_id=tenant, external_audience_disclosure_approved=False)
+    app = app_for_meetings(policies=[policy])
+    with TestClient(app) as client:
+        assert create(client).status_code == 403
+        assert client.get("/api/teams-meetings/status", headers={"Authorization": "Bearer " + GOOD}).json()["policies"] == []
+        assert not app.state.teams_meeting_token_service.issued
+
+
+def test_external_disclosure_flag_is_rejected_for_deployment_tenant_even_with_listener_grants():
+    policy = {**enabled_config()["policies"][0], "meeting_tenant_id": make_settings().tenant_id,
+              "external_audience_disclosure_approved": True}
+    app = app_for_meetings(policies=[policy])
+    with TestClient(app) as client:
+        assert create(client).status_code == 403
+        assert not app.state.teams_meeting_token_service.issued
+
+
+@pytest.mark.parametrize("external", [False, True])
+@pytest.mark.parametrize("context", ["mismatch", "missing", "empty", "duplicate", "invalid", "non_string"])
+def test_long_meeting_url_requires_context_tenant_matching_effective_policy(external, context):
+    policy = external_policy() if external else enabled_config()["policies"][0]
+    tenant = EXTERNAL_TENANT if external else make_settings().tenant_id
+    url = long_meeting_url(tenant)
+    if context == "mismatch":
+        url = long_meeting_url(make_settings().tenant_id if external else EXTERNAL_TENANT)
+    elif context == "missing":
+        url = url.split("?")[0]
+    elif context == "empty":
+        url = url.split("?")[0] + "?context="
+    elif context == "duplicate":
+        url += "&" + url.split("?")[1]
+    elif context == "invalid":
+        url = url.split("?")[0] + "?context=invalid-json"
+    else:
+        url = long_meeting_url(123)
+    policy["meeting_url"] = url
+    app = app_for_meetings(policies=[policy])
+    with TestClient(app) as client:
+        assert create(client, meeting_url=url).status_code == 403
+        assert not app.state.teams_meeting_token_service.issued
+
+
+def test_same_tenant_long_meeting_url_keeps_existing_listener_authorization():
+    url = long_meeting_url(make_settings().tenant_id)
+    policy = {**enabled_config()["policies"][0], "meeting_url": url}
+    app = app_for_meetings(policies=[policy])
+    with TestClient(app) as client:
+        assert create(client, meeting_url=url).status_code == 201
+
+
+@pytest.mark.parametrize("change", ["tenant", "approval"])
+def test_external_disclosure_change_during_identity_issue_reclaims_without_admitting(change):
+    app = app_for_meetings(policies=[external_policy()])
+    issue = app.state.teams_meeting_token_service.issue
+
+    def raced():
+        identity = issue()
+        current = app.state.settings
+        policy = current.teams_meetings.policies[0].model_copy(update=(
+            {"meeting_tenant_id": UUID("99999999-9999-4999-8999-999999999999")} if change == "tenant"
+            else {"external_audience_disclosure_approved": False}))
+        app.state.settings = current.model_copy(update={"teams_meetings": current.teams_meetings.model_copy(
+            update={"policies": [policy]})})
+        return identity
+
+    app.state.teams_meeting_token_service.issue = raced
+    with TestClient(app) as client:
+        assert create(client).status_code == 403
+        assert app.state.teams_meeting_token_service.deleted == ["user-0"]
+        assert not app.state.teams_meeting_registry.sessions
+
+
+@pytest.mark.parametrize("external", [False, True])
+def test_voice_reset_rotates_ticket_and_generation_without_extending_identity_or_duration(external):
+    app = app_for_meetings(**({"policies": [external_policy()]} if external else {}))
     with TestClient(app) as client:
         body = create(client).json()
         assert body["voice_generation"] == 0
@@ -350,8 +481,9 @@ def test_native_voice_reset_isolates_delayed_provider_input_from_new_generation(
         assert app.state.teams_meeting_token_service.deleted == ["user-0"]
 
 
-def test_requires_auth_exact_host_policy_and_consent_before_issuing_identity():
-    app = app_for_meetings()
+@pytest.mark.parametrize("external", [False, True])
+def test_requires_auth_exact_host_policy_and_consent_before_issuing_identity(external):
+    app = app_for_meetings(**({"policies": [external_policy()]} if external else {}))
     with TestClient(app) as client:
         assert create(client, token="invalid-token").status_code == 401
         assert create(client, token=OTHER).status_code == 403
@@ -363,8 +495,9 @@ def test_requires_auth_exact_host_policy_and_consent_before_issuing_identity():
         assert not app.state.teams_meeting_token_service.issued
 
 
-def test_token_is_no_store_single_use_and_bound_to_host_scope_audience():
-    app = app_for_meetings()
+@pytest.mark.parametrize("external", [False, True])
+def test_token_is_no_store_single_use_and_bound_to_host_scope_audience(external):
+    app = app_for_meetings(**({"policies": [external_policy()]} if external else {}))
     with TestClient(app) as client:
         result = create(client)
         assert result.status_code == 201
@@ -377,6 +510,8 @@ def test_token_is_no_store_single_use_and_bound_to_host_scope_audience():
         ticket = body["meeting_session"]
         for wrong, scope, audience in [
             (replace(principal, object_id="44444444-4444-4444-8444-444444444444"), "project001-dev", "project"),
+            (replace(principal, client_id=EXTERNAL_LISTENERS[0]), "project001-dev", "project"),
+            (replace(principal, tenant_id=EXTERNAL_TENANT), "project001-dev", "project"),
             (principal, "platform-dev", "project"),
             (principal, "project001-dev", "platform"),
         ]:
