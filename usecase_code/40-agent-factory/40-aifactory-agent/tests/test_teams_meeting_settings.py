@@ -98,6 +98,25 @@ def test_disabled_by_default_and_enabled_policy_is_explicit():
     assert TeamsMeetingSettings.model_validate(enabled_config()).max_session_seconds <= 3600
 
 
+def test_meeting_voice_profile_is_opt_in_and_does_not_replace_browser_configuration():
+    settings = TeamsMeetingSettings.model_validate(enabled_config())
+    assert settings.voice_mode == "inherit"
+    assert settings.full_duplex is False
+    opted_in = TeamsMeetingSettings.model_validate(enabled_config(voice_mode="realtime", full_duplex=True))
+    assert opted_in.voice_mode == "realtime" and opted_in.full_duplex is True
+
+
+@pytest.mark.parametrize("changes", [
+    {"voice_mode": "delegated"}, {"voice_mode": "speech_shell"}, {"voice_mode": True},
+    {"voice_mode": None}, {"voice_mode": "REALTIME"},
+    {"full_duplex": "true"}, {"full_duplex": "false"}, {"full_duplex": 1},
+    {"full_duplex": 0}, {"full_duplex": None},
+])
+def test_meeting_voice_profile_accepts_only_closed_server_owned_values(changes):
+    with pytest.raises(ValidationError):
+        TeamsMeetingSettings.model_validate(enabled_config(**changes))
+
+
 @pytest.mark.parametrize("listeners", [
     [], [LISTENER, LISTENER], ["00000000-0000-0000-0000-000000000000"],
     ["not-an-object-id"], [f"{number:08x}-1111-4111-8111-111111111111" for number in range(33)],

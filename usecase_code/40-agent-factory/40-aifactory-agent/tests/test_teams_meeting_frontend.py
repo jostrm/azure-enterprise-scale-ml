@@ -534,3 +534,62 @@ def test_leave_during_local_monitor_mute_does_not_open_a_late_voice_connection()
   assert.ok(agents[0].call.hungUp && contexts[0].closed);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 """, STATIC / "teams-meeting.js")
+
+
+def test_approved_full_duplex_forwards_speech_during_playback_and_flushes_on_barge_in():
+    node(HARNESS + r"""
+(async () => {
+  issued.full_duplex = true;
+  await join(); const ws=sockets[0];ws.open();ws.receive({type:"ready"});
+  const capture=find("voice-capture"),playback=find("voice-playback"),pcm=new ArrayBuffer(960);
+  capture.port.onmessage({data:pcm});
+  ws.receive(new ArrayBuffer(960));
+  capture.port.onmessage({data:pcm});
+  ws.receive(new ArrayBuffer(960));
+  capture.port.onmessage({data:pcm});
+  assert.equal(ws.sent.filter(value=>typeof value!=="string").length,1,
+    "return audio must not discard partially collected participant speech");
+  assert.equal(client.phase,"speaking");
+  ws.receive({type:"interrupted"});
+  assert.equal(playback.port.posts.at(-1),null);
+  assert.equal(client.phase,"listening");
+  for(let i=0;i<3;i++)capture.port.onmessage({data:pcm});
+  assert.equal(ws.sent.filter(value=>typeof value!=="string").length,2,
+    "full duplex does not apply the half-duplex post-playback quiet window");
+  assert.ok(agents[0].call.isIncomingAudioMuted);
+  await client.stop();
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
+
+
+def test_full_duplex_still_stops_input_during_pause_reset_and_on_unauthorized_roster():
+    node(HARNESS + r"""
+(async () => {
+  issued.full_duplex=true;
+  await join();const ws=sockets[0];ws.open();ws.receive({type:"ready"});
+  const capture=find("voice-capture"),pcm=new ArrayBuffer(960);
+  await client.pause();
+  for(let i=0;i<6;i++)capture.port.onmessage({data:pcm});
+  assert.equal(ws.sent.filter(value=>typeof value!=="string").length,0);
+  await client.resume({consentAcknowledged:true});
+  const next=sockets[1];next.open();next.receive({type:"ready"});
+  agents[0].call.remoteParticipants[0].identifier={unknown:"unapproved"};
+  for(let i=0;i<3;i++)capture.port.onmessage({data:pcm});
+  assert.equal(next.sent.filter(value=>typeof value!=="string").length,0);
+  for(let i=0;i<12;i++)await tick();
+  assert.ok(agents[0].call.hungUp);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
+
+
+def test_full_duplex_requires_explicit_boolean_server_admission():
+    node(HARNESS + r"""
+(async () => {
+  issued.full_duplex="true";
+  await join();const ws=sockets[0];ws.open();ws.receive({type:"ready"});
+  ws.receive(new ArrayBuffer(960));
+  for(let i=0;i<3;i++)find("voice-capture").port.onmessage({data:new ArrayBuffer(960)});
+  assert.equal(ws.sent.filter(value=>typeof value!=="string").length,0);
+  await client.stop();
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
