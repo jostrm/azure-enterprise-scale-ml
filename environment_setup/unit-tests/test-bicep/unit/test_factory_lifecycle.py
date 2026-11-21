@@ -1876,6 +1876,51 @@ def test_new_ado_scoped_template_uses_namespaced_connection_exact_commit_and_wor
     assert receipt["worker_receipt"]["status"] == "succeeded"
 
 
+@pytest.mark.parametrize("template_name", ["factory-lifecycle-ado.yml"])
+def test_ado_scoped_self_hosted_dispatch_omits_empty_template_parameters(template_name):
+    # ADO answers 400 "The 'vmImage' parameter is not a valid String." for "" (aif-163 run 2493);
+    # omitted parameters take the template's '' default instead.
+    document, _ = scoped_manifest()
+    document["route"]["runner"] = {"kind": "self-hosted", "os": "linux", "pool": "esaf-lifecycle-external"}
+    cloud = FakeCloud()
+    cloud.enrollment = scoped_enrollment(document)
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    seal(document)
+    cloud.runs["runs/" + document["run_id"] + ".worker.json"] = successful_worker_receipt(document)
+    locks = fl.BlobLocks(cloud, document)
+    locks.acquire()
+    template = (ROOT / "bootstrap/templates" / template_name).read_text().strip()
+    cloud.command = Mock(return_value=template)
+    original = cloud.request
+    calls = []
+
+    def request(method, url, audience, data=None, **kwargs):
+        if not url.startswith("https://dev.azure.com/"):
+            return original(method, url, audience, data, **kwargs)
+        calls.append((method, url, data))
+        if "/serviceendpoint/endpoints?" in url:
+            result = {"value": [{"name": document["route"]["auth_namespace"],
+                                 "authorization": {"scheme": "WorkloadIdentityFederation", "parameters": {"tenantid": TENANT}},
+                                 "data": {"subscriptionId": SUB}}]}
+        elif "/items?" in url:
+            result = {"content": template}
+        elif "/build/definitions?" in url:
+            result = {"value": [{"id": 7, "repository": {"name": "consumer"}, "process": {"yamlFilename": fl.SCOPED_ADO}}]}
+        elif method == "POST":
+            result = {"id": 43}
+        else:
+            result = {"state": "completed", "result": "succeeded",
+                      "resources": {"repositories": {"self": {"version": document["route"]["commit"]}}}}
+        return 200, {}, result
+
+    cloud.request = request
+    fl.ado_scoped(cloud, locks, document, ROOT, {}, lambda: None, sleep=Mock())
+    parameters = next(data for method, _, data in calls if method == "POST")["templateParameters"]
+    assert parameters["runnerKind"] == "self-hosted" and parameters["agentPool"] == "esaf-lifecycle-external"
+    assert "vmImage" not in parameters and "agentName" not in parameters
+    assert all(value != "" for value in parameters.values())
+
+
 def test_combined_template_keeps_secret_values_out_of_template_and_orders_nested_phases():
     document, templates = scoped_manifest(("017",))
     cloud = PlanCloud(document, templates)

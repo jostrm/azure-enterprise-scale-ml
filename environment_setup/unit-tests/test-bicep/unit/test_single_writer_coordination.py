@@ -741,8 +741,8 @@ def test_distinct_templates_scope_provider_credentials_and_keep_blob_permissions
     assert sum("GH_TOKEN" in step.get("env", {}) for step in steps) == 1
     assert next(step for step in steps if step.get("uses") == "actions/checkout@v4")["with"]["persist-credentials"] is False
     ado = yaml.safe_load((directory / "factory-lifecycle-single-writer-ado.yml").read_text())
-    assert ado["steps"][0]["persistCredentials"] is False
-    assert ado["steps"][-1]["env"]["AIFACTORY_STATE_TOKEN"] == "$(System.AccessToken)"
+    assert ado["jobs"][0]["steps"][0]["persistCredentials"] is False
+    assert ado["jobs"][0]["steps"][-1]["env"]["AIFACTORY_STATE_TOKEN"] == "$(System.AccessToken)"
 
 
 @pytest.mark.parametrize("kind", ["gha", "ado"])

@@ -7303,13 +7303,15 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
     require(len(matches) == 1 and type(matches[0].get("id")) is int, "exact-scoped-ado-pipeline-required")
     pipeline = matches[0]["id"]
     payload = {"resources": {"repositories": {"self": {"refName": route["ref"], "version": route["commit"]}}},
-               "templateParameters": {"runId": document["run_id"], "manifestHash": document["manifest_hash"],
-                                      "expectedCommit": route["commit"], "sourceCommit": document["source"]["commit"],
-                                      "serviceConnection": route["auth_namespace"],
-                                      "runnerKind": route["runner"]["kind"],
-                                      "vmImage": route["runner"].get("image", ""),
-                                      "agentPool": route["runner"].get("pool", ""),
-                                      "agentName": route["runner"].get("agent_name", "")},
+               # ADO rejects "" for a string parameter (400 "not a valid String"); omitted ones take the '' default.
+               "templateParameters": {key: value for key, value in {
+                   "runId": document["run_id"], "manifestHash": document["manifest_hash"],
+                   "expectedCommit": route["commit"], "sourceCommit": document["source"]["commit"],
+                   "serviceConnection": route["auth_namespace"],
+                   "runnerKind": route["runner"]["kind"],
+                   "vmImage": route["runner"].get("image", ""),
+                   "agentPool": route["runner"].get("pool", ""),
+                   "agentName": route["runner"].get("agent_name", "")}.items() if value != ""},
                "variables": {"AIFACTORY_ENVELOPE_JSON": {
                    "isSecret": True, "value": protected_worker_envelope(document, locks).decode("utf-8")}}}
     locks.assert_held()
