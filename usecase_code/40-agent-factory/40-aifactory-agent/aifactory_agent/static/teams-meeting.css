@@ -12,3 +12,7 @@
 #teams-meeting-card .teams-meeting-consent input { flex: 0 0 auto; margin-block-start: .25rem; }
 #teams-meeting-card .teams-meeting-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
 #teams-meeting-card [role="alert"] { color: var(--danger, #b42318); }
+.teams-link-sharing { border-top: 1px solid var(--border, #b8bdc7); margin-top: 1rem; padding-top: .5rem; }
+.teams-link-sharing pre { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.teams-link-sharing p { overflow-wrap: anywhere; }
+.teams-link-sharing [hidden] { display: none; }

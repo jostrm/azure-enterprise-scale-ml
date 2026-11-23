@@ -77,6 +77,7 @@ class StarletteChannel:
         self._lock = asyncio.Lock()
         self.policy_guard = None
         self.on_policy_denied = None
+        self.on_answer = None
 
     async def check_policy(self) -> None:
         if self.policy_guard is not None:
@@ -102,6 +103,8 @@ class StarletteChannel:
                 raise ClientGone() from exc
 
     async def send_json(self, message: dict) -> None:
+        if message.get("type") == "answer" and self.on_answer is not None:
+            message = self.on_answer(message)
         await self._send(text=json.dumps(message, separators=(",", ":")),
                          check_policy=message.get("type") not in {"closed", "error", "interrupted"})
 
@@ -420,6 +423,9 @@ def register_voice(app: FastAPI) -> None:
                 from .teams_meeting_routes import bind_meeting_voice_session
                 bind_meeting_voice_session(websocket.app, principal, session)
                 channel.on_policy_denied = lambda: session.end("meeting_policy_changed")
+                from .teams_meeting_chat import capture_meeting_links
+                channel.on_answer = lambda message: capture_meeting_links(
+                    websocket.app, principal, session, message)
             if entry.replaced:
                 await session.end("replaced")
             VOICE_SESSIONS.add(1, {"scope": hello.scope_key})

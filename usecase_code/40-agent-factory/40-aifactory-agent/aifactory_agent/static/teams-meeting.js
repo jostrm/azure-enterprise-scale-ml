@@ -19,6 +19,17 @@
       expired: "The meeting session expired. Join again explicitly if everyone still consents.",
       changed: "Sign-in or scope changed; the meeting bridge has left.", timeout: "Admission or audio timed out; the assistant left.",
       cleanup_pending: "Cleanup is not confirmed. Check that the assistant has left the meeting and ask the operator to check server/ACS cleanup before rejoining.",
+      chatTitle: "Share source links in meeting chat", chatPreview: "Preview source links",
+      chatSend: "Post approved links", chatDestination: "Destination meeting chat",
+      chatWarning: "This message contains source links from your private Agent Chat session. Teams chat persists and may be visible to people not currently in the meeting. Confirm before sending.",
+      chatConfirm: "I approve this exact message for everyone with access to this meeting chat.",
+      chat_available: "Source links are ready for preview. Nothing has been posted.",
+      chat_unavailable: "No shareable source links for an active approved meeting.",
+      chat_previewing: "Preparing the exact message…", chat_preview: "Review the destination and message before posting.",
+      chat_sending: "Posting the approved message…", chat_sent: "Source links posted to meeting chat.",
+      chat_unknown: "Delivery is unconfirmed. Check Teams before posting again; this send will not be retried automatically.",
+      chat_failed: "Link sharing failed. Audio can continue; check chat policy and access before trying a new answer.",
+      chat_expired: "This preview expired. Ask again for fresh source links.",
     },
     sv: {
       title: "Teams-mötesassistent (bemannad)", link: "Godkänd Teams-möteslänk",
@@ -35,6 +46,17 @@
       expired: "Mötessessionen har löpt ut. Anslut uttryckligen igen om alla fortfarande samtycker.",
       changed: "Inloggning eller omfång ändrades; mötesbryggan har lämnat.", timeout: "Tidsgränsen för insläpp eller ljud nåddes; assistenten lämnade.",
       cleanup_pending: "Rensningen är inte bekräftad. Kontrollera att assistenten har lämnat mötet och be operatören kontrollera serverns/ACS rensning innan du ansluter igen.",
+      chatTitle: "Dela källänkar i möteschatten", chatPreview: "Förhandsgranska källänkar",
+      chatSend: "Publicera godkända länkar", chatDestination: "Mottagande möteschatt",
+      chatWarning: "Meddelandet innehåller källänkar från din privata Agent Chat-session. Teams-chatten sparas och kan läsas av personer som inte deltar just nu. Bekräfta innan du skickar.",
+      chatConfirm: "Jag godkänner detta exakta meddelande för alla som har åtkomst till möteschatten.",
+      chat_available: "Källänkar kan förhandsgranskas. Inget har publicerats.",
+      chat_unavailable: "Inga delbara källänkar för ett aktivt godkänt möte.",
+      chat_previewing: "Förbereder det exakta meddelandet…", chat_preview: "Granska mottagare och meddelande innan du publicerar.",
+      chat_sending: "Publicerar det godkända meddelandet…", chat_sent: "Källänkarna har publicerats i möteschatten.",
+      chat_unknown: "Leveransen är inte bekräftad. Kontrollera Teams innan du publicerar igen; meddelandet skickas inte om automatiskt.",
+      chat_failed: "Länkdelningen misslyckades. Ljudet kan fortsätta; kontrollera chattpolicy och åtkomst före ett nytt svar.",
+      chat_expired: "Förhandsgranskningen har gått ut. Fråga igen för aktuella källänkar.",
     },
   };
   let sdkPromise;
@@ -54,6 +76,7 @@
     const env = options.env || globalThis;
     const now = () => env.Date.now();
     let active = null, phase = "off", stopping = null;
+    let linkView = {state: "unavailable"};
     const emit = (name, value) => {
       try { options[name]?.(value); } catch { env.console?.warn("teams_meeting_ui_callback_failed"); }
     };
@@ -65,6 +88,106 @@
         && latest.audience === current.session.audience && latest.expiresAt > now();
     };
     const headers = session => ({Authorization: `Bearer ${session.token}`, "Content-Type": "application/json"});
+    const showLinks = (state, details = {}) => {
+      linkView = {state, ...details};
+      emit("onLinks", linkView);
+    };
+    function clearLinks(current) {
+      current.linkEpoch = (current.linkEpoch || 0) + 1;
+      current.linkOffer = null;
+      current.linkDraft = null;
+      showLinks("unavailable");
+    }
+    function chatReady(current) {
+      return alive(current) && current.ready && !current.paused && !current.resetting
+        && sameSession(current) && current.call.state === "Connected"
+        && current.admission.chat_enabled === true
+        && typeof current.admission.chat_thread_id === "string"
+        && current.call.info?.threadId === current.admission.chat_thread_id;
+    }
+    async function chatRequest(current, operation, body) {
+      let timer;
+      const controller = new env.AbortController();
+      try {
+        return await Promise.race([
+          (async () => {
+            const response = await env.fetch(`/api/teams-meetings/sessions/${encodeURIComponent(current.admission.session_id)}/links/${operation}`,
+              {method: "POST", headers: headers(current.session), cache: "no-store",
+                body: JSON.stringify(body), signal: controller.signal});
+            return {ok: response.ok, status: response.status, body: response.ok ? await response.json() : null};
+          })(),
+          new Promise((resolve, reject) => {
+            timer = env.setTimeout(() => {
+              controller.abort(); reject(new Error("chat_timeout"));
+            }, 30000);
+          }),
+        ]);
+      } finally { env.clearTimeout(timer); }
+    }
+    async function previewLinks() {
+      const current = active;
+      if (!current || linkView.state !== "available") return;
+      if (!chatReady(current)) { clearLinks(current); return; }
+      if (!safe(current)) return;
+      const epoch = current.linkEpoch;
+      showLinks("previewing");
+      try {
+        const response = await chatRequest(current, "preview", {
+          voice_generation: current.admission.voice_generation,
+          offer_id: current.linkOffer.offer_id, thread_id: current.call.info.threadId,
+        });
+        if (!alive(current) || epoch !== current.linkEpoch) return;
+        if (!response.ok) { showLinks("failed"); return; }
+        const draft = response.body;
+        if (!alive(current) || epoch !== current.linkEpoch) return;
+        if (!chatReady(current)) { clearLinks(current); return; }
+        if (typeof draft.draft_id !== "string" || !draft.draft_id
+            || draft.voice_generation !== current.admission.voice_generation
+            || draft.thread_id !== current.call.info.threadId || typeof draft.content !== "string"
+            || !draft.content || draft.content.length > 16000 || !Number.isFinite(draft.expires_at)
+            || draft.expires_at * 1000 <= now()) { showLinks("failed"); return; }
+        current.linkDraft = draft;
+        showLinks("preview", {draft});
+        const expiry = env.setTimeout(() => {
+          if (alive(current) && epoch === current.linkEpoch && linkView.state === "preview") {
+            current.linkDraft = null; showLinks("expired");
+          }
+        }, draft.expires_at * 1000 - now());
+        current.timers.push(expiry);
+        return draft;
+      } catch {
+        if (alive(current) && epoch === current.linkEpoch) showLinks("failed");
+      }
+    }
+    async function postLinks({confirmed} = {}) {
+      const current = active;
+      if (!current || linkView.state !== "preview") return;
+      if (confirmed !== true) { emit("onMessage", "consent"); return; }
+      if (!chatReady(current)) { clearLinks(current); return; }
+      if (!safe(current)) return;
+      const draft = current.linkDraft;
+      if (!draft || draft.expires_at * 1000 <= now()) { showLinks("expired"); return; }
+      const epoch = current.linkEpoch;
+      showLinks("sending");
+      try {
+        const response = await chatRequest(current, "send", {
+          voice_generation: current.admission.voice_generation, draft_id: draft.draft_id,
+          thread_id: draft.thread_id, confirmed: true,
+        });
+        if (!alive(current) || epoch !== current.linkEpoch) return;
+        if (!response.ok) { showLinks(response.status >= 500 ? "unknown" : "failed"); return; }
+        const result = response.body;
+        if (!alive(current) || epoch !== current.linkEpoch) return;
+        if (result.status !== "sent" || typeof result.message_id !== "string" || !result.message_id
+            || result.thread_id !== draft.thread_id) { showLinks("unknown"); return; }
+        current.linkDraft = null;
+        showLinks("sent", {message_id: result.message_id});
+        return result;
+      } catch {
+        // A lost response may already have delivered the message. Never automatically resend.
+        if (alive(current) && epoch === current.linkEpoch) showLinks("unknown");
+      }
+    }
     function cleanupWarning(current) {
       current.cleanupPending = true;
       emit("onMessage", "cleanup_pending");
@@ -94,6 +217,7 @@
       if (!current) return;
       active = null;
       current.stopped = true;
+      clearLinks(current);
       show("stopping");
       for (const timer of current.timers) env.clearTimeout(timer);
       for (const cancel of current.cancel) attemptCleanup(current, cancel);
@@ -307,10 +431,19 @@
           current.playback.port.postMessage(null);
           current.playing = false; current.echoUntil = now() + 500;
           show(current.paused ? "paused" : "listening");
+        } else if (message.type === "answer") {
+          clearLinks(current);
+          const offer = message.chat_links;
+          if (chatReady(current) && typeof offer?.offer_id === "string"
+              && offer.offer_id.length > 0 && offer.offer_id.length <= 128
+              && Number.isInteger(offer.count) && offer.count >= 1 && offer.count <= 5) {
+            current.linkOffer = {offer_id: offer.offer_id};
+            showLinks("available");
+          }
         } else if (message.type === "closed" || (message.type === "error" && message.fatal)) {
           void stop("failed");
         }
-        // Transcript/answer frames are deliberately not rendered, forwarded to chat, or retained.
+        // Speech content is never copied to chat. Only server-owned source offers can be previewed.
       };
       socket.onclose = () => { if (alive(current) && current.socket === socket && !current.resetting) void stop("failed"); };
       socket.onerror = () => { if (alive(current) && current.socket === socket && !current.resetting) void stop("failed"); };
@@ -327,6 +460,7 @@
       const current = {session: {...session}, nodes: [], streams: [], timers: [], listeners: [], cancel: [],
         remote: new Map(), pending: [], stopped: false, ready: false, playing: false, echoUntil: 0};
       active = current; emit("onMessage", ""); show("connecting");
+      clearLinks(current);
       try {
         current.context = new env.AudioContext({sampleRate: 24000, latencyHint: "interactive"});
         await current.context.resume();
@@ -446,6 +580,7 @@
       current.paused = true;
       current.ready = false;
       current.resetting = true;
+      clearLinks(current);
       current.resumeRequested = resumeAfterReset;
       current.playback.port.postMessage(null);
       current.pending = [];
@@ -511,7 +646,8 @@
     function sessionChanged() {
       if (active && !sameSession(active)) void stop("changed");
     }
-    return {start, stop, interrupt, pause, resume, sessionChanged, get phase() { return phase; }};
+    return {start, stop, interrupt, pause, resume, previewLinks, postLinks, sessionChanged,
+      get phase() { return phase; }, get linkState() { return linkView; }};
   }
 
   function initialize(env = globalThis) {
@@ -535,6 +671,28 @@
     status.setAttribute("role", "status"); error.setAttribute("role", "alert");
     actions.append(join, mute, resume, leave, interrupt);
     card.append(title, notice, urlLabel, url, consentLabel, actions, status, error);
+    const chatSection = element("section"), chatTitle = element("h3", labels.chatTitle);
+    chatSection.className = "teams-link-sharing";
+    const preview = element("button", labels.chatPreview), send = element("button", labels.chatSend);
+    preview.type = send.type = "button";
+    const chatState = element("p", labels.chat_unavailable), destination = element("p");
+    chatState.setAttribute("aria-live", "polite");
+    const textPreview = element("pre"), warning = element("p", labels.chatWarning);
+    const confirmLabel = element("label"), confirm = element("input"); confirm.type = "checkbox";
+    confirmLabel.append(confirm, doc.createTextNode(labels.chatConfirm));
+    chatSection.append(chatTitle, preview, chatState, destination, textPreview, warning, confirmLabel, send);
+    card.append(chatSection);
+    let previewOpen = false;
+    const linkControls = value => {
+      previewOpen = value.state === "preview";
+      preview.disabled = value.state !== "available";
+      confirm.checked = false;
+      send.disabled = true;
+      destination.hidden = textPreview.hidden = warning.hidden = confirmLabel.hidden = send.hidden = !previewOpen;
+      destination.textContent = previewOpen ? `${labels.chatDestination}: ${value.draft.thread_id}` : "";
+      textPreview.textContent = previewOpen ? value.draft.content : "";
+      chatState.textContent = labels[`chat_${value.state}`] || labels.chat_failed;
+    };
     const anchor = doc.getElementById("voice-card");
     if (anchor) anchor.after(card); else (doc.querySelector("main") || doc.body).append(card);
     let approved = false, probe = 0, lastToken = null, policies = [], wasLive = false;
@@ -551,7 +709,12 @@
       status.textContent = labels[state] || labels.off;
     };
     const client = createMeetingClient({env, getSession: () => host.voiceSession(),
-      onState: controls, onMessage: key => { error.textContent = key ? labels[key] || labels.failed : ""; }});
+      onState: controls, onLinks: linkControls,
+      onMessage: key => { error.textContent = key ? labels[key] || labels.failed : ""; }});
+    preview.addEventListener("click", () => { void client.previewLinks(); });
+    confirm.addEventListener("change", () => { send.disabled = !previewOpen || !confirm.checked; });
+    send.addEventListener("click", () => { void client.postLinks({confirmed: confirm.checked}); });
+    linkControls({state: "unavailable"});
     async function changed() {
       client.sessionChanged();
       const session = host.voiceSession();

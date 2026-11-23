@@ -884,6 +884,114 @@ cost is required for this route; ACS usage, existing voice/model inference,
 Search and Container Apps still incur their applicable metered costs. No fixed
 price or measured latency is asserted here.
 
+## Source links in Teams meeting chat (opt-in)
+
+The attended bridge can prepare a **source-link message** from a completed,
+validated meeting answer. It does not post automatically when the model speaks
+or when somebody says "send the link". The operator selects **Preview source
+links**, reviews the exact destination and text, checks the explicit approval
+box, and selects **Post approved links**. This is not arbitrary message sending
+or a transcript/answer export.
+
+**Implementation is separate from live acceptance.** Delivery on a specific
+ACS resource and meeting requires an actual approved send and confirmation in
+Teams. An SDK import, chat token, prepared draft or mock send does not prove it.
+
+### Configure one approved persistent-chat destination
+
+Add these fields to the existing `teams_meetings` settings and the matching
+meeting policy, retaining the rest of that configuration:
+
+```json
+{
+  "teams_meetings": {
+    "chat_enabled": true,
+    "chat_allowed_link_hosts": ["learn.microsoft.com", "github.com"],
+    "policies": [{
+      "id": "approved-test",
+      "chat_thread_id": "<verified-19:meeting-thread-id@thread.v2>",
+      "chat_disclosure_approved": true
+    }]
+  }
+}
+```
+
+This is a **configuration fragment**, not a complete configuration or a runnable
+placeholder. Defaults leave chat disabled. Obtain the actual thread ID from the
+connected call's `call.info.threadId`, independently verify it belongs to the
+approved meeting, and configure that exact value. A short meeting URL or a
+person's email is not a chat thread ID. The browser compares its connected call
+to the configured thread before previewing or sending; the backend enforces the
+same binding independently. There is no dynamic model-selected destination.
+
+Chat disclosure approval is separate from audio consent: Teams chat persists,
+may be accessible to absent members or later readers, and follows its own
+retention/DLP rules. The operator must approve the selected source URLs for
+**everyone with access to the chat**, not merely the current media roster.
+Do not add guest accounts, general Agent Chat grants or Azure roles to make this
+work. Sharing a URL does not grant permission to open a private document.
+
+### Server-side transport and safety
+
+The ordinary browser receives only its existing ACS **VoIP** token. On a
+confirmed send, the server's managed-identity token broker acquires a separate
+**chat-scoped token for the same admitted ACS identity**, and sends through the
+Python `azure-communication-chat==1.3.0` SDK. No chat token, connection string,
+Foundry credential or Chat SDK is added to the browser.
+
+Only `source_url` values from a completed answer's citations are candidates.
+URLs extracted from free-form model prose, transcripts or client-provided text
+are not accepted. The server applies the configured exact HTTPS host allowlist,
+bounds/deduplication and unsafe-URL restrictions. Query-bearing URLs are rejected
+instead of potentially disclosing signed credentials. Some otherwise legitimate
+links will therefore be unavailable for this deliberately narrow first version.
+
+The server keeps bounded, short-lived offer/preview state in memory, not complete
+meeting transcripts. Preview and send are bound to the authenticated host and
+client, meeting session, current voice generation, approved thread and current
+policy. Reset, expiry, audience/policy changes and leave invalidate stale work.
+Changing the preview text in the browser cannot change the server's exact draft.
+
+Sending is single-flight. A repeated request cannot silently send another copy.
+If delivery is uncertain after a timeout, the UI says so and does not retry
+automatically; check Teams before asking for a new post. Already transmitted
+messages cannot be recalled merely because the meeting later ends. Chat failure
+is surfaced separately and does not intentionally terminate the working voice
+connection.
+
+The endpoints are:
+
+```text
+POST /api/teams-meetings/sessions/{id}/links/preview
+POST /api/teams-meetings/sessions/{id}/links/send
+```
+
+Both require the existing authenticated host. The send request contains a
+server-owned draft identifier and explicit confirmation, never arbitrary text
+or arbitrary URLs.
+
+### Platform limits and live test
+
+Microsoft documents ACS meeting chat in
+[Add Teams meeting chat to your app](https://learn.microsoft.com/azure/communication-services/quickstarts/chat/meeting-interop).
+The same admitted ACS identity participates in chat while allowed by the meeting
+and service. This implementation neither creates an unrelated chat nor uses
+Graph migration permissions to impersonate a user.
+
+**ACS Chat, including Teams meeting interop chat, retires September 30, 2028.**
+The [current retirement guide](https://learn.microsoft.com/azure/communication-services/acs-retirement-and-breaking-changes-guide)
+also warns about restrictions on retiring services. A newly created resource's
+chat eligibility must be verified; failures do not authorize using an unrelated
+older resource or changing tenant policies. A Teams-native messaging bot
+installed in the target meeting chat is the longer-term alternative, separate
+from the existing ACS audio transport.
+
+For acceptance, use one harmless public source link. Confirm the exact message
+in the preview, send once, verify its message ID and its appearance as the
+assistant in the intended Teams chat, and open the link. Also exercise wrong
+thread, expired preview, revoked policy and duplicate request cases. Verify
+voice remains functional and no chat message is sent before confirmation.
+
 ## Live voice (optional)
 
 Talk to the agent like a voice assistant. The page shows a voice card with a
