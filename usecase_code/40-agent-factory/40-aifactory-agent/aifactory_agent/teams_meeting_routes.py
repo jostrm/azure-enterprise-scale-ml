@@ -30,6 +30,7 @@ from starlette.responses import JSONResponse
 
 from . import web
 from .security import Principal, authorize
+from .teams_meeting_chat import ChatDraft, ChatOffer, register_meeting_chat
 from .teams_meeting_settings import validate_meeting_url
 from .voice_settings import VoiceSettings
 
@@ -72,21 +73,24 @@ class AcsTokenService:
         self.managed_identity_client_id = settings.managed_identity_client_id or managed_identity_client_id
 
     @contextmanager
-    def _client(self):
+    def _client(self, *, retry_total=2):
         from azure.communication.identity import CommunicationIdentityClient
         from azure.core.pipeline.transport import RequestsTransport
         from azure.identity import ManagedIdentityCredential
 
         kwargs = ({"client_id": str(self.managed_identity_client_id)} if self.managed_identity_client_id else {})
+        if retry_total == 0:
+            kwargs.update(retry_total=0, redirect_max=0, connection_timeout=10, read_timeout=20,
+                          logging_enable=False)
         with ExitStack() as stack:
             credential = ManagedIdentityCredential(**kwargs)
             stack.callback(credential.close)
             # Identity SDK 1.5 has no public close(). Own its transport rather than calling a nonexistent method.
-            transport = RequestsTransport()
+            transport = RequestsTransport(connection_timeout=10, read_timeout=20)
             stack.callback(transport.close)
             yield CommunicationIdentityClient(
                 self.settings.acs_endpoint, credential, transport=transport, logging_enable=False,
-                connection_timeout=10, read_timeout=20, retry_total=2,
+                connection_timeout=10, read_timeout=20, retry_total=retry_total, redirect_max=0,
             )
 
     def issue(self) -> MeetingIdentity:
@@ -120,6 +124,18 @@ class AcsTokenService:
             if identity is not None:
                 error.meeting_identity = identity
             raise
+
+    def chat_token(self, identity: MeetingIdentity) -> str:
+        """Issue CHAT only for the already admitted identity, never a browser credential."""
+        from azure.communication.identity import CommunicationTokenScope, CommunicationUserIdentifier
+
+        with self._client(retry_total=0) as client:
+            token = client.get_token(
+                CommunicationUserIdentifier(identity.user_id), scopes=[CommunicationTokenScope.CHAT],
+                token_expires_in=timedelta(hours=1))
+        if not isinstance(token.token, str) or not token.token:
+            raise TokenServiceError("acs_invalid_response", "InvalidChatToken")
+        return token.token
 
     def revoke(self, identity: MeetingIdentity) -> None:
         from azure.communication.identity import CommunicationUserIdentifier
@@ -174,6 +190,16 @@ class MeetingSession:
     cleanup_attempts: int = 0
     timer: asyncio.Task | None = field(default=None, repr=False)
     voice_session: object | None = field(default=None, repr=False)
+    chat_enabled: bool = False
+    chat_thread_id: str | None = field(default=None, repr=False)
+    chat_disclosure_approved: bool = False
+    chat_allowed_link_hosts: frozenset[str] = field(default_factory=frozenset)
+    chat_acs_endpoint: str | None = field(default=None, repr=False)
+    chat_display_name: str = ""
+    chat_managed_identity_client_id: UUID | None = field(default=None, repr=False)
+    chat_offer: ChatOffer | None = field(default=None, repr=False)
+    chat_draft: ChatDraft | None = field(default=None, repr=False)
+    chat_operation: ChatDraft | None = field(default=None, repr=False)
 
 
 class MeetingRegistry:
@@ -306,6 +332,17 @@ def _check_session(app, entry, settings=None):
             or policy.external_audience_disclosure_approved != entry.external_audience_disclosure_approved
             or current.teams_meetings.voice_mode != entry.voice_mode
             or current.teams_meetings.full_duplex != entry.full_duplex
+            or current.teams_meetings.chat_enabled != entry.chat_enabled
+            or (entry.chat_enabled and (
+                policy.chat_thread_id != entry.chat_thread_id
+                or policy.chat_disclosure_approved is not True
+                or not entry.chat_disclosure_approved
+                or frozenset(current.teams_meetings.chat_allowed_link_hosts) != entry.chat_allowed_link_hosts
+                or current.teams_meetings.acs_endpoint != entry.chat_acs_endpoint
+                or current.teams_meetings.display_name != entry.chat_display_name
+                or (current.teams_meetings.managed_identity_client_id
+                    or current.azure.managed_identity_client_id) != entry.chat_managed_identity_client_id
+            ))
             or frozenset(map(str, policy.allowed_participant_object_ids)) != entry.allowed_participant_object_ids):
         raise PermissionError("The meeting policy changed.")
 
@@ -484,6 +521,7 @@ async def end_meeting_session(app, session_id, *, expected_generation: int | Non
         if entry.cleaning:
             return "pending"
         entry.revoked = True
+        entry.chat_offer = entry.chat_draft = None
         entry.cleaning = True
         if entry.timer and entry.timer is not asyncio.current_task():
             entry.timer.cancel()
@@ -522,6 +560,7 @@ def register_teams_meetings(app: FastAPI) -> None:
     app.state.teams_meeting_registry = registry = MeetingRegistry()
     app.state.teams_meeting_token_service = AcsTokenService(
         meeting, managed_identity_client_id=app.state.settings.azure.managed_identity_client_id)
+    register_meeting_chat(app)
 
     @app.get("/api/teams-meetings/status")
     def status(principal: Annotated[Principal, Depends(web.get_principal)]):
@@ -542,13 +581,15 @@ def register_teams_meetings(app: FastAPI) -> None:
             "voice_mode": (current.voice.mode if current.teams_meetings.voice_mode == "inherit"
                            else current.teams_meetings.voice_mode),
             "full_duplex": current.teams_meetings.full_duplex,
+            "chat_enabled": current.teams_meetings.chat_enabled,
         }, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/teams-meetings/sessions")
     async def create(body: JoinRequest, principal: Annotated[Principal, Depends(web.get_principal)]):
         current = app.state.settings
-        policy = _policy(current, principal, body.meeting_url, body.scope_key)
-        meeting_settings = current.teams_meetings
+        policy = _policy(current, principal, body.meeting_url, body.scope_key).model_copy(deep=True)
+        meeting_settings = current.teams_meetings.model_copy(deep=True)
+        broker_client_id = meeting_settings.managed_identity_client_id or current.azure.managed_identity_client_id
         host = (principal.tenant_id, principal.object_id)
         with registry.lock:
             if host in registry.pending or any((entry.principal.tenant_id, entry.principal.object_id) == host
@@ -569,8 +610,9 @@ def register_teams_meetings(app: FastAPI) -> None:
             # Policy may have changed while obtaining the external identity.
             current = app.state.settings
             if (_policy(current, principal, body.meeting_url, body.scope_key) != policy
-                    or current.teams_meetings.voice_mode != meeting_settings.voice_mode
-                    or current.teams_meetings.full_duplex != meeting_settings.full_duplex):
+                    or current.teams_meetings != meeting_settings
+                    or (current.teams_meetings.managed_identity_client_id
+                        or current.azure.managed_identity_client_id) != broker_client_id):
                 raise PermissionError("The meeting policy changed during admission.")
             now = time.time()
             expires = min(now + current.teams_meetings.max_session_seconds, identity.expires_at - 15)
@@ -584,6 +626,13 @@ def register_teams_meetings(app: FastAPI) -> None:
                 external_audience_disclosure_approved=policy.external_audience_disclosure_approved,
                 voice_mode=meeting_settings.voice_mode, full_duplex=meeting_settings.full_duplex,
                 allowed_participant_object_ids=frozenset(map(str, policy.allowed_participant_object_ids)),
+                chat_enabled=meeting_settings.chat_enabled,
+                chat_thread_id=policy.chat_thread_id,
+                chat_disclosure_approved=policy.chat_disclosure_approved,
+                chat_allowed_link_hosts=frozenset(meeting_settings.chat_allowed_link_hosts),
+                chat_acs_endpoint=meeting_settings.acs_endpoint,
+                chat_display_name=meeting_settings.display_name,
+                chat_managed_identity_client_id=broker_client_id,
             )
             with registry.lock:
                 registry.sessions[entry.id] = entry
@@ -599,6 +648,8 @@ def register_teams_meetings(app: FastAPI) -> None:
                 "voice_generation": entry.generation,
                 "voice_mode": current.voice.mode if entry.voice_mode == "inherit" else entry.voice_mode,
                 "full_duplex": entry.full_duplex,
+                "chat_enabled": entry.chat_enabled,
+                **({"chat_thread_id": entry.chat_thread_id} if entry.chat_enabled else {}),
                 "scope_key": entry.scope_key, "audience": entry.audience, "acs_token": entry.identity.token,
                 "acs_expires_at": entry.identity.expires_at, "expires_at": entry.expires_at,
                 "display_name": current.teams_meetings.display_name,
@@ -631,6 +682,7 @@ def register_teams_meetings(app: FastAPI) -> None:
                 raise HTTPException(409, "The meeting voice generation changed; do not replay this reset.")
             ticket = secrets.token_urlsafe(48)
             entry.generation += 1
+            entry.chat_offer = entry.chat_draft = None
             generation = entry.generation
             entry.ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
             entry.consumed = False

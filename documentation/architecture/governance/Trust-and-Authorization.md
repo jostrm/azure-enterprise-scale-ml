@@ -8,6 +8,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_settings.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_chat.py
   - mcp/src/aifactory_mcp/auth.py
   - mcp/src/aifactory_mcp/server.py
   - mcp/src/aifactory_mcp/access.py
@@ -19,6 +20,7 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_chat.py
   - mcp/tests/test_auth.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
@@ -58,6 +60,18 @@ organizer-managed admission, consent, and knowledge approved for everyone.
 It must not be presented as a confidential arbitrary-meeting access mechanism.
 The existing backend remains private. ACS token-broker RBAC is a separately
 approved resource-scoped prerequisite, not a new tenant-wide Graph grant.
+
+## Persistent meeting-chat disclosure
+
+Meeting chat link sharing is a separately enabled outbound operation. Audio
+disclosure approval does not automatically approve persistent chat disclosure.
+The configured chat thread and URL-host allowlist, current host grant and
+session generation, and explicit confirmation of an exact backend preview are
+all required. Only completed citation URLs are candidates; arbitrary model
+output is never a send instruction. A chat token for the same admitted identity
+stays server-side. A timeout with unknown delivery never authorizes a retry.
+No general app grants, guest invitations or Graph migration permissions are
+implied by enabling this adapter.
 
 ## Mandatory evidence trust rule
 
