@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import re
-from ipaddress import IPv6Address
+from ipaddress import IPv6Address, ip_address
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def validate_chat_thread_id(value: str) -> str:
+    if not isinstance(value, str) or len(value) > 512 or not re.fullmatch(
+        r"19:[A-Za-z0-9_+=.-]+@thread\.v2", value
+    ):
+        raise ValueError("A bounded Teams meeting chat thread ID is required.")
+    return value
 
 
 def validate_meeting_url(value: str) -> str:
@@ -46,6 +54,16 @@ class MeetingPolicy(BaseModel):
         default_factory=list, max_length=32,
         description="Exact operator-verified Teams roster IDs in the meeting tenant; not voice authentication or app grants.",
     )
+    chat_thread_id: str | None = Field(default=None, max_length=512, repr=False)
+    chat_disclosure_approved: bool = Field(
+        default=False, strict=True,
+        description="Separate operator approval for disclosure to the persistent meeting chat audience, not just its live roster.",
+    )
+
+    @field_validator("chat_thread_id")
+    @classmethod
+    def chat_thread(cls, value):
+        return validate_chat_thread_id(value) if value is not None else None
 
     @field_validator("meeting_tenant_id")
     @classmethod
@@ -94,9 +112,29 @@ class TeamsMeetingSettings(BaseModel):
     full_duplex: bool = Field(
         default=False, strict=True, description="Keep meeting input capture active during playback for server-owned interruption.",
     )
+    chat_enabled: bool = Field(default=False, strict=True)
+    chat_allowed_link_hosts: list[str] = Field(default_factory=list, max_length=64)
     max_session_seconds: int = Field(default=900, ge=60, le=3600)
     lobby_timeout_seconds: int = Field(default=120, ge=10, le=300)
     max_concurrent_sessions: int = Field(default=4, ge=1, le=32)
+
+    @field_validator("chat_allowed_link_hosts")
+    @classmethod
+    def exact_link_hosts(cls, value):
+        for host in value:
+            if (len(host) > 253 or "." not in host or not all(
+                re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+                for label in host.split(".")
+            )):
+                raise ValueError("Chat link hosts must be exact lower-case DNS names, without URLs or wildcards.")
+            try:
+                ip_address(host)
+            except ValueError:
+                continue
+            raise ValueError("Chat link hosts cannot be IP addresses.")
+        if len(set(value)) != len(value):
+            raise ValueError("Chat link hosts must be distinct.")
+        return value
 
     @field_validator("acs_endpoint")
     @classmethod
@@ -147,6 +185,12 @@ class TeamsMeetingSettings(BaseModel):
 
     @model_validator(mode="after")
     def explicit_policy(self):
+        if self.chat_enabled and (
+            not self.enabled or not self.chat_allowed_link_hosts or not self.policies
+            or any(not policy.chat_thread_id or policy.chat_disclosure_approved is not True
+                   or not policy.meeting_safe_knowledge for policy in self.policies)
+        ):
+            raise ValueError("Chat requires enabled meetings, allowed link hosts and separate persistent-chat disclosure approval for every thread.")
         if self.enabled and not (self.acs_endpoint and self.allowed_host_object_ids and self.policies and self.connect_origins):
             raise ValueError("Enabled meetings require an ACS endpoint, explicit hosts, meeting policies and network origins.")
         if self.enabled and any(not policy.meeting_safe_knowledge for policy in self.policies):

@@ -62,6 +62,10 @@ def test_meeting_is_opt_in_and_ships_sdk_without_runtime_cdn():
     lock = (ROOT / "requirements.lock.txt").read_text("utf-8")
     assert "azure-communication-identity>=1.5,<2" in requirements
     assert "azure-communication-identity==1.5.0" in lock
+    assert "azure-communication-chat>=1.3,<2" in requirements
+    assert "azure-communication-chat==1.3.0" in lock
+    assert config["teams_meetings"]["chat_enabled"] is False
+    assert "@azure/communication-chat" not in entry
 
 
 def test_runtime_bundle_keeps_sdk_and_notices_but_excludes_installed_build_dependencies(package_inputs):

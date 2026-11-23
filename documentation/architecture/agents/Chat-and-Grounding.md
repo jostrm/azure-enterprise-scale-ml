@@ -19,6 +19,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_settings.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_chat.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/teams-meeting.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout-loader.js
@@ -40,6 +41,8 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_frontend.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_chat.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_links_frontend.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_companion.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
@@ -232,6 +235,24 @@ The PG's managed Voice Agent hosted-conversation-engine path is a separate
 integration, not implied by this ACS transport or the existing Voice Live relay.
 No Windows media host or Teams-native app package is required for this attended
 external participant; unattended Graph media uses a different adapter.
+
+## Confirmed meeting-chat source links
+
+The opt-in meeting-chat adapter publishes source links only after an
+authenticated operator previews and confirms the exact server-owned draft.
+Completed answer citations supply the bounded URL candidates; model prose and
+transcripts cannot supply a send command. The current meeting, voice generation,
+configured chat thread, disclosure policy and exact URL hosts constrain the
+operation. No automatic send accompanies an answer or a spoken instruction.
+
+The Python ACS Chat adapter uses a separate chat token for the admitted ACS
+identity, obtained server-side only for a confirmed send. The browser keeps its
+VoIP-only credential. Offer/draft state is short-lived and process-local; it is
+not transcript storage. Persistent Teams chat has a broader potential audience
+than the live roster, so chat disclosure is separately approved. Ambiguous
+delivery is explicit and not retried automatically. Service/meeting eligibility,
+retirement constraints and a real Teams message remain independent acceptance
+requirements.
 
 ## Separation of operations
 
