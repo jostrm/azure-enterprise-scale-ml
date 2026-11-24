@@ -728,7 +728,7 @@ Merge an explicitly reviewed block into the existing application configuration:
       "meeting_safe_knowledge": true,
       "allowed_participant_object_ids": ["<approved-listener-object-id>"]
     }],
-    "display_name": "ESAF AI meeting assistant",
+    "display_name": "ESAF Agent",
     "max_session_seconds": 900
   }
 }

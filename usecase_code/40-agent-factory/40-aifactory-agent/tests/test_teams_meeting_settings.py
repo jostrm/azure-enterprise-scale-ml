@@ -98,6 +98,14 @@ def test_disabled_by_default_and_enabled_policy_is_explicit():
     assert TeamsMeetingSettings.model_validate(enabled_config()).max_session_seconds <= 3600
 
 
+def test_default_participant_name_is_esaf_agent_and_operator_override_is_preserved():
+    assert TeamsMeetingSettings().display_name == "ESAF Agent"
+    assert TeamsMeetingSettings.model_validate(enabled_config()).display_name == "ESAF Agent"
+    assert TeamsMeetingSettings.model_validate(
+        enabled_config(display_name="Approved custom agent")
+    ).display_name == "Approved custom agent"
+
+
 def test_meeting_voice_profile_is_opt_in_and_does_not_replace_browser_configuration():
     settings = TeamsMeetingSettings.model_validate(enabled_config())
     assert settings.voice_mode == "inherit"
