@@ -403,6 +403,42 @@ def test_provider_token_cannot_escape_repository(endpoint, monkeypatch):
     cloud.opener.open.assert_not_called()
 
 
+@pytest.mark.parametrize("status", [429, 502, 503, 504])
+def test_transient_provider_read_is_retried_before_it_fails(status, monkeypatch):
+    # aif-163 run 2497: one ADO 503 during Prepare failed a dispatched continuation, which no later run can replace.
+    module = importlib.import_module("pipeline_lifecycle_cloud")
+    cloud, _ = bound_cloud()
+    monkeypatch.setenv("GH_TOKEN", "provider-token")
+    waits = []
+    monkeypatch.setattr(module.time, "sleep", waits.append)
+    cloud.opener.open.side_effect = [native.te.Response(status, {}), native.te.Response(200, {"ok": True})]
+    assert cloud.state_request("gha", "GET", "repos/org/repo", None, (200,))[2] == {"ok": True}
+    assert cloud.opener.open.call_count == 2 and len(waits) == 1
+
+
+def test_transient_provider_read_fails_after_bounded_retries(monkeypatch):
+    module = importlib.import_module("pipeline_lifecycle_cloud")
+    cloud, _ = bound_cloud()
+    monkeypatch.setenv("GH_TOKEN", "provider-token")
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    cloud.opener.open.side_effect = lambda *args, **kwargs: native.te.Response(503, {})
+    with pytest.raises(ValueError, match="pipeline-provider-request-failed-503"):
+        cloud.state_request("gha", "GET", "repos/org/repo", None, (200,))
+    assert cloud.opener.open.call_count == module.PROVIDER_READ_ATTEMPTS
+
+
+def test_transient_provider_write_is_never_retried(monkeypatch):
+    # A write may have landed before the 5xx; only idempotent reads repeat.
+    module = importlib.import_module("pipeline_lifecycle_cloud")
+    cloud, _ = bound_cloud()
+    monkeypatch.setenv("GH_TOKEN", "provider-token")
+    monkeypatch.setattr(module.time, "sleep", Mock(side_effect=AssertionError("no write retry")))
+    cloud.opener.open.side_effect = [native.te.Response(503, {}), native.te.Response(201, {"ok": True})]
+    with pytest.raises(ValueError, match="pipeline-provider-request-failed-503"):
+        cloud.state_request("gha", "POST", "repos/org/repo/git/blobs", {}, (201,))
+    assert cloud.opener.open.call_count == 1
+
+
 def test_provider_failure_never_prints_secret_response_or_exception(monkeypatch, capsys):
     cloud, _ = bound_cloud()
     monkeypatch.setenv("GH_TOKEN", "seeded-provider-secret")

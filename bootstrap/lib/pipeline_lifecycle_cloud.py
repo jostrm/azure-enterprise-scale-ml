@@ -10,6 +10,7 @@ from http.client import IncompleteRead
 import json
 import os
 import re
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlsplit
 from urllib.request import Request
@@ -18,6 +19,11 @@ import factory_enrollment as en
 import factory_lifecycle as fl
 import github_host
 from pipeline_lifecycle import PipelineError, canonical, require
+
+# One transient provider answer must not fail a run: a failed dispatched continuation cannot be replaced
+# (aif-163 run 2497). Only idempotent reads repeat; a write may already have landed.
+PROVIDER_READ_ATTEMPTS = 4
+PROVIDER_TRANSIENT_STATUSES = (429, 502, 503, 504)
 
 
 class _ProviderTransport:
@@ -62,15 +68,20 @@ class _ProviderTransport:
             "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"})
         data = body if isinstance(body, bytes) else canonical(body) if body is not None else None
         try:
-            try:
-                response = self.opener.open(Request(url, method=method, data=data, headers=outgoing),
-                                            timeout=en.REQUEST_TIMEOUT_SECONDS)
-            except HTTPError as error:
-                response = error
-            with response:
-                status = response.status if hasattr(response, "status") else response.code
-                incoming = {key.lower(): value for key, value in response.headers.items()}
-                raw = response.read(limit + 1)
+            for attempt in range(1, PROVIDER_READ_ATTEMPTS + 1):
+                try:
+                    response = self.opener.open(Request(url, method=method, data=data, headers=outgoing),
+                                                timeout=en.REQUEST_TIMEOUT_SECONDS)
+                except HTTPError as error:
+                    response = error
+                with response:
+                    status = response.status if hasattr(response, "status") else response.code
+                    incoming = {key.lower(): value for key, value in response.headers.items()}
+                    raw = response.read(limit + 1)
+                if (method not in ("GET", "HEAD") or status in allowed or status not in PROVIDER_TRANSIENT_STATUSES
+                        or attempt == PROVIDER_READ_ATTEMPTS):
+                    break
+                time.sleep(attempt)  # failure backoff: 1 s, 2 s, 3 s
             require(status in allowed, "pipeline-provider-request-failed-" + str(status))
             require(len(raw) <= limit, "pipeline-provider-response-too-large")
             return status, incoming, json.loads(raw) if raw else None
