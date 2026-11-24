@@ -1436,7 +1436,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_VPN_CLIENT_CIDR -->`AIF_VPN_CLIENT_CIDR` | O | `"172.31.240.0/24"` | Point-to-site VPN client address pool |
 | <!-- parameter bootstrap:AIF_YES -->`AIF_YES` | O | `"false"` | Aif yes override; see create launcher. |
 | <!-- parameter bootstrap:AZURE_DEVOPS_EXT_PAT -->`AZURE_DEVOPS_EXT_PAT` | C | `""` | Azure DevOps PAT |
-| <!-- parameter bootstrap:GITHUB_REPOSITORY -->`GITHUB_REPOSITORY` | C | `"$current_repo"` | GitHub repository (owner/name) |
+| <!-- parameter bootstrap:GITHUB_REPOSITORY -->`GITHUB_REPOSITORY` | C | `"$current_repo"` | GitHub repository (owner/name, or HOST/owner/name on GitHub Enterprise) |
 | <!-- parameter bootstrap:GITHUB_REPOSITORY_VISIBILITY -->`GITHUB_REPOSITORY_VISIBILITY` | O | `"private"` | Simple-mode repository visibility: private or public; independent of Azure networking. |
 
 ## Configuration helper CLI inputs
