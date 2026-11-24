@@ -295,6 +295,34 @@ def test_secret_reference_exception_cannot_hide_a_credential():
     inputs.public_configuration({"credential_environment": "DEPLOYMENT_CREDENTIAL"})
 
 
+@pytest.mark.parametrize("resource", [
+    "providers/microsoft.keyvault/vaults/kv-cmn-001/secrets/aifactory-proj-loganalytics-workspace-key",
+    "providers/microsoft.operationalinsights/workspaces/la-cmn-001/tables/databrickssecrets",
+    "providers/microsoft.operationalinsights/workspaces/la-cmn-001/tables/databricksgitcredentials"])
+def test_arm_resource_id_key_is_an_identifier_not_a_credential_field(resource):
+    # aif-163f run 2504: ownership_evidence is keyed by resource id; a deployed Key Vault secret or the
+    # Log Analytics table DatabricksSecrets blocked the canonical promotion after a successful COMMON deploy.
+    key = f"/subscriptions/{SUB}/resourcegroups/aif63-esml-common-sdc-dev-001/{resource}"
+    inputs.public_configuration({"ownership_evidence": {key: {"owner": {"factory_id": FACTORY}}}})
+
+
+def test_arm_resource_id_key_still_rejects_credentials_inside_its_value_or_key():
+    key = f"/subscriptions/{SUB}/resourcegroups/rg/providers/microsoft.keyvault/vaults/kv/secrets/name"
+    with pytest.raises(ValueError):
+        inputs.public_configuration({"ownership_evidence": {key: {"client_secret": "x"}}})
+    with pytest.raises(ValueError):
+        inputs.public_configuration({"ownership_evidence": {key + "/ghp_" + "a" * 36: {}}})
+    with pytest.raises(ValueError):
+        inputs.public_configuration({"/subscriptions/not-a-subscription/secrets": {}})
+
+
+def test_input_error_carries_its_code_for_the_cli_catch_all():
+    # pipeline_lifecycle.main reports getattr(error, "code", "pipeline-input-invalid"); run 2504 lost the reason.
+    with pytest.raises(inputs.InputError) as error:
+        inputs.public_configuration({"client_secret": "x"})
+    assert error.value.code == "credential-field-forbidden"
+
+
 def test_arm_keyvault_reference_is_configuration_not_plaintext():
     reference = {"reference": {
         "keyVault": {"id": f"/subscriptions/{SUB}/resourceGroups/platform/providers/Microsoft.KeyVault/vaults/platform-kv"},

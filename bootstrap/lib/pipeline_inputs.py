@@ -44,11 +44,20 @@ REQUEST_FIELDS = {
     "scale_set", "project", "source_ref", "source_commit", "variables", "bundle",
     "provider_binding", "include_project_subnets", "include_keyvault_and_resource_group",
 }
+# Evidence maps are keyed by ARM resource id (aif-163f: .../vaults/kv/secrets/<name>, .../tables/DatabricksSecrets);
+# such a key names a resource, not a credential field. Its value is still checked like any other.
+RESOURCE_ID_KEY = re.compile(r"/subscriptions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+                             r"(?:/[A-Za-z0-9_.()@%-]+)+")
 DEVICES = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(10)), *(f"lpt{i}" for i in range(10))}
 
 
 class InputError(ValueError):
     """A safe diagnostic that never includes input values or credentials."""
+
+    @property
+    def code(self):
+        # CLI catch-alls report getattr(error, "code", ...); without it run 2504 showed pipeline-input-invalid.
+        return self.args[0] if self.args else "pipeline-input-invalid"
 
 
 def require(condition, code):
@@ -103,7 +112,9 @@ def public_configuration(value):
             if isinstance(item, dict) and set(item) == {"reference"}:
                 public_configuration(item)
                 continue
-            if key in SECRET_NAMES:
+            if RESOURCE_ID_KEY.fullmatch(key):
+                require(not CREDENTIAL_VALUE.search(key), "credential-field-forbidden")
+            elif key in SECRET_NAMES:
                 require(isinstance(item, str) and (not item or re.fullmatch(r"[A-Za-z0-9-]{1,127}", item)),
                         "invalid-secret-name-reference")
             elif REFERENCE.search(normalized):
