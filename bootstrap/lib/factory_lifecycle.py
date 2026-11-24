@@ -528,6 +528,14 @@ def resource_digest(body, kind=None):
     return digest(fingerprint_body(body, kind))
 
 
+def newest_schema_api_version(available):
+    """The newest stable api-version a provider schema lists for a type, else its newest preview; None for neither."""
+    stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
+    preview = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)),
+                     reverse=True)
+    return (stable or preview or [None])[0]
+
+
 def resource_etag(body, headers, kind=None):
     """The etag a fingerprint compares: none where every deallocate/start rewrites it (VMs, NICs)."""
     if ("etag",) in VOLATILE_FIELDS.get((kind or str(body.get("type") or "")).lower(), ()):
@@ -931,6 +939,14 @@ def validate_deployment_plan(document):
                     "destructive-or-unknown-arm-change")
             ids.add(resource_id)
     require(projects == set(target["project_ids"]), "selected-project-plan-incomplete")
+    ignored = plan.get("ignored_instances", {})
+    own_groups = plan_step_groups(document)
+    require(isinstance(ignored, dict) and all(
+        isinstance(key, str) and key == key.lower() and NESTED_ID.fullmatch(key) and not RG_ID.fullmatch(key)
+        and arm_scope(key) in own_groups
+        and isinstance(value, dict) and set(value) == {"api_version", "body_hash"}
+        and isinstance(value["api_version"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", value["api_version"])
+        and hash_value(value["body_hash"]) for key, value in ignored.items()), "invalid-ignored-instance-proof")
     if document["operation"] in ("create-factory", "create-scaleset"):
         required = {COMMON_TEMPLATES["11-rgCommon"], COMMON_TEMPLATES["13-rgLevel"]}
         require(plan.get("network_mode") in ("managed", "byo"), "explicit-network-mode-required")
@@ -1928,17 +1944,15 @@ def _collect_resource_closure(reader, scopes, resource_versions):
 
     def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
-        available = provider(namespace).get(relative.lower(), [])
-        stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
-        fallback = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)), reverse=True)
-        if not stable and not fallback and parent_api and classify(kind) != "operation":
+        newest = newest_schema_api_version(provider(namespace).get(relative.lower(), []))
+        if newest is None and parent_api and classify(kind) != "operation":
             return parent_api
-        if not stable and not fallback and "/" in relative and classify(kind) != "operation":
+        if newest is None and "/" in relative and classify(kind) != "operation":
             # A child type the schema leaves out is served at its parent type's versions, as a walked child is above
             # (aif-138 2026-11-02: a private endpoint proxy named a deleted Key Vault connection, from Microsoft.Network).
             return version(namespace + "/" + relative.rsplit("/", 1)[0])
-        require(stable or fallback, "resource-api-version-not-discoverable")
-        return (stable or fallback)[0]
+        require(newest is not None, "resource-api-version-not-discoverable")
+        return newest
 
     def served(read, api, kind=None):
         """(version used, read(version)). A version from the provider schema (kind given) that the region does
@@ -3986,6 +4000,113 @@ def arm_changes(body, unchanged_resources=None):
     return sorted(result, key=lambda row: row["resource_id"])
 
 
+def plan_step_groups(document):
+    """The resource groups the plan's own steps deploy into (all of them locked scopes), lowercased."""
+    locked = {scope.lower() for scope in document["locks"]["scopes"]}
+    groups = set()
+    for step in document["deployment"]["steps"]:
+        groups.update(str(scope).lower() for scope in step.get("resource_groups") or [])
+        if step.get("resource_group"):
+            groups.add(str(step["resource_group"]).lower())
+    return groups & locked
+
+
+def ignored_instance_api_versions(cloud, kind, schemas):
+    """The api-versions to read `kind` at: the provider schema's newest stable one (else its newest preview, else its
+    parent type's), then at most API_VERSION_FALLBACKS older stable ones for a region that does not serve it yet."""
+    namespace, relative = kind.split("/", 1)
+    if namespace not in schemas:
+        body = cloud.provider_schema(namespace)
+        require(isinstance(body, dict) and isinstance(body.get("resourceTypes"), list), "incomplete-provider-schema")
+        schemas[namespace] = {str(row.get("resourceType", "")).lower(): row.get("apiVersions") or []
+                              for row in body["resourceTypes"] if isinstance(row, dict)}
+    available = schemas[namespace].get(relative, [])
+    newest = newest_schema_api_version(available)
+    if newest is None and "/" in relative:
+        return ignored_instance_api_versions(cloud, namespace + "/" + relative.rsplit("/", 1)[0], schemas)
+    require(newest is not None, "resource-api-version-not-discoverable")
+    return [newest] + sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)
+                              and value < newest), reverse=True)[:API_VERSION_FALLBACKS]
+
+
+def read_ignored_instances(cloud, versions):
+    """({resource id: current body, or None when absent}, {resource id: api-version served}) for
+    {resource id: api-versions to try in order}; only ApiVersionNotServed moves on to the next one.
+
+    Listed-only children (Log Analytics tables, see LISTED_ONLY_CHILDREN) come from one list of their parent
+    collection, as the inventory closure reads them; everything else is its own GET. Both go through
+    Cloud.request, which waits out 429/503 throttling (Retry-After) for reads.
+    """
+    bodies, served, lists = {}, {}, {}
+
+    def first_served(read, candidates):
+        for api in candidates:
+            try:
+                return api, read(api)
+            except ApiVersionNotServed as error:
+                failure = error
+        raise Blocked(failure.code, error_diagnostic=failure.error_diagnostic) from None
+
+    for identifier, candidates in sorted(versions.items()):
+        if resource_type_from_id(identifier) in LISTED_ONLY_CHILDREN:
+            parent = identifier.rsplit("/", 1)[0]
+            key = (parent, tuple(candidates))
+            if key not in lists:
+                api, (rows, _) = first_served(lambda value: cloud.collection(parent, value), candidates)
+                lists[key] = api, {row["id"].lower(): row for row in rows}
+            api, body = lists[key][0], lists[key][1].get(identifier)
+        else:
+            api, (status, _, body) = first_served(
+                lambda value: cloud.arm("GET", identifier, value, allowed=(200, 404)), candidates)
+            body = body if status == 200 else None
+        served[identifier] = api
+        bodies[identifier] = (copy.deepcopy(body) if isinstance(body, dict)
+                              and str(body.get("id", "")).lower() == identifier else None)
+    return bodies, served
+
+
+def freeze_ignored_instances(cloud, document, raw_changes, proven):
+    """Prepare: an exact-instance proof for each what-if Ignore row inside the plan's own step resource groups.
+
+    ARM reports the children the platform creates (private DNS SOA/@ and zone-group A records, built-in Log Analytics
+    tables, Key Vault secrets) as Ignore: no step template declares them, and Incremental mode leaves them alone
+    (purple gap #18, aif67 run 2520). Rows already proven otherwise, rows outside the plan's groups and rows that
+    cannot be read get no proof here, so arm_changes still stops them.
+    """
+    groups, schemas, versions = plan_step_groups(document), {}, {}
+    for row in raw_changes if isinstance(raw_changes, list) else []:
+        identifier = str(row.get("resourceId", "")).lower() if isinstance(row, dict) else ""
+        if (row.get("changeType") if isinstance(row, dict) else None) != "Ignore" or identifier in proven:
+            continue
+        if not NESTED_ID.fullmatch(identifier) or RG_ID.fullmatch(identifier) or arm_scope(identifier) not in groups:
+            continue
+        versions[identifier] = ignored_instance_api_versions(cloud, resource_type_from_id(identifier), schemas)
+    bodies, served = read_ignored_instances(cloud, versions)
+    result = {identifier: {"api_version": served[identifier],
+                           "body_hash": resource_digest(bodies[identifier], resource_type_from_id(identifier))}
+              for identifier in sorted(versions) if bodies[identifier] is not None}
+    if result:
+        document["deployment"]["ignored_instances"] = result
+    else:
+        document["deployment"].pop("ignored_instances", None)
+    return result
+
+
+def verify_ignored_instances(cloud, document):
+    """Execute, before the re-preview: every instance proven at Prepare still has its exact body.
+
+    A hard gate on purpose: the body hash is the only evidence that an Ignore row ARM leaves alone is the instance
+    the reviewer saw, so a changed or deleted instance needs a fresh Prepare (ignored-instance-changed-since-prepare).
+    """
+    proofs = document["deployment"].get("ignored_instances", {})
+    # The frozen api-version is pinned: it never falls back.
+    bodies, _ = read_ignored_instances(cloud, {key: [value["api_version"]] for key, value in proofs.items()})
+    for identifier, proof in proofs.items():
+        body = bodies[identifier]
+        require(body is not None and resource_digest(body, resource_type_from_id(identifier)) == proof["body_hash"],
+                "ignored-instance-changed-since-prepare")
+
+
 def deployment_endpoint(document, step):
     scope = ("/subscriptions/" + document["target"]["subscription_id"] if step["scope"] == "subscription"
              else step["resource_group"])
@@ -4165,8 +4286,12 @@ def rest_what_if_response(cloud, document, step, payload, sleep=time.sleep):
 
 def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
                      resource_payloads=None, source_changes=None, phase_receipt=None, tag_updates=None,
-                     response=None):
-    """Reviewed rows from one preview; a per-step transport hands in its merged `response`."""
+                     response=None, freeze_ignored=False):
+    """Reviewed rows from one preview; a per-step transport hands in its merged `response`.
+
+    Prepare passes `freeze_ignored` to prove the preview's Ignore rows (freeze_ignored_instances); later previews use
+    the frozen `ignored_instances` proofs as they are.
+    """
     if response is None:
         response = rest_what_if_response(cloud, document, step, payload, sleep)
     foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
@@ -4182,6 +4307,10 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
     if identity:
         require(hash_value(identity.get("body_hash")), "native-foundry-identity-proof-invalid")
         resources = {**resources, identity["resource_id"]: {"body_hash": identity["body_hash"]}}
+    if freeze_ignored:
+        raw = response.get("properties", response) if isinstance(response, dict) else None
+        freeze_ignored_instances(cloud, document, raw.get("changes") if isinstance(raw, dict) else None, resources)
+    resources = {**document.get("deployment", {}).get("ignored_instances", {}), **resources}
     changes = arm_changes(response, resources)
     raw_changes = response.get("properties", response)["changes"]
     if source_changes is not None:
@@ -6820,7 +6949,8 @@ def _freeze_deployment_contents(cloud, document, source_root):
     if freeze_foundry_identity_stage(cloud, draft, source_root):
         result["configuration_hash"] = digest(document["config"])
         return result
-    result["changes"] = plan_what_if(cloud, draft, source_root, {"id": "factory", "scope": "subscription"})
+    result["changes"] = plan_what_if(cloud, draft, source_root, {"id": "factory", "scope": "subscription"},
+                                     freeze_ignored=True)
     verify_bootstrap_preservation(draft, result["changes"])
     freeze_foundry_lifecycle(cloud, draft, source_root)
     result["configuration_hash"] = digest(document["config"])
@@ -6951,6 +7081,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         locks.assert_held()
         cloud.verify_identity(require_default=True)
         verify_foundry_identity_current(cloud, locks, document)
+        verify_ignored_instances(cloud, document)
         root_step = {"id": "factory", "scope": "subscription"}
         payload = None if per_step_transport(document) else combined_plan_payload(cloud, document, source_root)
         reviewed = sorted(({**row, "resource_id": row["resource_id"].lower()}
