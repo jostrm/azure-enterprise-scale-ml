@@ -45,6 +45,24 @@ Follow the [end-to-end setup guide](../../../documentation/v2/20-29/24-end-2-end
 
 ## Updates and uninstall
 
+Builds containing the in-app updater check the shared
+[`app-updates.json`](../../app-updates.json) feed once at startup and ask before
+installing a newer version. **Check for updates** runs the same check manually.
+The installer and every CAB part are prepared together before the app closes.
+An unavailable source is not reported as "up to date"; startup remains usable
+offline. Settings and configurations stay outside the installer payload.
+
+The default source is this repository's published `environment_setup` directory.
+Set `AIFACTORY_UPDATE_SOURCE` to an absolute local `environment_setup` directory
+or an HTTPS base URL before launching the app to use another approved source.
+The feed keeps ConfigWizard, My Project, TutorialApp and Tkinter separate;
+an app without its own installer is unavailable, never substituted with another app.
+
+After copying a complete release into this directory, the publisher runs
+`python environment_setup\generate_app_updates.py` from the accelerator repository
+root and publishes the generated feed alongside the artifacts. This does not
+rebuild or add updating support to older installed binaries.
+
 Close the app and finish or explicitly resolve any active deployment before updating. Run the newer `.msi`
 (with its parts) to update the same per-user installation. Uninstall through
 **Settings > Apps > Installed apps > Enterprise Scale AI Factory**.
