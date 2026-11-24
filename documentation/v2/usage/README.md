@@ -53,7 +53,7 @@ tools.
 | [Single agent](../../../usecase_code/40-agent-factory/41-single-agent/readme.md) | Choose a prompt agent or a hosted agent. |
 | [Multi-agent](../../../usecase_code/40-agent-factory/42-multi-agent/readme.md) | Run a helpdesk team of agents. |
 | [RAG agent](../../../usecase_code/40-agent-factory/45-rag-agent/readme.md) | Ground an agent in the shared lake or your project storage. |
-| [Enterprise Scale AI Factory Agent](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md) | Run a full chat app with live voice. |
+| [ESAF Agent](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md) | Run a full chat app with live voice, Teams chat, or a Teams meeting live voice participant. |
 | [Foundry examples](../../../usecase_code/readme.md#how-to-setup--run-code-samples) | Run two standalone Foundry agent scripts. |
 
 Want the chat agent that answers questions about your Factory? Ask your platform team to enable Agent Chat,

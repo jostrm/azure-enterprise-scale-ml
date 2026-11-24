@@ -41,13 +41,13 @@
       "id": "aifactory-agent",
       "number": 1,
       "place": "teams",
-      "title": "ESAF agent with a private web chat, ready for Teams",
-      "summary": "A Foundry prompt agent grounded in Azure AI Search, with a private web chat. Publish it to Teams and Microsoft 365 Copilot with enableBotService and botFoundryAgentName.",
+      "title": "ESAF agent with a private standalone web chat, or via Teams chat, or via Teams meeting as live voice participant",
+      "summary": "A Foundry prompt agent grounded in Azure AI Search, with a private web chat. Publish it to Teams (chat or live meeting voice) and Microsoft 365 Copilot with enableBotService and botFoundryAgentName.",
       "path": "usecase_code/40-agent-factory/40-aifactory-agent",
       "readme": "usecase_code/40-agent-factory/40-aifactory-agent/readme.md",
       "factory": "Agent Factory",
       "services": ["Microsoft Foundry", "Azure AI Search", "Container Apps", "Bot Service", "Storage"],
-      "tags": ["rag", "prompt-agent", "web-app", "teams", "evaluation"]
+      "tags": ["rag", "prompt-agent", "web-app", "teams", "voice", "evaluation"]
     },
     {
       "id": "aifactory-agent-live-voice",

@@ -17,10 +17,10 @@ own commands, required inputs and expected results.
 <table>
 <tr>
 <td align="center" valign="top" width="33%">
-<a href="40-aifactory-agent/readme.md"><img src="images/aifactory-agent-thumb.gif" width="260" alt="Animated RAG flow behind the Enterprise Scale AI Factory Agent"></a><br>
-<a href="40-aifactory-agent/readme.md"><b>Enterprise Scale AI Factory Agent</b></a><br>
-<sub>Versioned Foundry prompt agent grounded in Azure AI Search, with a private web frontend.</sub><br>
-<sub><code>Agent</code> <code>RAG</code> <code>Web app</code></sub>
+<a href="40-aifactory-agent/readme.md"><img src="images/aifactory-agent-thumb.gif" width="260" alt="Animated RAG flow behind the ESAF Agent"></a><br>
+<a href="40-aifactory-agent/readme.md"><b>ESAF Agent</b></a><br>
+<sub>Versioned Foundry prompt agent grounded in Azure AI Search, with a private web chat, Teams chat, or as a Teams meeting live voice participant.</sub><br>
+<sub><code>Agent</code> <code>RAG</code> <code>Web app</code> <code>Teams</code></sub>
 </td>
 <td align="center" valign="top" width="33%">
 <a href="41-single-agent/readme.md"><b>Single-agent examples</b></a><br>

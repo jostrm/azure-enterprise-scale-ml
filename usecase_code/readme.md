@@ -20,9 +20,9 @@ There are also **3 archived full stack examples**: including those gives **150 e
 
 ### Live Voice Agent Chat
 
-Meet your AI colleague: the [Enterprise Scale AI Factory Agent](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example) runs as a full-stack application in your **ESAF project in Azure**, combining **Azure Container Apps**, **Microsoft Foundry**, **Azure AI Search**, and optional **Azure Voice Live** with private networking and firewall controls. Use it in a **web browser** to type or talk about your project and explore grounded answers.
+Meet your AI colleague: the [ESAF Agent](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example) runs as a full-stack application in your **ESAF project in Azure**, combining **Azure Container Apps**, **Microsoft Foundry**, **Azure AI Search**, and optional **Azure Voice Live** with private networking and firewall controls. Use it standalone in a **web browser** to type or talk about your project and explore grounded answers.
 
-For **double-encryption** requirements or extending the agent into **Microsoft Teams** through an authenticated **reverse proxy**, including the additional integration needed to join and speak in meetings, see the [template's security and Teams caveats](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example). These are not enabled automatically by deploying the browser template.
+For **double-encryption** requirements, publishing the same agent to **Microsoft Teams chat and Microsoft 365 Copilot** (`enableBotService`, `botFoundryAgentName`), or inviting it into a **Teams meeting as a live voice participant** (the opt-in `teams_meetings.enabled` flag), see the [template's security and Teams caveats](40-agent-factory/40-aifactory-agent/readme.md#use-case-template-example). These are not enabled automatically by deploying the browser template.
 
 <table>
 <tr>
@@ -46,10 +46,10 @@ The first row features three Agent Factory use cases. The second reproduces all 
 <table>
 <tr>
 <td align="center" valign="top" width="33%">
-<a href="40-agent-factory/40-aifactory-agent/readme.md"><img src="40-agent-factory/images/aifactory-agent-thumb.gif" width="260" alt="Animated RAG flow behind the Enterprise Scale AI Factory Agent"></a><br>
-<a href="40-agent-factory/40-aifactory-agent/readme.md"><b>Enterprise Scale AI Factory Agent</b></a><br>
-<sub>Versioned Foundry prompt agent grounded in Azure AI Search, with a private web frontend.</sub><br>
-<sub><code>Agent</code> <code>RAG</code> <code>Web app</code></sub>
+<a href="40-agent-factory/40-aifactory-agent/readme.md"><img src="40-agent-factory/images/aifactory-agent-thumb.gif" width="260" alt="Animated RAG flow behind the ESAF Agent"></a><br>
+<a href="40-agent-factory/40-aifactory-agent/readme.md"><b>ESAF Agent</b></a><br>
+<sub>Versioned Foundry prompt agent grounded in Azure AI Search, with a private web chat, Teams chat, or as a Teams meeting live voice participant.</sub><br>
+<sub><code>Agent</code> <code>RAG</code> <code>Web app</code> <code>Teams</code></sub>
 </td>
 <td align="center" valign="top" width="33%">
 <a href="40-agent-factory/45-rag-agent/readme.md"><img src="40-agent-factory/images/rag-agent-thumb.gif" width="260" alt="Animated RAG flow from documents to a grounded answer"></a><br>
