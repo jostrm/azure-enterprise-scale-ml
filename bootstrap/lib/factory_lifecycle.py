@@ -3222,6 +3222,24 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache, drift
     return owner
 
 
+# Rule T (aif68 run 2526, approved 2026-11-24): Azure creates Log Analytics tables (AzureDiagnostics) in a workspace
+# once diagnostics flow, after the receipt that deployed the workspace, and leaves them untagged. Only this type, and
+# only through its parent workspace's own verified receipt.
+AZURE_CREATED_TABLE_TYPE = "microsoft.operationalinsights/workspaces/tables"
+
+
+def existing_receipt_owner(locks, known, resource_id, resources, cache):
+    """verified_receipt_owner for an untagged existing resource of the Execute ownership walk. A Log Analytics table
+    without evidence of its own is owned through its parent workspace's verified receipt (Rule T)."""
+    key = resource_id.lower()
+    evidence = known.get(key, {})
+    if not evidence and NESTED_ID.fullmatch(key) and resource_type_from_id(key) == AZURE_CREATED_TABLE_TYPE:
+        workspace = key.rsplit("/tables/", 1)[0]
+        require(workspace in resources and known.get(workspace), "child-ownership-evidence-required")
+        return verified_receipt_owner(locks, known[workspace], workspace, resources[workspace]["body_hash"], cache)
+    return verified_receipt_owner(locks, evidence, key, resources[key]["body_hash"], cache)
+
+
 def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=()):
     data = document["deletion"]
     absent = [group["id"] for group in data["resource_groups"] if group.get("already_absent") is True]
@@ -4030,14 +4048,75 @@ def unproven_ignored_refusal(changes, proofs):
     return Blocked(IGNORED_UNPROVEN_CODE, error_diagnostic=detail)
 
 
-def arm_changes(body, unchanged_resources=None):
+# Rule U (aif68 run 2526, approved 2026-11-24): what-if cannot compute the id of a child whose name needs a value the
+# same deployment creates (a role assignment for a new principal) and lists it as Unsupported with an unevaluated id.
+# Such a row passes only when its id sits strictly under a resource this same preview reports as Create inside the
+# plan's own locked groups: it can only reach what the run itself creates. Every other Unsupported row still blocks.
+UNSUPPORTED_EXTENSION_ID = re.compile(r"\[extensionResourceId\('(/subscriptions/[^'\[\]()]+)',\s*"
+                                      r"'([A-Za-z0-9.]+(?:/[A-Za-z0-9]+)+)',[^\[\]]*\)\]", re.I | re.S)
+UNSUPPORTED_DIAGNOSTIC_ROWS = 32
+
+
+def unsupported_row_base(change):
+    """(the literal id an Unsupported row sits strictly under or at, its type), or (None, None) when unparsed: a
+    plain nested id is itself; `[extensionResourceId('<id>', '<type>', <name>)]` lies under `<id>/providers/<type>`.
+    Any other expression (computed names, wrapped functions, non-literal scopes) is never parsed."""
+    identifier = str(change.get("resourceId", "")) if isinstance(change, dict) else ""
+    match = UNSUPPORTED_EXTENSION_ID.fullmatch(identifier)
+    if match and NESTED_ID.fullmatch(match.group(1)):
+        return match.group(1).lower() + "/providers/" + match.group(2).lower(), match.group(2).lower()
+    if NESTED_ID.fullmatch(identifier):
+        return identifier.lower(), resource_type_from_id(identifier)
+    return None, None
+
+
+def created_parents(changes, own_groups):
+    """The nested resources a preview reports as Create inside the plan's own groups (Rule U parents)."""
+    return {str(row["resourceId"]).lower() for row in changes
+            if isinstance(row, dict) and row.get("changeType") == "Create" and isinstance(row.get("resourceId"), str)
+            and NESTED_ID.fullmatch(row["resourceId"]) and arm_scope(row["resourceId"].lower()) in own_groups}
+
+
+def unsupported_child_accepted(change, created):
+    base, _ = unsupported_row_base(change)
+    return (base is not None and not change.get("error") and not change.get("delta")
+            and any(base.startswith(parent + "/") for parent in created))
+
+
+def unaccepted_unsupported_refusal(changes, created):
+    """Names every Unsupported row Rule U does not accept (parent and type only; unsafe values are dropped)."""
+    rows = []
+    for change in changes:
+        if not (isinstance(change, dict) and change.get("changeType") == "Unsupported"
+                and not unsupported_child_accepted(change, created)):
+            continue
+        base, kind = unsupported_row_base(change)
+        under = base.rsplit("/providers/", 1)[0] if base and base.endswith("/providers/" + kind) else base
+        declared = re.search(r"declared at '([A-Za-z0-9_.\[\]]{1,300})'", str(change.get("unsupportedReason", "")))
+        rows.append({"under": under if _safe_resource_identifier(under) else None,
+                     "type": kind if kind and re.fullmatch(r"[a-z0-9.]+(?:/[a-z0-9]+)+", kind) else None,
+                     "reason": "unparsed-resource-id" if base is None else "no-created-parent",
+                     "declared": declared.group(1) if declared else None})
+    detail = {"rows": rows[:UNSUPPORTED_DIAGNOSTIC_ROWS], "count": len(rows)}
+    print(json.dumps({"event": "unsupported-resource-unproven", **detail}, sort_keys=True), file=sys.stderr, flush=True)
+    return Blocked("unresolved-or-destructive-arm-what-if")
+
+
+def arm_changes(body, unchanged_resources=None, own_groups=None):
+    """Reviewed rows of one preview. With the plan's `own_groups`, Rule U accepts Unsupported children of resources
+    the same preview creates there; they have no resolvable id or body, so they are not reviewed rows."""
     require(isinstance(body, dict) and body.get("status") in (None, "Succeeded") and not body.get("error"),
             "arm-what-if-failed-or-incomplete")
     properties = body.get("properties", body)
     require(isinstance(properties, dict) and not properties.get("error")
             and isinstance(properties.get("changes"), list), "complete-arm-what-if-required")
     result, proofs = [], unchanged_resources or {}
+    created = created_parents(properties["changes"], own_groups) if own_groups else set()
     for change in properties["changes"]:
+        if change.get("changeType") == "Unsupported" and own_groups:
+            if not unsupported_child_accepted(change, created):
+                raise unaccepted_unsupported_refusal(properties["changes"], created)
+            continue
         if change.get("changeType") == "Ignore":
             identifier = change.get("resourceId", "").lower()
             proof = proofs.get(identifier)
@@ -4382,7 +4461,9 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
         raw = response.get("properties", response) if isinstance(response, dict) else None
         freeze_ignored_instances(cloud, document, raw.get("changes") if isinstance(raw, dict) else None, resources)
     resources = {**ignored_proofs(document), **resources}
-    changes = arm_changes(response, resources)
+    plan = document.get("deployment", {})
+    changes = arm_changes(response, resources, plan_step_groups(document)
+                          if isinstance(plan.get("steps"), list) and "locks" in document else None)
     raw_changes = response.get("properties", response)["changes"]
     if source_changes is not None:
         # Preservation-normalized Ignore is not evidence of a source declaration.
@@ -7143,7 +7224,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                             key, body_hash=bootstrap_owners[key]["body_hash"] == metadata["body_hash"])
                         previous_owners[key] = bootstrap_owners[key]["owner"]
                     else:
-                        previous_owners[key] = verified_receipt_owner(locks, evidence, key, metadata["body_hash"], previous_receipts)
+                        previous_owners[key] = existing_receipt_owner(locks, document["deployment"].get("known_ownership", {}), key,
+                                                                      closure["resources"], previous_receipts)
                 require(all(previous_owners[key].get(field) == document["target"][field]
                             for field in ("factory_id", "scaleset_id")), "existing-resource-owner-mismatch")
                 require(key not in modified_ids or not previous_owners[key].get("project_id")
