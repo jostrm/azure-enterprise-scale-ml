@@ -56,6 +56,15 @@ reviewed_source: '66f7ea35 + native voice working tree; observed 2026-10-11; no 
 ---
 # Chat and grounding
 
+## Release/v1.25 Teams backport
+
+The Teams backport retains the branch's companion, microphone-input controls
+and authentication lifecycle. It does not include the separate browser-session
+recovery or deployment-button changes. The optional authorized voice question
+hook preserves the voice session's random conversation ID when an emitter is
+supplied and is a no-op otherwise; no new usage telemetry or pipeline is enabled.
+Source publication does not establish deployment or actual Teams chat delivery.
+
 ## Default browser presentation
 
 The application root serves the bundled three-panel companion by default over
