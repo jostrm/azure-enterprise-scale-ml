@@ -23,6 +23,7 @@
       chatSend: "Post approved links", chatDestination: "Destination meeting chat",
       chatWarning: "This message contains source links from your private Agent Chat session. Teams chat persists and may be visible to people not currently in the meeting. Confirm before sending.",
       chatConfirm: "I approve this exact message for everyone with access to this meeting chat.",
+      chatHelp: "Completed answers with approved source links open a preview here automatically. Asking aloud does not post a message: review the preview and use Post approved links.",
       chat_available: "Source links are ready for preview. Nothing has been posted.",
       chat_unavailable: "No shareable source links for an active approved meeting.",
       chat_previewing: "Preparing the exact message…", chat_preview: "Review the destination and message before posting.",
@@ -30,6 +31,10 @@
       chat_unknown: "Delivery is unconfirmed. Check Teams before posting again; this send will not be retried automatically.",
       chat_failed: "Link sharing failed. Audio can continue; check chat policy and access before trying a new answer.",
       chat_expired: "This preview expired. Ask again for fresh source links.",
+      chat_changed: "A new answer replaced the previous link offer. No message was sent from that preview. Ask again for source links.",
+      chat_signin: "Sign in again before sharing links. No message was sent.",
+      chat_denied: "Link sharing was denied by the chat service or meeting policy. No message was sent; ask the operator to check access.",
+      chat_throttled: "The chat service rejected this send because of its rate limit. No message was sent and it will not be retried automatically.",
     },
     sv: {
       title: "Teams-mötesassistent (bemannad)", link: "Godkänd Teams-möteslänk",
@@ -50,6 +55,7 @@
       chatSend: "Publicera godkända länkar", chatDestination: "Mottagande möteschatt",
       chatWarning: "Meddelandet innehåller källänkar från din privata Agent Chat-session. Teams-chatten sparas och kan läsas av personer som inte deltar just nu. Bekräfta innan du skickar.",
       chatConfirm: "Jag godkänner detta exakta meddelande för alla som har åtkomst till möteschatten.",
+      chatHelp: "Färdiga svar med godkända källänkar öppnar en förhandsgranskning här automatiskt. En muntlig begäran skickar inget meddelande: granska förslaget och välj Publicera godkända länkar.",
       chat_available: "Källänkar kan förhandsgranskas. Inget har publicerats.",
       chat_unavailable: "Inga delbara källänkar för ett aktivt godkänt möte.",
       chat_previewing: "Förbereder det exakta meddelandet…", chat_preview: "Granska mottagare och meddelande innan du publicerar.",
@@ -57,6 +63,10 @@
       chat_unknown: "Leveransen är inte bekräftad. Kontrollera Teams innan du publicerar igen; meddelandet skickas inte om automatiskt.",
       chat_failed: "Länkdelningen misslyckades. Ljudet kan fortsätta; kontrollera chattpolicy och åtkomst före ett nytt svar.",
       chat_expired: "Förhandsgranskningen har gått ut. Fråga igen för aktuella källänkar.",
+      chat_changed: "Ett nytt svar ersatte föregående länkförslag. Inget meddelande skickades från den förhandsgranskningen. Fråga igen efter källänkar.",
+      chat_signin: "Logga in igen innan du delar länkar. Inget meddelande skickades.",
+      chat_denied: "Chattjänsten eller mötespolicyn nekade länkdelning. Inget meddelande skickades; be operatören kontrollera åtkomsten.",
+      chat_throttled: "Chattjänsten nekade sändningen på grund av sin hastighetsgräns. Inget meddelande skickades och det skickas inte om automatiskt.",
     },
   };
   let sdkPromise;
@@ -92,11 +102,11 @@
       linkView = {state, ...details};
       emit("onLinks", linkView);
     };
-    function clearLinks(current) {
+    function clearLinks(current, state = "unavailable") {
       current.linkEpoch = (current.linkEpoch || 0) + 1;
       current.linkOffer = null;
       current.linkDraft = null;
-      showLinks("unavailable");
+      showLinks(state);
     }
     function chatReady(current) {
       return alive(current) && current.ready && !current.paused && !current.resetting
@@ -114,7 +124,7 @@
             const response = await env.fetch(`/api/teams-meetings/sessions/${encodeURIComponent(current.admission.session_id)}/links/${operation}`,
               {method: "POST", headers: headers(current.session), cache: "no-store",
                 body: JSON.stringify(body), signal: controller.signal});
-            return {ok: response.ok, status: response.status, body: response.ok ? await response.json() : null};
+            return {ok: response.ok, status: response.status, body: await response.json()};
           })(),
           new Promise((resolve, reject) => {
             timer = env.setTimeout(() => {
@@ -123,6 +133,19 @@
           }),
         ]);
       } finally { env.clearTimeout(timer); }
+    }
+    function chatFailure(response, sending = false) {
+      // Map only server-owned codes. Raw provider details must never become UI text.
+      const code = response.body?.detail?.code;
+      if (response.status === 401) return "signin";
+      if (response.status === 403 || code === "chat_rejected_401" || code === "chat_rejected_403"
+          || code === "chat_authorization_changed") return "denied";
+      if (response.status === 429 || code === "chat_rejected_429") return "throttled";
+      if (code === "offer_expired" || response.status === 410) return "expired";
+      if (["offer_changed", "draft_changed", "voice_generation_changed"].includes(code)) return "changed";
+      if (["chat_token_unavailable", "chat_unavailable"].includes(code)) return "failed";
+      return sending && (response.status >= 500 || code === "delivery_unknown" || code === "sending")
+        ? "unknown" : "failed";
     }
     async function previewLinks() {
       const current = active;
@@ -137,7 +160,7 @@
           offer_id: current.linkOffer.offer_id, thread_id: current.call.info.threadId,
         });
         if (!alive(current) || epoch !== current.linkEpoch) return;
-        if (!response.ok) { showLinks("failed"); return; }
+        if (!response.ok) { showLinks(chatFailure(response)); return; }
         const draft = response.body;
         if (!alive(current) || epoch !== current.linkEpoch) return;
         if (!chatReady(current)) { clearLinks(current); return; }
@@ -175,7 +198,7 @@
           thread_id: draft.thread_id, confirmed: true,
         });
         if (!alive(current) || epoch !== current.linkEpoch) return;
-        if (!response.ok) { showLinks(response.status >= 500 ? "unknown" : "failed"); return; }
+        if (!response.ok) { showLinks(chatFailure(response, true)); return; }
         const result = response.body;
         if (!alive(current) || epoch !== current.linkEpoch) return;
         if (result.status !== "sent" || typeof result.message_id !== "string" || !result.message_id
@@ -432,13 +455,15 @@
           current.playing = false; current.echoUntil = now() + 500;
           show(current.paused ? "paused" : "listening");
         } else if (message.type === "answer") {
-          clearLinks(current);
+          const replaced = ["available", "previewing", "preview"].includes(linkView.state);
+          clearLinks(current, replaced ? "changed" : "unavailable");
           const offer = message.chat_links;
           if (chatReady(current) && typeof offer?.offer_id === "string"
               && offer.offer_id.length > 0 && offer.offer_id.length <= 128
               && Number.isInteger(offer.count) && offer.count >= 1 && offer.count <= 5) {
             current.linkOffer = {offer_id: offer.offer_id};
             showLinks("available");
+            if (options.autoPreviewLinks === true) void previewLinks();
           }
         } else if (message.type === "closed" || (message.type === "error" && message.fatal)) {
           void stop("failed");
@@ -680,7 +705,8 @@
     const textPreview = element("pre"), warning = element("p", labels.chatWarning);
     const confirmLabel = element("label"), confirm = element("input"); confirm.type = "checkbox";
     confirmLabel.append(confirm, doc.createTextNode(labels.chatConfirm));
-    chatSection.append(chatTitle, preview, chatState, destination, textPreview, warning, confirmLabel, send);
+    chatSection.append(chatTitle, element("p", labels.chatHelp), preview, chatState,
+      destination, textPreview, warning, confirmLabel, send);
     card.append(chatSection);
     let previewOpen = false;
     const linkControls = value => {
@@ -692,6 +718,13 @@
       destination.textContent = previewOpen ? `${labels.chatDestination}: ${value.draft.thread_id}` : "";
       textPreview.textContent = previewOpen ? value.draft.content : "";
       chatState.textContent = labels[`chat_${value.state}`] || labels.chat_failed;
+      if (!["unavailable", "available"].includes(value.state)) {
+        // The companion can nest this card in more than one collapsed disclosure.
+        for (let parent = chatSection.parentElement; parent; parent = parent.parentElement) {
+          if (parent.tagName === "DETAILS") parent.open = true;
+        }
+        chatSection.scrollIntoView({block: "nearest"});
+      }
     };
     const anchor = doc.getElementById("voice-card");
     if (anchor) anchor.after(card); else (doc.querySelector("main") || doc.body).append(card);
@@ -709,6 +742,7 @@
       status.textContent = labels[state] || labels.off;
     };
     const client = createMeetingClient({env, getSession: () => host.voiceSession(),
+      autoPreviewLinks: true,
       onState: controls, onLinks: linkControls,
       onMessage: key => { error.textContent = key ? labels[key] || labels.failed : ""; }});
     preview.addEventListener("click", () => { void client.previewLinks(); });

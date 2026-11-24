@@ -904,10 +904,13 @@ price or measured latency is asserted here.
 
 The attended bridge can prepare a **source-link message** from a completed,
 validated meeting answer. It does not post automatically when the model speaks
-or when somebody says "send the link". The operator selects **Preview source
-links**, reviews the exact destination and text, checks the explicit approval
-box, and selects **Post approved links**. This is not arbitrary message sending
-or a transcript/answer export.
+or when somebody says "send the link". In the attended UI, eligible source links
+automatically open the exact preview, including any collapsed companion drawers.
+Preparing a preview does not obtain a chat token or send anything. The operator
+reviews the destination and text, checks the explicit approval box, and selects
+**Post approved links**. The client API retains manual **Preview source links**
+unless automatic preview is explicitly selected. This is not arbitrary message
+sending or a transcript/answer export.
 
 **Implementation is separate from live acceptance.** Delivery on a specific
 ACS resource and meeting requires an actual approved send and confirmation in
@@ -967,6 +970,9 @@ meeting transcripts. Preview and send are bound to the authenticated host and
 client, meeting session, current voice generation, approved thread and current
 policy. Reset, expiry, audience/policy changes and leave invalidate stale work.
 Changing the preview text in the browser cannot change the server's exact draft.
+A later answer also replaces the offer and clears any unsubmitted approval; the
+UI explains when no replacement links are available. No preview survives an
+invalid session merely to keep the posting button enabled.
 
 Sending is single-flight. A repeated request cannot silently send another copy.
 If delivery is uncertain after a timeout, the UI says so and does not retry
@@ -974,6 +980,15 @@ automatically; check Teams before asking for a new post. Already transmitted
 messages cannot be recalled merely because the meeting later ends. Chat failure
 is surfaced separately and does not intentionally terminate the working voice
 connection.
+
+When diagnosing a missing post, distinguish the completed answer's link offer,
+the `/links/preview` request, the explicit operator confirmation, and the
+`/links/send` response. No preview/send request means delivery was never attempted,
+not that Teams rejected the message. The UI distinguishes expired/replaced
+offers, sign-in, denied access, rate limits and uncertain delivery using bounded
+server-owned error codes; it never displays raw service errors. Even a successful
+send response still needs confirmation that the intended meeting chat displays
+the message and that its links are usable.
 
 The endpoints are:
 

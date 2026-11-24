@@ -244,6 +244,13 @@ Completed answer citations supply the bounded URL candidates; model prose and
 transcripts cannot supply a send command. The current meeting, voice generation,
 configured chat thread, disclosure policy and exact URL hosts constrain the
 operation. No automatic send accompanies an answer or a spoken instruction.
+The attended UI automatically prepares eligible previews and reveals enclosing
+companion disclosures without checking approval or sending. The reusable client
+retains manual preview by default. Later answers invalidate prior previews and
+approval; reset/leave/expiry retain their existing authorization boundary.
+Bounded server error codes distinguish stale offers, sign-in, denial, rate limits
+and uncertain delivery without exposing raw provider errors. An absent preview
+or send request is evidence of an incomplete operator flow, not an ACS rejection.
 
 The Python ACS Chat adapter uses a separate chat token for the admitted ACS
 identity, obtained server-side only for a confirmed send. The browser keeps its

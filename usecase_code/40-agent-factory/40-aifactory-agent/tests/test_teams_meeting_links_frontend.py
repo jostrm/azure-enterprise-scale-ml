@@ -7,7 +7,7 @@ const thread = "19:approved-meeting@thread.v2";
 issued.chat_enabled = true; issued.chat_thread_id = thread;
 const fetchBase = env.fetch;
 let previewCount=0, sendCount=0, previewStatus=200, sendStatus=200, previewRelease=null, sendRelease=null;
-let previewBodyRelease=null, sendBodyRelease=null;
+let previewBodyRelease=null, sendBodyRelease=null, chatError="delivery_unknown";
 env.AbortController=AbortController;
 const draft = {draft_id:"draft-one", voice_generation:0, thread_id:thread,
   content:"ESAF Agent Chat sources:\nhttps://learn.microsoft.com/azure/",
@@ -19,7 +19,7 @@ env.fetch=async (url, options) => {
     if(previewRelease)await new Promise(resolve=>{previewRelease=resolve;});
     return {ok:previewStatus===200,status:previewStatus,json:async()=>{
       if(previewBodyRelease)await new Promise(resolve=>{previewBodyRelease=resolve;});
-      return draft;
+      return previewStatus===200?draft:{detail:{code:chatError}};
     }};
   }
   if(url.endsWith("/links/send")){
@@ -28,7 +28,7 @@ env.fetch=async (url, options) => {
     return {ok:sendStatus===200,status:sendStatus,
       json:async()=>{
         if(sendBodyRelease)await new Promise(resolve=>{sendBodyRelease=resolve;});
-        return sendStatus===200?{status:"sent",message_id:"message-one",thread_id:thread}:{detail:{code:"delivery_unknown"}};
+        return sendStatus===200?{status:"sent",message_id:"message-one",thread_id:thread}:{detail:{code:chatError}};
       }};
   }
   return fetchBase(url,options);
@@ -205,5 +205,106 @@ def test_response_body_stall_is_bounded_and_aborted_for_both_operations():
  sendBodyRelease();for(let i=0;i<4;i++)await tick();
  await client.postLinks({confirmed:true});assert.equal(sendCount,1);
  assert.equal(client.linkState.state,"unknown");await client.stop();
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
+
+
+def test_preview_and_send_failures_report_safe_actionable_states():
+    node(CHAT + r"""
+(async()=>{
+ await ready();
+ for(const [status,code,expected] of [
+   [410,"offer_expired","expired"],[409,"offer_changed","changed"],
+   [401,"anything","signin"],[403,"anything","denied"],
+   [502,"private exception with token and meeting URL","failed"]
+ ]){
+   offer();previewStatus=status;chatError=code;await client.previewLinks();
+   assert.equal(client.linkState.state,expected);assert.equal(sendCount,0);
+   assert.ok(!JSON.stringify(client.linkState).includes("private exception"));
+ }
+ previewStatus=200;
+ for(const [code,expected] of [
+   ["chat_rejected_403","denied"],["chat_rejected_429","throttled"],
+   ["chat_token_unavailable","failed"],["delivery_unknown","unknown"],
+   ["private transport details","unknown"]
+ ]){
+   offer();await client.previewLinks();sendStatus=502;chatError=code;
+   await client.postLinks({confirmed:true});assert.equal(client.linkState.state,expected);
+   const count=sendCount;await client.postLinks({confirmed:true});assert.equal(sendCount,count);
+ }
+ assert.equal(client.phase,"listening");await client.stop();
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
+
+
+UI = CHAT + r"""
+class Element {
+ constructor(tag){this.tagName=tag.toUpperCase();this.children=[];this.listeners={};this.hidden=false;this.open=false;}
+ append(...nodes){for(const node of nodes){node.parentElement=this;this.children.push(node);}}
+ after(node){node.parentElement=this.parentElement;this.parentElement.children.push(node);}
+ setAttribute(name,value){this[name]=value;}
+ addEventListener(name,fn){this.listeners[name]=fn;}
+ scrollIntoView(){this.scrolled=true;}
+}
+const body=new Element("body"), outer=new Element("details"), inner=new Element("details");
+const anchor=new Element("section");anchor.id="voice-card";
+body.append(outer);outer.append(inner);inner.append(anchor);
+const elements=()=>{const list=[];const visit=n=>{list.push(n);for(const c of n.children||[])visit(c);};visit(body);return list;};
+env.document={documentElement:{lang:"en"},body,
+ getElementById:id=>elements().find(n=>n.id===id),
+ querySelector:()=>null,createElement:tag=>new Element(tag),
+ createTextNode:text=>({textContent:text})};
+env.AIFactoryAgent={voiceSession:()=>session,subscribe(){}};
+env.ESAFMeetingSDK=sdk;env.addEventListener=()=>{};
+const chatFetch=env.fetch;
+env.fetch=async(url,options)=>url==="/api/teams-meetings/status"?
+ {ok:true,json:async()=>({enabled:true,policies:[{scope_key:session.scopeKey}]})}:chatFetch(url,options);
+const ui=env.AIFactoryTeamsMeeting.initialize(env);
+const byText=text=>elements().find(n=>n.textContent===text);
+async function uiReady(){
+ await ui.start({meetingUrl:issued.meeting_url,consentAcknowledged:true});
+ agents[0].call.info={threadId:thread};sockets[0].open();sockets[0].receive({type:"ready"});
+}
+"""
+
+
+def test_visible_ui_prepares_preview_without_sending_or_auto_confirming():
+    node(UI + r"""
+(async()=>{
+ await uiReady();offer();for(let i=0;i<6;i++)await tick();
+ assert.equal(previewCount,1);assert.equal(sendCount,0);
+ assert.equal(ui.linkState.state,"preview");
+ assert.ok(outer.open&&inner.open,"both collapsed companion drawers must reveal the preview");
+ const section=elements().find(n=>n.className==="teams-link-sharing");
+ assert.ok(section.scrolled);assert.equal(byText(draft.content).tagName,"PRE");
+ const confirm=section.children.find(n=>n.tagName==="LABEL").children[0];
+ const send=byText("Post approved links");
+ assert.equal(confirm.checked,false);assert.equal(send.disabled,true);
+ assert.equal(byText(env.AIFactoryTeamsMeeting.labels.en.chatWarning).hidden,false);
+ confirm.checked=true;confirm.listeners.change();assert.equal(send.disabled,false);
+ sockets[0].receive({type:"answer"});assert.equal(confirm.checked,false);assert.equal(send.disabled,true);
+ assert.equal(ui.linkState.state,"changed");
+ assert.ok(byText(env.AIFactoryTeamsMeeting.labels.en.chat_changed));
+ assert.equal(sendCount,0);await ui.stop();
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", STATIC / "teams-meeting.js")
+
+
+def test_automatic_preview_discards_late_results_on_new_answer_reset_and_leave():
+    node(UI + r"""
+(async()=>{
+ await uiReady();previewRelease=true;offer();for(let i=0;i<4;i++)await tick();
+ assert.equal(previewCount,1);
+ sockets[0].receive({type:"answer"});previewRelease();for(let i=0;i<6;i++)await tick();
+ assert.equal(ui.linkState.state,"changed");assert.equal(sendCount,0);
+ previewRelease=true;offer();for(let i=0;i<4;i++)await tick();
+ await ui.pause();previewRelease();for(let i=0;i<6;i++)await tick();
+ assert.equal(ui.linkState.state,"unavailable");
+ await ui.resume({consentAcknowledged:true});sockets[1].open();sockets[1].receive({type:"ready"});
+ previewRelease=true;
+ sockets[1].receive({type:"answer",chat_links:{offer_id:"new",count:1}});
+ for(let i=0;i<4;i++)await tick();
+ await ui.stop();previewRelease();for(let i=0;i<6;i++)await tick();
+ assert.equal(ui.linkState.state,"unavailable");assert.equal(sendCount,0);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 """, STATIC / "teams-meeting.js")
