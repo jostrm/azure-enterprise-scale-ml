@@ -206,6 +206,23 @@ class AppUpdateFeedTests(unittest.TestCase):
 
 
 class PublishedAppUpdateFeedTests(unittest.TestCase):
+    def test_all_four_windows_apps_have_a_published_installer(self):
+        committed = json.loads((SETUP / "app-updates.json").read_text(encoding="utf-8"))
+        expected = {
+            "esaif-configwizard": "msi",
+            "esaif-configwizard-project": "inno",
+            "esaif-tutorialapp": "msi",
+            "aifactory-config": "zip",
+        }
+        for app_id, installer_type in expected.items():
+            with self.subTest(app_id=app_id):
+                release = committed["apps"][app_id]["platforms"].get("windows-x64")
+                self.assertIsNotNone(release, f"{app_id} has no published Windows installer")
+                self.assertEqual(installer_type, release["installerType"])
+                self.assertTrue(release["files"])
+                for artifact in release["files"]:
+                    self.assertTrue((SETUP / artifact["path"]).is_file(), artifact["path"])
+
     def test_committed_feed_describes_real_complete_releases(self):
         committed = json.loads((SETUP / "app-updates.json").read_text(encoding="utf-8"))
         self.assertEqual(FEED.build_feed(SETUP), committed)

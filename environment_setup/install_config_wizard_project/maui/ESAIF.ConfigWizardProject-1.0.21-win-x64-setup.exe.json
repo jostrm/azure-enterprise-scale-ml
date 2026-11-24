@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "appId": "esaif-configwizard-project",
+  "version": "1.0.21",
+  "sourceRepository": "https://github.com/jostrm/maui-apps",
+  "sourceCommit": "ce0e95a325bb464c76663264e5d3be4e57310c40",
+  "platform": "windows-x64",
+  "installerType": "inno",
+  "innoAppId": "{D77386A2-9B9B-4A66-B493-A8E5B57EBB7B}",
+  "nativeProductName": "ESAF - My Project",
+  "nativeFileDescription": "ESAF-INNO-1:D77386A29B9B4A66B493A8E5B57EBB7B:2",
+  "apiSourceCommit": "e5503d9f2fb41aaffb2cb98250b9d9c1c20bad44",
+  "signed": false,
+  "files": [
+    {
+      "name": "ESAIF.ConfigWizardProject-1.0.21-win-x64-setup.exe",
+      "bytes": 2380802,
+      "sha256": "fe1c4d121603b0d69b349c8ffa5d9d4e32345d295d2ee7bb67ca41f204def6e1"
+    },
+    {
+      "name": "ESAIF.ConfigWizardProject-1.0.21-win-x64-setup-1.bin",
+      "bytes": 93618688,
+      "sha256": "b082ed03125fb01d27d4c1e24f6a3c00880a179fffe5cfb15ea960af6dc769f2"
+    },
+    {
+      "name": "ESAIF.ConfigWizardProject-1.0.21-win-x64-setup-2.bin",
+      "bytes": 14443716,
+      "sha256": "7b706c81c93e42a4f5566d58a13a3628a80a5912820c5608b425815145959730"
+    }
+  ]
+}

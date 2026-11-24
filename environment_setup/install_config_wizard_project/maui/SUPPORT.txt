@@ -1,0 +1,36 @@
+ESAF - My Project: Windows x64 application updates
+
+Requires Windows 11 x64 (build 22000 or newer) and Microsoft Edge WebView2
+Evergreen Runtime. ARM64 and Windows Server are not supported by this package.
+The .NET runtime, Windows App SDK runtime and restricted Python API are included.
+Opening the app does not sign in to Azure or deploy Azure resources.
+
+Download the setup EXE and every numbered BIN file named in
+environment_setup/app-updates.json into one directory. Keep their original
+filenames and run only the setup EXE. SHA256SUMS.txt describes the full set.
+
+The updater-enabled application checks its own release at startup and through
+Check for updates. It never substitutes the full ConfigWizard installer.
+An equal or older published version is reported as current, not reinstalled.
+
+Finish deployments and terminal/SDK work before updating. If the application's
+own API is running, a separate confirmation is required before stopping it.
+Known active work and pending API startup cannot be overridden. Unsaved drafts
+require confirmation. External/shared APIs are not stopped.
+
+The installer retains the existing Inno AppId:
+{D77386A2-9B9B-4A66-B493-A8E5B57EBB7B}
+Its native FileDescription identifies that product and the required BIN count.
+Settings and repositories are separate from the application files.
+The versioned setup.exe.json receipt records its source commit and package identity.
+Third-party component licenses are included in the installed Licenses directory.
+
+These are unsigned preview packages. Follow your organization's application
+approval policy; do not disable Windows security controls.
+
+Default update source:
+https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/
+
+AIFACTORY_UPDATE_SOURCE may select an approved local environment_setup folder
+or HTTPS base URL. Existing installations without the updater need one manual
+upgrade before they can check for future updates from inside the application.

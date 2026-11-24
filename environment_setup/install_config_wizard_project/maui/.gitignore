@@ -1,0 +1,6 @@
+/source/
+/artifacts/
+/staging/
+*.pfx
+*.p12
+*.pdb
