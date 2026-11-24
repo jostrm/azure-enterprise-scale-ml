@@ -262,9 +262,30 @@ def footprint_diagnostic(value):
     return {"resource_changes": {key: rows[key] for key in sorted(rows)}, "tag_updates": sorted(updates)}
 
 
+IGNORED_UNPROVEN_CODE = "ignored-resource-requires-exact-instance-proof"
+IGNORED_DIAGNOSTIC_ROWS = 32
+GROUP_TYPE = "microsoft.resources/resourcegroups"
+
+
+def ignored_rows_diagnostic(value):
+    """The Ignore rows an exact-instance refusal names: {resource id: type} (at most IGNORED_DIAGNOSTIC_ROWS) and how
+    many rows were unproven in all, nothing else."""
+    if type(value) is not dict or set(value) != {"unproven_ignored", "count"}:
+        return None
+    rows, count = value["unproven_ignored"], value["count"]
+    if (type(rows) is not dict or len(rows) > IGNORED_DIAGNOSTIC_ROWS or type(count) is not int or count < len(rows)
+            or any(not _safe_resource_identifier(key) or type(kind) is not str
+                   or not re.fullmatch(r"[a-z0-9.]{1,64}(?:/[a-z0-9_.-]{1,64}){1,8}", kind)
+                   for key, kind in rows.items())):
+        return None
+    return {"unproven_ignored": {key: rows[key] for key in sorted(rows)}, "count": count}
+
+
 def safe_instance_diagnostic(code, value):
     if code == "unsupported-child-inventory-endpoint":
         return child_inventory_diagnostic(value)
+    if code == IGNORED_UNPROVEN_CODE:
+        return ignored_rows_diagnostic(value)
     if code in (FOOTPRINT_CODE, PREVIEW_INCOMPLETE_CODE):
         return footprint_diagnostic(value)
     if (code not in ("bootstrap-resource-instance-changed", "project-resource-instance-changed",
@@ -947,6 +968,12 @@ def validate_deployment_plan(document):
         and isinstance(value, dict) and set(value) == {"api_version", "body_hash"}
         and isinstance(value["api_version"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", value["api_version"])
         and hash_value(value["body_hash"]) for key, value in ignored.items()), "invalid-ignored-instance-proof")
+    groups = plan.get("ignored_groups", {})
+    require(isinstance(groups, dict) and all(
+        isinstance(key, str) and key == key.lower() and RG_ID.fullmatch(key) and key in own_groups
+        and isinstance(value, dict) and set(value) == {"api_version", "body_hash"}
+        and value["api_version"] == RG_API and hash_value(value["body_hash"]) for key, value in groups.items()),
+        "invalid-ignored-instance-proof")
     if document["operation"] in ("create-factory", "create-scaleset"):
         required = {COMMON_TEMPLATES["11-rgCommon"], COMMON_TEMPLATES["13-rgLevel"]}
         require(plan.get("network_mode") in ("managed", "byo"), "explicit-network-mode-required")
@@ -3972,22 +3999,50 @@ def project_run_request(document):
     }
 
 
+def ignored_row_proven(change, proof):
+    """An Ignore row passes only with an exact-instance proof and no change of its own."""
+    return (isinstance(proof, dict) and hash_value(proof.get("body_hash"))
+            and (change.get("after") is None or change.get("before") == change.get("after"))
+            and not change.get("delta") and not change.get("error") and not change.get("unsupportedReason"))
+
+
+def ignored_type(identifier):
+    """The ARM type of an Ignore row's id: a resource group, a nested resource, or None for anything else."""
+    if RG_ID.fullmatch(identifier):
+        return GROUP_TYPE
+    return resource_type_from_id(identifier) if NESTED_ID.fullmatch(identifier) else None
+
+
+def unproven_ignored_refusal(changes, proofs):
+    """The refusal of the first unproven Ignore row, naming all of them: every failed continuation forces a fresh
+    factory (bug #16), so the operator log and the receipt say which rows were unproven (resource ids and types are
+    not secrets; a value outside the safe id shape is counted, never echoed)."""
+    rows = {}
+    for change in changes:
+        identifier = str(change.get("resourceId", "")).lower() if isinstance(change, dict) else ""
+        if (isinstance(change, dict) and change.get("changeType") == "Ignore"
+                and not ignored_row_proven(change, proofs.get(identifier))):
+            rows[identifier] = ignored_type(identifier)
+    named = {key: kind for key, kind in sorted(rows.items())
+             if kind is not None and _safe_resource_identifier(key)}
+    detail = {"unproven_ignored": dict(list(named.items())[:IGNORED_DIAGNOSTIC_ROWS]), "count": len(rows)}
+    print(json.dumps({"event": "ignored-resource-unproven", **detail}, sort_keys=True), file=sys.stderr, flush=True)
+    return Blocked(IGNORED_UNPROVEN_CODE, error_diagnostic=detail)
+
+
 def arm_changes(body, unchanged_resources=None):
     require(isinstance(body, dict) and body.get("status") in (None, "Succeeded") and not body.get("error"),
             "arm-what-if-failed-or-incomplete")
     properties = body.get("properties", body)
     require(isinstance(properties, dict) and not properties.get("error")
             and isinstance(properties.get("changes"), list), "complete-arm-what-if-required")
-    result = []
+    result, proofs = [], unchanged_resources or {}
     for change in properties["changes"]:
         if change.get("changeType") == "Ignore":
             identifier = change.get("resourceId", "").lower()
-            proof = (unchanged_resources or {}).get(identifier)
-            require(isinstance(proof, dict) and hash_value(proof.get("body_hash"))
-                    and (change.get("after") is None or change.get("before") == change.get("after"))
-                    and not change.get("delta")
-                    and not change.get("error") and not change.get("unsupportedReason"),
-                    "ignored-resource-requires-exact-instance-proof")
+            proof = proofs.get(identifier)
+            if not ignored_row_proven(change, proof):
+                raise unproven_ignored_refusal(properties["changes"], proofs)
             result.append({"resource_id": identifier, "change_type": "NoChange",
                            "before_hash": proof["body_hash"], "after_hash": proof["body_hash"]})
             continue
@@ -4070,25 +4125,35 @@ def freeze_ignored_instances(cloud, document, raw_changes, proven):
 
     ARM reports the children the platform creates (private DNS SOA/@ and zone-group A records, built-in Log Analytics
     tables, Key Vault secrets) as Ignore: no step template declares them, and Incremental mode leaves them alone
-    (purple gap #18, aif67 run 2520). Rows already proven otherwise, rows outside the plan's groups and rows that
-    cannot be read get no proof here, so arm_changes still stops them.
+    (purple gap #18, aif67 run 2520). It lists the plan's own locked group itself as Ignore too when subscription-scope
+    steps deploy into it without declaring it (purple gap #19, aif68 run 2526: the common group in the project001
+    continuation); that group is proven by its own body at RG_API under `ignored_groups`, never as an instance.
+    Rows already proven otherwise, rows outside the plan's groups and rows that cannot be read get no proof here, so
+    arm_changes still stops them.
     """
-    groups, schemas, versions = plan_step_groups(document), {}, {}
+    groups, schemas, versions, own = plan_step_groups(document), {}, {}, {}
     for row in raw_changes if isinstance(raw_changes, list) else []:
         identifier = str(row.get("resourceId", "")).lower() if isinstance(row, dict) else ""
         if (row.get("changeType") if isinstance(row, dict) else None) != "Ignore" or identifier in proven:
             continue
-        if not NESTED_ID.fullmatch(identifier) or RG_ID.fullmatch(identifier) or arm_scope(identifier) not in groups:
+        if RG_ID.fullmatch(identifier):
+            if identifier in groups:
+                own[identifier] = [RG_API]
+            continue
+        if not NESTED_ID.fullmatch(identifier) or arm_scope(identifier) not in groups:
             continue
         versions[identifier] = ignored_instance_api_versions(cloud, resource_type_from_id(identifier), schemas)
-    bodies, served = read_ignored_instances(cloud, versions)
-    result = {identifier: {"api_version": served[identifier],
-                           "body_hash": resource_digest(bodies[identifier], resource_type_from_id(identifier))}
-              for identifier in sorted(versions) if bodies[identifier] is not None}
-    if result:
-        document["deployment"]["ignored_instances"] = result
-    else:
-        document["deployment"].pop("ignored_instances", None)
+    bodies, served = read_ignored_instances(cloud, {**versions, **own})
+    result = {}
+    for key, selected in (("ignored_instances", versions), ("ignored_groups", own)):
+        proofs = {identifier: {"api_version": served[identifier],
+                               "body_hash": resource_digest(bodies[identifier], ignored_type(identifier))}
+                  for identifier in sorted(selected) if bodies[identifier] is not None}
+        if proofs:
+            document["deployment"][key] = proofs
+        else:
+            document["deployment"].pop(key, None)
+        result.update(proofs)
     return result
 
 
@@ -4098,13 +4163,19 @@ def verify_ignored_instances(cloud, document):
     A hard gate on purpose: the body hash is the only evidence that an Ignore row ARM leaves alone is the instance
     the reviewer saw, so a changed or deleted instance needs a fresh Prepare (ignored-instance-changed-since-prepare).
     """
-    proofs = document["deployment"].get("ignored_instances", {})
+    proofs = ignored_proofs(document)
     # The frozen api-version is pinned: it never falls back.
     bodies, _ = read_ignored_instances(cloud, {key: [value["api_version"]] for key, value in proofs.items()})
     for identifier, proof in proofs.items():
         body = bodies[identifier]
-        require(body is not None and resource_digest(body, resource_type_from_id(identifier)) == proof["body_hash"],
+        require(body is not None and resource_digest(body, ignored_type(identifier)) == proof["body_hash"],
                 "ignored-instance-changed-since-prepare")
+
+
+def ignored_proofs(document):
+    """Every frozen Ignore-row proof: nested instances and the plan's own groups."""
+    plan = document.get("deployment", {})
+    return {**plan.get("ignored_instances", {}), **plan.get("ignored_groups", {})}
 
 
 def deployment_endpoint(document, step):
@@ -4310,7 +4381,7 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
     if freeze_ignored:
         raw = response.get("properties", response) if isinstance(response, dict) else None
         freeze_ignored_instances(cloud, document, raw.get("changes") if isinstance(raw, dict) else None, resources)
-    resources = {**document.get("deployment", {}).get("ignored_instances", {}), **resources}
+    resources = {**ignored_proofs(document), **resources}
     changes = arm_changes(response, resources)
     raw_changes = response.get("properties", response)["changes"]
     if source_changes is not None:

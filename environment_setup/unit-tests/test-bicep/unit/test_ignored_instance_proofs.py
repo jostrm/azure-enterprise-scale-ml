@@ -8,6 +8,7 @@ Execute re-reads it before the re-preview. Anything outside the plan's groups st
 """
 
 import copy
+import json
 import sys
 from unittest.mock import Mock
 
@@ -279,3 +280,128 @@ def test_changed_listed_only_table_fails_at_execute(offline_worker):
     cloud.children[TABLES[1].lower()]["properties"]["retentionInDays"] = 90
     with pytest.raises(fl.Blocked, match="ignored-instance-changed-since-prepare"):
         fl.verify_ignored_instances(cloud, document)
+
+
+# Purple gap #19 (aif68, ADO run 2526, 2026-11-24): the project001 continuation's per-step what-if lists the plan's own
+# common resource group itself as Ignore (its subscription-scope steps deploy into it, none declares it); its 72
+# nested Ignore rows were all proven, the group was not. The group is proven by its own body hash under a separate
+# `ignored_groups` key, so an RG id among the instance proofs stays invalid.
+GROUP_KIND = "microsoft.resources/resourcegroups"
+
+
+class GroupIgnoreCloud(IgnoreCloud):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.group_reads = []
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "GET" and fl.RG_ID.fullmatch(resource_id):
+            self.group_reads.append((resource_id.lower(), api_version))
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+def group_case():
+    document, templates = scoped_manifest()
+    cloud = GroupIgnoreCloud(document, templates, [], {})
+    body = copy.deepcopy(cloud.bodies[GROUP.lower()])
+    cloud.rows = [ignore_row(GROUP, body), ignore_row(SOA, SOA_BODY)]
+    cloud.children = {SOA.lower(): copy.deepcopy(SOA_BODY)}
+    return document, cloud, body
+
+
+def test_ignore_row_of_the_plans_own_resource_group_is_proven_by_its_body_at_prepare():
+    document, cloud, body = group_case()
+    frozen(cloud, document)
+    proof = {"api_version": fl.RG_API, "body_hash": fl.resource_digest(body, GROUP_KIND)}
+    assert document["deployment"]["ignored_groups"] == {GROUP.lower(): proof}
+    # The nested row keeps its instance proof; the group never joins the instance proofs.
+    assert set(document["deployment"]["ignored_instances"]) == {SOA.lower()}
+    assert cloud.group_reads.count((GROUP.lower(), fl.RG_API)) >= 1
+    assert {"resource_id": GROUP.lower(), "change_type": "NoChange", "before_hash": proof["body_hash"],
+            "after_hash": proof["body_hash"]} in document["deployment"]["changes"]
+    assert fl.validate_manifest(document) == document
+
+
+@pytest.mark.parametrize("outside", [COMMON, "/subscriptions/" + SUB + "/resourceGroups/someone-else"],
+                         ids=["common-dependency", "foreign-group"])
+def test_ignore_row_of_a_group_outside_the_plans_own_groups_still_blocks_and_is_never_read(outside):
+    document, cloud, body = group_case()
+    cloud.rows = [ignore_row(outside, {**body, "id": outside})]
+    with pytest.raises(fl.Blocked, match="ignored-resource-requires-exact-instance-proof"):
+        fl._freeze_deployment_contents(cloud, document, ROOT)
+    assert (outside.lower(), fl.RG_API) not in cloud.group_reads
+
+
+def test_changed_ignored_group_fails_at_execute_and_unchanged_passes():
+    document, cloud, _ = group_case()
+    frozen(cloud, document)
+    cloud.group_reads.clear()
+    fl.verify_ignored_instances(cloud, document)
+    # Re-read at the frozen api-version, before the re-preview.
+    assert cloud.group_reads == [(GROUP.lower(), fl.RG_API)]
+    cloud.bodies[GROUP.lower()]["tags"] = {"changed": "yes"}
+    with pytest.raises(fl.Blocked, match="ignored-instance-changed-since-prepare"):
+        fl.verify_ignored_instances(cloud, document)
+
+
+def test_proven_ignored_group_passes_the_execute_re_preview(offline_worker):
+    document, cloud, _ = group_case()
+    frozen(cloud, document)
+    result = run_worker(document, cloud)
+    assert result["status"] == "succeeded", result.get("error_code")
+    assert len(cloud.arm_writes) == 1
+
+
+@pytest.mark.parametrize("change", [
+    lambda proofs: "not-a-dict",
+    lambda proofs: {SOA.lower(): value for value in proofs.values()},
+    lambda proofs: {COMMON.lower(): value for value in proofs.values()},
+    lambda proofs: {GROUP: value for value in proofs.values()},
+    lambda proofs: {key: {**value, "api_version": "2024-06-01"} for key, value in proofs.items()},
+    lambda proofs: {key: {**value, "body_hash": "f" * 63} for key, value in proofs.items()},
+    lambda proofs: {key: {**value, "owner": "factory-a"} for key, value in proofs.items()},
+], ids=["not-dict", "nested-id", "outside-step-groups", "not-lowercase", "other-api-version", "short-hash",
+        "extra-field"])
+def test_malformed_ignored_groups_fail_plan_validation(change):
+    document, cloud, _ = group_case()
+    frozen(cloud, document)
+    document["deployment"]["ignored_groups"] = change(document["deployment"]["ignored_groups"])
+    with pytest.raises(fl.Blocked, match="invalid-ignored-instance-proof"):
+        fl.validate_manifest(seal(document))
+
+
+def test_unproven_ignore_rows_are_named_with_their_types_in_the_refusal_and_the_log(capsys):
+    # Every failed continuation forces a fresh factory (bug #16): the refusal must say which rows were unproven.
+    foreign = "/subscriptions/" + SUB + "/resourceGroups/someone-else"
+    rows = [ignore_row(OUTSIDE_SOA, SOA_BODY), ignore_row(foreign), ignore_row(SOA, SOA_BODY),
+            {"resourceId": "not-an-arm-id", "changeType": "Ignore"}]
+    with pytest.raises(fl.Blocked, match="ignored-resource-requires-exact-instance-proof") as raised:
+        fl.arm_changes({"properties": {"changes": rows}}, {})
+    expected = {"unproven_ignored": {OUTSIDE_SOA.lower(): "microsoft.network/privatednszones/soa",
+                                     SOA.lower(): "microsoft.network/privatednszones/soa",
+                                     foreign.lower(): GROUP_KIND},
+                "count": 4}
+    assert raised.value.error_diagnostic == expected
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    assert {"event": "ignored-resource-unproven", **expected} in events
+
+
+def test_unproven_ignore_diagnostic_is_bounded_and_drops_unsafe_values():
+    many = [ignore_row(GROUP + "/providers/Microsoft.KeyVault/vaults/kv/secrets/s" + str(index)) for index in range(40)]
+    with pytest.raises(fl.Blocked) as raised:
+        fl.arm_changes({"properties": {"changes": many}}, {})
+    detail = raised.value.error_diagnostic
+    assert detail["count"] == 40 and len(detail["unproven_ignored"]) == 32
+    assert set(detail["unproven_ignored"].values()) == {"microsoft.keyvault/vaults/secrets"}
+    assert fl.safe_instance_diagnostic("ignored-resource-requires-exact-instance-proof",
+                                       {"unproven_ignored": {"https://evil": "x"}, "count": 1}) is None
+    assert fl.safe_instance_diagnostic("other-code", detail) is None
+
+
+def test_a_proven_ignore_row_never_reaches_the_refusal_and_order_of_checks_is_kept():
+    proofs = {SOA.lower(): {"body_hash": fl.resource_digest(SOA_BODY)}}
+    unsupported = {"resourceId": RESOURCE, "changeType": "Unsupported", "unsupportedReason": "unknown"}
+    # A destructive or unresolved row before an unproven Ignore row still answers with its own code.
+    with pytest.raises(fl.Blocked, match="unresolved-or-destructive-arm-what-if"):
+        fl.arm_changes({"properties": {"changes": [unsupported, ignore_row(OUTSIDE_SOA)]}}, proofs)
+    assert fl.arm_changes({"properties": {"changes": [ignore_row(SOA, SOA_BODY)]}}, proofs)[0]["change_type"] == "NoChange"
