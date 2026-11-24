@@ -141,10 +141,20 @@ def _services(app: FastAPI) -> AgentServices:
     return services
 
 
-def _answerer(app: FastAPI, principal: Principal, scope_key: str, audience: str):
+def _record_question(app: FastAPI, principal: Principal, scope_key: str, conversation_id: str) -> None:
+    """One aifactory.chat question per authorized spoken turn, in the voice session's random conversation."""
+    authorize(_services(app).settings, principal, scope_key, "knowledge.read")
+    events = getattr(app.state, "chat_events", None)
+    if events is not None:
+        events.question(conversation_id)
+
+
+def _answerer(app: FastAPI, principal: Principal, scope_key: str, audience: str, *, conversation_id: str | None = None):
     """Bind the verified identity and scope; the answer path is the very same Conversation as POST /api/chat."""
+    conversation_id = conversation_id or uuid.uuid4().hex
 
     def work(text: str) -> dict:
+        _record_question(app, principal, scope_key, conversation_id)
         services = _services(app)
         result = services.conversation(services.knowledge()).answer(text, audience, principal, scope_key)
         authorize(_services(app).settings, principal, scope_key, "knowledge.read")
@@ -180,8 +190,12 @@ async def _native_work(work, *arguments):
         raise VoiceAnswerError("operation_blocked", "The approved operation is blocked or invalid.")
 
 
-def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audience: str):
+def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audience: str, *,
+                     conversation_id: str | None = None):
+    conversation_id = conversation_id or uuid.uuid4().hex
+
     def prepare_work(text):
+        _record_question(app, principal, scope_key, conversation_id)
         services = _services(app)
         prepared = services.conversation(services.knowledge()).prepare(text, audience, principal, scope_key)
         authorize(_services(app).settings, principal, scope_key, "knowledge.read")
@@ -408,16 +422,19 @@ def register_voice(app: FastAPI) -> None:
                              else DelegatedVoiceSession)
                 session = delegated(
                     selected_voice, upstream, channel,
-                    _answerer(websocket.app, principal, hello.scope_key, hello.audience),
+                    _answerer(websocket.app, principal, hello.scope_key, hello.audience,
+                              conversation_id=options["session_id"]),
                     authorize=lambda: authorize(state.settings, principal, hello.scope_key, "knowledge.read"),
                     **options)
             elif selected_voice.mode == "realtime":
-                prepare, execute = _native_handlers(websocket.app, principal, hello.scope_key, hello.audience)
+                prepare, execute = _native_handlers(websocket.app, principal, hello.scope_key, hello.audience,
+                                                    conversation_id=options["session_id"])
                 session = RealtimeVoiceSession(selected_voice, upstream, channel, prepare, execute,
                                                max_tool_rounds=current.max_tool_rounds, **options)
             else:
                 session = VoiceSession(selected_voice, upstream, channel,
-                                       _answerer(websocket.app, principal, hello.scope_key, hello.audience), **options)
+                                       _answerer(websocket.app, principal, hello.scope_key, hello.audience,
+                                                 conversation_id=options["session_id"]), **options)
             entry.session = session
             if meeting_id is not None:
                 from .teams_meeting_routes import bind_meeting_voice_session
