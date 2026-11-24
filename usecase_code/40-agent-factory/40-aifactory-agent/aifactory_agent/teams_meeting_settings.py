@@ -105,7 +105,7 @@ class TeamsMeetingSettings(BaseModel):
     )
     allowed_host_object_ids: list[UUID] = Field(default_factory=list, max_length=100)
     policies: list[MeetingPolicy] = Field(default_factory=list, max_length=100)
-    display_name: str = Field(default="ESAF AI meeting assistant", min_length=1, max_length=100)
+    display_name: str = Field(default="ESAF Agent", min_length=1, max_length=100)
     voice_mode: Literal["inherit", "realtime"] = Field(
         default="inherit", description="Meeting-only profile; realtime reuses the configured native model and governed grounding.",
     )
