@@ -1,4 +1,5 @@
 import json
+import re
 import tarfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,6 +9,14 @@ from test_skill_packaging import package_inputs
 
 
 ROOT = Path(__file__).parents[1]
+
+
+def test_release_page_only_references_existing_bundled_assets():
+    static = ROOT / "aifactory_agent" / "static"
+    html = (static / "index.html").read_text("utf-8")
+    assets = re.findall(r'(?:src|href)="/static/([^"]+)"', html)
+    assert "teams-meeting.js" in assets and "teams-meeting.css" in assets
+    assert all((static / asset).is_file() for asset in assets)
 
 
 def settings(enabled):

@@ -12,7 +12,6 @@ sources:
   - mcp/src/aifactory_mcp/auth.py
   - mcp/src/aifactory_mcp/server.py
   - mcp/src/aifactory_mcp/access.py
-  - bootstrap/lib/factory_lifecycle_contract.txt
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
@@ -91,4 +90,4 @@ This vault contains safe source descriptions and relative evidence references, n
 
 See [[Reviewed-Operations]], [[Identity-and-Personas]], [[MCP-Boundary]], [[Chat-and-Grounding]], [[Retrieval-Provenance]], [[ADR-001-Dual-Graph]] and [[Index]].
 
-Authority: [agent security boundary](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md), [MCP identity boundary](../../../mcp/readme.md), [lifecycle trust and coordination](../../../bootstrap/lib/factory_lifecycle_contract.txt).
+Authority: [agent security boundary](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md), [MCP identity boundary](../../../mcp/readme.md).

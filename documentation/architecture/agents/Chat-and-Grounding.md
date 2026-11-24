@@ -23,8 +23,6 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/teams_meeting_chat.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/teams-meeting.js
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
-  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout-loader.js
-  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/esaif-maui-layout.js
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_costs.py
@@ -44,7 +42,6 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_frontend.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_chat.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_teams_meeting_links_frontend.py
-  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_companion.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
@@ -53,43 +50,24 @@ graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/costs.py::function:CostSkills._billing
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py::class:VoiceSession
-reviewed_source: '66f7ea35 + native voice working tree; observed 2026-10-11; no native live deployment asserted'
+reviewed_source: 'release/v1.24 Teams backport on 6539ea3e; reviewed 2026-11-24; no deployment asserted'
 ---
 # Chat and grounding
 
-## Default browser presentation
+## Release/v1.24 integration boundary
 
-The application root serves the bundled three-panel companion by default over
-HTTPS or loopback HTTP. `layout=companion` is no longer required;
-`layout=legacy` explicitly retains the original interface. Frames and unknown
-host modes do not acquire companion host integration. The embedded MAUI mode
-still requires its HTTPS host marker and WebView message channel.
+The Teams backport keeps this branch's existing browser presentation, sign-in
+and embedded-host lifecycle. It adds only the Teams script and stylesheet to
+the page; it does not install the later companion or microphone-input selector,
+or the separate browser-session recovery change. Existing browser voice keeps
+its original capture path. The meeting adapter uses remote meeting audio and
+does not select the operator's microphone.
 
-The presentation Adapter moves original DOM nodes, retaining authentication,
-voice, scope/view handlers and action confirmations. It renders Gray, neutral
-Purple, and Blue / Yellow themes, a pending-answer sweep, and local-only message
-feedback/copy/display deletion. It does not call inference, capture audio,
-acquire tokens, submit feedback to a service or mutate operation history.
-`test_companion.py` covers bare-root wiring, static asset delivery, origin/host
-guards and the current template's DOM contract. Source parity does not prove a
-deployed Container App revision; live rollout is a separate observation.
-
-## Browser session continuity (source observation, 2026-11-18)
-
-Access tokens remain in memory. After the API validates the browser principal,
-tab-scoped session storage retains only a versioned digest of the principal and
-configured public client/audience. A reload with that marker starts a fresh PKCE
-authorization with `prompt=none`, reusing the Entra browser session when policy
-allows. The returned `/api/context` identity must match before the restored
-session is exposed to the UI or additional API reads begin.
-
-Explicit sign-out removes the marker. Missing/corrupt markers, account changes,
-consent or account-selection requirements, and recovery failures leave the page
-signed out without a redirect loop. No access/refresh token, email or raw object
-ID is persisted. This is not a promise of indefinite login: conditional access
-and Entra session expiry may require interaction. The embedded MAUI token bridge
-retains its existing independent lifecycle. `test_web.py` exercises these paths
-with controlled Entra/API responses; source coverage does not prove deployment.
+The optional authorized voice question hook retains the voice session's random
+conversation ID when an emitter is supplied. It is a no-op without that emitter;
+this backport does not enable new usage telemetry or its deployment pipeline.
+The three imported architecture notes describe source contracts, not a complete
+architecture vault or a deployed release.
 
 ## Observed baseline flow
 

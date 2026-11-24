@@ -2,7 +2,7 @@
 id: packaging-and-release
 status: observed
 sources:
-  - RELEASE_125.md
+  - RELEASE_124.md
   - environment_setup/install_config_wizard/readme.md
   - environment_setup/azurefactory-cli/setup.py
   - esml-v2/esml_build.py
@@ -58,10 +58,12 @@ Release notes explicitly distinguish branch snapshots from GA/publication. The c
 
 ## Intended separation
 
-Graph runtime queries are standard-library-only. Generation remains offline and outside model/cloud deployment and ingestion. [[dual-graph-lifecycle]] records the locally verified paths and interfaces; [[ADR-001-Dual-Graph]] remains proposed as a decision record.
+Graph runtime queries are standard-library-only. Generation remains offline and
+outside model/cloud deployment and ingestion. This release backport includes
+only the three Teams-relevant architecture notes, not the complete main vault.
+The coordinating checkout's dual-graph lifecycle contract governs the separate
+local static refresh; a snapshot does not prove deployment or complete coverage.
 
-[[dual-graph-lifecycle]] distinguishes requested top-level review outputs from the immutable manifest-validated runtime snapshot, records the verified approved-mirror Graphify 0.9.72 development pin, and explains extraction/export limitations.
+See [[Chat-and-Grounding]] and [[Trust-and-Authorization]].
 
-See [[Repository-Boundaries]], [[Factory-API-and-SDK]], [[Chat-and-Grounding]], [[Retrieval-Provenance]], [[Evidence-and-Gaps]] and [[Index]].
-
-Authority: [release caveats](../../../RELEASE_125.md), [SDK packaging](../../../environment_setup/azurefactory-cli/readme.md), [ML package boundary](../../v2/30-39/37-mlops.md), [agent deployment](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md).
+Authority: [release caveats](../../../RELEASE_124.md), [SDK packaging](../../../environment_setup/azurefactory-cli/readme.md), [ML package boundary](../../v2/30-39/37-mlops.md), [agent deployment](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md).
