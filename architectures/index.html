@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../assets/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -2651,8 +2651,8 @@ or to run a workshop. Networking is hybrid or public.</p>
 <tbody>
 <tr>
 <td><strong>1</strong></td>
-<td><a href="../code-templates/#aifactory-agent">ESAF agent with a private web chat, ready for Teams</a></td>
-<td>A Foundry prompt agent grounded in Azure AI Search, with a private web chat. Publish it to Teams and Microsoft 365 Copilot with enableBotService and botFoundryAgentName.</td>
+<td><a href="../code-templates/#aifactory-agent">ESAF agent with a private standalone web chat, or via Teams chat, or via Teams meeting as live voice participant</a></td>
+<td>A Foundry prompt agent grounded in Azure AI Search, with a private web chat. Publish it to Teams (chat or live meeting voice) and Microsoft 365 Copilot with enableBotService and botFoundryAgentName.</td>
 <td>Microsoft 365, through Bot Service to the agent</td>
 <td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/40-agent-factory/40-aifactory-agent"><code>40-agent-factory/40-aifactory-agent</code></a></td>
 </tr>
@@ -2791,6 +2791,11 @@ or to run a workshop. Networking is hybrid or public.</p>
 <td><strong>Microsoft 365</strong>: Teams and Microsoft 365 Copilot</td>
 <td>You publish an agent of the Foundry project. Azure Bot Service passes each message from Teams or Copilot to that agent.</td>
 <td><code>enableBotService</code>, <code>botFoundryAgentName</code>, <code>botFoundryProjectResourceId</code>. Template 1.</td>
+</tr>
+<tr>
+<td><strong>Teams meetings</strong>: live voice participant (attended preview)</td>
+<td>An authorized operator opts the same agent into a real Teams meeting as a visibly named AI participant, over an Azure Communication Services bridge that speaks through the agent's existing voice relay.</td>
+<td><code>teams_meetings.enabled</code>. Template 1.</td>
 </tr>
 <tr>
 <td><strong>Microsoft Power Platform</strong>: Copilot Studio and Power Automate</td>
