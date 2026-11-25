@@ -151,6 +151,8 @@ class Azure:
         self.existing_groups = None
         self.fail_deployment = False
         self.foreign_tenant = ""
+        self.finops = None
+        self.fail_finops = False
 
     def project(self, number, environment, subscription):
         name = f"fixture-esml-project{number}-sdc-{environment}-001-rg"
@@ -192,7 +194,20 @@ class Azure:
             if runner.shared.usage.is_read_command(args):
                 return response(None, "AuthorizationFailed")
             method = args[args.index("--method") + 1]
-            assert args[args.index("--url") + 1].startswith(f"https://management.azure.com{self.cfg.dashboard_id}?")
+            url = args[args.index("--url") + 1]
+            if url.startswith(f"https://management.azure.com{getattr(self.cfg, 'finops_workbook_id', 'not-yet')}?"):
+                assert sub == self.cfg.host_subscription
+                assert url == runner.shared.finops_command(self.cfg, method)[6]
+                if method == "get":
+                    return response(self.finops, "" if self.finops else "ResourceNotFound")
+                assert method == "put"
+                assert any(a.startswith(("If-Match=", "If-None-Match=")) for a in args)
+                if self.fail_finops:
+                    return response({}, "AuthorizationFailed")
+                self.finops = json.loads(Path(args[args.index("--body") + 1][1:]).read_text(encoding="utf-8"))
+                self.finops["etag"] = '"finops-v1"'
+                return response(self.finops)
+            assert url == f"https://management.azure.com{self.cfg.dashboard_id}?api-version={runner.shared.API_VERSION}"
             if method == "get":
                 return response({"etag": '"v1"', "properties": {"metadata": {"aifactoryInventory": self.inventory}}})
             assert method == "put" and 'If-Match="v1"' in args
@@ -539,6 +554,248 @@ def test_plan_reads_existing_telemetry_no_cloud_writes(compiled, workspace, caps
     assert "SECRET" not in capsys.readouterr().out
 
 
+def test_finops_plan_reports_exact_common_workbook_without_writes(compiled, workspace):
+    args, _ = arguments(workspace, environment="stage")
+    azure = fake_azure(payload(), "stage", compiled)
+    summary = runner.run(args, azure)
+    assert summary["aiGatewayFinopsWorkbookId"] == azure.cfg.finops_workbook_id
+    assert f"/subscriptions/{DEV}/resourceGroups/{azure.cfg.dashboard_resource_group}/" in azure.cfg.finops_workbook_id
+    assert "AI Gateway FinOps" in " ".join(summary["writes"])
+    assert azure.finops is None
+    assert not any("put" in c or c[:3] == ("deployment", "group", "create") for c in azure.commands)
+
+
+@pytest.mark.parametrize("value", ["missing.json", "../outside.json", r"C:\outside.json"])
+def test_finops_bad_config_fails_offline_preflight(workspace, value):
+    document = payload()
+    document["dev"]["aiGatewayFinopsConfigFile"] = value
+    args, _ = arguments(workspace, "deploy", document=document)
+    azure = fake_azure(document, "dev", {})
+    with pytest.raises(ValueError):
+        runner.run(args, azure)
+    assert azure.commands == []
+
+
+def test_finops_duplicate_configuration_keys_fail_offline_preflight(workspace):
+    (workspace / "finops.json").write_text(
+        '{"applications":[],"applications":[],"rates":[],"trustedTelemetryResourceIds":[]}',
+        encoding="utf-8",
+    )
+    document = payload()
+    document["dev"]["aiGatewayFinopsConfigFile"] = "finops.json"
+    args, _ = arguments(workspace, "deploy", document=document)
+    azure = fake_azure(document, "dev", {})
+    with pytest.raises(ValueError):
+        runner.run(args, azure)
+    assert azure.commands == []
+
+
+def test_finops_is_shared_across_projects_and_environments():
+    ids = set()
+    for project in ("001", "002"):
+        document = payload()
+        for section in document.values():
+            section["project_number_000"] = project
+        for environment in ("dev", "stage", "prod"):
+            _, cfg, _ = runner.configuration(document, environment, project)
+            ids.add(cfg.finops_workbook_id)
+    assert len(ids) == 1
+
+
+def test_finops_configuration_uses_dev_common_ownership_not_project_or_stage():
+    document = payload()
+    document["dev"]["tagsProject"] = {
+        "aifactory.factory_id": "factory-a", "aifactory.scaleset_id": "dev-scale",
+        "aifactory.project_id": "project001",
+    }
+    document["stage_prod"]["tagsProject"] = {
+        "aifactory.factory_id": "factory-a", "aifactory.scaleset_id": "stage-scale",
+        "aifactory.project_id": "project001",
+    }
+    _, dev, _ = runner.configuration(document, "dev", "001")
+    _, stage, _ = runner.configuration(document, "stage", "001")
+    assert dev.ownership == {"factory_id": "factory-a", "scaleset_id": "dev-scale"}
+    assert stage.ownership == {}
+
+
+def test_finops_workbook_retains_factory_ownership_on_stage_refresh(compiled, workspace):
+    args, _ = arguments(workspace, "deploy", "stage")
+    azure = fake_azure(payload(), "stage", compiled)
+    azure.inventory["ownership"] = {"factory_id": "factory-a", "scaleset_id": "dev-scale"}
+    runner.run(args, azure)
+    assert azure.finops["tags"]["aifactory.factory_id"] == "factory-a"
+    assert azure.finops["tags"]["aifactory.scaleset_id"] == "dev-scale"
+    assert "aifactory.project_id" not in azure.finops["tags"]
+
+
+def test_finops_failure_stops_before_publishing_common_link(compiled, workspace):
+    args, _ = arguments(workspace, "deploy")
+    azure = fake_azure(payload(), "dev", compiled)
+    azure.fail_finops = True
+    with pytest.raises(RuntimeError, match="FinOps"):
+        runner.run(args, azure)
+    assert azure.parameters is not None
+    assert azure.factory is None
+    assert not list(workspace.glob(".dashboard-only-*"))
+
+
+@pytest.mark.parametrize("mutation", ["workbook", "subscription", "method", "extra-argument", "plan"])
+def test_finops_boundary_allows_only_its_exact_workbook(compiled, workspace, mutation):
+    args, _ = arguments(workspace, "deploy")
+    cloud = fake_azure(payload(), "dev", compiled)
+    runner.run(args, cloud)
+    command = list(next(c for c in cloud.commands if "put" in c and cloud.cfg.finops_workbook_id in c[c.index("--url") + 1]))
+    azure = runner.DashboardAzure(cloud.cfg, "plan" if mutation == "plan" else "deploy", lambda *a: pytest.fail("Unauthorized command reached Azure"))
+    if mutation == "workbook":
+        command[command.index("--url") + 1] = command[command.index("--url") + 1].replace(cloud.cfg.finops_workbook_id.split("/")[-1], "another-workbook")
+    elif mutation == "subscription":
+        command[command.index("--subscription") + 1] = STAGE
+    elif mutation == "method":
+        command[command.index("--method") + 1] = "patch"
+    elif mutation == "extra-argument":
+        command.extend(["--url", "https://management.azure.com/other"])
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
+
+
+@pytest.mark.parametrize("mutation", ["workbook", "subscription", "extra-argument"])
+def test_finops_read_boundary_is_exact_in_plan(mutation):
+    _, cfg, _ = runner.configuration(payload(), "dev", "001")
+    accepted = []
+    azure = runner.DashboardAzure(cfg, "plan", lambda *args: accepted.append(args) or response({}))
+    command = list(runner.shared.finops_command(cfg, "get"))
+    azure(*command)
+    if mutation == "workbook":
+        command[6] = command[6].replace(cfg.finops_workbook_id.split("/")[-1], "another-workbook")
+    elif mutation == "subscription":
+        command[2] = STAGE
+    else:
+        command.extend(["--url", "https://management.azure.com/other"])
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
+    assert len(accepted) == 1
+
+
+def test_finops_uses_documented_api_and_fetches_full_saved_content():
+    _, cfg, _ = runner.configuration(payload(), "dev", "001")
+    endpoint = f"https://management.azure.com{cfg.finops_workbook_id}?api-version=2021-08-01"
+    assert runner.shared.finops_command(cfg, "get") == (
+        "rest", "--subscription", DEV, "--method", "get", "--url",
+        endpoint + "&canFetchContent=true", "--only-show-errors",
+    )
+    assert runner.shared.finops_command(cfg, "put") == (
+        "rest", "--subscription", DEV, "--method", "put", "--url",
+        endpoint, "--only-show-errors",
+    )
+
+
+def finops_settings():
+    gateway = f"/subscriptions/{DEV}/resourceGroups/existing/providers/Microsoft.ApiManagement/service/gateway"
+    return {
+        "applications": [{"gatewayResourceId": gateway, "apimSubscriptionId": "consumer-17",
+                          "applicationId": "app-a", "teamId": "team-a"}],
+        "rates": [{"gatewayResourceId": gateway, "backendHost": "existing.openai.azure.com",
+                   "deployment": "reviewed-deployment", "model": "reviewed-model",
+                   "validFrom": "2026-01-01T00:00:00Z", "validTo": "2027-01-01T00:00:00Z",
+                   "currency": "USD", "meter": "openai-text-tokens", "billingMode": "consumption",
+                   "inputPerMillion": 2, "cachedInputPerMillion": 1, "outputPerMillion": 8}],
+        "trustedTelemetryResourceIds": [],
+    }
+
+
+def finops_parameters(workbook):
+    return {p["name"]: p for item in workbook["items"]
+            for p in item.get("content", {}).get("parameters", [])}
+
+
+def test_finops_repeat_preserves_saved_pricing_mapping_and_viewer_defaults(compiled, workspace):
+    args, _ = arguments(workspace, "deploy")
+    azure = fake_azure(payload(), "dev", compiled)
+    runner.run(args, azure)
+    saved = json.loads(azure.finops["properties"]["serializedData"])
+    parameters = finops_parameters(saved)
+    parameters["Configuration"]["value"] = json.dumps(runner.shared.finops_renderer().validate_config(finops_settings()))
+    parameters["Workspaces"]["value"] = [azure.workspace]
+    parameters["GroupBy"]["value"] = "User"
+    parameters["TimeRange"]["value"] = {"durationMs": 86400000}
+    # Upgrade content, but not the operator-owned settings.
+    saved["items"].insert(0, {"type": 1, "content": {"json": "old workbook version"}})
+    azure.finops["properties"]["serializedData"] = json.dumps(saved)
+    before = len(azure.commands)
+    runner.run(args, azure)
+    new = finops_parameters(json.loads(azure.finops["properties"]["serializedData"]))
+    for key in ("Configuration", "Workspaces", "GroupBy", "TimeRange"):
+        if key == "Configuration":
+            assert json.loads(new[key]["value"]) == json.loads(parameters[key]["value"])
+        else:
+            assert new[key]["value"] == parameters[key]["value"]
+    writes = [c for c in azure.commands[before:] if "put" in c and azure.cfg.finops_workbook_id in c[c.index("--url") + 1]]
+    assert len(writes) == 1 and 'If-Match="finops-v1"' in writes[0]
+    assert "old workbook version" not in azure.finops["properties"]["serializedData"]
+    before = len(azure.commands)
+    runner.run(args, azure)
+    assert not any("put" in c and azure.cfg.finops_workbook_id in c[c.index("--url") + 1] for c in azure.commands[before:])
+
+
+def test_finops_explicit_dev_configuration_is_canonical_for_stage(compiled, workspace):
+    settings = finops_settings()
+    (workspace / "finops.json").write_text(json.dumps(settings), encoding="utf-8")
+    document = payload()
+    document["dev"]["aiGatewayFinopsConfigFile"] = "finops.json"
+    document["stage_prod"]["aiGatewayFinopsConfigFile"] = "must-not-use-project-stage-settings.json"
+    args, path = arguments(workspace, "deploy", "stage", document)
+    before = path.read_bytes()
+    azure = fake_azure(document, "stage", compiled)
+    runner.run(args, azure)
+    saved = json.loads(azure.finops["properties"]["serializedData"])
+    assert json.loads(finops_parameters(saved)["Configuration"]["value"]) == runner.shared.finops_renderer().validate_config(settings)
+    saved_parameters = finops_parameters(saved)
+    saved_parameters["Configuration"]["value"] = json.dumps({"applications": [], "rates": [], "trustedTelemetryResourceIds": []})
+    azure.finops["properties"]["serializedData"] = json.dumps(saved)
+    runner.run(args, azure)
+    updated = json.loads(azure.finops["properties"]["serializedData"])
+    assert json.loads(finops_parameters(updated)["Configuration"]["value"]) == runner.shared.finops_renderer().validate_config(settings)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("failure", ["read-denied", "unmanaged", "invalid-config", "no-etag"])
+def test_finops_saved_settings_fail_closed_before_project_writes(compiled, workspace, failure):
+    args, _ = arguments(workspace, "deploy")
+    azure = fake_azure(payload(), "dev", compiled)
+    runner.run(args, azure)
+    if failure == "unmanaged":
+        azure.finops["tags"] = {}
+    elif failure == "invalid-config":
+        notebook = json.loads(azure.finops["properties"]["serializedData"])
+        finops_parameters(notebook)["Configuration"]["value"] = "{invalid-json"
+        azure.finops["properties"]["serializedData"] = json.dumps(notebook)
+    elif failure == "no-etag":
+        azure.finops.pop("etag")
+        azure.finops["properties"]["displayName"] = "older title"
+    before = len(azure.commands)
+
+    def request(*args):
+        if failure == "read-denied" and args == runner.shared.finops_command(azure.cfg, "get"):
+            return response({}, "AuthorizationFailed")
+        return azure(*args)
+
+    with pytest.raises((ValueError, RuntimeError)):
+        runner.run(args, request)
+    assert not any("put" in c or c[:3] == ("deployment", "group", "create") for c in azure.commands[before:])
+
+
+def test_finops_saved_settings_errors_do_not_echo_configuration(compiled, workspace):
+    args, _ = arguments(workspace, "deploy")
+    azure = fake_azure(payload(), "dev", compiled)
+    runner.run(args, azure)
+    notebook = json.loads(azure.finops["properties"]["serializedData"])
+    finops_parameters(notebook)["Configuration"]["value"] = '{"SECRET-KEY":1,"SECRET-KEY":2}'
+    azure.finops["properties"]["serializedData"] = json.dumps(notebook)
+    with pytest.raises((ValueError, RuntimeError)) as error:
+        runner.run(args, azure)
+    assert "SECRET" not in str(error.value)
+
+
 def shared_subscription_payload(project="001"):
     document = payload()
     for section in document.values():
@@ -663,8 +920,12 @@ def test_deploy_only_incremental_dashboard_writes_with_etag_retry(compiled, work
     }]
     runner.run(args, azure)
     writes = [c for c in azure.commands if c[:3] == ("deployment", "group", "create") or "put" in c]
-    assert len(writes) == 3
-    assert all("If-Match=" in " ".join(c) for c in writes[1:])
+    assert len(writes) == 4
+    assert "If-None-Match=*" in writes[1]
+    assert all("If-Match=" in " ".join(c) for c in writes[2:])
+    assert sum(azure.cfg.finops_workbook_id in c[c.index("--url") + 1] for c in writes if "--url" in c) == 1
+    assert "AI Gateway" in json.dumps(azure.factory)
+    assert "estimated" in json.dumps(azure.factory).lower()
     assert azure.parameters["parameters"]["myProjectFactoryId"]["value"] == FACTORY
     assert azure.parameters["parameters"]["myProjectScaleSetId"]["value"] == SCALE
     assert azure.parameters["parameters"]["myProjectCoverage"]["value"] == {}
@@ -822,6 +1083,9 @@ def test_workflows_are_manual_plan_default_safe_oidc_and_shared_runner():
     assert set(gha["jobs"]["configure"]["outputs"]) == {"runs_on"}
     for path in (ADO, GHA):
         source = path.read_text()
+        assert "DEV common dashboard + AI Gateway FinOps workbook read/write" in source
+        assert "dev.aiGatewayFinopsConfigFile" in source
+        assert "No APIM, network, RBAC or diagnostics changes" in source
         assert source.count("deploy-dashboards-only.py") == 2
         assert "--mode $env:DASHBOARD_MODE" in source
         assert "az deployment" not in source and "az group create" not in source

@@ -21,6 +21,12 @@ sources:
   - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/03a-GH-create-or-update-github-variables.sh
   - environment_setup/aifactory/variables.json
   - documentation/v2/20-29/29-factory-AI-Gateways.md
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai_gateway_finops.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai-gateway-finops.kql
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai-gateway-finops.workbook.json
+  - environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py
+  - environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py
+  - environment_setup/aigateway/readme.md
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_apim_gateway_deployment.py
   - environment_setup/unit-tests/test-bicep/unit/test_apim_gateway_workflows.py
@@ -29,6 +35,9 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_bicep_matrix.py
   - environment_setup/unit-tests/test-bicep/unit/test_pipeline_feature_contracts.py
   - environment_setup/unit-tests/test-bicep/unit/test_mcp_ai_gateway_flags.py
+  - environment_setup/unit-tests/test-bicep/test_ai_gateway_finops.py
+  - environment_setup/unit-tests/test-bicep/test_aifactory_dashboard.py
+  - environment_setup/unit-tests/test-bicep/test_dashboard_only.py
 graph_symbols:
   - environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py::class:Deployment
   - environment_setup/aifactory/bicep/scripts/apim-gateway-deployment.py::function:Deployment.execute
@@ -93,3 +102,33 @@ APIM remain operator responsibilities.
 All evidence is offline: unit tests with a fake Azure CLI, compiled Bicep and parsed pipelines. No
 what-if or deployment of the runner has run against Azure (status `observed` describes source).
 User guide: `documentation/v2/20-29/29-factory-AI-Gateways.md`.
+
+## Gateway FinOps reporting (source addition, 2026-11-25)
+
+The reusable report lives under
+`environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops`.
+Its Python builder renders the Azure Monitor workbook from the canonical KQL and
+validated configuration. The generated JSON is also importable without deployment tooling.
+The existing common-dashboard reconciler and dashboard-only pipeline save one workbook
+in the DEV common resource group and publish its launch tile on the common dashboard.
+The workbook uses existing, viewer-authorized Log Analytics workspaces; dashboard refresh
+does not enable diagnostics, provision a gateway, grant roles, or ingest telemetry.
+
+Native APIM LLM logs supply token usage and are correlated with gateway logs for the
+APIM subscription. An APIM subscription is not an Azure subscription, and the APIM
+developer user is not an authenticated application end user. Per-user estimates require
+the documented metadata-only producer and an explicitly trusted telemetry source.
+Missing identity, cache details, rates, or complete usage remain visibly unattributed
+or unpriced. Estimated token charges are not invoice amounts; provisioned capacity and
+other meters require separate billing reconciliation.
+
+Consumer configuration is optional and repository-relative through
+`dev.aiGatewayFinopsConfigFile`. Without an explicit replacement, refreshed workbooks
+preserve validated saved settings. The dashboard-only plan remains read-only and its
+workbook writes are constrained to the deterministic common workbook resource.
+See `environment_setup/aigateway/readme.md` for prerequisites, producer usage,
+configuration, and plan/deploy commands.
+
+This addition describes source and offline evidence only. No live workspace query,
+portal workbook execution, APIM configuration change, or Azure deployment is established
+by this note. Earlier provisioning observations above retain their original scope.

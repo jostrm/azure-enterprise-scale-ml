@@ -3,6 +3,11 @@
 # AZURE_CLIENT_ID, TENANT_ID and vars.AZURE_SUBSCRIPTION_ID. No new identity or roles.
 # Requires PowerShell Core, Python 3.10+, Azure CLI and preinstalled Bicep.
 # Reads persistent nested variables.json unchanged; never exports its contents.
+# Permissions: existing RG/resource read, DEV common dashboard + AI Gateway FinOps workbook read/write,
+# selected project RG deployment/dashboard/workbook write. No role grants or RG creation.
+# Automatically refreshes the common FinOps workbook before publishing its factory tile.
+# Optional dev.aiGatewayFinopsConfigFile is consumer-relative; otherwise saved pricing/mapping defaults survive.
+# No APIM, network, RBAC or diagnostics changes; usage estimates are not billed costs.
 name: infra-project-dashboards
 run-name: Dashboards ${{ inputs.environment }} project${{ inputs.project_number }} (${{ inputs.mode }})
 
@@ -26,7 +31,7 @@ on:
         required: true
         default: aifactory/variables.json
       mode:
-        description: Plan is read-only; deploy explicitly refreshes dashboards and workbook
+        description: Plan is read-only; deploy refreshes dashboards and My Project + AI Gateway FinOps workbooks
         type: choice
         required: true
         default: plan
@@ -102,7 +107,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Verify exact account and refresh dashboards only
+      - name: Verify account and refresh dashboards + My Project / AI Gateway FinOps
         shell: pwsh
         env:
           CONSUMER_ROOT: ${{ github.workspace }}

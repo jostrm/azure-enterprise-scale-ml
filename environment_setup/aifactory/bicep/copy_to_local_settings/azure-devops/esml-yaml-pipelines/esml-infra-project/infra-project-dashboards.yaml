@@ -6,8 +6,11 @@
 # its output selects the actual dashboard job's pool from variables.json.
 # Explicit microsoft-hosted overrides JSON self-hosting for both jobs (windows-2022);
 # no private-network agent or VM start/provisioning is needed for these ARM operations.
-# Permissions: existing RG/resource read, DEV common dashboard read/write, selected
+# Permissions: existing RG/resource read, DEV common dashboard + AI Gateway FinOps workbook read/write, selected
 # project RG deployment/dashboard/workbook write. No role grants or RG creation.
+# Automatically refreshes the common FinOps workbook before publishing its factory tile.
+# Optional dev.aiGatewayFinopsConfigFile is consumer-relative; otherwise saved pricing/mapping defaults survive.
+# No APIM, network, RBAC or diagnostics changes; usage estimates are not billed costs.
 trigger: none
 pr: none
 
@@ -26,7 +29,7 @@ parameters:
     type: string
     default: aifactory/variables.json
   - name: mode
-    displayName: Plan is read-only; deploy explicitly refreshes dashboards and workbook
+    displayName: Plan is read-only; deploy refreshes dashboards and My Project + AI Gateway FinOps workbooks
     type: string
     default: plan
     values: [plan, deploy]
@@ -117,7 +120,7 @@ jobs:
           submodules: recursive
           persistCredentials: false
         - task: AzureCLI@2
-          displayName: Verify exact account and refresh dashboards only
+          displayName: Verify account and refresh dashboards + My Project / AI Gateway FinOps
           inputs:
             azureSubscription: ${{ variables.dashboardServiceConnection }}
             scriptType: pscore

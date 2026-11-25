@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reconcile and deploy the shared AI Factory Azure Portal dashboard."""
+"""Reconcile the shared AI Factory dashboard and AI Gateway FinOps workbook only."""
 from __future__ import annotations
 
 import importlib.util
@@ -14,8 +14,10 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable
+from urllib.parse import quote
+from uuid import NAMESPACE_URL, uuid5
 
 
 _usage_spec = importlib.util.spec_from_file_location(
@@ -36,6 +38,8 @@ ENVIRONMENTS = (
     ("prod", "PROD", "DASHBOARD_PROD_SUBSCRIPTION_ID"),
 )
 API_VERSION = "2020-09-01-preview"
+FINOPS_API_VERSION = "2021-08-01"
+FINOPS_TITLE = "AI Gateway - Usage and Cost by App and User"
 ENVIRONMENT_WIDTH = 16
 USAGE_LABELS = (
     ("activity", "Email-caller Activity Log - 30d"),
@@ -139,6 +143,124 @@ def arm_id(subscription: str, resource_group: str) -> str:
     return f"/subscriptions/{subscription}/resourceGroups/{resource_group}"
 
 
+def finops_renderer():
+    path = (Path(__file__).resolve().parents[1] / "copy_to_local_settings" / "automation"
+            / "coreteam" / "finops" / "ai_gateway_finops.py")
+    spec = importlib.util.spec_from_file_location("aifactory_finops_renderer", path)
+    renderer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = renderer
+    spec.loader.exec_module(renderer)
+    return renderer
+
+
+def load_finops_config(root: Path, value: object) -> dict | None:
+    if value == "":
+        return None
+    if (not isinstance(value, str) or not value or len(value) > 2048
+            or any(ord(c) < 32 for c in value) or "$(" in value):
+        raise ValueError("aiGatewayFinopsConfigFile must be a nonempty repository-relative path.")
+    candidate = Path(value.replace("\\", "/"))
+    if (candidate.is_absolute() or PureWindowsPath(value).drive or PureWindowsPath(value).root
+            or ".." in candidate.parts or ":" in value):
+        raise ValueError("aiGatewayFinopsConfigFile must remain inside the consumer repository.")
+    path = (root / candidate).resolve()
+    if not path.is_relative_to(root.resolve()) or not path.is_file():
+        raise ValueError("aiGatewayFinopsConfigFile must identify an existing checked-out file.")
+    try:
+        return finops_renderer().load_config(path)
+    except (OSError, ValueError):
+        raise ValueError("Cannot read or validate aiGatewayFinopsConfigFile; check the reviewed FinOps configuration schema.") from None
+
+
+def finops_command(config, method: str) -> tuple[str, ...]:
+    url = f"https://management.azure.com{config.finops_workbook_id}?api-version={FINOPS_API_VERSION}"
+    if method == "get":
+        url += "&canFetchContent=true"
+    return ("rest", "--subscription", config.host_subscription, "--method", method,
+            "--url", url, "--only-show-errors")
+
+
+def prepare_finops_workbook(config, inventory: dict, az: Az) -> dict:
+    """Read/validate without writes; never replace unreadable or unmanaged saved settings."""
+    result = az(*finops_command(config, "get"))
+    existing = None
+    saved = None
+    etag = None
+    if result.returncode:
+        if error_code(result) != "ResourceNotFound":
+            raise RuntimeError("Unable to read the AI Gateway FinOps workbook. Verify DEV common workbook read access; no writes attempted.")
+    else:
+        try:
+            existing = json.loads(result.stdout)
+            if (not isinstance(existing, dict) or not isinstance(existing.get("tags"), dict)
+                    or existing["tags"].get("AI-Factory-FinOps") != "true"):
+                raise ValueError("unmanaged workbook")
+            saved = json.loads(existing["properties"]["serializedData"])
+            if not isinstance(saved, dict) or saved.get("version") != "Notebook/1.0":
+                raise ValueError("invalid notebook")
+            etag = existing.get("etag")
+        except (ValueError, KeyError, TypeError):
+            raise RuntimeError("Existing AI Gateway FinOps workbook is unmanaged or unreadable; refusing to overwrite saved settings.") from None
+    try:
+        workbook = finops_renderer().render_workbook(
+            configuration=config.finops_config,
+            existing_serialized_data=existing["properties"]["serializedData"] if existing else None,
+        )
+    except (ValueError, TypeError, OSError):
+        raise RuntimeError(
+            "AI Gateway FinOps workbook settings could not be validated. No writes attempted; "
+            "review saved parameter defaults or supply a valid aiGatewayFinopsConfigFile."
+        ) from None
+    body = {
+        "location": existing.get("location", config.location) if existing else config.location,
+        "kind": "shared",
+        "tags": {
+            **(existing.get("tags", {}) if existing else {}),
+            "AI-Factory": "true", "AI-Factory-FinOps": "true",
+            **ownership_tags(inventory),
+        },
+        "properties": {
+            "displayName": FINOPS_TITLE,
+            "serializedData": json.dumps(workbook, ensure_ascii=False),
+            "version": "Notebook/1.0", "sourceId": "Azure Monitor", "category": "workbook",
+        },
+    }
+    unchanged = existing is not None and saved == workbook and all(
+        existing.get(key) == body[key] for key in ("location", "kind", "tags")
+    ) and all(
+        existing["properties"].get(key) == value
+        for key, value in body["properties"].items() if key != "serializedData"
+    )
+    if existing is not None and not unchanged:
+        if not isinstance(etag, str) or not etag or etag == "*" or any(ord(c) < 32 for c in etag):
+            raise RuntimeError("AI Gateway FinOps workbook has no usable ETag; refusing to overwrite concurrent pricing/mapping edits.")
+        body["etag"] = etag
+    return {"body": body, "etag": etag,
+            "action": "unchanged" if unchanged else "update" if existing is not None else "create"}
+
+
+def deploy_finops_workbook(config, prepared: dict, az: Az, *, directory: Path | None = None) -> None:
+    if prepared["action"] == "unchanged":
+        return
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", encoding="utf-8", delete=False,
+                                     dir=directory or Path.cwd()) as handle:
+        json.dump(prepared["body"], handle, ensure_ascii=False)
+        path = Path(handle.name)
+    try:
+        result = az(
+            *finops_command(config, "put"), "--headers",
+            f"If-Match={prepared['etag']}" if prepared["etag"] is not None else "If-None-Match=*",
+            "Content-Type=application/json", "--body", f"@{path}",
+        )
+    finally:
+        path.unlink(missing_ok=True)
+    if result.returncode:
+        raise RuntimeError(
+            "AI Gateway FinOps workbook write failed; factory dashboard link not published. "
+            "Check workbook permissions or concurrent edits, then rerun."
+        )
+
+
 def configuration_payload() -> dict:
     path_value = env_value("DASHBOARD_CONFIG_FILE")
     if not path_value:
@@ -175,6 +297,7 @@ class Config:
     vnet_resource_group: str
     template_file: Path
     ownership: dict[str, str] = field(default_factory=dict)
+    finops_config: dict | None = None
 
     @classmethod
     def from_env(cls) -> Config:
@@ -263,6 +386,11 @@ class Config:
             # Only a DEV run stamps the owner: the dashboard lives in the DEV common group.
             ownership=(dashboard_ownership(dev_configuration.get("tagsProject"))
                        if current_environment == "dev" else {}),
+            finops_config=load_finops_config(
+                Path(env_value("DASHBOARD_CONSUMER_ROOT",
+                               env_value("BUILD_SOURCESDIRECTORY", env_value("GITHUB_WORKSPACE", str(Path.cwd()))))),
+                dev_configuration.get("aiGatewayFinopsConfigFile", ""),
+            ),
         )
         for name in (
             config.dashboard_resource_group,
@@ -306,6 +434,14 @@ class Config:
         return (
             f"{arm_id(self.host_subscription, self.dashboard_resource_group)}"
             f"/providers/Microsoft.Portal/dashboards/{self.dashboard_name}"
+        )
+
+    @property
+    def finops_workbook_id(self) -> str:
+        name = uuid5(NAMESPACE_URL, self.dashboard_id.lower() + "/ai-gateway-finops")
+        return (
+            f"{arm_id(self.host_subscription, self.dashboard_resource_group)}"
+            f"/providers/Microsoft.Insights/workbooks/{name}"
         )
 
     @property
@@ -937,7 +1073,7 @@ def environment_row(inventory: dict) -> int:
     return 6 + max(0, min(len(inventory["hubResourceGroups"]), 3) - 1) * 4
 
 
-def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
+def dashboard_parts(inventory: dict, tenant_id: str, finops_workbook_id: str = "") -> list[dict]:
     parts = [
         markdown_part(
             0,
@@ -1022,6 +1158,19 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
             for row, shortcuts in enumerate(rows):
                 for shortcut_index, shortcut in enumerate(shortcuts[:3 if row else 5]):
                     parts.append(resource_part(x + shortcut_index, y + 5 + row, 1, 1, shortcut))
+    if finops_workbook_id:
+        bottom = max(p["position"]["y"] + p["position"]["rowSpan"] for p in parts)
+        url = (
+            f"https://portal.azure.com/#@{tenant_id}/blade/AppInsightsExtension/WorkbookViewerBlade/"
+            f"ComponentId/Azure%20Monitor/ConfigurationId/{quote(finops_workbook_id, safe='')}/Type/workbook"
+        )
+        parts.append(markdown_part(
+            0, bottom, 3 * ENVIRONMENT_WIDTH, 3,
+            f"## {FINOPS_TITLE}\n\n[Open AI Gateway FinOps workbook]({url})\n\n"
+            "Requests, tokens and estimated usage costs by app, user, model, deployment and group. "
+            "Estimates are not billed costs. Select an existing authorized workspace in the workbook; "
+            "missing telemetry and unknown pricing are shown explicitly. No gateway or diagnostics changes.",
+        ))
     return parts
 
 
@@ -1081,7 +1230,7 @@ def dashboard_resource(config: Config, inventory: dict, tenant_id: str) -> dict:
             "lenses": [
                 {
                     "order": 0,
-                    "parts": dashboard_parts(inventory, tenant_id),
+                    "parts": dashboard_parts(inventory, tenant_id, config.finops_workbook_id),
                 }
             ],
             "metadata": {
@@ -1127,7 +1276,11 @@ def deploy(
     tenant_id: str,
     etag: str | None,
     az: Az = az_cli,
+    *,
+    finops_ready: bool = False,
 ) -> str:
+    if not finops_ready:
+        deploy_finops_workbook(config, prepare_finops_workbook(config, inventory, az), az)
     portal_url = (
         f"https://portal.azure.com/#@{tenant_id}/dashboard/arm{config.dashboard_id}"
     )
@@ -1137,6 +1290,7 @@ def deploy(
             suffix=".json",
             encoding="utf-8",
             delete=False,
+            dir=Path.cwd(),
         ) as handle:
             json.dump(dashboard_resource(config, inventory, tenant_id), handle, indent=2)
             body_file = Path(handle.name)
@@ -1177,7 +1331,7 @@ def deploy(
             "location": {"value": config.location},
             "dashboardName": {"value": config.dashboard_name},
             "dashboardTitle": {"value": config.dashboard_name},
-            "dashboardParts": {"value": dashboard_parts(inventory, tenant_id)},
+            "dashboardParts": {"value": dashboard_parts(inventory, tenant_id, config.finops_workbook_id)},
             "aifactoryInventory": {"value": inventory},
             "tags": {
                 "value": {
@@ -1193,6 +1347,7 @@ def deploy(
         suffix=".json",
         encoding="utf-8",
         delete=False,
+        dir=Path.cwd(),
     ) as handle:
         json.dump(parameters, handle, indent=2)
         parameter_file = Path(handle.name)
@@ -1229,10 +1384,14 @@ def deploy(
 def main() -> int:
     try:
         config = Config.from_env()
+        finops_ready = False
         for attempt in range(1, 4):
             inventory, tenant_id, etag = reconcile(config)
+            if not finops_ready:
+                deploy_finops_workbook(config, prepare_finops_workbook(config, inventory, az_cli), az_cli)
+                finops_ready = True
             try:
-                dashboard_url = deploy(config, inventory, tenant_id, etag)
+                dashboard_url = deploy(config, inventory, tenant_id, etag, finops_ready=finops_ready)
                 break
             except ConcurrentUpdate:
                 if attempt == 3:

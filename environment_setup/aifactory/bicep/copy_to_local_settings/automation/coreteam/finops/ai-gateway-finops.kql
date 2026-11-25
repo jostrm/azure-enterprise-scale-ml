@@ -1,0 +1,173 @@
+// Optional table resolution is schema-safe; authorization/query failures are not suppressed.
+let Configuration = parse_json(base64_decode_tostring('{Configuration:base64}'));
+let ConfigShapeValid = gettype(Configuration) == 'dictionary'
+    and gettype(Configuration.rates) == 'array' and gettype(Configuration.applications) == 'array'
+    and gettype(Configuration.trustedTelemetryResourceIds) == 'array';
+let GroupBy = base64_decode_tostring('{GroupBy:base64}');
+let TrustedSources = toscalar(print Sources=Configuration.trustedTelemetryResourceIds
+    | mv-expand Sources | summarize Sources=make_set(tolower(tostring(Sources))));
+let Native = materialize(
+    union isfuzzy=true
+        (datatable(TimeGenerated:datetime, _ResourceId:string, CorrelationId:string,
+            RequestId:string, PromptTokens:int, CompletionTokens:int, TotalTokens:int,
+            DeploymentName:string, ModelName:string)[]),
+        ApiManagementGatewayLlmLog
+    | where TimeGenerated {TimeRange}
+    | project NativeTime=TimeGenerated, GatewayResourceId=tolower(_ResourceId), CorrelationId=tolower(CorrelationId),
+        RequestId, PromptTokens, CompletionTokens, TotalTokens, DeploymentName, ModelName
+    | where isnotempty(GatewayResourceId) and isnotempty(CorrelationId)
+    | extend ValidTokens=isnotnull(PromptTokens) and isnotnull(CompletionTokens)
+        and PromptTokens >= 0 and CompletionTokens >= 0 and TotalTokens > 0
+        and tolong(TotalTokens) == tolong(PromptTokens) + tolong(CompletionTokens)
+    // Repeated request/response chunks are observations of a total, not additive usage.
+    | summarize NativeTime=min(NativeTime),
+        NativeUsageVariants=make_set_if(pack_array(PromptTokens, CompletionTokens, TotalTokens,
+            DeploymentName, ModelName), ValidTokens, 2),
+        ProviderRequests=make_set_if(RequestId, isnotempty(RequestId), 2),
+        NativeDeployments=make_set_if(DeploymentName, isnotempty(DeploymentName), 2),
+        NativeModels=make_set_if(ModelName, isnotempty(ModelName), 2)
+        by GatewayResourceId, CorrelationId
+    | extend HasNative=true,
+        NativeConflict=array_length(NativeUsageVariants) > 1 or array_length(ProviderRequests) > 1
+            or array_length(NativeDeployments) > 1 or array_length(NativeModels) > 1,
+        NativeKnown=array_length(NativeUsageVariants) == 1,
+        NativeInput=todouble(NativeUsageVariants[0][0]),
+        NativeOutput=todouble(NativeUsageVariants[0][1]),
+        NativeTotal=todouble(NativeUsageVariants[0][2]),
+        NativeDeployment=tostring(NativeDeployments[0]), NativeModel=tostring(NativeModels[0])
+);
+let Gateway = materialize(
+    union isfuzzy=true
+        (datatable(TimeGenerated:datetime, _ResourceId:string, CorrelationId:string,
+            ApimSubscriptionId:string, BackendUrl:string, ResponseCode:int)[]),
+        ApiManagementGatewayLogs
+    | where TimeGenerated {TimeRange}
+    | project GatewayResourceId=tolower(_ResourceId), CorrelationId=tolower(CorrelationId), ApimSubscriptionId,
+        BackendHost=tolower(tostring(parse_url(BackendUrl).Host)), ResponseCode
+    | where isnotempty(GatewayResourceId) and isnotempty(CorrelationId)
+    | summarize GatewayVariants=make_set(pack_array(ApimSubscriptionId, BackendHost, ResponseCode), 2)
+        by GatewayResourceId, CorrelationId
+    | extend GatewayConflict=array_length(GatewayVariants) != 1,
+        GatewaySubscription=tostring(GatewayVariants[0][0]),
+        GatewayBackend=tostring(GatewayVariants[0][1]), GatewayStatus=toint(GatewayVariants[0][2])
+);
+let Events = materialize(
+    union isfuzzy=true
+        (datatable(TimeGenerated:datetime, Name:string, Message:string, Properties:dynamic,
+            _ResourceId:string, ItemCount:int)[]),
+        AppEvents, AppTraces
+    | where TimeGenerated {TimeRange}
+    | where Name == 'aifactory.ai-gateway.usage' or Message == 'aifactory.ai-gateway.usage'
+    | project E=parse_json(tostring(Properties.finops)), Source=tolower(_ResourceId), ItemCount
+    | where tostring(E.schema) == 'aifactory.ai-gateway.usage/v1'
+    | extend Trusted=set_has_element(TrustedSources, Source)
+);
+let UntrustedEventCount = toscalar(Events | summarize countif(not(Trusted)));
+let Enriched = materialize(
+    Events | where Trusted
+    | extend GatewayResourceId=tolower(tostring(E.gateway_resource_id)), CorrelationId=tolower(tostring(E.correlation_id))
+    | where isnotempty(GatewayResourceId) and isnotempty(CorrelationId)
+    | summarize EventVariants=make_set(tostring(E), 2), Sampled=countif(ItemCount > 1)
+        by GatewayResourceId, CorrelationId
+    | extend E=parse_json(tostring(EventVariants[0])), HasEvent=true,
+        EventConflict=array_length(EventVariants) != 1
+    | extend EventTime=todatetime(E.observed_at), EventInput=todouble(E.input_tokens),
+        EventOutput=todouble(E.output_tokens), EventTotal=todouble(E.total_tokens),
+        EventCache=todouble(E.cached_input_tokens)
+    | extend EventKnown=gettype(E.usage_complete) == 'bool' and tobool(E.usage_complete)
+        and gettype(E.input_tokens) == 'long' and gettype(E.output_tokens) == 'long'
+        and gettype(E.total_tokens) == 'long'
+        and EventInput between (0.0 .. 9007199254740991.0)
+        and EventOutput between (0.0 .. 9007199254740991.0)
+        and EventTotal between (0.0 .. 9007199254740991.0)
+        and EventTotal == EventInput + EventOutput and isnotnull(EventTime),
+        EventCacheValid=isnull(E.cached_input_tokens) or
+            (gettype(E.cached_input_tokens) == 'long' and EventCache >= 0 and EventCache <= EventInput),
+        TextMeter=gettype(E.text_only) == 'bool' and tobool(E.text_only) and tostring(E.api_kind) in ('chat', 'responses')
+);
+let Applications =
+    print A=Configuration.applications | mv-expand A
+    | project GatewayResourceId=tolower(tostring(A.gatewayResourceId)),
+        ApimSubscriptionId=tostring(A.apimSubscriptionId), MappedApplication=tostring(A.applicationId),
+        MappedTeam=tostring(A.teamId)
+    | where isnotempty(GatewayResourceId) and isnotempty(ApimSubscriptionId)
+        and isnotempty(MappedApplication) and isnotempty(MappedTeam)
+    | summarize ApplicationMatches=count(), take_any(MappedApplication, MappedTeam)
+        by GatewayResourceId, ApimSubscriptionId;
+let Rates =
+    print R=Configuration.rates | mv-expand R
+    | project GatewayResourceId=tolower(tostring(R.gatewayResourceId)), BackendHost=tolower(tostring(R.backendHost)),
+        Deployment=tostring(R.deployment), Model=tostring(R.model),
+        RateStart=todatetime(R.validFrom), RateEnd=todatetime(R.validTo), RateCurrency=tostring(R.currency),
+        RateInput=todouble(R.inputPerMillion), RateCache=todouble(R.cachedInputPerMillion),
+        RateOutput=todouble(R.outputPerMillion),
+        SupportedRate=tostring(R.meter) == 'openai-text-tokens' and tostring(R.billingMode) == 'consumption'
+            and gettype(R.inputPerMillion) in ('long', 'real') and gettype(R.cachedInputPerMillion) in ('long', 'real')
+            and gettype(R.outputPerMillion) in ('long', 'real')
+    | extend SupportedRate=SupportedRate and RateCurrency matches regex '^[A-Z]{3}$'
+        and RateInput between (0.0 .. 9007199254740991.0) and RateCache between (0.0 .. 9007199254740991.0)
+        and RateOutput between (0.0 .. 9007199254740991.0) and RateStart < RateEnd;
+let Usage = materialize(
+    Native
+    | join kind=fullouter Enriched on GatewayResourceId, CorrelationId
+    | extend GatewayResourceId=coalesce(GatewayResourceId, GatewayResourceId1),
+        CorrelationId=coalesce(CorrelationId, CorrelationId1), HasNative=coalesce(HasNative, false),
+        HasEvent=coalesce(HasEvent, false), NativeKnown=coalesce(NativeKnown, false),
+        EventKnown=coalesce(EventKnown, false)
+    | join kind=leftouter Gateway on GatewayResourceId, CorrelationId
+    | extend TimeGenerated=coalesce(EventTime, NativeTime),
+        ApimSubscriptionId=coalesce(GatewaySubscription, tostring(E.apim_subscription_id)),
+        BackendHost=coalesce(GatewayBackend, tolower(tostring(E.backend_host))),
+        Deployment=coalesce(NativeDeployment, tostring(E.deployment)), Model=coalesce(NativeModel, tostring(E.model)),
+        UsageConflict=coalesce(NativeConflict, false) or coalesce(EventConflict, false) or coalesce(GatewayConflict, false)
+            or (NativeKnown and EventKnown and
+                (NativeInput != EventInput or NativeOutput != EventOutput or NativeTotal != EventTotal))
+            or (isnotempty(GatewaySubscription) and isnotempty(tostring(E.apim_subscription_id))
+                and GatewaySubscription != tostring(E.apim_subscription_id))
+            or (isnotempty(GatewayBackend) and isnotempty(tostring(E.backend_host))
+                and GatewayBackend != tolower(tostring(E.backend_host)))
+            or (isnotempty(NativeDeployment) and isnotempty(tostring(E.deployment)) and NativeDeployment != tostring(E.deployment))
+            or (isnotempty(NativeModel) and isnotempty(tostring(E.model)) and NativeModel != tostring(E.model))
+    | where TimeGenerated {TimeRange}
+    | extend UsageKnown=not(UsageConflict) and (isnull(GatewayStatus) or GatewayStatus between (200 .. 299))
+        and iff(HasEvent, EventKnown and EventCacheValid, NativeKnown),
+        ValidatedApplication=iff(HasEvent and not(UsageConflict), tostring(E.validated_application_id), ''),
+        User=iff(HasEvent and not(UsageConflict) and tostring(E.user_id) matches regex '^[0-9a-f]{64}$',
+            tostring(E.user_id), 'Unknown')
+    | extend InputTokens=iff(UsageKnown, iff(HasEvent, EventInput, NativeInput), real(null)),
+        OutputTokens=iff(UsageKnown, iff(HasEvent, EventOutput, NativeOutput), real(null)),
+        TotalTokens=iff(UsageKnown, iff(HasEvent, EventTotal, NativeTotal), real(null)),
+        CachedInputTokens=iff(HasEvent and UsageKnown, EventCache, real(null))
+    | join kind=leftouter Applications on GatewayResourceId, ApimSubscriptionId
+    | extend Application=case(ApplicationMatches == 1, MappedApplication,
+            ApplicationMatches > 1, 'Unknown', isnotempty(ValidatedApplication), ValidatedApplication, 'Unknown'),
+        Team=iff(ApplicationMatches == 1, MappedTeam, 'Unknown')
+    // Rate fan-out is reduced to one correlation BEFORE reporting any totals.
+    | join kind=leftouter Rates on GatewayResourceId, BackendHost, Deployment, Model
+    | extend RateApplies=TimeGenerated >= RateStart and TimeGenerated < RateEnd
+    | extend RateRank=iff(RateApplies, 1, 0)
+    | summarize RateMatches=countif(RateApplies), arg_max(RateRank, *) by GatewayResourceId, CorrelationId
+    | extend MissingCacheSplit=isnull(CachedInputTokens) and RateInput != RateCache,
+        PricingStatus=case(UsageConflict, 'Conflicting/retried observations',
+            not(UsageKnown), 'Incomplete or invalid usage',
+            not(HasEvent), 'Native only: completion/text/cache not established',
+            not(TextMeter), 'Unsupported nontext/provider meter',
+            Sampled > 0, 'Sampled enrichment: disable sampling for this event',
+            RateMatches == 0, 'Missing exact effective supported rate',
+            RateMatches > 1, 'Ambiguous overlapping rates',
+            not(SupportedRate), 'Unsupported rate or PTU billing mode',
+            isnull(CachedInputTokens) and RateInput != RateCache, 'Missing cache split',
+            'Estimated (not billed)')
+    | extend EstimatedCost=iff(PricingStatus == 'Estimated (not billed)',
+            iff(isnull(CachedInputTokens), InputTokens * RateInput,
+                (InputTokens - CachedInputTokens) * RateInput + CachedInputTokens * RateCache)
+                / 1000000.0 + OutputTokens * RateOutput / 1000000.0, real(null)),
+        Currency=iff(PricingStatus == 'Estimated (not billed)', RateCurrency, 'Unpriced')
+    | extend Group=case(GroupBy == 'APIM subscription', coalesce(ApimSubscriptionId, 'Unknown'),
+        GroupBy == 'User', User, GroupBy == 'Team', Team,
+        GroupBy == 'Deployment', coalesce(Deployment, 'Unknown'), GroupBy == 'Model', coalesce(Model, 'Unknown'),
+        GroupBy == 'Day', format_datetime(TimeGenerated, 'yyyy-MM-dd'), Application)
+    | project TimeGenerated, GatewayResourceId, CorrelationId, ApimSubscriptionId, BackendHost, Deployment, Model,
+        Application, Team, User, Group, HasNative, HasEvent, UsageKnown, InputTokens, OutputTokens, TotalTokens,
+        CachedInputTokens, EstimatedCost, Currency, PricingStatus
+);

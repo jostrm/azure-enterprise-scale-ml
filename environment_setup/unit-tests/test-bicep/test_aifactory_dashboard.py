@@ -265,6 +265,8 @@ class FakeAz:
         self.rest_body = None
         self.update_error = ""
         self.include_etag = True
+        self.finops = None
+        self.finops_error = ""
 
     def __call__(self, *args: str) -> subprocess.CompletedProcess[str]:
         self.calls.append(args)
@@ -276,6 +278,17 @@ class FakeAz:
         if args[0] == "rest":
             if module.usage.is_read_command(args):
                 return response(error='{"error":{"code":"AuthorizationFailed"}}')
+            if getattr(self.config, "finops_workbook_id", "not-yet") in args[args.index("--url") + 1]:
+                method = args[args.index("--method") + 1]
+                assert args[args.index("--url") + 1] == module.finops_command(self.config, method)[6]
+                assert args[args.index("--subscription") + 1] == self.config.host_subscription
+                if method == "get":
+                    return response(self.finops, "" if self.finops else '{"error":{"code":"ResourceNotFound"}}')
+                if self.finops_error:
+                    return response(error=self.finops_error)
+                self.finops = json.loads(Path(args[args.index("--body") + 1][1:]).read_text(encoding="utf-8"))
+                self.finops["etag"] = '"finops-v1"'
+                return response(self.finops)
             if "--method" in args and args[args.index("--method") + 1] == "put":
                 body_arg = args[args.index("--body") + 1]
                 self.rest_body = json.loads(
@@ -796,6 +809,84 @@ class TestAifactoryDashboard(unittest.TestCase):
         deployment_call = fake.calls[-1]
         self.assertIn(str(TEMPLATE), deployment_call)
         self.assertIn(config.dashboard_resource_group, deployment_call)
+
+    def test_finops_created_before_dashboard_with_nonoverlapping_encoded_link(self) -> None:
+        from urllib.parse import quote
+        config = self.config()
+        fake = FakeAz(config)
+        inventory, tenant, etag = module.reconcile(config, fake)
+        module.deploy(config, inventory, tenant, etag, fake)
+        self.assertIsNotNone(fake.finops)
+        self.assertEqual("shared", fake.finops["kind"])
+        self.assertEqual("Azure Monitor", fake.finops["properties"]["sourceId"])
+        self.assertEqual("workbook", fake.finops["properties"]["category"])
+        self.assertEqual("AI Gateway - Usage and Cost by App and User", fake.finops["properties"]["displayName"])
+        self.assertEqual("Notebook/1.0", json.loads(fake.finops["properties"]["serializedData"])["version"])
+        parts = fake.deployment_parameters["parameters"]["dashboardParts"]["value"]
+        link = next(p for p in parts if "AI Gateway - Usage and Cost" in json.dumps(p))
+        self.assertIn(quote(config.finops_workbook_id, safe=""), json.dumps(link))
+        self.assertIn("billed", json.dumps(link).lower())
+        self.assertTrue(all(p is link or p["position"]["y"] + p["position"]["rowSpan"] <= link["position"]["y"] for p in parts))
+        writes = [c for c in fake.calls if "put" in c or c[:3] == ("deployment", "group", "create")]
+        self.assertIn(config.finops_workbook_id, writes[0][writes[0].index("--url") + 1])
+        self.assertEqual(("deployment", "group", "create"), writes[1][:3])
+
+    def test_finops_link_uses_native_workbook_configuration_id(self) -> None:
+        from urllib.parse import quote
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        parts = module.dashboard_resource(config, inventory, tenant)["properties"]["lenses"][0]["parts"]
+        link = next(p for p in parts if "AI Gateway - Usage and Cost" in json.dumps(p))
+        self.assertIn(f"/ConfigurationId/{quote(config.finops_workbook_id, safe='')}/Type/workbook", json.dumps(link))
+
+    def test_finops_failure_does_not_publish_dashboard(self) -> None:
+        config = self.config()
+        fake = FakeAz(config)
+        fake.finops_error = '{"error":{"code":"AuthorizationFailed"}}'
+        inventory, tenant, etag = module.reconcile(config, fake)
+        with self.assertRaisesRegex(RuntimeError, "FinOps"):
+            module.deploy(config, inventory, tenant, etag, fake)
+        self.assertIsNone(fake.deployment_parameters)
+        self.assertIsNone(fake.rest_body)
+
+    def test_finops_normal_refresh_uses_consumer_relative_dev_config(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as folder:
+            root = Path(folder)
+            settings = {"applications": [], "rates": [], "trustedTelemetryResourceIds": []}
+            (root / "rates.json").write_text(json.dumps(settings), encoding="utf-8")
+            path = root / "variables.json"
+            path.write_text(json.dumps({
+                "dev": {"aiGatewayFinopsConfigFile": "rates.json"},
+                "stage_prod": {"aiGatewayFinopsConfigFile": "wrong-stage-file.json"},
+            }), encoding="utf-8")
+            values = environment() | {
+                "DASHBOARD_CONFIG_FILE": str(path), "DASHBOARD_CONSUMER_ROOT": str(root),
+                "DASHBOARD_CURRENT_ENV": "test", "DASHBOARD_CURRENT_SUBSCRIPTION_ID": TEST_SUB,
+            }
+            with patch.dict(os.environ, values, clear=True):
+                config = module.Config.from_env()
+                self.assertEqual(settings, config.finops_config)
+                (root / "rates.json").unlink()
+                with self.assertRaisesRegex(ValueError, "aiGatewayFinopsConfigFile"):
+                    module.Config.from_env()
+
+    def test_finops_normal_dashboard_retries_do_not_repeat_workbook_write(self) -> None:
+        config = self.config()
+        fake = FakeAz(config, {"schemaVersion": 1, "hubResourceGroups": [], "environments": []})
+        fake.update_error = '{"error":{"code":"PreconditionFailed"}}'
+        original_reconcile, original_deploy = module.reconcile, module.deploy
+        with (
+            patch.dict(os.environ, environment(), clear=True),
+            patch.object(module, "az_cli", fake),
+            patch.object(module, "reconcile", side_effect=lambda cfg: original_reconcile(cfg, fake)),
+            patch.object(module, "deploy", side_effect=lambda cfg, inv, tenant, etag, **kw: original_deploy(cfg, inv, tenant, etag, fake, **kw)),
+            patch("sys.stderr", new_callable=io.StringIO),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            self.assertEqual(1, module.main())
+        puts = [call for call in fake.calls if "put" in call]
+        self.assertEqual(1, sum(config.finops_workbook_id in call[call.index("--url") + 1] for call in puts))
+        self.assertEqual(3, sum(config.dashboard_id in call[call.index("--url") + 1] for call in puts))
 
     def owned_config(self, folder: str, values: dict[str, str] | None = None):
         # The pink Factory API's reviewed project configuration stamps the aifactory.* ownership tags in tagsProject.

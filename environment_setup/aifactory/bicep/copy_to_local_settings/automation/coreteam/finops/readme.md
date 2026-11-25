@@ -2,6 +2,23 @@
 
 **Governance, visibility and control for AI / token-based cloud consumption.**
 
+## AI gateway usage and cost by application and user
+
+`ai-gateway-finops.workbook.json` is the Azure Monitor workbook for native APIM
+token usage and optional trusted application/end-user attribution. Its shared
+builder is `ai_gateway_finops.py`, with canonical queries in
+`ai-gateway-finops.kql` and an empty, safe configuration in
+`ai-gateway-finops.config.json`. Missing rates or usage details are unpriced,
+not zero; calculated amounts are estimates, not Azure invoice charges.
+
+The existing dashboard deployment paths publish the workbook and a launch tile
+on the AI Factory common dashboard. See the
+[AI gateway setup and run instructions](../../../../../../aigateway/readme.md)
+for telemetry prerequisites, persistent rate/application configuration, optional
+per-user instrumentation, standalone import, and dashboard-only plan/deploy.
+This report is separate from the offline evidence bridge below; neither workflow
+silently enables log collection or changes gateway policies.
+
 ## Offline evidence bridge and optional native workbook
 
 From the copied `automation` directory, the following only prints a local sample:

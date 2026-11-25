@@ -3,8 +3,9 @@
 
 Requires Azure CLI (with Bicep) and Python 3.10+. The selected account must
 match variables.json. Grant resource discovery/read at the relevant existing
-RGs, dashboard write at the DEV common RG, and deployment/dashboard/workbook
-write at the selected project RG. This command never grants permissions.
+RGs, dashboard and AI Gateway FinOps workbook read/write at the DEV common RG,
+and deployment/dashboard/workbook write at the selected project RG.
+This command never grants permissions or changes gateways, networking or diagnostics.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path, PureWindowsPath
 from uuid import uuid4
 
@@ -158,6 +160,8 @@ def configuration(payload: dict, environment: str, project: str = "") -> tuple[d
         vnet_subscription="",
         vnet_resource_group="",
         template_file=SCRIPTS.parent / "modules" / "aifactory-dash-01.bicep",
+        ownership=(shared.dashboard_ownership(payload["dev"].get("tagsProject"))
+                   if environment == "dev" else {}),
     )
     for name in (config.current_project_resource_group, *(config.common_resource_group(e) for e in subscriptions)):
         if not shared.RG_NAME.fullmatch(name) or name.endswith("."):
@@ -240,6 +244,10 @@ def load_configuration(args):
         raise ValueError("Use the persistent registered variables.json, not an ephemeral reviewed configuration.")
     payload = read_json(path)
     values, cfg, tenant = configuration(payload, args.environment, args.project)
+    # Factory-wide settings always come from DEV, never the selected project's stage overlay.
+    cfg = replace(cfg, finops_config=shared.load_finops_config(
+        consumer, payload["dev"].get("aiGatewayFinopsConfigFile", ""),
+    ))
     factory_id, scale_set_id = registered_ids(
         consumer, cfg, tenant, values, args.factory_id, args.scale_set_id
     )
@@ -325,6 +333,14 @@ class DashboardAzure:
         compile_only = args == compile_command()
         usage_read = shared.usage.is_read_command(args)
         factory_read = args == factory_command(self, "get")
+        finops_read = args == shared.finops_command(self.config, "get")
+        finops_write = (
+            len(args) == 13 and args[:8] == shared.finops_command(self.config, "put")
+            and args[8] == "--headers"
+            and args[9].startswith(("If-Match=", "If-None-Match="))
+            and args[10:12] == ("Content-Type=application/json", "--body")
+            and args[12].startswith("@")
+        )
         factory_write = (
             args[:1] == ("rest",) and "--method" in args
             and args[args.index("--method") + 1] == "put"
@@ -333,8 +349,8 @@ class DashboardAzure:
             and any(a.startswith(("If-Match=", "If-None-Match=")) for a in args)
         )
         deployment = self.deployment_command is not None and args == self.deployment_command
-        if not (read or compile_only or factory_read or usage_read
-                or (self.mode == "deploy" and (factory_write or deployment))):
+        if not (read or compile_only or factory_read or finops_read or usage_read
+                or (self.mode == "deploy" and (factory_write or finops_write or deployment))):
             raise RuntimeError("Non-dashboard Azure command prohibited.")
         if not compile_only:
             if "--subscription" in args:
@@ -691,6 +707,7 @@ def run(args, az=None) -> dict:
     inventory, dashboard_tenant, etag = reconcile(azure)
     if dashboard_tenant.lower() != tenant.lower():
         raise RuntimeError("Factory dashboard tenant mismatch.")
+    finops = shared.prepare_finops_workbook(cfg, inventory, azure)
     summary = {
         "mode": args.mode,
         "environment": cfg.current_environment,
@@ -699,6 +716,9 @@ def run(args, az=None) -> dict:
         "subscription": cfg.current_subscription,
         "projectResourceGroup": cfg.current_project_resource_group,
         "factoryDashboardId": cfg.dashboard_id,
+        "aiGatewayFinopsWorkbookId": cfg.finops_workbook_id,
+        "aiGatewayFinopsWorkbookChange": finops["action"],
+        "aiGatewayFinopsSettings": "configuration-file" if cfg.finops_config is not None else "preserve-saved-defaults",
         "applicationInsightsId": insight,
         "workspaceId": workspace,
         "existingResourceGroupsVerified": True,
@@ -709,7 +729,7 @@ def run(args, az=None) -> dict:
             environment["name"]: environment["commonResourceGroup"].get("deploymentStatus", "unverified")
             for environment in inventory["environments"]
         },
-        "writes": ["Microsoft.Portal/dashboards (factory + project)", "Microsoft.Insights/workbooks (My Project)",
+        "writes": ["Microsoft.Portal/dashboards (factory + project)", "Microsoft.Insights/workbooks (My Project + DEV common AI Gateway FinOps)",
                    "Microsoft.Resources/deployments (Incremental deployment records)"],
         "coverage": "all false",
         "usageSnapshots": [
@@ -719,7 +739,7 @@ def run(args, az=None) -> dict:
     }
     if args.mode == "plan":
         print(json.dumps(summary, indent=2))
-        print("PLAN ONLY: no Azure writes. Deploy refreshes both dashboards and the workbook; no infrastructure or roles.")
+        print("PLAN ONLY: no Azure writes. Deploy refreshes both dashboards, My Project and the common AI Gateway FinOps workbook; no infrastructure or roles.")
         return summary
     # Artifacts live only in an invocation-owned directory inside the checkout;
     # neither configuration nor Azure CLI output is uploaded or printed.
@@ -738,6 +758,13 @@ def run(args, az=None) -> dict:
         result = azure(*azure.deployment_command)
         if result.returncode:
             raise RuntimeError("Project dashboard/workbook deployment failed. No factory update attempted; review scoped deployment permissions and deployment history.")
+        try:
+            shared.deploy_finops_workbook(cfg, finops, azure, directory=work)
+        except RuntimeError as error:
+            raise RuntimeError(
+                "AI Gateway FinOps workbook update failed; project dashboard/workbook already refreshed. "
+                "No factory dashboard link was published. Rerun after resolving workbook access or concurrent edits."
+            ) from error
         for attempt in range(3):
             # Refresh after the project deployment so the snapshot/ETag is current.
             inventory, dashboard_tenant, etag = reconcile(azure)
@@ -757,7 +784,7 @@ def run(args, az=None) -> dict:
     finally:
         shutil.rmtree(work)
     print(json.dumps(summary, indent=2))
-    print("Refreshed factory dashboard, project dashboard and My Project workbook only.")
+    print("Refreshed factory dashboard, project dashboard, My Project and common AI Gateway FinOps workbooks only.")
     return summary
 
 
