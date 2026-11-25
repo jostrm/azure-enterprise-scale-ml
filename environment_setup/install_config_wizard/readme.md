@@ -34,7 +34,7 @@ Access to the private API source repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.105, complete executable and `_internal` folder |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.107, complete executable and `_internal` folder |
 | Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.36, self-contained executable |
 | macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.36, self-contained executable |
 
@@ -176,6 +176,15 @@ Factory from the `release/v1.25` head; use v0.47.104 or later.
 From v0.47.105, the wizard's own API host no longer fails when its port is taken (for example 8765 held by
 another wizard or API host): a **Choose other port** dialog takes another port, `0` for any free port, or Cancel.
 The packaged Factory API is the same as in v0.47.104.
+
+From v0.47.106, the packaged API has the iac switch: `azurefactory esaf init-factory --iac terraform` deploys the
+scale set's common part with Terraform through GitHub Actions (`infra-common-terraform.yml`, accelerator
+`release/v1.26` or later); Bicep stays the default. It also has the API-2-Pipelines project route for Azure DevOps
+and GitHub Enterprise repositories (`github_repository` = `[HOST/]OWNER/REPO`).
+
+From v0.47.107, `aifactory-config.exe --api-host --port 8765` starts the Factory API without a window and without
+redirected output; v0.47.106 and older showed an "Unable to configure formatter 'default'" error instead. See
+[Quickstart 01, Option C](../../documentation/v2/quickstarts/01-install-esaf.md#start-the-factory-api).
 
 Every parameter, jobs, errors and the CLI equivalents (`azurefactory esaf ...`) are in the
 [ESAF usage guide](../azurefactory-cli/docs/esaf/readme.md).

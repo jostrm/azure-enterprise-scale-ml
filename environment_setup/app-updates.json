@@ -109,14 +109,14 @@
       "displayName": "AIFactory Config Wizard",
       "platforms": {
         "windows-x64": {
-          "version": "0.47.105",
+          "version": "0.47.107",
           "installerType": "zip",
           "entryPoint": "aifactory-config/aifactory-config.exe",
           "files": [
             {
               "path": "install_config_wizard/windows/aifactory-config-windows.zip",
-              "bytes": 45148841,
-              "sha256": "5bfdbe9217dc20293b9c4e47bbe2b86e189c55dfdf61cec8d7d93e7610910b68"
+              "bytes": 45360143,
+              "sha256": "b6d8a1e363ff1acd69731dc3e29d108246f134c916cb66d113621b2476bc789c"
             }
           ]
         },
