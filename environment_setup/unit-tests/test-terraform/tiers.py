@@ -20,6 +20,8 @@ MANIFEST = TierManifest(default="1-2", tiers=(
         "test_format_and_generated.py",
         "test_iac_switch.py",
         "test_parity_map.py",
+        "test_private_dns_dependencies.py",
+        "test_resource_id_casing.py",
         "test_terraform_adopt.py",
         "test_terraform_workflow.py",
         "test_tiers.py",

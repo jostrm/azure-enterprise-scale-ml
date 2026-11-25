@@ -3,11 +3,12 @@
 # joins the factory's own access hub: hub -> spoke (allow_gateway_transit) first, then spoke -> hub
 # (use_remote_gateways). Same properties as bootstrap/lib/common_network_preservation.plan_peerings.
 
+# The Factory API passes ids lowercased; azurerm parses them strictly, so remote_virtual_network_id is
+# normalised (aif-164, 2026-11-17).
 resource "azurerm_virtual_network_peering" "peering" {
   name                         = var.peering_name
   resource_group_name          = var.resource_group_name
   virtual_network_name         = var.vnet_name
-  # The Factory API passes ids lowercased; azurerm parses them strictly (aif-164, 2026-11-17).
   remote_virtual_network_id    = provider::azurerm::normalise_resource_id(var.remote_vnet_id)
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
