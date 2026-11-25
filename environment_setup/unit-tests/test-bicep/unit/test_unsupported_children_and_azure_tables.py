@@ -374,6 +374,24 @@ def test_evaluate_what_if_applies_rule_r_with_the_plans_own_groups():
             change(STORAGE, "Create"), scoped_role_assignment(ACR_COMMON, "common")))
 
 
+def test_source_provenance_names_exactly_the_reviewed_rows_not_the_accepted_unsupported_ones():
+    """Live 2026-11-25 (read-only replay of aif69 ADO run 2532 with the Foundry sequence planned): the Foundry phase
+    previews recorded the Rule U and Rule R rows in their source provenance although those rows are not reviewed
+    rows, so validate_foundry_lifecycle blocked Prepare with native-foundry-phase-source-provenance-required."""
+    document, _ = scoped_manifest()
+    document["deployment"] = {"steps": [{"id": "s", "resource_groups": [GROUP]}]}
+    provenance = {"stale": "Create"}
+    reviewed = fl.evaluate_what_if(None, document, {"id": "foundry-project-phase", "scope": "subscription"}, None,
+                                   source_changes=provenance, response=preview(
+                                       change(STORAGE, "Create"), role_assignment(STORAGE), cosmos_role_assignment(),
+                                       scoped_role_assignment(FOUNDRY, "reviewed")))
+    assert provenance == {row["resource_id"]: row["change_type"] for row in reviewed} == {STORAGE.lower(): "Create"}
+    with pytest.raises(fl.Blocked, match="unresolved-or-destructive-arm-what-if"):
+        fl.evaluate_what_if(None, document, {"id": "foundry-project-phase", "scope": "subscription"}, None,
+                            source_changes={}, response=preview(
+                                change(STORAGE, "Create"), scoped_role_assignment(ACR_COMMON, "common")))
+
+
 def test_rule_r_lives_in_the_single_unsupported_decision_of_arm_changes():
     source = (ROOT / "bootstrap" / "lib" / "factory_lifecycle.py").read_text(encoding="utf-8")
     assert source.count("ROLE_ASSIGNMENT_UNSUPPORTED_TYPES") == 2

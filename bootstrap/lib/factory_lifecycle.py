@@ -4654,9 +4654,13 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
                           if isinstance(plan.get("steps"), list) and "locks" in document else None)
     raw_changes = response.get("properties", response)["changes"]
     if source_changes is not None:
-        # Preservation-normalized Ignore is not evidence of a source declaration.
+        # Preservation-normalized Ignore is not evidence of a source declaration. An Unsupported row that reached
+        # here was accepted by Rule U or Rule R (arm_changes refuses every other one) and is not a reviewed row, so
+        # it has no provenance: the Foundry phases bind provenance one-to-one to their reviewed rows (aif69 replay of
+        # run 2532, 2026-11-25: native-foundry-phase-source-provenance-required).
         source_changes.clear()
-        source_changes.update({row["resourceId"].lower(): row["changeType"] for row in raw_changes})
+        source_changes.update({row["resourceId"].lower(): row["changeType"] for row in raw_changes
+                               if row.get("changeType") != "Unsupported"})
     if tag_updates is not None:
         # Modify rows whose delta is tags only: {resource id: the tags the deployment writes}.
         tag_updates.clear()
