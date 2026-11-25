@@ -36,3 +36,22 @@ def test_option_a_says_the_port_changes_and_how_to_connect():
     section = text[start:text.index("</details>", start)]
     assert "new port every time" in section
     assert "Type connection" in section
+
+def test_option_c_starts_the_packaged_api_host_from_the_command_line():
+    """Videos 20a-c (2026-11-25): the Factory API starts without a window, from PowerShell, with a key the
+    reader never sees (aifactory-config.exe --api-host, pink v0.47.107+)."""
+    text = PAGE.read_text(encoding="utf-8")
+    start = text.index("Option C) Windows - Start from the command line")
+    section = text[start:text.index("</details>", start)]
+    for needle in ("v0.47.107", "aifactory-config-windows.zip", "Expand-Archive", "RandomNumberGenerator",
+                   "$env:AIFACTORY_API_KEY", "'--api-host', '--port', '8765'", "-PassThru",
+                   "Invoke-RestMethod http://127.0.0.1:8765/health", "Stop-Process -Id $api.Id"):
+        assert needle in section, needle
+    assert "Write-Host $env:AIFACTORY_API_KEY" not in section and "echo $env:AIFACTORY_API_KEY" not in section
+
+
+def test_powershell_tab_connects_option_c_in_the_same_window():
+    powershell = tab(PAGE.read_text(encoding="utf-8"), "CLI (PowerShell)")
+    option_c = powershell.index("Option C")
+    assert "same PowerShell window" in powershell[option_c:]
+    assert "$env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'" in powershell[option_c:]

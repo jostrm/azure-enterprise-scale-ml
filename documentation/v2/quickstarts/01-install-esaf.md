@@ -79,6 +79,32 @@ Keep the app open. The API stops when you close it.
 
 </details>
 
+<details>
+<summary><b>Option C) Windows - Start from the command line (no app window)</b></summary>
+
+The Windows package of the AIFactory Config Wizard also runs the Factory API on its own, without a window. You need
+v0.47.107 or later. Run these lines in the PowerShell window you use for the next steps.
+
+1. Download and extract the package:
+
+   ```powershell
+   Invoke-WebRequest 'https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip' -OutFile "$HOME\Downloads\aifactory-config-windows.zip"
+   Expand-Archive "$HOME\Downloads\aifactory-config-windows.zip" "$HOME\aifactory-config" -Force
+   ```
+
+2. Start the API with a new random key. The key stays in `$env:AIFACTORY_API_KEY` in this window; it is never shown:
+
+   ```powershell
+   $env:AIFACTORY_API_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+   $api = Start-Process "$HOME\aifactory-config\aifactory-config\aifactory-config.exe" -ArgumentList '--api-host', '--port', '8765' -PassThru
+   foreach ($i in 1..30) { try { Invoke-RestMethod http://127.0.0.1:8765/health; break } catch { Start-Sleep 1 } }
+   ```
+
+   The API answers on `http://127.0.0.1:8765` and only on this computer. Keep this PowerShell window open: it holds
+   the key. To stop the API, run `Stop-Process -Id $api.Id`.
+
+</details>
+
 ## Create your Factory folder
 
 Your Factory's configuration lives in an `azurefactory` folder in your consumer repository.
@@ -139,6 +165,12 @@ Open PowerShell in the root of your consumer repository.
      ```powershell
      $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
      $env:AIFACTORY_API_KEY = Read-Host 'API key you entered in the app'
+     ```
+   - **Option C, command line:** run the next lines in the same PowerShell window that started the API. The key is
+     already set there; set only the address:
+
+     ```powershell
+     $env:AIFACTORY_API_URL = 'http://127.0.0.1:8765'
      ```
 
 3. Point the CLI at your folder and check the connection:
