@@ -459,6 +459,10 @@ class NativePlanner:
             require(fl.capabilities().get("arm_parameter_transport") == KEYVAULT_TRANSPORT,
                     "native-keyvault-reference-transport-required")
             document["deployment"]["parameter_transport"] = KEYVAULT_TRANSPORT
+        # A first-run Foundry project deploys as the reviewed native sequence (prerequisites, account-only, full
+        # project), expanded exactly as the catalog planner does before its freeze; a no-op for every other plan.
+        # Without it validate_manifest blocks Prepare (aif69, 2026-11-25: native-foundry-sequence-required).
+        fl.plan_foundry_lifecycle(document)
         # Native planning verifies network preservation, exact schemas, live
         # what-if, ownership and Foundry phases; no fabricated what-if rows.
         return fl.freeze_deployment_plan(cloud, document, self.source_root)

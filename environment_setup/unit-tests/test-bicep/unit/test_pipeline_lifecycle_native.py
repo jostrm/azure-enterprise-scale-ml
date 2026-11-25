@@ -809,6 +809,57 @@ def test_scenario_one_deploys_common_first_and_requires_a_reviewed_project_conti
     assert {step["parameters"]["inputKeyvault"] for step in document["deployment"]["steps"]} == {"kvseedaif"}
 
 
+FOUNDRY_FIRST_RUN = {"enableAIFoundry": True, "aiFoundryV2Exists": False, "foundryV22AccountOnly": False,
+                     "useAVMFoundry": False, "cmk": False, "cmkDisableForFoundry": False,
+                     "aiFoundryV2ProjectExists": False, "disableAgentNetworkInjection": True, "aca2SubnetId": ""}
+
+
+def test_scenario_one_continuation_freezes_the_reviewed_native_foundry_sequence(monkeypatch):
+    """Live 2026-11-25 (aif69, ADO run 2532): the pipelines-only planner handed a first-run Foundry project to the
+    freeze without the reviewed prerequisites / account-only / full-project sequence the catalog planner expands, so
+    validate_manifest blocked Prepare with native-foundry-sequence-required. The freeze itself (what-if and Foundry
+    phase previews) is the lifecycle's own, tested in test_native_foundry_lifecycle; here it records its input."""
+    from .test_pipeline_lifecycle_adapters import PROJECT
+    data, cloud, _, planner, _ = production_fixture(monkeypatch, 1, COMMON.rsplit("/", 1)[1])
+    planner.journal = CommonJournal(deployed=True)
+    data["variables"][PROJECT]["dev"].update(FOUNDRY_FIRST_RUN)
+    compile_template = cloud.compile_template
+
+    def with_foundry_selection(root, path):
+        template = compile_template(root, path)
+        if path == fl.FOUNDRY_TEMPLATE:
+            template["parameters"].update({name: {"type": "string" if name == "aca2SubnetId" else "bool"}
+                                           for name in FOUNDRY_FIRST_RUN})
+        return template
+
+    monkeypatch.setattr(cloud, "compile_template", with_foundry_selection)
+    frozen = []
+
+    def freeze(actual, document, source_root):
+        frozen.append(copy.deepcopy(document["deployment"]))
+        return {**copy.deepcopy(document["deployment"]), "changes": [
+            {"resource_id": GROUP, "change_type": "NoChange", "before_hash": None, "after_hash": None}]}
+
+    monkeypatch.setattr(fl, "freeze_deployment_plan", freeze)
+    plan = planner.prepare(data, "11111111-1111-1111-1111-111111111111")
+    document = plan["stages"][0]["manifests"][0]
+    assert document["operation"] == "deploy-project" and document["target"]["project_ids"] == ["001"]
+    sequence = frozen[0]["foundry_lifecycle"]
+    assert sequence["contract"] == fl.FOUNDRY_CONTRACT
+    steps = {step["id"]: step for step in frozen[0]["steps"]}
+    order = [step["id"] for step in frozen[0]["steps"]]
+    full = next(step["id"] for step in frozen[0]["steps"]
+                if step["template"] == fl.FOUNDRY_TEMPLATE and step["id"] != sequence["account_step"])
+    assert (sequence["account_step"], sequence["full_step"]) == ("foundry-account", full)
+    assert order.index("foundry-account") == order.index(full) - 1
+    assert steps["foundry-account"]["parameters"] == {**steps[full]["parameters"], "foundryV22AccountOnly": True}
+    assert steps[full]["parameters"]["foundryV22AccountOnly"] is False
+    assert steps[full]["depends_on"] == ["foundry-account"]
+    assert [phase["id"] for phase in sequence["phases"]] == [
+        "foundry-prerequisites", "foundry-account-phase", "foundry-project-phase"]
+    fl.validate_manifest(document)
+
+
 def test_scenario_one_continuation_deploys_only_the_project_after_verified_common(monkeypatch):
     data, cloud, _, planner, _ = production_fixture(monkeypatch, 1, COMMON.rsplit("/", 1)[1])
     planner.journal = CommonJournal(deployed=True)
