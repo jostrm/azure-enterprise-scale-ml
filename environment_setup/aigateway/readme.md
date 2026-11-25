@@ -1,5 +1,7 @@
 # AI Factory gateways
 
+![AI Factory architecture: project-owned Foundry and shared APIM model endpoints on one enterprise foundation](images/foundry-project-and-gateway-architecture.png)
+
 The [supported APIM gateway](apim/readme.md) and its log-based FinOps workbook are
 described first. The existing Kong deployment guide is retained below; **Kong
 file logs are not an input to this APIM workbook**.

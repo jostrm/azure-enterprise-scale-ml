@@ -1,5 +1,7 @@
 # APIM Azure OpenAI Gateway
 
+![AI Factory architecture: project-owned Foundry and shared APIM model endpoints on one enterprise foundation](../images/foundry-project-and-gateway-architecture.png)
+
 The supported APIM implementation is in `../../aifactory/bicep/esml-common/ai-gateway/apim`.
 
 It configures an existing APIM service with an Azure OpenAI weighted backend pool, 429 circuit breakers that accept `Retry-After`, aggregate and per-caller token limits, managed-identity backend authentication, and buffered retries.
