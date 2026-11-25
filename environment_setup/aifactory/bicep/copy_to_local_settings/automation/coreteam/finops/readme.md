@@ -11,6 +11,13 @@ builder is `ai_gateway_finops.py`, with canonical queries in
 `ai-gateway-finops.config.json`. Missing rates or usage details are unpriced,
 not zero; calculated amounts are estimates, not Azure invoice charges.
 
+The default window is 30 days. `foundry_billing.py` adds separate live Azure
+Cost Management views by Foundry resource, deployment tag and daily raw meter
+(input, output, cache read/write and other charges). Requester estimates have
+daily totals and a requester -> Foundry -> deployment -> day tree; validated
+Entra tenant/object/kind identity can aggregate across gateways and direct calls.
+Missing historical identity/usage remains unavailable, never inferred from owners.
+
 The existing dashboard deployment paths publish the workbook and a launch tile
 on the AI Factory common dashboard. See the
 [AI gateway setup and run instructions](../../../../../../aigateway/readme.md)

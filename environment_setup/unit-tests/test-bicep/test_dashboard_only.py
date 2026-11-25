@@ -201,10 +201,18 @@ class Azure:
                 if method == "get":
                     return response(self.finops, "" if self.finops else "ResourceNotFound")
                 assert method == "put"
-                assert any(a.startswith(("If-Match=", "If-None-Match=")) for a in args)
+                assert not any(a.startswith("If-None-Match=") for a in args)
+                body = json.loads(Path(args[args.index("--body") + 1][1:]).read_text(encoding="utf-8"))
+                if self.finops is not None:
+                    assert f"If-Match={self.finops['etag']}" in args
+                    assert body["etag"] == self.finops["etag"]
+                else:
+                    assert not any(a.startswith("If-Match=") for a in args)
+                    assert "etag" not in body
+                    assert self.commands[-2] == runner.shared.finops_command(self.cfg, "get")
                 if self.fail_finops:
                     return response({}, "AuthorizationFailed")
-                self.finops = json.loads(Path(args[args.index("--body") + 1][1:]).read_text(encoding="utf-8"))
+                self.finops = body
                 self.finops["etag"] = '"finops-v1"'
                 return response(self.finops)
             assert url == f"https://management.azure.com{self.cfg.dashboard_id}?api-version={runner.shared.API_VERSION}"
@@ -640,12 +648,21 @@ def test_finops_failure_stops_before_publishing_common_link(compiled, workspace)
 
 
 @pytest.mark.parametrize("mutation", ["workbook", "subscription", "method", "extra-argument", "plan"])
-def test_finops_boundary_allows_only_its_exact_workbook(compiled, workspace, mutation):
-    args, _ = arguments(workspace, "deploy")
-    cloud = fake_azure(payload(), "dev", compiled)
-    runner.run(args, cloud)
-    command = list(next(c for c in cloud.commands if "put" in c and cloud.cfg.finops_workbook_id in c[c.index("--url") + 1]))
-    azure = runner.DashboardAzure(cloud.cfg, "plan" if mutation == "plan" else "deploy", lambda *a: pytest.fail("Unauthorized command reached Azure"))
+def test_finops_boundary_allows_only_its_exact_workbook(workspace, mutation):
+    cloud = fake_azure(payload(), "dev", {})
+    calls = []
+
+    def transport(*args):
+        calls.append(args)
+        assert args == runner.shared.finops_command(cloud.cfg, "get")
+        return response(None, "ResourceNotFound")
+
+    path = workspace / "body.json"
+    path.write_text("{}", encoding="utf-8")
+    command = [*runner.shared.finops_command(cloud.cfg, "put"), "--headers",
+               "Content-Type=application/json", "--body", f"@{path}"]
+    azure = runner.DashboardAzure(cloud.cfg, "plan" if mutation == "plan" else "deploy", transport)
+    azure(*runner.shared.finops_command(cloud.cfg, "get"))
     if mutation == "workbook":
         command[command.index("--url") + 1] = command[command.index("--url") + 1].replace(cloud.cfg.finops_workbook_id.split("/")[-1], "another-workbook")
     elif mutation == "subscription":
@@ -656,6 +673,7 @@ def test_finops_boundary_allows_only_its_exact_workbook(compiled, workspace, mut
         command.extend(["--url", "https://management.azure.com/other"])
     with pytest.raises(RuntimeError, match="prohibited"):
         azure(*command)
+    assert calls == [runner.shared.finops_command(cloud.cfg, "get")]
 
 
 @pytest.mark.parametrize("mutation", ["workbook", "subscription", "extra-argument"])
@@ -688,6 +706,142 @@ def test_finops_uses_documented_api_and_fetches_full_saved_content():
         endpoint, "--only-show-errors",
     )
 
+@pytest.mark.parametrize("failure", ["exact", "foreign", "forbidden", "invalid"])
+def test_finops_boundary_classifies_only_exact_codeless_404_before_sanitizing(workspace, failure):
+    cloud = fake_azure(payload(), "dev", {})
+    cfg = cloud.cfg
+    resource = cfg.finops_workbook_id if failure != "foreign" else "/foreign/SECRET"
+    stderr = "ERROR: Not Found(" + json.dumps({"Message": f"Resource '{resource}' is not found."}) + ")"
+    if failure == "forbidden":
+        stderr = stderr.replace("Not Found", "Forbidden")
+    elif failure == "invalid":
+        stderr = "ERROR: Not Found({SECRET unparseable})"
+
+    def transport(*args):
+        if args == runner.shared.finops_command(cfg, "get"):
+            cloud.commands.append(args)
+            return subprocess.CompletedProcess(args, 1, "", stderr)
+        return cloud(*args)
+
+    azure = runner.DashboardAzure(cfg, "deploy", transport)
+    safe = azure(*runner.shared.finops_command(cfg, "get"))
+    assert safe.stdout == "" and "SECRET" not in safe.stderr
+    assert runner.shared.error_code(safe) == ("ResourceNotFound" if failure == "exact" else "AzureCommandFailed")
+    if failure == "exact":
+        prepared = runner.shared.prepare_finops_workbook(cfg, {}, azure)
+        runner.shared.deploy_finops_workbook(cfg, prepared, azure, directory=workspace)
+        assert cloud.finops is not None
+    else:
+        with pytest.raises(RuntimeError, match="Unable to read"):
+            runner.shared.prepare_finops_workbook(cfg, {}, azure)
+        assert not any("put" in c for c in cloud.commands)
+
+
+@pytest.mark.parametrize("outcome", ["success", "failed", "exception"])
+def test_finops_boundary_create_requires_instance_missing_read_and_consumes_it(workspace, outcome):
+    cloud = fake_azure(payload(), "dev", {})
+    cfg = cloud.cfg
+    path = workspace / "body.json"
+    path.write_text(json.dumps({"properties": {}}), encoding="utf-8")
+    command = (*runner.shared.finops_command(cfg, "put"), "--headers",
+               "Content-Type=application/json", "--body", f"@{path}")
+    calls = []
+
+    def transport(*args):
+        calls.append(args)
+        if args == runner.shared.finops_command(cfg, "get"):
+            return response(None, "ResourceNotFound")
+        if outcome == "exception":
+            raise OSError("uncertain transport failure")
+        return response({}, "NotImplemented" if outcome == "failed" else "")
+
+    azure = runner.DashboardAzure(cfg, "deploy", transport)
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
+    assert calls == []
+    azure(*runner.shared.finops_command(cfg, "get"))
+    if outcome == "exception":
+        with pytest.raises(OSError):
+            azure(*command)
+    else:
+        azure(*command)
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
+    assert calls == [runner.shared.finops_command(cfg, "get"), command]
+
+
+def test_finops_boundary_does_not_share_missing_read_between_instances(workspace):
+    cloud = fake_azure(payload(), "dev", {})
+    first = runner.DashboardAzure(cloud.cfg, "deploy", cloud)
+    first(*runner.shared.finops_command(cloud.cfg, "get"))
+    second = runner.DashboardAzure(cloud.cfg, "deploy", cloud)
+    path = workspace / "body.json"
+    path.write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="prohibited"):
+        second(*runner.shared.finops_command(cloud.cfg, "put"), "--headers",
+               "Content-Type=application/json", "--body", f"@{path}")
+    assert cloud.commands == [runner.shared.finops_command(cloud.cfg, "get")]
+
+
+@pytest.mark.parametrize("body", ['{"etag":"stale"}', '{"etag":null}', "{invalid}", "[]"])
+def test_finops_boundary_create_rejects_etag_or_invalid_body_after_missing_read(workspace, body):
+    cloud = fake_azure(payload(), "dev", {})
+    azure = runner.DashboardAzure(cloud.cfg, "deploy", cloud)
+    azure(*runner.shared.finops_command(cloud.cfg, "get"))
+    path = workspace / "body.json"
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*runner.shared.finops_command(cloud.cfg, "put"), "--headers",
+              "Content-Type=application/json", "--body", f"@{path}")
+    assert cloud.commands == [runner.shared.finops_command(cloud.cfg, "get")]
+
+
+@pytest.mark.parametrize("latest", ["present", "forbidden", "invalid", "exception"])
+def test_finops_boundary_recheck_invalidates_prior_missing_read(workspace, latest):
+    cloud = fake_azure(payload(), "dev", {})
+    responses = [response(None, "ResourceNotFound")]
+    if latest == "present":
+        responses.append(response({"etag": '"new"'}))
+    elif latest == "forbidden":
+        responses.append(response(None, "AuthorizationFailed"))
+    elif latest == "invalid":
+        responses.append(subprocess.CompletedProcess([], 0, "invalid", ""))
+    calls = []
+
+    def transport(*args):
+        calls.append(args)
+        if latest == "exception" and len(calls) == 2:
+            raise OSError("read failed")
+        return responses.pop(0)
+
+    azure = runner.DashboardAzure(cloud.cfg, "deploy", transport)
+    azure(*runner.shared.finops_command(cloud.cfg, "get"))
+    if latest == "exception":
+        with pytest.raises(OSError):
+            azure(*runner.shared.finops_command(cloud.cfg, "get"))
+    else:
+        azure(*runner.shared.finops_command(cloud.cfg, "get"))
+    path = workspace / "body.json"
+    path.write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*runner.shared.finops_command(cloud.cfg, "put"), "--headers",
+              "Content-Type=application/json", "--body", f"@{path}")
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("header,body_etag", [
+    ("If-None-Match=*", None), ("If-Match=*", "*"), ('If-Match="v1"', None),
+    ('If-Match="v1"', '"v2"'), ("If-Match=", ""),
+])
+def test_finops_boundary_rejects_unsupported_or_mismatched_preconditions(workspace, header, body_etag):
+    cloud = fake_azure(payload(), "dev", {})
+    azure = runner.DashboardAzure(cloud.cfg, "deploy", lambda *a: pytest.fail("Unsafe write reached Azure"))
+    path = workspace / "body.json"
+    path.write_text(json.dumps({"etag": body_etag}), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*runner.shared.finops_command(cloud.cfg, "put"), "--headers", header,
+              "Content-Type=application/json", "--body", f"@{path}")
+
 
 def finops_settings():
     gateway = f"/subscriptions/{DEV}/resourceGroups/existing/providers/Microsoft.ApiManagement/service/gateway"
@@ -718,11 +872,13 @@ def test_finops_repeat_preserves_saved_pricing_mapping_and_viewer_defaults(compi
     parameters["Workspaces"]["value"] = [azure.workspace]
     parameters["GroupBy"]["value"] = "User"
     parameters["TimeRange"]["value"] = {"durationMs": 86400000}
+    azure.finops["properties"]["displayName"] = "Operator-owned FinOps title"
     # Upgrade content, but not the operator-owned settings.
     saved["items"].insert(0, {"type": 1, "content": {"json": "old workbook version"}})
     azure.finops["properties"]["serializedData"] = json.dumps(saved)
     before = len(azure.commands)
     runner.run(args, azure)
+    assert azure.finops["properties"]["displayName"] == "Operator-owned FinOps title"
     new = finops_parameters(json.loads(azure.finops["properties"]["serializedData"]))
     for key in ("Configuration", "Workspaces", "GroupBy", "TimeRange"):
         if key == "Configuration":
@@ -771,7 +927,7 @@ def test_finops_saved_settings_fail_closed_before_project_writes(compiled, works
         azure.finops["properties"]["serializedData"] = json.dumps(notebook)
     elif failure == "no-etag":
         azure.finops.pop("etag")
-        azure.finops["properties"]["displayName"] = "older title"
+        azure.finops["properties"]["category"] = "older category"
     before = len(azure.commands)
 
     def request(*args):
@@ -921,7 +1077,7 @@ def test_deploy_only_incremental_dashboard_writes_with_etag_retry(compiled, work
     runner.run(args, azure)
     writes = [c for c in azure.commands if c[:3] == ("deployment", "group", "create") or "put" in c]
     assert len(writes) == 4
-    assert "If-None-Match=*" in writes[1]
+    assert not any(arg.startswith("If-") for arg in writes[1])
     assert all("If-Match=" in " ".join(c) for c in writes[2:])
     assert sum(azure.cfg.finops_workbook_id in c[c.index("--url") + 1] for c in writes if "--url" in c) == 1
     assert "AI Gateway" in json.dumps(azure.factory)

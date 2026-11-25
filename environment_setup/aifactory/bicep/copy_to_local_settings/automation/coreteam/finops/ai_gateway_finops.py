@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import hashlib
 import hmac
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -25,6 +26,7 @@ MAX_EXACT_INT = 9007199254740991
 EMPTY_CONFIG = {"applications": [], "rates": [], "trustedTelemetryResourceIds": []}
 GROUPS = ["Application", "APIM subscription", "User", "Team", "Deployment", "Model", "Day"]
 _UNSET = object()
+GUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 RESOURCE_PATTERN = (
     r"/subscriptions/[0-9a-f]{{8}}-[0-9a-f]{{4}}-[0-9a-f]{{4}}-[0-9a-f]{{4}}-[0-9a-f]{{12}}/resourceGroups/[^/]+/providers/"
     r"{provider}/{kind}/[^/]+"
@@ -43,6 +45,21 @@ def _text(value, label, *, optional=False):
     if not isinstance(value, str) or len(value) > 256 or (not optional and not value.strip()):
         raise ValueError(f"{label} must be a nonempty metadata string of at most 256 characters")
     return value
+
+
+def _guid(value, label):
+    if not isinstance(value, str) or not re.fullmatch(GUID_PATTERN, value, re.I):
+        raise ValueError(f"{label} must be an Entra GUID, not a name, email or UPN")
+    return value.lower()
+
+
+def _scope(payload):
+    gateway = payload.get("gateway_resource_id")
+    if gateway:
+        return _resource(gateway, "Microsoft.ApiManagement", "service")
+    if payload.get("target_validated") is not True:
+        raise ValueError("Direct usage requires a server-validated Foundry target")
+    return _resource(payload.get("foundry_resource_id"), "Microsoft.CognitiveServices", "accounts")
 
 
 def _timestamp(value):
@@ -103,13 +120,25 @@ def validate_config(configuration):
         seen.add(key)
     periods = {}
     for rate in config["rates"]:
-        if not isinstance(rate, dict) or set(rate) != {
-            "gatewayResourceId", "backendHost", "deployment", "model", "validFrom", "validTo",
+        required = {
+            "backendHost", "deployment", "model", "validFrom", "validTo",
             "currency", "meter", "billingMode", "inputPerMillion", "cachedInputPerMillion",
             "outputPerMillion",
-        }:
+        }
+        if not isinstance(rate, dict) or not required <= set(rate) or set(rate) - (
+            required | {"gatewayResourceId", "foundryResourceId"}
+        ):
             raise ValueError("Rate card entry has missing or unknown fields")
-        rate["gatewayResourceId"] = _resource(rate["gatewayResourceId"], "Microsoft.ApiManagement", "service")
+        if rate.get("gatewayResourceId"):
+            rate["gatewayResourceId"] = _resource(
+                rate["gatewayResourceId"], "Microsoft.ApiManagement", "service")
+        elif "gatewayResourceId" in rate and rate["gatewayResourceId"] != "":
+            raise ValueError("gatewayResourceId must be a full APIM ID or an empty string")
+        if "foundryResourceId" in rate:
+            rate["foundryResourceId"] = _resource(
+                rate["foundryResourceId"], "Microsoft.CognitiveServices", "accounts")
+        if not rate.get("gatewayResourceId") and not rate.get("foundryResourceId"):
+            raise ValueError("Rates require a gatewayResourceId or an exact foundryResourceId for direct calls")
         rate["backendHost"] = _host(rate["backendHost"])
         for key in ("deployment", "model"):
             _text(rate[key], key)
@@ -122,10 +151,11 @@ def validate_config(configuration):
         start, end = _timestamp(rate["validFrom"]), _timestamp(rate["validTo"])
         if start >= end:
             raise ValueError("validTo must be later than validFrom (exclusive upper bound)")
-        key = tuple(rate[field] for field in ("gatewayResourceId", "backendHost", "deployment", "model"))
+        key = (rate.get("gatewayResourceId") or rate["foundryResourceId"],
+               *(rate[field] for field in ("backendHost", "deployment", "model")))
         for previous_start, previous_end in periods.setdefault(key, []):
             if start < previous_end and end > previous_start:
-                raise ValueError("Overlapping rates for the same gateway/backend/deployment/model")
+                raise ValueError("Overlapping rates for the same metering scope/backend/deployment/model")
         periods[key].append((start, end))
     return config
 
@@ -135,10 +165,12 @@ def _token(value):
 
 
 def make_usage_event(
-    *, gateway_resource_id, correlation_id, apim_subscription_id, backend_host,
+    *, gateway_resource_id=None, correlation_id, apim_subscription_id="", backend_host,
     deployment, model, api_kind, usage, completed, text_only, observed_at=None,
     authenticated_subject=None, pseudonym_key=None, identity_validated=False,
     validated_application_id="",
+    entra_tenant_id=None, entra_object_id=None, requester_kind=None,
+    foundry_resource_id=None, target_validated=False,
 ):
     """Create one metadata-only event after a response or failed stream.
 
@@ -146,9 +178,22 @@ def make_usage_event(
     `completed` means successful response/stream completion, not just HTTP 200.
     `text_only` is a server-side assertion excluding audio/images/tools/other meters.
     No JWT is verified by this helper; identity_validated is the application's
-    assertion AFTER signature, issuer, audience and delegated-user validation.
+    assertion AFTER signature, issuer, audience and requester-kind validation.
+    Entra IDs are explicit opt-in server claims (tid + oid), never caller headers.
+    target_validated asserts the actual server-selected backend ARM ID is known.
+    A direct call omits gateway_resource_id and requires that validated Foundry ID.
     """
-    gateway = _resource(gateway_resource_id, "Microsoft.ApiManagement", "service")
+    gateway = (_resource(gateway_resource_id, "Microsoft.ApiManagement", "service")
+               if gateway_resource_id is not None and gateway_resource_id != "" else "")
+    if type(target_validated) is not bool:
+        raise ValueError("The target-validated assertion must be a boolean")
+    foundry = ""
+    if foundry_resource_id is not None:
+        if not target_validated:
+            raise ValueError("Foundry target must be validated from server-selected routing, never a caller header")
+        foundry = _resource(foundry_resource_id, "Microsoft.CognitiveServices", "accounts")
+    if not gateway and (not foundry or apim_subscription_id):
+        raise ValueError("Direct usage requires a validated Foundry ID and no APIM subscription ID")
     for value, label in ((correlation_id, "correlation_id"),
                          (apim_subscription_id, "apim_subscription_id"),
                          (deployment, "deployment"), (model, "model")):
@@ -158,15 +203,26 @@ def make_usage_event(
     if type(completed) is not bool or type(text_only) is not bool or type(identity_validated) is not bool:
         raise ValueError("Completion, text-only and validated-identity assertions must be booleans")
     _text(validated_application_id, "validated_application_id", optional=True)
-    if (authenticated_subject is not None or validated_application_id) and not identity_validated:
+    has_entra = entra_tenant_id is not None or entra_object_id is not None
+    if (authenticated_subject is not None or validated_application_id or has_entra or requester_kind) and not identity_validated:
         raise ValueError("End-user/application identity must be validated server-side")
+    if requester_kind is not None and requester_kind not in ("user", "serviceprincipal"):
+        raise ValueError("requester_kind must be user or serviceprincipal")
+    tenant, principal = "", ""
+    if has_entra:
+        if requester_kind is None or authenticated_subject is not None:
+            raise ValueError("Entra opt-in requires an explicit requester_kind and cannot be combined with a pseudonym")
+        tenant = _guid(entra_tenant_id, "entra_tenant_id")
+        principal = _guid(entra_object_id, "entra_object_id")
+    if requester_kind and not has_entra and authenticated_subject is None:
+        raise ValueError("requester_kind requires a validated requester identity")
     user_id = ""
     if authenticated_subject is not None:
         _text(authenticated_subject, "authenticated_subject")
         if not isinstance(pseudonym_key, bytes) or len(pseudonym_key) < 32:
             raise ValueError("A private pseudonym key of at least 32 bytes is required")
         user_id = hmac.new(
-            pseudonym_key, (gateway + "\0" + authenticated_subject).encode(), hashlib.sha256
+            pseudonym_key, ((gateway or foundry) + "\0" + authenticated_subject).encode(), hashlib.sha256
         ).hexdigest()
     observed_at = observed_at or datetime.now(timezone.utc).isoformat()
     observed_at = _timestamp(observed_at).isoformat()
@@ -209,6 +265,10 @@ def make_usage_event(
         "total_tokens": total_tokens if usage_complete else None,
         "cached_input_tokens": cached if usage_complete else None,
         "user_id": user_id, "validated_application_id": validated_application_id,
+        "identity_validated": identity_validated,
+        "requester_kind": requester_kind or ("user" if user_id else ""),
+        "entra_tenant_id": tenant, "entra_object_id": principal,
+        "foundry_resource_id": foundry, "target_validated": target_validated and bool(foundry),
     }
     return {"name": EVENT_NAME, "properties": {"finops": json.dumps(
         payload, sort_keys=True, separators=(",", ":"), allow_nan=False)}}
@@ -221,10 +281,58 @@ def emit_usage_event(logger, event):
     })
 
 
-def estimate_cost(payload, configuration):
-    """Offline reference calculation for a normalized trusted producer payload."""
-    config = validate_config(configuration)
-    missing = {"amount": None, "currency": None}
+def requester_identity(payload):
+    """Resolve trusted metadata only; never infer a person from application ownership."""
+    scope = _scope(payload)
+    identity = {"key": json.dumps(["unknown", scope], separators=(",", ":")),
+                "label": "Unknown", "kind": "unknown", "scope": scope}
+    tenant, principal = payload.get("entra_tenant_id"), payload.get("entra_object_id")
+    kind = payload.get("requester_kind")
+    if tenant or principal:
+        if payload.get("identity_validated") is not True or kind not in ("user", "serviceprincipal"):
+            return identity
+        try:
+            tenant, principal = _guid(tenant, "tid"), _guid(principal, "oid")
+        except ValueError:
+            return identity
+        return {"key": json.dumps(["entra", tenant, principal, kind], separators=(",", ":")),
+                "label": f"Entra {kind}: {tenant}/{principal}", "kind": kind, "scope": "Entra tenant/object"}
+    pseudonym = payload.get("user_id", "")
+    # v1 trusted sources predate the optional assertion and requester-kind fields.
+    kind = kind or "user"
+    if payload.get("identity_validated", True) is not True or kind not in ("user", "serviceprincipal"):
+        return identity
+    if isinstance(pseudonym, str) and re.fullmatch(r"[0-9a-f]{64}", pseudonym):
+        return {"key": json.dumps(["pseudonym", scope, pseudonym, kind], separators=(",", ":")),
+                "label": f"Scoped {kind}: {pseudonym} ({scope})", "kind": kind, "scope": scope}
+    return identity
+
+
+def _estimate_cost(payload, config):
+    scope = _scope(payload)
+    observed = _timestamp(payload["observed_at"])
+    matches = [
+        rate for rate in config["rates"]
+        if (rate.get("gatewayResourceId") or rate.get("foundryResourceId")) == scope
+        and rate["backendHost"] == payload["backend_host"].lower()
+        and rate["deployment"] == payload["deployment"] and rate["model"] == payload["model"]
+        and _timestamp(rate["validFrom"]) <= observed < _timestamp(rate["validTo"])
+    ]
+    rate = matches[0] if len(matches) == 1 else None
+    producer_target = ""
+    if payload.get("target_validated") is True and payload.get("foundry_resource_id"):
+        try:
+            producer_target = _resource(payload["foundry_resource_id"], "Microsoft.CognitiveServices", "accounts")
+        except ValueError:
+            pass
+    mapped_target = rate.get("foundryResourceId", "") if rate else ""
+    target_conflict = bool(producer_target and mapped_target and producer_target != mapped_target)
+    missing = {"amount": None, "currency": rate["currency"] if rate else None,
+               "input_cost": None, "cached_input_cost": None, "output_cost": None,
+               "combined_input_cost": None, "category_coverage": "Unpriced",
+               "foundry_resource_id": "Unknown" if target_conflict else producer_target or mapped_target or "Unknown"}
+    if target_conflict:
+        return {**missing, "status": "Conflicting Foundry target"}
     if payload.get("schema") != SCHEMA or payload.get("usage_complete") is not True:
         return {**missing, "status": "Incomplete usage"}
     if payload.get("text_only") is not True or payload.get("api_kind") not in ("chat", "responses"):
@@ -235,42 +343,145 @@ def estimate_cost(payload, configuration):
     cached = payload.get("cached_input_tokens")
     if cached is not None and (not _token(cached) or cached > incoming):
         return {**missing, "status": "Invalid cache split"}
-    observed = _timestamp(payload["observed_at"])
-    matches = [
-        rate for rate in config["rates"]
-        if rate["gatewayResourceId"] == payload["gateway_resource_id"].lower()
-        and rate["backendHost"] == payload["backend_host"].lower()
-        and rate["deployment"] == payload["deployment"] and rate["model"] == payload["model"]
-        and _timestamp(rate["validFrom"]) <= observed < _timestamp(rate["validTo"])
-    ]
-    if len(matches) != 1:
+    if rate is None:
         return {**missing, "status": "No exact effective rate"}
-    rate = matches[0]
     input_rate, cache_rate, output_rate = (
         _rate(rate[key]) for key in ("inputPerMillion", "cachedInputPerMillion", "outputPerMillion"))
     if cached is None:
         if input_rate != cache_rate:
             return {**missing, "status": "Missing cache split"}
-        amount = Decimal(incoming) * input_rate + Decimal(outgoing) * output_rate
+        input_cost = cache_cost = None
+        combined = Decimal(incoming) * input_rate / Decimal(1000000)
     else:
-        amount = Decimal(incoming - cached) * input_rate + Decimal(cached) * cache_rate + Decimal(outgoing) * output_rate
-    return {"amount": (amount / Decimal(1000000)).normalize(),
-            "currency": rate["currency"], "status": "Estimated (not billed)"}
+        input_cost = Decimal(incoming - cached) * input_rate / Decimal(1000000)
+        cache_cost = Decimal(cached) * cache_rate / Decimal(1000000)
+        combined = input_cost + cache_cost
+    output_cost = Decimal(outgoing) * output_rate / Decimal(1000000)
+    return {**missing, "amount": (combined + output_cost).normalize(),
+            "input_cost": input_cost, "cached_input_cost": cache_cost, "output_cost": output_cost,
+            "combined_input_cost": combined,
+            "category_coverage": "Unknown cache split" if cached is None else "Known",
+            "status": "Estimated (not billed)"}
+
+
+def estimate_cost(payload, configuration):
+    """Offline reference calculation for a normalized trusted producer payload."""
+    return _estimate_cost(payload, validate_config(configuration))
+
+
+def summarize_requesters(payloads, configuration):
+    """Offline reference rollup of trusted unsampled events, not an ingestion adapter.
+
+    Identical correlation copies count once. Conflicting copies become one unknown,
+    unpriced request, matching the conservative workbook correlation semantics.
+    """
+    config = validate_config(configuration)
+    correlations = {}
+    for payload in payloads:
+        key = (_scope(payload), payload["correlation_id"].lower())
+        correlations.setdefault(key, {})[json.dumps(payload, sort_keys=True)] = payload
+    leaves = {}
+    for copies in correlations.values():
+        payload = next(iter(copies.values()))
+        identity = requester_identity(payload)
+        estimate = _estimate_cost(payload, config)
+        if len(copies) != 1:
+            identity = requester_identity({**payload, "entra_tenant_id": "", "entra_object_id": "", "user_id": ""})
+            estimate = {**estimate, "amount": None, "input_cost": None, "cached_input_cost": None,
+                        "output_cost": None, "combined_input_cost": None, "foundry_resource_id": "Unknown",
+                        "category_coverage": "Unpriced"}
+        key = (identity["key"], estimate["currency"] or "Unpriced", estimate["foundry_resource_id"],
+               payload.get("deployment") or "Unknown", _timestamp(payload["observed_at"]).date().isoformat())
+        leaves.setdefault(key, []).append((identity, estimate))
+
+    def aggregate(records):
+        priced = [estimate for _, estimate in records if estimate["amount"] is not None]
+        unknown = sum(estimate["input_cost"] is None for estimate in priced)
+        result = {"Requests": len(records), "PricedRequests": len(priced),
+                  "UnpricedRequests": len(records) - len(priced), "UnknownCategoryRequests": unknown}
+        for column, field in (("InputCost", "input_cost"), ("OutputCost", "output_cost"),
+                              ("CachedInputCost", "cached_input_cost"), ("CombinedInputCost", "combined_input_cost"),
+                              ("EstimatedSubtotal", "amount")):
+            result[column] = (sum((estimate[field] for estimate in priced), Decimal(0))
+                              if priced and not (unknown and field in ("input_cost", "cached_input_cost")) else None)
+        return result
+
+    groups, daily, tree = {}, [], []
+    for key, records in sorted(leaves.items()):
+        identity = records[0][0]
+        base = {"RequesterKey": key[0], "Requester": identity["label"], "RequesterKind": identity["kind"],
+                "IdentityScope": identity["scope"], "Currency": key[1],
+                "FoundryResourceId": key[2], "Deployment": key[3], "Day": key[4]}
+        daily.append({**base, **aggregate(records)})
+        for length, kind in ((2, "Requester"), (3, "Foundry resource"), (4, "Deployment"), (5, "Day")):
+            group_key = key[:length]
+            group = groups.setdefault(group_key, {"base": base, "records": [], "kind": kind})
+            group["records"].extend(records)
+    totals = []
+    for key, group in sorted(groups.items()):
+        base = group["base"]
+        if len(key) == 2:
+            totals.append({name: base[name] for name in (
+                "RequesterKey", "Requester", "RequesterKind", "IdentityScope", "Currency")} | aggregate(group["records"]))
+        tree.append({**aggregate(group["records"]), "Currency": key[1], "RequesterKind": base["RequesterKind"],
+                     "Kind": group["kind"], "Name": base["Requester"] if len(key) == 2 else key[-1],
+                     "Id": json.dumps(key, separators=(",", ":")),
+                     "ParentId": "" if len(key) == 2 else json.dumps(key[:-1], separators=(",", ":"))})
+    return {"totals": totals, "daily": daily, "tree": tree}
+
+
+def _requester_rollup(*dimensions):
+    return """RequesterLeaves
+| summarize Requests=sum(Requests), PricedRequests=sum(PricedRequests), UnpricedRequests=sum(UnpricedRequests),
+    UnknownCategoryRequests=sum(UnknownCategoryRequests), InputCost=sum(InputCost), OutputCost=sum(OutputCost),
+    CachedInputCost=sum(CachedInputCost), CombinedInputCost=sum(CombinedInputCost),
+    EstimatedSubtotal=sum(EstimatedSubtotal) by """ + ", ".join((
+        "RequesterKey", "Requester", "RequesterKind", "IdentityScope", "Currency", *dimensions)) + """
+| extend InputCost=iff(PricedRequests > 0 and UnknownCategoryRequests == 0, InputCost, real(null)),
+    CachedInputCost=iff(PricedRequests > 0 and UnknownCategoryRequests == 0, CachedInputCost, real(null)),
+    OutputCost=iff(PricedRequests > 0, OutputCost, real(null)),
+    CombinedInputCost=iff(PricedRequests > 0, CombinedInputCost, real(null)),
+    EstimatedSubtotal=iff(PricedRequests > 0, EstimatedSubtotal, real(null))
+"""
+
+
+def _requester_tree():
+    return (
+        "let RequesterNodes = " + _requester_rollup() + """
+| extend Id=tostring(pack_array(RequesterKey, Currency)), ParentId='', Kind='Requester', Name=Requester;
+let FoundryNodes = """ + _requester_rollup("FoundryResourceId") + """
+| extend Id=tostring(pack_array(RequesterKey, Currency, FoundryResourceId)),
+    ParentId=tostring(pack_array(RequesterKey, Currency)), Kind='Foundry resource', Name=FoundryResourceId;
+let DeploymentNodes = """ + _requester_rollup("FoundryResourceId", "Deployment") + """
+| extend Id=tostring(pack_array(RequesterKey, Currency, FoundryResourceId, Deployment)),
+    ParentId=tostring(pack_array(RequesterKey, Currency, FoundryResourceId)), Kind='Deployment', Name=Deployment;
+union RequesterNodes, FoundryNodes, DeploymentNodes, (
+    RequesterLeaves
+    | extend Id=tostring(pack_array(RequesterKey, Currency, FoundryResourceId, Deployment, format_datetime(Day, 'yyyy-MM-dd'))),
+        ParentId=tostring(pack_array(RequesterKey, Currency, FoundryResourceId, Deployment)),
+        Kind='Day', Name=format_datetime(Day, 'yyyy-MM-dd'))
+| project Name, Kind, RequesterKind, Currency, InputCost, OutputCost, CachedInputCost, CombinedInputCost,
+    EstimatedSubtotal, Requests, PricedRequests, UnpricedRequests, UnknownCategoryRequests, IdentityScope, Id, ParentId
+| order by Id asc
+""")
 
 
 def build_workbook(configuration=None):
     config = validate_config(EMPTY_CONFIG if configuration is None else configuration)
     query = (HERE / "ai-gateway-finops.kql").read_text(encoding="utf-8")
+    spec = importlib.util.spec_from_file_location("foundry_billing", HERE / "foundry_billing.py")
+    billing = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(billing)
     parameters = [
         {"id": "finops-workspaces", "name": "Workspaces", "type": 5, "isRequired": True,
-         "multiSelect": True, "value": [], "queryType": 1,
+         "multiSelect": True, "value": [], "quote": "'", "delimiter": ",", "queryType": 1,
          "resourceType": "microsoft.resourcegraph/resources",
+         "crossComponentResources": ["value::all"],
          "query": "Resources | where type =~ 'microsoft.operationalinsights/workspaces' | project value=id, label=id, selected=false | order by label asc",
          "typeSettings": {
-             "resourceTypeFilter": ["microsoft.operationalinsights/workspaces"],
              "additionalResourceOptions": [], "showDefault": False}},
         {"id": "finops-time", "name": "TimeRange", "type": 4, "isRequired": True,
-         "value": {"durationMs": 604800000}, "typeSettings": {"selectableValues": [
+         "value": {"durationMs": 2592000000}, "typeSettings": {"selectableValues": [
              {"durationMs": 3600000}, {"durationMs": 86400000}, {"durationMs": 604800000},
              {"durationMs": 2592000000}]}},
         {"id": "finops-group", "name": "GroupBy", "type": 2, "isRequired": True,
@@ -280,26 +491,80 @@ def build_workbook(configuration=None):
          "value": json.dumps(config, separators=(",", ":")), "label": "Reviewed configuration JSON",
          "typeSettings": {"editorLanguage": "json", "multiLineText": True, "multiLineHeight": 160}},
     ]
+    parameters.extend(billing.billing_parameters())
+    for parameter in parameters:
+        parameter["version"] = "KqlParameterItem/1.0"
     intro = (
         f"# {DISPLAY_NAME}\n\n"
         "**Estimated showback, not an invoice.** Select the existing Log Analytics workspace(s) "
         "receiving APIM LLM and gateway logs. No telemetry/resource discovery is required to deploy "
-        "this workbook. Default: last 7 days, no prices and no trusted enrichment sources.\n\n"
+        "this workbook. Default: last 30 days, no prices and no trusted enrichment sources.\n\n"
         "Native logs immediately report observed input/output/total tokens; unknown, interrupted or "
         "conflicting usage remains blank, never zero. Prices require the optional trusted metadata "
         "event for completed, text-only OpenAI Chat Completions/Responses and an exact effective "
         "reviewed rate. No native cached-token field is assumed. PTU, images, audio, tools and "
         "other provider meters are not priced. Reasoning tokens are already part of output.\n\n"
         "Application/team mapping uses **APIM consumer subscription IDs, not Azure subscription IDs**. "
-        "User means a server-validated HMAC pseudonym, not a gateway managed identity or a caller header. "
-        "Unmapped/unknown identities remain visible. Distinct users across multiple gateways are "
-        "gateway-scoped pseudonyms and are not an organization-wide unique population.\n\n"
+        "Requester means either an explicitly opted-in, server-validated **Entra tenant ID + object ID + kind "
+        "(user/serviceprincipal)** or a scope-local HMAC pseudonym. Only the Entra tuple aggregates the same "
+        "requester across gateways/Foundry instances; old pseudonyms remain gateway-scoped. No email, UPN, "
+        "names, prompts, credentials, resource creators or deployers are used for attribution. A service principal "
+        "is shown only when it actually authenticated the request, never just because it owns a resource.\n\n"
+        "**Requester estimates are incomplete observed showback, not billed user costs.** Actual Azure billing "
+        "cannot attribute individual requesters. Unknown identities and unknown Foundry targets remain visible. "
+        "Exact Foundry ARM attribution requires a server-validated target or a reviewed exact effective backend "
+        "mapping, never a hostname guess. Direct Foundry calls appear only with this trusted final-usage contract "
+        "and a direct-Foundry reviewed rate; native gateway logs cannot cover them. Ordinary Function runtime "
+        "traces are not usage/identity evidence. If that is all the workspace contains, requester cost is "
+        "**unavailable**, not zero; collection is not enabled by this workbook.\n\n"
+        "Expand requester → Foundry resource → deployment → day below. Each currency is separate. "
+        "InputCost excludes cached input; reasoning is already in OutputCost. When the cache split is absent "
+        "but input/cache rates match, only CombinedInputCost and the subtotal are known; InputCost and "
+        "CachedInputCost stay blank. UnpricedRequests and UnknownCategoryRequests expose incomplete coverage. "
+        "Parent rows aggregate leaves once: never add parent and child rows together.\n\n"
         "See `environment_setup/aigateway/readme.md` → **AI gateway FinOps workbook** for setup, "
         "the metadata producer, import steps and rate configuration. Empty results: check the time "
         "range, selected workspace, collection, RBAC and private-network access. This workbook "
         "does not turn on diagnostics or change gateway policies."
     )
     sections = [
+        ("requester-coverage", "Requester estimates — telemetry and attribution coverage", "table", """
+Usage
+| summarize ObservedRequests=count(), TrustedUsageEvents=countif(HasEvent),
+    KnownRequesters=countif(RequesterKind != 'unknown'), KnownFoundryTargets=countif(FoundryResourceId != 'Unknown'),
+    PricedRequests=countif(isnotnull(EstimatedCost)), UnpricedRequests=countif(isnull(EstimatedCost)),
+    UnknownCategoryRequests=countif(isnotnull(EstimatedCost) and isnull(InputCost))
+| extend Status=case(TrustedUsageEvents == 0,
+        'NO TRUSTED REQUESTER DATA: unavailable, not zero. Runtime traces/native billing do not contain the required validated identity + final provider usage contract. Collection is not enabled by this workbook.',
+    KnownRequesters == 0, 'UNKNOWN REQUESTERS: trusted usage exists but no validated Entra or scoped pseudonym identity is present.',
+    'INCOMPLETE OBSERVED ESTIMATES: only trusted unsampled completed supported usage with reviewed rates is priced; not billed user cost.'),
+    DirectFoundryCoverage='Only explicit trusted direct-Foundry events; no claim to cover uninstrumented calls',
+    IdentityCoverage='Cross-scope totals only for validated tenant/object/kind; pseudonyms remain scoped',
+    TargetCoverage='Unknown remains unknown; no owner/deployer attribution or hostname-to-ARM inference',
+    IgnoredUntrustedEvents=UntrustedEventCount
+"""),
+        ("requester-totals", "Requester TOTAL across observed Foundry resources and deployments — separate currencies", "table",
+         _requester_rollup() + """
+| project Requester, RequesterKind, IdentityScope, Currency, InputCost, OutputCost, CachedInputCost,
+    CombinedInputCost, EstimatedSubtotal, Requests, PricedRequests, UnpricedRequests, UnknownCategoryRequests
+| order by Requester asc, Currency asc
+"""),
+        ("requester-hierarchy", "Expand requester → Foundry resource → deployment → day (estimated, not billed)", "table",
+         _requester_tree()),
+        ("requester-daily", "Daily requester estimates by Foundry resource and deployment — unknown categories stay blank", "table", """
+RequesterLeaves
+| project Day, Requester, RequesterKind, IdentityScope, FoundryResourceId, Deployment, Currency,
+    InputCost, OutputCost, CachedInputCost, CombinedInputCost, EstimatedSubtotal,
+    Requests, PricedRequests, UnpricedRequests, UnknownCategoryRequests
+| order by Day desc, Requester asc, FoundryResourceId asc, Deployment asc, Currency asc
+"""),
+        ("requester-daily-trend", "Daily requester estimated subtotal across all observed targets — currency-labelled series", "timechart",
+         _requester_rollup("Day") + """
+| where PricedRequests > 0
+| project Day, Series=strcat(Requester, iff(RequesterKind == 'unknown', strcat(' (', IdentityScope, ')'), ''),
+    ' [', Currency, ']'), EstimatedSubtotal
+| order by Day asc
+"""),
         ("coverage", "Observed request coverage and token totals (not all gateway traffic)", "table", """
 Usage
 | summarize ObservedRequests=count(), KnownUsage=countif(UsageKnown),
@@ -359,10 +624,18 @@ Usage
 """),
     ]
     items = [
-        {"type": 1, "name": "overview", "content": {"json": intro}},
+        {"type": 1, "name": "overview", "content": {"json":
+            f"# {DISPLAY_NAME}\n\n"
+            "**Last 30 days:** live billed costs by Foundry resource, deployment and daily token meter, "
+            "followed by separately labelled requester estimates across observed Foundry resources. "
+            "Current-period billing is not an invoice. Billing works without a workspace. "
+            "Requester identity and estimates require trusted usage telemetry; "
+            "missing history stays unavailable, never assigned to a resource owner or reported as free."}},
         {"type": 9, "name": "finops-parameters", "content": {
             "version": "KqlParameterItem/1.0", "parameters": parameters, "style": "above"}},
     ]
+    items.extend(billing.billing_items())
+    items.append({"type": 1, "name": "requester-explanation", "content": {"json": intro}})
     for name, title, visualization, suffix in sections:
         items.append({"type": 3, "name": name, "content": {
             "version": "KqlItem/1.0", "title": title, "query": query + "\n" + suffix.strip(),
@@ -371,6 +644,12 @@ Usage
             "visualization": visualization,
             "noDataMessage": "No matching observations/prices. Check coverage, collection, access and reviewed configuration; no data is not zero cost.",
         }})
+        if name == "requester-hierarchy":
+            items[-1]["content"]["gridSettings"] = {
+                "formatters": [{"columnMatch": column, "formatter": 5} for column in ("Id", "ParentId")],
+                "hierarchySettings": {"treeType": 0, "idColumn": "Id", "parentColumn": "ParentId",
+                                      "expanderColumn": "Name", "expandTopLevel": True},
+            }
     return {"version": "Notebook/1.0", "items": items, "fallbackResourceIds": ["Azure Monitor"], "isLocked": False}
 
 
@@ -390,7 +669,17 @@ def load_config(path):
 
 
 def _validate_saved_parameter(name, value):
-    if name == "Workspaces":
+    if name == "BillingSubscription":
+        if value not in (None, "", "value::1") and (
+                not isinstance(value, str) or not re.fullmatch(
+                    r"(?:/subscriptions/)?[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", value, re.I)):
+            raise ValueError("Saved BillingSubscription must be an Azure subscription ID")
+    elif name == "BillingResource":
+        if value:
+            _resource(value, "Microsoft.CognitiveServices", "accounts")
+        elif value not in (None, ""):
+            raise ValueError("Saved BillingResource must be a Foundry resource ID")
+    elif name == "Workspaces":
         if not isinstance(value, list) or len(value) > 100:
             raise ValueError("Saved Workspaces must be an array of at most 100 workspace resource IDs")
         for resource_id in value:
@@ -456,7 +745,9 @@ def render_workbook(configuration=None, existing_serialized_data=None, *, config
                 if not isinstance(values, list):
                     raise ValueError("Existing workbook parameters must be an array")
                 parameters.extend(value for value in values if isinstance(value, dict)
-                                  and value.get("name") in {"Configuration", "Workspaces", "TimeRange", "GroupBy"})
+                                  and value.get("name") in {
+                                      "Configuration", "Workspaces", "TimeRange", "GroupBy",
+                                      "BillingSubscription", "BillingResource"})
             elif item.get("type") == 12:
                 collect(content.get("items", []))
 
@@ -472,7 +763,7 @@ def render_workbook(configuration=None, existing_serialized_data=None, *, config
                for parameter in item["content"]["parameters"]}
     for parameter in parameters:
         name = parameter["name"]
-        if name != "Configuration":
+        if name != "Configuration" and "value" in parameter:
             targets[name]["value"] = _validate_saved_parameter(name, parameter.get("value"))
     return rendered
 

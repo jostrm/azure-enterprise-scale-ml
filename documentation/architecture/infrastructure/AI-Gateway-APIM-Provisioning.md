@@ -22,6 +22,7 @@ sources:
   - environment_setup/aifactory/variables.json
   - documentation/v2/20-29/29-factory-AI-Gateways.md
   - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai_gateway_finops.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/foundry_billing.py
   - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai-gateway-finops.kql
   - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops/ai-gateway-finops.workbook.json
   - environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py
@@ -36,6 +37,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_pipeline_feature_contracts.py
   - environment_setup/unit-tests/test-bicep/unit/test_mcp_ai_gateway_flags.py
   - environment_setup/unit-tests/test-bicep/test_ai_gateway_finops.py
+  - environment_setup/unit-tests/test-bicep/test_foundry_billing.py
   - environment_setup/unit-tests/test-bicep/test_aifactory_dashboard.py
   - environment_setup/unit-tests/test-bicep/test_dashboard_only.py
 graph_symbols:
@@ -132,3 +134,33 @@ configuration, and plan/deploy commands.
 This addition describes source and offline evidence only. No live workspace query,
 portal workbook execution, APIM configuration change, or Azure deployment is established
 by this note. Earlier provisioning observations above retain their original scope.
+
+### Thirty-day billing and requester drilldowns
+
+The workbook now composes `foundry_billing.py` live Azure Resource Manager
+Cost Management queries with the separate log-based requester estimates.
+The billing path filters actual resource IDs and the `deployment` billing tag,
+retaining daily raw meters (including cache read/write and non-token charges)
+and separate currencies. Its POST results expose pagination and column-schema
+status instead of claiming an incomplete page is the entire bill.
+
+Requester estimates support explicit validated Entra tenant/object/kind identity
+across gateways and direct Foundry calls. Direct calls require a validated
+Foundry target and exact reviewed direct-scope rates. Scope-local pseudonyms
+remain supported but are not an organization-wide identity. Parent/child
+requester, Foundry, deployment and day nodes aggregate leaves only once.
+
+Observed live on Spider on 2026-11-25: the workbook was saved and opened through
+its common-dashboard tile, with existing tiles retained; deployment selection
+returned daily billed input, output, cache-read and cache-write rows and a chart.
+Read-only synthetic KQL fixtures exercised requester aggregation without
+ingesting test events. Existing Spider telemetry did not contain trusted
+requester usage, so real historical requester costs remain unavailable.
+No gateway, diagnostics, networking or RBAC changes were made by this rollout.
+
+The workbook API rejects `If-None-Match` on creation and sometimes returns a
+code-less exact-resource HTTP 404. The adapter recognizes only that exact
+absence response, rechecks before create, and uses an unconditional create
+under a single-writer assumption. This does not claim atomic create-only
+protection. Existing-workbook updates use the saved ETag in header and body,
+which was accepted by the live service; failed/uncertain writes are not retried.

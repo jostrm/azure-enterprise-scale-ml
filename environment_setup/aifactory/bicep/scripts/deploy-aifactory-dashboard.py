@@ -180,6 +180,23 @@ def finops_command(config, method: str) -> tuple[str, ...]:
             "--url", url, "--only-show-errors")
 
 
+def finops_workbook_missing(config, command: tuple[str, ...], result: subprocess.CompletedProcess[str]) -> bool:
+    """Recognize absence only for the exact workbook GET, before CLI error sanitization."""
+    if tuple(command) != finops_command(config, "get") or not result.returncode:
+        return False
+    code = error_code(result)
+    if code is not None:
+        return code == "ResourceNotFound"
+    match = re.fullmatch(r"ERROR: Not Found\((\{.*\})\)", result.stderr.strip(), re.S)
+    if not match:
+        return False
+    try:
+        payload = json.loads(match[1])
+    except ValueError:
+        return False
+    return payload == {"Message": f"Resource '{config.finops_workbook_id}' is not found."}
+
+
 def prepare_finops_workbook(config, inventory: dict, az: Az) -> dict:
     """Read/validate without writes; never replace unreadable or unmanaged saved settings."""
     result = az(*finops_command(config, "get"))
@@ -187,7 +204,7 @@ def prepare_finops_workbook(config, inventory: dict, az: Az) -> dict:
     saved = None
     etag = None
     if result.returncode:
-        if error_code(result) != "ResourceNotFound":
+        if not finops_workbook_missing(config, finops_command(config, "get"), result):
             raise RuntimeError("Unable to read the AI Gateway FinOps workbook. Verify DEV common workbook read access; no writes attempted.")
     else:
         try:
@@ -220,7 +237,7 @@ def prepare_finops_workbook(config, inventory: dict, az: Az) -> dict:
             **ownership_tags(inventory),
         },
         "properties": {
-            "displayName": FINOPS_TITLE,
+            "displayName": existing["properties"].get("displayName", FINOPS_TITLE) if existing else FINOPS_TITLE,
             "serializedData": json.dumps(workbook, ensure_ascii=False),
             "version": "Notebook/1.0", "sourceId": "Azure Monitor", "category": "workbook",
         },
@@ -240,17 +257,34 @@ def prepare_finops_workbook(config, inventory: dict, az: Az) -> dict:
 
 
 def deploy_finops_workbook(config, prepared: dict, az: Az, *, directory: Path | None = None) -> None:
+    """Create only after a fresh absence check; update with the saved ETag.
+
+    Workbook API 2021-08-01 rejects If-None-Match. Creation therefore assumes a
+    single writer: another writer can still race the final GET and unconditional
+    PUT. Stop if the workbook appeared since preparation; never retry a write.
+    """
     if prepared["action"] == "unchanged":
         return
+    headers = ("Content-Type=application/json",)
+    if prepared["action"] == "update":
+        headers = (f"If-Match={prepared['etag']}", *headers)
+    elif prepared["action"] != "create" or prepared["etag"] is not None or "etag" in prepared["body"]:
+        raise RuntimeError("Invalid AI Gateway FinOps workbook create request; no writes attempted.")
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", encoding="utf-8", delete=False,
                                      dir=directory or Path.cwd()) as handle:
         json.dump(prepared["body"], handle, ensure_ascii=False)
         path = Path(handle.name)
     try:
+        if prepared["action"] == "create":
+            command = finops_command(config, "get")
+            check = az(*command)
+            if not finops_workbook_missing(config, command, check):
+                raise RuntimeError(
+                    "AI Gateway FinOps workbook appeared or could not be confirmed absent before creation; "
+                    "no writes attempted. Rerun to preserve its saved settings."
+                )
         result = az(
-            *finops_command(config, "put"), "--headers",
-            f"If-Match={prepared['etag']}" if prepared["etag"] is not None else "If-None-Match=*",
-            "Content-Type=application/json", "--body", f"@{path}",
+            *finops_command(config, "put"), "--headers", *headers, "--body", f"@{path}",
         )
     finally:
         path.unlink(missing_ok=True)
@@ -1167,9 +1201,10 @@ def dashboard_parts(inventory: dict, tenant_id: str, finops_workbook_id: str = "
         parts.append(markdown_part(
             0, bottom, 3 * ENVIRONMENT_WIDTH, 3,
             f"## {FINOPS_TITLE}\n\n[Open AI Gateway FinOps workbook]({url})\n\n"
-            "Requests, tokens and estimated usage costs by app, user, model, deployment and group. "
-            "Estimates are not billed costs. Select an existing authorized workspace in the workbook; "
-            "missing telemetry and unknown pricing are shown explicitly. No gateway or diagnostics changes.",
+            "Last 30 days: live Foundry billed costs by resource, deployment and daily input/output/cache meter. "
+            "Separate requester estimated costs include daily totals and Foundry/deployment drilldown. "
+            "Select a billing resource; requester estimates also need an authorized telemetry workspace. "
+            "Missing history stays unavailable, not zero. No gateway or diagnostics changes.",
         ))
     return parts
 

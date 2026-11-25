@@ -2,7 +2,7 @@
 
 ![AI Factory architecture: project-owned Foundry and shared APIM model endpoints on one enterprise foundation](images/foundry-project-and-gateway-architecture.png)
 
-The [supported APIM gateway](apim/readme.md) and its log-based FinOps workbook are
+The [supported APIM gateway](apim/readme.md) and its FinOps workbook are
 described first. The existing Kong deployment guide is retained below; **Kong
 file logs are not an input to this APIM workbook**.
 
@@ -11,10 +11,11 @@ file logs are not an input to this APIM workbook**.
 **AI Gateway - Usage and Cost by App and User** is a reusable Azure Monitor
 workbook in
 [`automation/coreteam/finops`](../aifactory/bicep/copy_to_local_settings/automation/coreteam/finops).
-It reports observed requests, input/output/total tokens, application/user/pricing
-coverage, grouped breakdowns, daily token/cost trends and actionable gaps.
+It separates **live Azure Cost Management billed costs** from log-based observed
+requests, input/output/total tokens, application/user/pricing coverage, estimated
+showback, daily trends and actionable gaps.
 Group by **application, APIM subscription, user, team, deployment, model or day**.
-It queries logs, not high-cardinality custom metrics.
+The usage/estimated-showback view queries logs, not high-cardinality custom metrics.
 
 ### Open or import
 
@@ -28,15 +29,117 @@ It queries logs, not high-cardinality custom metrics.
   apply and save as **AI Gateway - Usage and Cost by App and User** in the common
   resource group. Its resource source is `Azure Monitor`; no resource IDs need
   replacing in the default file.
-- Select the **existing Log Analytics workspace(s)** receiving the logs. The
+- For **billed costs**, select a **Billing subscription**, then a **Billed Foundry /
+  OpenAI resource**. No Log Analytics workspace or rate configuration is required.
+- For **usage and estimated showback**, select the **existing Log Analytics
+  workspace(s)** receiving the logs. The
   resource picker lists accessible workspaces in the portal's selected/default
   subscriptions through Resource Graph; this is resource selection, not telemetry
   discovery. Adjust the portal subscription filter if the workspace is absent.
-  Start with the default **last 7 days**; widen only as needed.
+  Start with the default **last 30 days**; narrow for detailed billing queries.
 
 The shipped configuration has **empty rates, mappings and trusted telemetry
 sources**. Native token reporting still works; it never invents prices.
 Blank cost means *unknown/unpriced*, not free.
+
+### Live billed cost: Foundry resource → deployment → daily meters
+
+The billed-cost view calls the first-party **Azure Resource Manager** workbook
+data source (`queryType: 12`, `ARMEndpoint/1.0`) with a synchronous **POST** to
+`Microsoft.CostManagement/query?api-version=2025-03-01`. It requests **ActualCost**,
+the shared time range as a custom UTC interval, and `Sum(Cost)`. No historical bill
+snapshot, retail price list or inferred token price is embedded in the workbook.
+The pure-stdlib `foundry_billing.py` builder only generates workbook fragments;
+Azure queries execute in the portal under the workbook reader's identity.
+
+1. Select the subscription and an accessible `AIServices`/`OpenAI` account. The
+   optional subscription overview shows billed costs by resource ID and currency
+   for **all Cognitive Services accounts**, including other kinds and historical
+   resources. The current-resource picker is restricted to Foundry/OpenAI.
+2. The deployment table filters the selected **ResourceId** and groups by the
+   actual billing tag **`deployment`**. Click a nonblank deployment row to see its
+   daily **Meter**, **Cost** and **Currency** rows. The selected resource,
+   deployment, dates and currency are shown explicitly. Subscription scope for
+   each resource drill is derived from that resource's ARM ID.
+3. Use the optional daily meter trend for the selected row's currency, or open
+   **daily costs for all deployments, including unattributed**. The all-deployment
+   table groups by `deployment` and `Meter`, with daily granularity and no more
+   than two API grouping expressions. Currency is supplied by billing, never
+   defaulted to USD or converted.
+4. **Input, output, cache-read and cache-write costs** are separate raw billing-meter rows
+   when Azure reports separate meters. Raw Meter names are preserved rather than
+   guessed from model/deployment names. Missing cache meters are unavailable/not
+   separately reported, not assumed zero. Cache-write meters remain distinct from
+   cached-input/cache-read meters; they are not merged or double-counted.
+   Combined/unknown meters, audio/image,
+   tool, hosting, PTU/reservation and negative adjustment rows remain visible.
+   The grid's search can narrow displayed meter names.
+5. Blank deployment tags mean **Unattributed**. They remain in all-deployment
+   detail; no model name is used to invent a deployment. If the billing scope
+   doesn't support the tag, use **daily resource meters — no deployment tag
+   required**. Marketplace/SaaS charges assigned to a different resource ID are
+   outside the account-filtered view; use resource-group/subscription Cost Analysis
+   to include those charges.
+
+**Completeness is explicit:** native workbook POST does **not** paginate Cost
+Management's `properties.nextLink`. Every result has a visible response-status
+table with **NextPage**, an **INCOMPLETE** warning when populated, and returned
+column metadata. A nonempty next link means the amounts shown cover only the
+returned page: do not sum or report them as a complete bill. Narrow the date/
+resource/deployment selection or use **Cost Analysis / exports** with complete
+pagination. Status is a separate live request, not an atomic snapshot of the
+displayed rows; a failed/missing status is unverified. Compare returned columns
+with the documented expected order before interpreting values. Tag grouping
+returns **TagKey and TagValue**; DeploymentTag displays the **TagValue**, never the
+constant key. The daily `deployment`-then-`Meter` response order is **Cost,
+UsageDate, TagKey, TagValue, Meter, Currency**. Optional views load only when opened
+to reduce requests and 429s.
+
+Readers need **Cost Management Reader** or equivalent billing access at the
+subscription scope and permission to discover the resource. Workbook deployment
+doesn't grant access or change collection. Empty/204, denied/403, throttled/429,
+unsupported billing scopes and missing tags are unavailable data, not zero spend;
+use the included Cost Analysis link and check the same scope and dates. Wait
+before retrying a throttled request.
+
+Billed costs normally arrive **8–24 hours** after usage, at your actual prices,
+before invoice credits and taxes. Current-period costs can change before invoice
+finalization; **this view is not an invoice**. Any signed adjustments that the API
+does return are retained. The API does not identify individual requesting users:
+historical per-user costs cannot be reconstructed from billing meters or a
+gateway's managed identity. Per-user showback requires the separately described
+trusted usage telemetry and remains an estimate, never silently allocated billed
+cost.
+
+References: [Workbook ARM data source and POST limitations](https://learn.microsoft.com/azure/azure-monitor/visualize/workbooks-data-sources#azure-resource-manager),
+[Cost Management Query API](https://learn.microsoft.com/rest/api/cost-management/query/usage?view=rest-cost-management-2025-03-01),
+[Foundry meter/deployment-tag cost analysis](https://learn.microsoft.com/azure/foundry/how-to/analyze-costs-cost-management),
+and [cost data timing and invoice limitations](https://learn.microsoft.com/azure/foundry/concepts/manage-costs).
+
+### Requester → Foundry resource → deployment → day: estimated showback
+
+The separate requester view shows **totals, an expandable hierarchy, daily rows
+and daily trends**, keeping currencies separate. Requester means the actual
+authenticated **user or service principal**, not a resource owner, creator,
+deployer, APIM developer account or backend identity. Expand requester → Foundry
+resource → deployment → day. Parent rows already aggregate their leaves: never
+add parent and child rows together.
+
+Cross-resource/cross-gateway requester totals require the explicitly opted-in,
+server-validated **Entra tenant ID + object ID + requester kind** tuple described
+below. Default HMAC pseudonyms remain metering-scope-local. Unknown requesters and
+unknown Foundry targets stay visible, with `UnpricedRequests` and
+`UnknownCategoryRequests` exposing incomplete coverage. Exact target attribution
+comes from server-validated routing or the reviewed effective backend mapping,
+never a hostname guess.
+
+These are **incomplete observed estimates, not billed user costs**. Ordinary
+Function/runtime traces, native billing and resource ownership do not supply the
+validated requester identity plus final provider-usage contract. If those are all
+the selected workspace contains, requester cost is **unavailable, not zero**.
+Historical requester identity cannot be backfilled from them. Direct Foundry calls
+appear only when the trusted direct-call contract below was already collected.
+This workbook enables no diagnostics or telemetry.
 
 ### Existing telemetry prerequisites (operator-controlled)
 
@@ -107,8 +210,17 @@ inputs before use:
 }
 ```
 
-Rates match **gateway + actual backend DNS host + deployment + returned model**
+Rates match **metering scope + actual backend DNS host + deployment + returned model**
 exactly, within `[validFrom, validTo)`, using the response observation's UTC time.
+The metering scope is the gateway ARM ID for APIM calls, or the exact Foundry ARM
+ID for direct calls. The root configuration remains exactly `applications`,
+`rates` and `trustedTelemetryResourceIds`. A rate may additionally include
+**`foundryResourceId`**, a full `Microsoft.CognitiveServices/accounts` ARM ID, to
+map that exact effective backend/deployment/model to its target. Omit
+`gatewayResourceId` (or set it to `""`) only when `foundryResourceId` is present:
+that is a **direct-Foundry rate**, never a wildcard across gateways. Overlapping
+rates in the same metering scope remain invalid even if their Foundry target
+fields differ. Conflicting observed/mapped targets fail closed as unknown/unpriced.
 Backend pool names are not backend hosts. Include every eligible pool backend,
 model version, deployment, region/offer-specific rate and effective interval.
 No wildcard rates, currency conversion or overlapping intervals are accepted.
@@ -127,6 +239,10 @@ Cached input is a **subset** of input, subtracted exactly once. Reasoning is
 normally already included in output, never added again. When a completed
 text-only event has no cache field, pricing is permitted only if the reviewed
 cached and uncached input rates are identical; no zero cache count is invented.
+In that case `CombinedInputCost` and the subtotal can be known, but `InputCost`
+and `CachedInputCost` remain null because the category split is unknown.
+Otherwise `InputCost` excludes cached input and `OutputCost` includes reasoning
+tokens already counted by the provider.
 Audio, images, tool/search charges, prediction/other token detail meters and
 other providers are not priced. The application must enforce text-only eligibility;
 token totals alone cannot prove absence of additional meters. Missing rates,
@@ -162,7 +278,7 @@ edits cannot be recovered. Malformed, missing or ambiguous saved configuration
 must fail validation rather than silently erase rates. Preserve rates in the
 consumer repository for change review; other manual workbook/query edits are
 replaced by the canonical report on deployment. Without an explicit configuration,
-saved `Workspaces`, `TimeRange` and `GroupBy` values are also preserved after
+saved `Workspaces`, `TimeRange`, `GroupBy`, `BillingSubscription` and `BillingResource` values are also preserved after
 validation (workspace ARM IDs, supported grouping, and a positive time range of
 at most 366 days). An explicit configuration resets these selectors to canonical
 defaults along with replacing the configuration.
@@ -207,24 +323,46 @@ and saved in the **Dev common resource group**, avoiding a new workbook on every
 project/environment deployment. Existing saved content is fetched before
 rendering; conditional updates use its ETag rather than blindly overwriting
 concurrent portal edits.
+Creation rechecks exact-resource absence immediately before the write. The
+workbook API does not support `If-None-Match`, so serialize first-time deployments:
+there is no atomic create-only guarantee between the final read and write.
+The runner stops if the resource has appeared and does not retry uncertain writes.
 
-### Optional trusted per-user and pricing producer
+### Optional trusted requester and pricing producer
 
 `ai_gateway_finops.py` includes `make_usage_event` and `emit_usage_event`.
 Use them in the **authenticated server application**, not browser/mobile code:
 
-- Validate JWT signature, issuer, audience and delegated-user claims before
+- Validate JWT signature, issuer, audience and requester-kind claims before
   passing an opaque tenant-scoped subject (for example `tid:oid`). Do not accept
   `x-user` headers or infer a person from APIM/backend managed identity. For
-  app-only calls omit the user. `identity_validated=True` is an explicit assertion
+  app-only calls never label a service principal as a human; omit identity unless
+  the actual requesting principal is validated. `identity_validated=True` is an explicit assertion
   by your authentication middleware, **not verification performed by this helper**.
 - Load a private HMAC key (at least 32 bytes) from the application's approved
   secret facility. The producer emits a SHA-256 pseudonym, not the subject, key,
-  UPN or email. Pseudonyms are gateway-scoped; key rotation changes user grouping.
-- Obtain `correlation_id` from the trusted gateway response's `apim-request-id`,
+  UPN or email. Pseudonyms are metering-scope-local: gateway-scoped for APIM,
+  Foundry-resource-scoped for direct calls. Existing APIM hashes are unchanged;
+  key rotation changes grouping. `requester_kind` defaults to `"user"` for
+  pseudonyms; explicitly use `"serviceprincipal"` only for the actual validated
+  requesting application identity.
+- **Explicit Entra-ID opt-in:** instead of `authenticated_subject`, supply both
+  `entra_tenant_id` and `entra_object_id` as GUIDs, plus `requester_kind="user"` or
+  `"serviceprincipal"`, after the same application authentication checks and with
+  `identity_validated=True`. These IDs are emitted to trusted telemetry and allow
+  cross-scope aggregation. They cannot be combined with a pseudonym. Do not emit
+  names, UPNs, emails, credentials or identities inferred from deployment ownership.
+- For APIM, obtain `correlation_id` from the trusted gateway response's `apim-request-id`,
   verified against the native `CorrelationId`; never manufacture one from an
   untrusted client header. If your route does not expose it, an operator must
   review a correlation mechanism. No policy is changed by this package.
+- Optionally provide `foundry_resource_id` as the full accounts ARM ID with
+  `target_validated=True` only after the server confirms the actual routed target,
+  never from a caller header. For **direct Foundry calls**, omit
+  `gateway_resource_id` (or pass `None`/`""`), leave `apim_subscription_id=""`,
+  and provide this validated Foundry target; it is required. Supply a stable
+  server-controlled correlation ID for the direct request. Native APIM logs do
+  not cover direct calls.
 - Supply actual final `response.usage` (`model_dump()` for SDK objects). Streaming
   needs final usage (for Chat Completions request `stream_options.include_usage`
   where supported) **and successful terminal completion**. On disconnect/failure,
@@ -273,7 +411,12 @@ print(json.dumps(event, indent=2))
 Pop-Location
 ```
 
-One event per gateway correlation is the contract. Persist/retry the **same event**,
+The event name and `aifactory.ai-gateway.usage/v1` schema remain unchanged.
+Optional payload fields are `entra_tenant_id`, `entra_object_id`, `requester_kind`,
+`identity_validated`, `foundry_resource_id` and `target_validated`; legacy v1
+events without them remain supported.
+
+One event per metering-scope correlation is the contract. Persist/retry the **same event**,
 not a regenerated event with a different timestamp. Native request/response chunks,
 duplicate exports and duplicate events are reduced **before joins**. Conflicting
 token tuples, multiple provider request IDs/retries, conflicting gateway metadata,
@@ -281,9 +424,10 @@ or conflicting enriched events make usage/cost unknown rather than multiplying
 tokens. Native and enriched copies are never summed together. Missing native
 LLM logs can be supplemented by a trusted event, including supported Responses
 operations; normal gateway-only non-LLM requests are intentionally not counted.
-Joins use normalized gateway `_ResourceId` plus `CorrelationId`: identical
+APIM joins use normalized gateway `_ResourceId` plus `CorrelationId`: identical
 correlation IDs from different gateways stay separate, while duplicate exports
-of the same gateway request to selected workspaces are deduplicated. Native
+of the same gateway request to selected workspaces are deduplicated. Direct-call
+events use the validated Foundry scope plus correlation ID. Native
 `UserId` is an APIM developer identity and is not used as an end-user identity;
 `TenantId` is the Log Analytics workspace ID, not an Entra tenant claim. Pricing
 uses the actual `BackendUrl` host only (the full URL is neither emitted nor
@@ -301,18 +445,21 @@ of a weighted pool.
   End-user coverage is separate from application coverage. Shared application
   subscriptions, unknown identities and ambiguous mappings are not silently
   assigned to an individual. Team comes only from the reviewed subscription map.
-- Cost subtotals include **only priced rows**, by currency, with priced-request
+- Estimated-showback subtotals include **only priced rows**, by currency, with priced-request
   coverage beside them. They exclude unobserved retries, gateway/compute/storage/
   networking, logging overhead, PTU commitments, discounts, taxes and other meters.
   Reconcile separately against Cost Management actual/amortized costs; do not
   add these alternative accounting bases together.
-- Resource IDs, model/deployment names and HMAC pseudonyms are still sensitive
+- Resource IDs, model/deployment names, HMAC pseudonyms and opted-in Entra
+  tenant/object IDs are still sensitive
   operational metadata. Apply least-privilege workbook/workspace access, approved
   retention, regional/privacy rules and restricted report export. HMAC identifiers
   are pseudonymous, not a promise of anonymity. Avoid prompts, completions, auth
-  headers, API keys, raw identities, UPNs and email in telemetry or configuration.
+  headers, API keys, raw subjects, UPNs and email in telemetry or configuration.
+  Emitting the optional Entra IDs requires the corresponding privacy/retention approval.
 - Collection, retention and repeated log queries can incur Azure Monitor charges.
-  Start with seven days and the smallest workspace set. This package creates no
+  The default is 30 days; narrow it and use the smallest workspace set when possible.
+  This package creates no
   ingestion resource, diagnostic setting, RBAC assignment, schedule or network
   change and performs no billed model calls.
 
@@ -320,6 +467,7 @@ Offline verification:
 
 ```powershell
 python -m unittest discover -s .\environment_setup\unit-tests\test-bicep -p test_ai_gateway_finops.py
+python -m unittest discover -s .\environment_setup\unit-tests\test-bicep -p test_foundry_billing.py
 ```
 
 Tests cover generated workbook consistency, safe parameter substitution,

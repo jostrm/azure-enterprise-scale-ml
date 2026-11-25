@@ -839,6 +839,99 @@ class TestAifactoryDashboard(unittest.TestCase):
         link = next(p for p in parts if "AI Gateway - Usage and Cost" in json.dumps(p))
         self.assertIn(f"/ConfigurationId/{quote(config.finops_workbook_id, safe='')}/Type/workbook", json.dumps(link))
 
+    def test_finops_exact_codeless_404_creates_after_fresh_read_without_precondition(self) -> None:
+        config = self.config()
+        calls = []
+
+        def azure(*args):
+            calls.append(args)
+            if args == module.finops_command(config, "get"):
+                return response(error="ERROR: Not Found(" + json.dumps({
+                    "Message": f"Resource '{config.finops_workbook_id}' is not found.",
+                }, indent=2) + ")")
+            self.assertEqual(module.finops_command(config, "put"), args[:8])
+            self.assertFalse(any(arg.startswith("If-") for arg in args))
+            return response({})
+
+        prepared = module.prepare_finops_workbook(config, {}, azure)
+        self.assertEqual("create", prepared["action"])
+        module.deploy_finops_workbook(config, prepared, azure, directory=ROOT)
+        self.assertEqual(["get", "get", "put"], [c[4] for c in calls])
+
+    def test_finops_codeless_missing_is_scoped_not_global(self) -> None:
+        config = self.config()
+        command = module.finops_command(config, "get")
+        message = {"Message": f"Resource '{config.finops_workbook_id}' is not found."}
+        missing = response(error="ERROR: Not Found(" + json.dumps(message) + ")")
+        self.assertIsNone(module.error_code(missing))
+        self.assertTrue(module.finops_workbook_missing(config, command, missing))
+        for altered in (
+            module.finops_command(config, "put"),
+            (*command[:6], command[6].replace("management.azure.com", "example.com"), command[7]),
+            (*command[:2], TEST_SUB, *command[3:]),
+            (*command[:6], command[6].replace("&canFetchContent=true", ""), command[7]),
+        ):
+            with self.subTest(command=altered):
+                self.assertFalse(module.finops_workbook_missing(config, altered, missing))
+        self.assertFalse(module.finops_workbook_missing(
+            config, command, subprocess.CompletedProcess(command, 0, "", missing.stderr),
+        ))
+
+    def test_finops_uncertain_reads_never_create(self) -> None:
+        config = self.config()
+        exact = json.dumps({"Message": f"Resource '{config.finops_workbook_id}' is not found."})
+        errors = [
+            "ERROR: Not Found(" + exact.replace(config.finops_workbook_id, "/foreign/workbook") + ")",
+            "ERROR: Forbidden(" + exact + ")",
+            "ERROR: Not Found({unparseable})",
+            "ERROR: Not Found(" + json.dumps({"Message": "Table 'Requests' is not found."}) + ")",
+            "ERROR: Not Found(" + exact + ") trailing secret",
+            "ERROR: Not Found(" + json.dumps({"Message": f"Resource '{config.finops_workbook_id}' is not found.",
+                                            "error": {"code": "AuthorizationFailed"}}) + ")",
+        ]
+        for error in errors:
+            with self.subTest(error=error):
+                calls = []
+
+                def azure(*args):
+                    calls.append(args)
+                    return response(error=error)
+
+                with self.assertRaisesRegex(RuntimeError, "Unable to read"):
+                    module.prepare_finops_workbook(config, {}, azure)
+                self.assertEqual([module.finops_command(config, "get")], calls)
+
+    def test_finops_create_rechecks_and_never_overwrites_appeared_or_unreadable_workbook(self) -> None:
+        config = self.config()
+        for recheck in (response({"etag": '"appeared"', "properties": {"displayName": "Saved"}}),
+                        response(error='{"error":{"code":"AuthorizationFailed"}}')):
+            with self.subTest(recheck=recheck):
+                calls = []
+
+                def azure(*args):
+                    calls.append(args)
+                    if len(calls) == 1:
+                        return response(error='{"error":{"code":"ResourceNotFound"}}')
+                    return recheck
+
+                prepared = module.prepare_finops_workbook(config, {}, azure)
+                with self.assertRaisesRegex(RuntimeError, "no writes attempted"):
+                    module.deploy_finops_workbook(config, prepared, azure, directory=ROOT)
+                self.assertEqual([module.finops_command(config, "get")] * 2, calls)
+
+    def test_finops_uncertain_write_is_never_retried(self) -> None:
+        config = self.config()
+        fake = FakeAz(config)
+        fake.finops_error = ('{"error":{"code":"NotImplemented",'
+                             '"message":"If-None-Match precondition is not supported",'
+                             '"innererror":{"trace":["System.NotSupportedException"]}}}')
+        prepared = module.prepare_finops_workbook(config, {}, fake)
+        with self.assertRaisesRegex(RuntimeError, "write failed"):
+            module.deploy_finops_workbook(config, prepared, fake, directory=ROOT)
+        writes = [c for c in fake.calls if "put" in c]
+        self.assertEqual(1, len(writes))
+        self.assertFalse(any(arg.startswith("If-") for arg in writes[0]))
+
     def test_finops_failure_does_not_publish_dashboard(self) -> None:
         config = self.config()
         fake = FakeAz(config)

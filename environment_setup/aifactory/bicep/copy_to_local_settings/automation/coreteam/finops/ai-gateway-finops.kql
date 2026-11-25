@@ -4,6 +4,9 @@ let ConfigShapeValid = gettype(Configuration) == 'dictionary'
     and gettype(Configuration.rates) == 'array' and gettype(Configuration.applications) == 'array'
     and gettype(Configuration.trustedTelemetryResourceIds) == 'array';
 let GroupBy = base64_decode_tostring('{GroupBy:base64}');
+let GuidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+let GatewayPattern = '^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourcegroups/[^/]+/providers/microsoft.apimanagement/service/[^/]+$';
+let FoundryPattern = '^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourcegroups/[^/]+/providers/microsoft.cognitiveservices/accounts/[^/]+$';
 let TrustedSources = toscalar(print Sources=Configuration.trustedTelemetryResourceIds
     | mv-expand Sources | summarize Sources=make_set(tolower(tostring(Sources))));
 let Native = materialize(
@@ -15,7 +18,7 @@ let Native = materialize(
     | where TimeGenerated {TimeRange}
     | project NativeTime=TimeGenerated, GatewayResourceId=tolower(_ResourceId), CorrelationId=tolower(CorrelationId),
         RequestId, PromptTokens, CompletionTokens, TotalTokens, DeploymentName, ModelName
-    | where isnotempty(GatewayResourceId) and isnotempty(CorrelationId)
+    | where GatewayResourceId matches regex GatewayPattern and isnotempty(CorrelationId)
     | extend ValidTokens=isnotnull(PromptTokens) and isnotnull(CompletionTokens)
         and PromptTokens >= 0 and CompletionTokens >= 0 and TotalTokens > 0
         and tolong(TotalTokens) == tolong(PromptTokens) + tolong(CompletionTokens)
@@ -34,7 +37,8 @@ let Native = materialize(
         NativeInput=todouble(NativeUsageVariants[0][0]),
         NativeOutput=todouble(NativeUsageVariants[0][1]),
         NativeTotal=todouble(NativeUsageVariants[0][2]),
-        NativeDeployment=tostring(NativeDeployments[0]), NativeModel=tostring(NativeModels[0])
+        NativeDeployment=tostring(NativeDeployments[0]), NativeModel=tostring(NativeModels[0]),
+        MeteringScope=GatewayResourceId
 );
 let Gateway = materialize(
     union isfuzzy=true
@@ -65,15 +69,20 @@ let Events = materialize(
 let UntrustedEventCount = toscalar(Events | summarize countif(not(Trusted)));
 let Enriched = materialize(
     Events | where Trusted
-    | extend GatewayResourceId=tolower(tostring(E.gateway_resource_id)), CorrelationId=tolower(tostring(E.correlation_id))
-    | where isnotempty(GatewayResourceId) and isnotempty(CorrelationId)
+    | extend GatewayResourceId=tolower(tostring(E.gateway_resource_id)), CorrelationId=tolower(tostring(E.correlation_id)),
+        EventFoundry=tolower(tostring(E.foundry_resource_id))
+    | extend MeteringScope=case(GatewayResourceId matches regex GatewayPattern, GatewayResourceId,
+        isempty(GatewayResourceId) and EventFoundry matches regex FoundryPattern
+            and gettype(E.target_validated) == 'bool' and tobool(E.target_validated)
+            and isempty(tostring(E.apim_subscription_id)), EventFoundry, '')
+    | where isnotempty(MeteringScope) and isnotempty(CorrelationId)
     | summarize EventVariants=make_set(tostring(E), 2), Sampled=countif(ItemCount > 1)
-        by GatewayResourceId, CorrelationId
+        by MeteringScope, CorrelationId
     | extend E=parse_json(tostring(EventVariants[0])), HasEvent=true,
         EventConflict=array_length(EventVariants) != 1
     | extend EventTime=todatetime(E.observed_at), EventInput=todouble(E.input_tokens),
         EventOutput=todouble(E.output_tokens), EventTotal=todouble(E.total_tokens),
-        EventCache=todouble(E.cached_input_tokens)
+        EventCache=todouble(E.cached_input_tokens), GatewayResourceId=tolower(tostring(E.gateway_resource_id))
     | extend EventKnown=gettype(E.usage_complete) == 'bool' and tobool(E.usage_complete)
         and gettype(E.input_tokens) == 'long' and gettype(E.output_tokens) == 'long'
         and gettype(E.total_tokens) == 'long'
@@ -97,20 +106,25 @@ let Applications =
 let Rates =
     print R=Configuration.rates | mv-expand R
     | project GatewayResourceId=tolower(tostring(R.gatewayResourceId)), BackendHost=tolower(tostring(R.backendHost)),
+        RateFoundry=tolower(tostring(R.foundryResourceId)),
         Deployment=tostring(R.deployment), Model=tostring(R.model),
         RateStart=todatetime(R.validFrom), RateEnd=todatetime(R.validTo), RateCurrency=tostring(R.currency),
         RateInput=todouble(R.inputPerMillion), RateCache=todouble(R.cachedInputPerMillion),
         RateOutput=todouble(R.outputPerMillion),
         SupportedRate=tostring(R.meter) == 'openai-text-tokens' and tostring(R.billingMode) == 'consumption'
-            and gettype(R.inputPerMillion) in ('long', 'real') and gettype(R.cachedInputPerMillion) in ('long', 'real')
-            and gettype(R.outputPerMillion) in ('long', 'real')
-    | extend SupportedRate=SupportedRate and RateCurrency matches regex '^[A-Z]{3}$'
+            and gettype(R.inputPerMillion) in ('long', 'double') and gettype(R.cachedInputPerMillion) in ('long', 'double')
+            and gettype(R.outputPerMillion) in ('long', 'double')
+    | extend MeteringScope=coalesce(GatewayResourceId, RateFoundry),
+        SupportedRate=SupportedRate and RateCurrency matches regex '^[A-Z]{3}$'
+        and (isempty(RateFoundry) or RateFoundry matches regex FoundryPattern)
+        and (GatewayResourceId matches regex GatewayPattern or (isempty(GatewayResourceId) and RateFoundry matches regex FoundryPattern))
         and RateInput between (0.0 .. 9007199254740991.0) and RateCache between (0.0 .. 9007199254740991.0)
         and RateOutput between (0.0 .. 9007199254740991.0) and RateStart < RateEnd;
 let Usage = materialize(
     Native
-    | join kind=fullouter Enriched on GatewayResourceId, CorrelationId
-    | extend GatewayResourceId=coalesce(GatewayResourceId, GatewayResourceId1),
+    | join kind=fullouter Enriched on MeteringScope, CorrelationId
+    | extend MeteringScope=coalesce(MeteringScope, MeteringScope1),
+        GatewayResourceId=coalesce(GatewayResourceId, GatewayResourceId1),
         CorrelationId=coalesce(CorrelationId, CorrelationId1), HasNative=coalesce(HasNative, false),
         HasEvent=coalesce(HasEvent, false), NativeKnown=coalesce(NativeKnown, false),
         EventKnown=coalesce(EventKnown, false)
@@ -132,8 +146,24 @@ let Usage = materialize(
     | extend UsageKnown=not(UsageConflict) and (isnull(GatewayStatus) or GatewayStatus between (200 .. 299))
         and iff(HasEvent, EventKnown and EventCacheValid, NativeKnown),
         ValidatedApplication=iff(HasEvent and not(UsageConflict), tostring(E.validated_application_id), ''),
-        User=iff(HasEvent and not(UsageConflict) and tostring(E.user_id) matches regex '^[0-9a-f]{64}$',
-            tostring(E.user_id), 'Unknown')
+        Tenant=tolower(tostring(E.entra_tenant_id)), Principal=tolower(tostring(E.entra_object_id)),
+        ClaimKind=tostring(E.requester_kind), PseudonymKind=coalesce(tostring(E.requester_kind), 'user'),
+        Pseudonym=tostring(E.user_id)
+    | extend HasEntraClaims=isnotempty(Tenant) or isnotempty(Principal),
+        EntraKnown=HasEvent and not(UsageConflict) and gettype(E.identity_validated) == 'bool'
+            and tobool(E.identity_validated) and Tenant matches regex GuidPattern and Principal matches regex GuidPattern
+            and ClaimKind in ('user', 'serviceprincipal')
+    | extend PseudonymKnown=HasEvent and not(UsageConflict) and not(HasEntraClaims)
+            and (isnull(E.identity_validated) or (gettype(E.identity_validated) == 'bool' and tobool(E.identity_validated)))
+            and Pseudonym matches regex '^[0-9a-f]{64}$' and PseudonymKind in ('user', 'serviceprincipal')
+    | extend RequesterKey=case(EntraKnown, tostring(pack_array('entra', Tenant, Principal, ClaimKind)),
+            PseudonymKnown, tostring(pack_array('pseudonym', MeteringScope, Pseudonym, PseudonymKind)),
+            tostring(pack_array('unknown', MeteringScope))),
+        Requester=case(EntraKnown, strcat('Entra ', ClaimKind, ': ', Tenant, '/', Principal),
+            PseudonymKnown, strcat('Scoped ', PseudonymKind, ': ', Pseudonym, ' (', MeteringScope, ')'), 'Unknown'),
+        RequesterKind=case(EntraKnown, ClaimKind, PseudonymKnown, PseudonymKind, 'unknown'),
+        IdentityScope=iff(EntraKnown, 'Entra tenant/object', MeteringScope)
+    | extend User=Requester
     | extend InputTokens=iff(UsageKnown, iff(HasEvent, EventInput, NativeInput), real(null)),
         OutputTokens=iff(UsageKnown, iff(HasEvent, EventOutput, NativeOutput), real(null)),
         TotalTokens=iff(UsageKnown, iff(HasEvent, EventTotal, NativeTotal), real(null)),
@@ -143,12 +173,21 @@ let Usage = materialize(
             ApplicationMatches > 1, 'Unknown', isnotempty(ValidatedApplication), ValidatedApplication, 'Unknown'),
         Team=iff(ApplicationMatches == 1, MappedTeam, 'Unknown')
     // Rate fan-out is reduced to one correlation BEFORE reporting any totals.
-    | join kind=leftouter Rates on GatewayResourceId, BackendHost, Deployment, Model
+    | join kind=leftouter Rates on MeteringScope, BackendHost, Deployment, Model
     | extend RateApplies=TimeGenerated >= RateStart and TimeGenerated < RateEnd
     | extend RateRank=iff(RateApplies, 1, 0)
-    | summarize RateMatches=countif(RateApplies), arg_max(RateRank, *) by GatewayResourceId, CorrelationId
-    | extend MissingCacheSplit=isnull(CachedInputTokens) and RateInput != RateCache,
+    | summarize RateMatches=countif(RateApplies), arg_max(RateRank, *) by MeteringScope, CorrelationId
+    | extend ProducerFoundry=iff(HasEvent and not(UsageConflict)
+            and gettype(E.target_validated) == 'bool' and tobool(E.target_validated)
+            and tolower(tostring(E.foundry_resource_id)) matches regex FoundryPattern,
+            tolower(tostring(E.foundry_resource_id)), ''),
+        MappedFoundry=iff(RateMatches == 1 and SupportedRate, RateFoundry, '')
+    | extend TargetConflict=isnotempty(ProducerFoundry) and isnotempty(MappedFoundry) and ProducerFoundry != MappedFoundry
+    | extend FoundryResourceId=iff(UsageConflict or TargetConflict, 'Unknown',
+            coalesce(ProducerFoundry, MappedFoundry, 'Unknown')),
+        MissingCacheSplit=isnull(CachedInputTokens) and RateInput != RateCache,
         PricingStatus=case(UsageConflict, 'Conflicting/retried observations',
+            TargetConflict, 'Conflicting Foundry target',
             not(UsageKnown), 'Incomplete or invalid usage',
             not(HasEvent), 'Native only: completion/text/cache not established',
             not(TextMeter), 'Unsupported nontext/provider meter',
@@ -162,12 +201,40 @@ let Usage = materialize(
             iff(isnull(CachedInputTokens), InputTokens * RateInput,
                 (InputTokens - CachedInputTokens) * RateInput + CachedInputTokens * RateCache)
                 / 1000000.0 + OutputTokens * RateOutput / 1000000.0, real(null)),
-        Currency=iff(PricingStatus == 'Estimated (not billed)', RateCurrency, 'Unpriced')
+        Currency=iff(RateMatches == 1 and SupportedRate, RateCurrency, 'Unpriced')
+    | extend InputCost=iff(isnotnull(EstimatedCost) and isnotnull(CachedInputTokens),
+            (InputTokens - CachedInputTokens) * RateInput / 1000000.0, real(null)),
+        CachedInputCost=iff(isnotnull(EstimatedCost) and isnotnull(CachedInputTokens),
+            CachedInputTokens * RateCache / 1000000.0, real(null)),
+        OutputCost=iff(isnotnull(EstimatedCost), OutputTokens * RateOutput / 1000000.0, real(null)),
+        CombinedInputCost=iff(isnotnull(EstimatedCost),
+            iff(isnull(CachedInputTokens), InputTokens * RateInput,
+                (InputTokens - CachedInputTokens) * RateInput + CachedInputTokens * RateCache) / 1000000.0, real(null)),
+        CategoryCoverage=case(isnull(EstimatedCost), 'Unpriced', isnull(CachedInputTokens), 'Unknown cache split', 'Known')
     | extend Group=case(GroupBy == 'APIM subscription', coalesce(ApimSubscriptionId, 'Unknown'),
         GroupBy == 'User', User, GroupBy == 'Team', Team,
         GroupBy == 'Deployment', coalesce(Deployment, 'Unknown'), GroupBy == 'Model', coalesce(Model, 'Unknown'),
         GroupBy == 'Day', format_datetime(TimeGenerated, 'yyyy-MM-dd'), Application)
-    | project TimeGenerated, GatewayResourceId, CorrelationId, ApimSubscriptionId, BackendHost, Deployment, Model,
+    | project TimeGenerated, MeteringScope, GatewayResourceId, CorrelationId, ApimSubscriptionId, BackendHost,
+        Deployment=coalesce(Deployment, 'Unknown'), Model,
         Application, Team, User, Group, HasNative, HasEvent, UsageKnown, InputTokens, OutputTokens, TotalTokens,
-        CachedInputTokens, EstimatedCost, Currency, PricingStatus
+        CachedInputTokens, EstimatedCost, Currency, PricingStatus, FoundryResourceId,
+        RequesterKey, Requester, RequesterKind, IdentityScope, InputCost, OutputCost, CachedInputCost,
+        CombinedInputCost, CategoryCoverage
+);
+// Leaves are the only additive input to every hierarchy level; never sum parent + child rows.
+let RequesterLeaves = materialize(
+    Usage
+    | summarize Requests=count(), PricedRequests=countif(isnotnull(EstimatedCost)),
+        UnpricedRequests=countif(isnull(EstimatedCost)),
+        UnknownCategoryRequests=countif(isnotnull(EstimatedCost) and isnull(InputCost)),
+        InputCost=sum(InputCost), OutputCost=sum(OutputCost), CachedInputCost=sum(CachedInputCost),
+        CombinedInputCost=sum(CombinedInputCost), EstimatedSubtotal=sum(EstimatedCost)
+        by RequesterKey, Requester, RequesterKind, IdentityScope, FoundryResourceId, Deployment,
+            Day=bin(TimeGenerated, 1d), Currency
+    | extend InputCost=iff(PricedRequests > 0 and UnknownCategoryRequests == 0, InputCost, real(null)),
+        CachedInputCost=iff(PricedRequests > 0 and UnknownCategoryRequests == 0, CachedInputCost, real(null)),
+        OutputCost=iff(PricedRequests > 0, OutputCost, real(null)),
+        CombinedInputCost=iff(PricedRequests > 0, CombinedInputCost, real(null)),
+        EstimatedSubtotal=iff(PricedRequests > 0, EstimatedSubtotal, real(null))
 );

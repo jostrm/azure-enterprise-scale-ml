@@ -319,6 +319,7 @@ class DashboardAzure:
         self.previous_inventory = {}
         self.deployment_command = None
         self.usage_collector = shared.usage.Collector(self)
+        self._finops_missing = False
 
     @property
     def dashboard_url(self):
@@ -334,13 +335,31 @@ class DashboardAzure:
         usage_read = shared.usage.is_read_command(args)
         factory_read = args == factory_command(self, "get")
         finops_read = args == shared.finops_command(self.config, "get")
-        finops_write = (
+        finops_update = (
             len(args) == 13 and args[:8] == shared.finops_command(self.config, "put")
             and args[8] == "--headers"
-            and args[9].startswith(("If-Match=", "If-None-Match="))
+            and args[9].startswith("If-Match=")
             and args[10:12] == ("Content-Type=application/json", "--body")
             and args[12].startswith("@")
         )
+        finops_create = (
+            self._finops_missing and len(args) == 12
+            and args[:8] == shared.finops_command(self.config, "put")
+            and args[8:11] == ("--headers", "Content-Type=application/json", "--body")
+            and args[11].startswith("@")
+        )
+        finops_write = finops_update or finops_create
+        if finops_write:
+            try:
+                body = read_json(Path(args[-1][1:]))
+            except ValueError:
+                finops_write = False
+            else:
+                if finops_update:
+                    etag = args[9].removeprefix("If-Match=")
+                    finops_write = bool(etag) and etag != "*" and not any(ord(c) < 32 for c in etag) and body.get("etag") == etag
+                else:
+                    finops_write = "etag" not in body
         factory_write = (
             args[:1] == ("rest",) and "--method" in args
             and args[args.index("--method") + 1] == "put"
@@ -359,9 +378,15 @@ class DashboardAzure:
                     raise RuntimeError("Azure command subscription is outside the configured scope.")
             elif args != ("account", "show", "--output", "json", "--only-show-errors"):
                 raise RuntimeError("Azure commands require an explicit configured subscription.")
+        if finops_read or finops_write:
+            # Revoke stale evidence before transport, including exceptions and uncertain writes.
+            self._finops_missing = False
         result = self.az(*args)
+        if finops_read:
+            self._finops_missing = shared.finops_workbook_missing(self.config, args, result)
         if result.returncode:
-            code = shared.usage.read_failure_code(result) if usage_read else shared.error_code(result)
+            code = ("ResourceNotFound" if finops_read and self._finops_missing else
+                    shared.usage.read_failure_code(result) if usage_read else shared.error_code(result))
             if not code or not re.fullmatch(r"[A-Za-z0-9]+", code):
                 code = "AzureCommandFailed"
             # Never replay raw CLI errors: they can include parameter/configuration values.

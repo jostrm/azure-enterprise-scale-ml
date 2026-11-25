@@ -1,5 +1,6 @@
 """Credential-free contracts for the log-based AI gateway FinOps workbook."""
 import copy
+from decimal import Decimal
 import importlib.util
 import json
 from pathlib import Path
@@ -11,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[3]
 FINOPS = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/finops"
 GATEWAY = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/common/providers/Microsoft.ApiManagement/service/gateway"
 COMPONENT = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/apps/providers/Microsoft.Insights/components/app"
+FOUNDRY = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/ai/providers/Microsoft.CognitiveServices/accounts/foundry"
+TENANT = "22222222-2222-2222-2222-222222222222"
+OBJECT = "33333333-3333-3333-3333-333333333333"
 
 
 def load_helper():
@@ -68,16 +72,16 @@ class FinOpsTests(unittest.TestCase):
                   for p in item["content"]["parameters"]}
         self.assertEqual(params["Workspaces"]["type"], 5)
         self.assertTrue(params["Workspaces"]["multiSelect"])
-        self.assertIn("microsoft.operationalinsights/workspaces",
-                      params["Workspaces"]["typeSettings"]["resourceTypeFilter"])
+        self.assertIn("microsoft.operationalinsights/workspaces", params["Workspaces"]["query"])
         self.assertEqual(params["Workspaces"]["queryType"], 1)
         self.assertIn("Resources", params["Workspaces"]["query"])
-        self.assertEqual(params["TimeRange"]["value"]["durationMs"], 604800000)
+        self.assertEqual(params["TimeRange"]["value"]["durationMs"], 2592000000)
         self.assertTrue(params["Configuration"]["typeSettings"]["multiLineText"])
         self.assertEqual(json.loads(params["Configuration"]["value"])["rates"], [])
         groups = {v["value"] for v in json.loads(params["GroupBy"]["jsonData"])}
         self.assertEqual(groups, {"Application", "APIM subscription", "User", "Team", "Deployment", "Model", "Day"})
-        queries = [item["content"] for item in workbook["items"] if item["type"] == 3]
+        queries = [item["content"] for item in workbook["items"]
+                   if item["type"] == 3 and item["content"].get("queryType") == 0]
         self.assertGreaterEqual(len(queries), 4)
         for content in queries:
             self.assertEqual(content["crossComponentResources"], ["{Workspaces}"])
@@ -85,6 +89,44 @@ class FinOpsTests(unittest.TestCase):
             self.assertIn("base64_decode_tostring('{Configuration:base64}')", content["query"])
             self.assertNotIn("{Configuration}", content["query"])
             self.assertEqual(content["resourceType"], "microsoft.operationalinsights/workspaces")
+
+    def test_generated_workbook_includes_independent_live_billing_drilldown(self):
+        workbook = self.module.build_workbook()
+        parameters = {p["name"]: p for p in workbook["items"][1]["content"]["parameters"]}
+        self.assertIn("BillingSubscription", parameters)
+        self.assertIn("BillingResource", parameters)
+        billing = next(item for item in workbook["items"] if item["name"] == "billing-deployments")
+        self.assertEqual(billing["content"]["queryType"], 12)
+        endpoint = json.loads(billing["content"]["query"])
+        self.assertEqual(endpoint["method"], "POST")
+        self.assertEqual(json.loads(endpoint["data"])["type"], "ActualCost")
+        self.assertNotIn("{Workspaces}", json.dumps(billing))
+        names = [item["name"] for item in workbook["items"]]
+        self.assertLess(names.index("billing-heading"), names.index("requester-totals"))
+
+    def test_query_resource_pickers_follow_native_serialized_contract(self):
+        parameters = self.module.build_workbook()["items"][1]["content"]["parameters"]
+        for parameter in parameters:
+            self.assertEqual(parameter["version"], "KqlParameterItem/1.0")
+            if parameter["type"] == 5:
+                self.assertNotIn("resourceTypeFilter", parameter["typeSettings"])
+
+    def test_billing_selection_is_preserved_and_validated(self):
+        workbook = self.module.build_workbook()
+        parameters = {p["name"]: p for p in workbook["items"][1]["content"]["parameters"]}
+        subscription = "11111111-1111-1111-1111-111111111111"
+        resource = f"/subscriptions/{subscription}/resourceGroups/apps/providers/Microsoft.CognitiveServices/accounts/foundry"
+        parameters["BillingSubscription"]["value"] = subscription
+        parameters["BillingResource"]["value"] = resource
+        rendered = self.module.render_workbook(existing=workbook)
+        saved = {p["name"]: p for p in rendered["items"][1]["content"]["parameters"]}
+        self.assertEqual(saved["BillingSubscription"]["value"], subscription)
+        self.assertEqual(saved["BillingResource"]["value"], resource)
+        for name in ("BillingSubscription", "BillingResource"):
+            bad = copy.deepcopy(workbook)
+            next(p for p in bad["items"][1]["content"]["parameters"] if p["name"] == name)["value"] = "'bad\""
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.module.render_workbook(existing=bad)
 
     def test_queries_reduce_chunks_and_join_cardinality_before_pricing(self):
         query = (FINOPS / "ai-gateway-finops.kql").read_text(encoding="utf-8")
@@ -105,6 +147,23 @@ class FinOpsTests(unittest.TestCase):
         self.assertEqual(query.count("CorrelationId=tolower(CorrelationId)"), 2)
         self.assertIn("CorrelationId=tolower(tostring(E.correlation_id))", query)
 
+    def test_workspace_resource_graph_picker_has_independent_subscription_scope(self):
+        workbook = self.module.build_workbook()
+        workspace = next(p for p in workbook["items"][1]["content"]["parameters"] if p["name"] == "Workspaces")
+        self.assertEqual(workspace["queryType"], 1)
+        self.assertEqual(workspace["crossComponentResources"], ["value::all"])
+        self.assertNotIn("{Workspaces}", workspace["crossComponentResources"])
+        selected = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/common/providers/Microsoft.OperationalInsights/workspaces/logs"
+        workspace["value"] = [selected]
+        rendered = self.module.render_workbook(existing=workbook)
+        restored = next(p for p in rendered["items"][1]["content"]["parameters"] if p["name"] == "Workspaces")
+        self.assertEqual(restored["value"], [selected])
+        self.assertEqual(restored["crossComponentResources"], ["value::all"])
+        for item in rendered["items"]:
+            if item["type"] == 3 and item["content"].get("queryType") == 0:
+                self.assertEqual(item["content"]["crossComponentResources"], ["{Workspaces}"])
+                self.assertIn("noDataMessage", item["content"])
+
     def test_gateway_correlation_ids_are_case_normalized(self):
         self.assertEqual(self.payload(correlation_id="AABBCCDD-0000-1111-2222-1234567890AB")["correlation_id"],
                          "aabbccdd-0000-1111-2222-1234567890ab")
@@ -116,6 +175,233 @@ class FinOpsTests(unittest.TestCase):
         estimate = self.module.estimate_cost(payload, config())
         self.assertEqual(str(estimate["amount"]), "0.002")
         self.assertEqual(estimate["currency"], "USD")
+
+    def test_fractional_rates_accept_kusto_dynamic_double_type(self):
+        query = (FINOPS / "ai-gateway-finops.kql").read_text(encoding="utf-8")
+        for field in ("inputPerMillion", "cachedInputPerMillion", "outputPerMillion"):
+            self.assertIn(f"gettype(R.{field}) in ('long', 'double')", query)
+
+    def test_separate_cost_categories_add_to_subtotal_without_reasoning_double_count(self):
+        estimate = self.module.estimate_cost(self.payload(), config())
+        self.assertEqual(estimate["input_cost"], Decimal("0.0012"))
+        self.assertEqual(estimate["cached_input_cost"], Decimal("0.0002"))
+        self.assertEqual(estimate["output_cost"], Decimal("0.0006"))
+        self.assertEqual(estimate["combined_input_cost"], Decimal("0.0014"))
+        self.assertEqual(sum(estimate[key] for key in ("input_cost", "cached_input_cost", "output_cost")),
+                         estimate["amount"])
+
+    def test_equal_rates_allow_subtotal_but_never_invent_cache_categories(self):
+        card = config()
+        card["rates"][0]["cachedInputPerMillion"] = 2
+        estimate = self.module.estimate_cost(self.payload(usage={
+            "prompt_tokens": 1000, "completion_tokens": 100, "total_tokens": 1100}), card)
+        self.assertEqual(estimate["amount"], Decimal("0.0026"))
+        self.assertEqual(estimate["combined_input_cost"], Decimal("0.002"))
+        self.assertIsNone(estimate["input_cost"])
+        self.assertIsNone(estimate["cached_input_cost"])
+        self.assertEqual(estimate["category_coverage"], "Unknown cache split")
+
+    def test_entra_identity_is_explicit_validated_tid_oid_kind_not_email(self):
+        payload = self.payload(entra_tenant_id=TENANT, entra_object_id=OBJECT,
+                               requester_kind="user", identity_validated=True)
+        identity = self.module.requester_identity(payload)
+        self.assertEqual(identity["kind"], "user")
+        self.assertIn(TENANT, identity["key"])
+        self.assertIn(OBJECT, identity["key"])
+        self.assertEqual(payload["user_id"], "")
+        for overrides in (
+            {"entra_tenant_id": TENANT},
+            {"entra_object_id": OBJECT},
+            {"entra_tenant_id": TENANT, "entra_object_id": OBJECT},
+            {"entra_tenant_id": TENANT, "entra_object_id": OBJECT, "requester_kind": "user"},
+            {"entra_tenant_id": "someone@example.com", "entra_object_id": OBJECT,
+             "requester_kind": "user", "identity_validated": True},
+            {"entra_tenant_id": TENANT, "entra_object_id": OBJECT,
+             "requester_kind": "managed-identity-owner", "identity_validated": True},
+        ):
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                self.event(**overrides)
+
+    def test_entra_namespace_separates_tenant_and_principal_kind(self):
+        base = dict(entra_tenant_id=TENANT, entra_object_id=OBJECT,
+                    requester_kind="user", identity_validated=True)
+        first = self.module.requester_identity(self.payload(**base))
+        service = self.module.requester_identity(self.payload(**{**base, "requester_kind": "serviceprincipal"}))
+        tenant = self.module.requester_identity(self.payload(**{**base, "entra_tenant_id": OBJECT}))
+        self.assertEqual(len({first["key"], service["key"], tenant["key"]}), 3)
+        for broken in ({"identity_validated": False}, {"entra_object_id": ""}, {"requester_kind": ""}):
+            payload = {**self.payload(**base), **broken}
+            self.assertEqual(self.module.requester_identity(payload)["kind"], "unknown")
+
+    def test_pseudonyms_remain_gateway_scoped_and_v1_payloads_work(self):
+        kwargs = dict(authenticated_subject="private subject", pseudonym_key=b"k" * 32,
+                      identity_validated=True)
+        first = self.payload(**kwargs)
+        second = self.payload(**kwargs, gateway_resource_id=GATEWAY + "-two")
+        self.assertNotEqual(first["user_id"], second["user_id"])
+        second["user_id"] = first["user_id"]
+        self.assertNotEqual(self.module.requester_identity(first)["key"],
+                            self.module.requester_identity(second)["key"])
+        legacy = {key: value for key, value in first.items()
+                  if key not in {"identity_validated", "requester_kind", "entra_tenant_id", "entra_object_id",
+                                 "foundry_resource_id", "target_validated"}}
+        self.assertEqual(self.module.requester_identity(legacy)["key"],
+                         self.module.requester_identity(first)["key"])
+        self.assertEqual(self.module.estimate_cost(legacy, config())["amount"], Decimal("0.002"))
+
+    def test_foundry_target_requires_trusted_producer_or_reviewed_exact_mapping(self):
+        unknown = self.module.estimate_cost(self.payload(), config())
+        self.assertEqual(unknown["foundry_resource_id"], "Unknown")
+        with self.assertRaises(ValueError):
+            self.event(foundry_resource_id=FOUNDRY)
+        with self.assertRaises(ValueError):
+            self.event(foundry_resource_id=GATEWAY, target_validated=True)
+        direct_target = self.payload(foundry_resource_id=FOUNDRY, target_validated=True)
+        self.assertEqual(self.module.estimate_cost(direct_target, config())["foundry_resource_id"], FOUNDRY.lower())
+        card = config()
+        card["rates"][0]["foundryResourceId"] = FOUNDRY
+        self.assertEqual(self.module.estimate_cost(self.payload(), card)["foundry_resource_id"], FOUNDRY.lower())
+        conflict = self.module.estimate_cost(
+            self.payload(foundry_resource_id=FOUNDRY + "-other", target_validated=True), card)
+        self.assertIsNone(conflict["amount"])
+        self.assertEqual(conflict["foundry_resource_id"], "Unknown")
+
+    def test_direct_foundry_usage_is_not_disguised_as_apim(self):
+        payload = self.payload(gateway_resource_id=None, apim_subscription_id="",
+                               foundry_resource_id=FOUNDRY, target_validated=True)
+        self.assertEqual(payload["gateway_resource_id"], "")
+        card = config()
+        card["rates"][0].pop("gatewayResourceId")
+        card["rates"][0]["foundryResourceId"] = FOUNDRY
+        self.assertEqual(self.module.estimate_cost(payload, card)["amount"], Decimal("0.002"))
+        self.assertIsNone(self.module.estimate_cost(self.payload(), card)["amount"])
+        with self.assertRaises(ValueError):
+            self.event(gateway_resource_id=None)
+        with self.assertRaises(ValueError):
+            self.event(gateway_resource_id=None, foundry_resource_id=FOUNDRY,
+                       target_validated=True, apim_subscription_id="not-an-apim-call")
+        for invalid_gateway in (False, 0, []):
+            with self.subTest(gateway=invalid_gateway), self.assertRaises(ValueError):
+                self.event(gateway_resource_id=invalid_gateway, foundry_resource_id=FOUNDRY,
+                           target_validated=True, apim_subscription_id="")
+
+    def test_new_rate_contract_is_optional_and_validated(self):
+        original = config()
+        self.assertEqual(set(self.module.validate_config(original)["rates"][0]), set(original["rates"][0]))
+        for change in ({"foundryResourceId": GATEWAY}, {"gatewayResourceId": ""},
+                       {"foundryResourceId": FOUNDRY, "unreviewed": True}):
+            card = config()
+            card["rates"][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.module.validate_config(card)
+        card = config()
+        card["rates"][0]["foundryResourceId"] = FOUNDRY
+        second = copy.deepcopy(card["rates"][0])
+        second["foundryResourceId"] = FOUNDRY + "-other"
+        card["rates"].append(second)
+        with self.assertRaises(ValueError):
+            self.module.validate_config(card)
+
+    def test_scoped_pseudonyms_never_become_cross_gateway_totals(self):
+        card = config()
+        second_rate = copy.deepcopy(card["rates"][0])
+        second_rate["gatewayResourceId"] = GATEWAY + "-two"
+        card["rates"].append(second_rate)
+        first = self.payload(authenticated_subject="private subject", pseudonym_key=b"k" * 32,
+                             identity_validated=True)
+        second = {**first, "gateway_resource_id": (GATEWAY + "-two").lower()}
+        totals = self.module.summarize_requesters([first, second], card)["totals"]
+        self.assertEqual(len(totals), 2)
+        self.assertTrue(all(row["Requests"] == 1 for row in totals))
+        self.assertEqual(len({row["RequesterKey"] for row in totals}), 2)
+
+    def test_hierarchy_identifiers_roundtrip_scopes_and_delimiters(self):
+        card = config()
+        card["rates"][0]["deployment"] = "name|with:delimiters,\"and quotes\""
+        payload = self.payload(deployment=card["rates"][0]["deployment"])
+        tree = self.module.summarize_requesters([payload], card)["tree"]
+        self.assertEqual(len(tree), 4)
+        for row in tree:
+            parts = json.loads(row["Id"])
+            if row["ParentId"]:
+                self.assertEqual(json.loads(row["ParentId"]), parts[:-1])
+        self.assertEqual(next(row["Name"] for row in tree if row["Kind"] == "Deployment"),
+                         card["rates"][0]["deployment"])
+
+    def test_requester_hierarchy_deduplicates_and_rolls_up_leaves_once(self):
+        card = config()
+        card["rates"][0]["foundryResourceId"] = FOUNDRY
+        second_rate = copy.deepcopy(card["rates"][0])
+        second_rate.update(gatewayResourceId=GATEWAY + "-two", foundryResourceId=FOUNDRY + "-two")
+        card["rates"].append(second_rate)
+        identity = dict(entra_tenant_id=TENANT, entra_object_id=OBJECT,
+                        requester_kind="user", identity_validated=True)
+        first = self.payload(**identity)
+        second = self.payload(**identity, gateway_resource_id=GATEWAY + "-two",
+                              observed_at="2026-06-02T12:00:00Z")
+        summary = self.module.summarize_requesters([first, copy.deepcopy(first), second], card)
+        self.assertEqual(len(summary["totals"]), 1)
+        self.assertEqual(summary["totals"][0]["Requests"], 2)
+        self.assertEqual(summary["totals"][0]["EstimatedSubtotal"], Decimal("0.004"))
+        self.assertEqual(len(summary["daily"]), 2)
+        tree = summary["tree"]
+        self.assertEqual(len(tree), 7)
+        self.assertEqual(len({row["Id"] for row in tree}), len(tree))
+        self.assertEqual(sum(row["EstimatedSubtotal"] for row in tree if row["Kind"] == "Day"),
+                         summary["totals"][0]["EstimatedSubtotal"])
+        for parent in (row for row in tree if row["Kind"] != "Day"):
+            children = [row for row in tree if row["ParentId"] == parent["Id"]]
+            self.assertEqual(sum(row["EstimatedSubtotal"] for row in children), parent["EstimatedSubtotal"])
+
+    def test_requester_summary_keeps_currencies_unknowns_and_missing_categories(self):
+        card = config()
+        card["rates"][0]["cachedInputPerMillion"] = 2
+        second = copy.deepcopy(card["rates"][0])
+        second.update(gatewayResourceId=GATEWAY + "-two", currency="EUR")
+        card["rates"].append(second)
+        identity = dict(entra_tenant_id=TENANT, entra_object_id=OBJECT,
+                        requester_kind="user", identity_validated=True)
+        rows = [self.payload(**identity),
+                self.payload(**identity, correlation_id="request-2", usage={
+                    "prompt_tokens": 1000, "completion_tokens": 100, "total_tokens": 1100}),
+                self.payload(**identity, gateway_resource_id=GATEWAY + "-two"),
+                self.payload(**identity, correlation_id="request-3", model="not-reviewed")]
+        summary = self.module.summarize_requesters(rows, card)
+        self.assertEqual({row["Currency"] for row in summary["totals"]}, {"USD", "EUR", "Unpriced"})
+        usd = next(row for row in summary["totals"] if row["Currency"] == "USD")
+        self.assertEqual(usd["EstimatedSubtotal"], Decimal("0.0052"))
+        self.assertIsNone(usd["InputCost"])
+        self.assertIsNone(usd["CachedInputCost"])
+        self.assertEqual(usd["UnknownCategoryRequests"], 1)
+        self.assertEqual(sum(row["UnpricedRequests"] for row in summary["totals"]), 1)
+        self.assertTrue(all(row["FoundryResourceId"] == "Unknown" for row in summary["daily"]))
+
+    def test_conflicting_copies_are_not_arbitrarily_assigned_or_charged(self):
+        first = self.payload()
+        conflicting = {**first, "user_id": "b" * 64}
+        summary = self.module.summarize_requesters([first, conflicting], config())
+        self.assertEqual(len(summary["totals"]), 1)
+        self.assertEqual(summary["totals"][0]["RequesterKind"], "unknown")
+        self.assertEqual(summary["totals"][0]["Requests"], 1)
+        self.assertEqual(summary["totals"][0]["UnpricedRequests"], 1)
+        self.assertIsNone(summary["totals"][0]["EstimatedSubtotal"])
+
+    def test_requester_workbook_has_native_tree_and_explicit_no_data_coverage(self):
+        workbook = self.module.build_workbook()
+        sections = {item["name"]: item["content"] for item in workbook["items"]}
+        for name in ("requester-coverage", "requester-totals", "requester-daily",
+                     "requester-daily-trend", "requester-hierarchy"):
+            self.assertIn(name, sections)
+        tree = sections["requester-hierarchy"]
+        self.assertEqual(tree["visualization"], "table")
+        self.assertEqual(tree["gridSettings"]["hierarchySettings"], {
+            "treeType": 0, "idColumn": "Id", "parentColumn": "ParentId",
+            "expanderColumn": "Name", "expandTopLevel": True})
+        for column in ("InputCost", "OutputCost", "CachedInputCost", "EstimatedSubtotal", "UnpricedRequests"):
+            self.assertIn(column, tree["query"])
+        self.assertIn("pack_array", tree["query"])
+        self.assertIn("NO TRUSTED REQUESTER DATA", sections["requester-coverage"]["query"])
+        self.assertIn("not an invoice", sections["overview"]["json"])
 
     def test_responses_usage_supported(self):
         payload = self.payload(api_kind="responses", usage={

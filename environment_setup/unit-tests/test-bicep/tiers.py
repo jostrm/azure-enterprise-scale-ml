@@ -99,6 +99,7 @@ MANIFEST = TierManifest(default="1-4", tiers=(
         "test_aifactory_dashboard.py",
         "test_dashboard_only.py",
         "test_dashboard_usage.py",
+        "test_foundry_billing.py",
         "test_dns_policy_ownership.py",
         "test_generic_project_workbook.py",
         "test_hosts_inventory.py",
