@@ -4083,19 +4083,117 @@ def unsupported_child_accepted(change, created):
             and any(base.startswith(parent + "/") for parent in created))
 
 
-def unaccepted_unsupported_refusal(changes, created):
-    """Names every Unsupported row Rule U does not accept (parent and type only; unsafe values are dropped)."""
+# Rule R (aif68 run 2526, approved 2026-11-25): what-if cannot compute the guid()-named id of a role assignment (AcrPull
+# on the existing common registry, the Foundry account of the native step, a Cosmos sqlRoleAssignment) and lists it as
+# Unsupported. Such a row only adds access and comes from the reviewed, pinned purple template, so it passes when its
+# own literal id deploys it into one of the plan's own locked groups. Any other type, an error or delta, a group that
+# is unknown, contradicted by the row or outside the plan, and every Delete or Deploy row still block.
+ROLE_ASSIGNMENT_UNSUPPORTED_TYPES = frozenset({"microsoft.authorization/roleassignments",
+                                               "microsoft.documentdb/databaseaccounts/sqlroleassignments"})
+ARM_LITERAL = re.compile(r"\s*'((?:[^']|'')*)'\s*", re.S)
+
+
+def arm_call_arguments(expression, function):
+    """The top-level arguments of `[function(...)]` when that one call is the whole expression, else None. A literal
+    argument is its string value; any other argument is None."""
+    if not (isinstance(expression, str) and expression.startswith("[" + function + "(") and expression.endswith(")]")):
+        return None
+    text, arguments, current, stack, index = expression[len(function) + 2:-1], [], [], ["("], 0
+    while index < len(text):
+        char = text[index]
+        if char == "'":
+            end = index + 1
+            while end < len(text) and not (text[end] == "'" and text[end + 1:end + 2] != "'"):
+                end += 2 if text[end] == "'" else 1
+            if end >= len(text):
+                return None
+            current.append(text[index:end + 1])
+            index = end + 1
+            continue
+        if char in "([":
+            stack.append(char)
+        elif char in ")]":
+            if stack.pop() != "(["[")]".index(char)]:
+                return None
+            if not stack:
+                if index != len(text) - 1:
+                    return None
+                arguments.append("".join(current))
+                return [match.group(1).replace("''", "'") if (match := ARM_LITERAL.fullmatch(argument)) else None
+                        for argument in arguments]
+        elif char == "," and len(stack) == 1:
+            arguments.append("".join(current))
+            current, index = [], index + 1
+            continue
+        current.append(char)
+        index += 1
+    return None
+
+
+def role_assignment_evidence(change):
+    """(type, deploying group) an Unsupported row's own literal id carries, each None without evidence:
+    `[extensionResourceId('<nested id>', '<type>', ...)]` deploys into that id's group, `[resourceId('<subscription>',
+    '<group>', '<type>', ...)]` into that group. `after` must carry the same type, and its id, resourceGroup and
+    subscriptionId must not contradict the id; a separate `after.scope` leaves the group unknown."""
+    after = change.get("after")
+    if not isinstance(after, dict):
+        return None, None
+    identifier = change.get("resourceId")
+    extension = arm_call_arguments(identifier, "extensionResourceId")
+    plain = arm_call_arguments(identifier, "resourceId")
+    kind = group = None
+    if extension and len(extension) >= 3:
+        kind = extension[1]
+        if extension[0] and NESTED_ID.fullmatch(extension[0]) and _safe_resource_identifier(arm_scope(extension[0])):
+            group = arm_scope(extension[0])
+    elif plain and len(plain) >= 4:
+        kind = plain[2]
+        if plain[0] and plain[1] and re.fullmatch(GUID, plain[0]) and re.fullmatch(r"[A-Za-z0-9_.()-]{1,90}", plain[1]):
+            group = ("/subscriptions/" + plain[0] + "/resourcegroups/" + plain[1]).lower()
+    kind = kind.lower() if kind and str(after.get("type", "")).lower() == kind.lower() else None
+    if group is not None:
+        _, subscription, _, name = group.split("/", 4)[1:]
+        if ("scope" in after or ("id" in after and after["id"] != identifier)
+                or ("resourceGroup" in after and str(after["resourceGroup"]).lower() != name)
+                or ("subscriptionId" in after and str(after["subscriptionId"]).lower() != subscription)):
+            group = None
+    return kind, group
+
+
+def role_assignment_refusal(change, own_groups):
+    """None when Rule R accepts the Unsupported row, else why it does not."""
+    kind, group = role_assignment_evidence(change)
+    if change.get("error") or change.get("delta"):
+        return "error-or-delta"
+    if group is None:
+        return "no-deploying-group"
+    if group not in own_groups:
+        return "outside-locked-groups"
+    return None if kind in ROLE_ASSIGNMENT_UNSUPPORTED_TYPES else "not-role-assignment"
+
+
+def unsupported_row_accepted(change, created, own_groups):
+    """The single Unsupported decision: Rule U (child of a created resource) or Rule R (role assignment)."""
+    return unsupported_child_accepted(change, created) or role_assignment_refusal(change, own_groups) is None
+
+
+def unaccepted_unsupported_refusal(changes, created, own_groups):
+    """Names every Unsupported row Rules U and R do not accept (parent, type, group; unsafe values are dropped)."""
     rows = []
     for change in changes:
         if not (isinstance(change, dict) and change.get("changeType") == "Unsupported"
-                and not unsupported_child_accepted(change, created)):
+                and not unsupported_row_accepted(change, created, own_groups)):
             continue
         base, kind = unsupported_row_base(change)
+        role_kind, group = role_assignment_evidence(change)
         under = base.rsplit("/providers/", 1)[0] if base and base.endswith("/providers/" + kind) else base
+        kind = kind or role_kind
         declared = re.search(r"declared at '([A-Za-z0-9_.\[\]]{1,300})'", str(change.get("unsupportedReason", "")))
         rows.append({"under": under if _safe_resource_identifier(under) else None,
                      "type": kind if kind and re.fullmatch(r"[a-z0-9.]+(?:/[a-z0-9]+)+", kind) else None,
                      "reason": "unparsed-resource-id" if base is None else "no-created-parent",
+                     "group": group if _safe_resource_identifier(group) else None,
+                     "rule_r": role_assignment_refusal(change, own_groups),
                      "declared": declared.group(1) if declared else None})
     detail = {"rows": rows[:UNSUPPORTED_DIAGNOSTIC_ROWS], "count": len(rows)}
     print(json.dumps({"event": "unsupported-resource-unproven", **detail}, sort_keys=True), file=sys.stderr, flush=True)
@@ -4104,7 +4202,8 @@ def unaccepted_unsupported_refusal(changes, created):
 
 def arm_changes(body, unchanged_resources=None, own_groups=None):
     """Reviewed rows of one preview. With the plan's `own_groups`, Rule U accepts Unsupported children of resources
-    the same preview creates there; they have no resolvable id or body, so they are not reviewed rows."""
+    the same preview creates there and Rule R Unsupported role assignments deployed there; they have no resolvable id
+    or body, so they are not reviewed rows."""
     require(isinstance(body, dict) and body.get("status") in (None, "Succeeded") and not body.get("error"),
             "arm-what-if-failed-or-incomplete")
     properties = body.get("properties", body)
@@ -4114,8 +4213,8 @@ def arm_changes(body, unchanged_resources=None, own_groups=None):
     created = created_parents(properties["changes"], own_groups) if own_groups else set()
     for change in properties["changes"]:
         if change.get("changeType") == "Unsupported" and own_groups:
-            if not unsupported_child_accepted(change, created):
-                raise unaccepted_unsupported_refusal(properties["changes"], created)
+            if not unsupported_row_accepted(change, created, own_groups):
+                raise unaccepted_unsupported_refusal(properties["changes"], created, own_groups)
             continue
         if change.get("changeType") == "Ignore":
             identifier = change.get("resourceId", "").lower()
