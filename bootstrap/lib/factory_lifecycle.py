@@ -3226,17 +3226,106 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache, drift
 # once diagnostics flow, after the receipt that deployed the workspace, and leaves them untagged. Only this type, and
 # only through its parent workspace's own verified receipt.
 AZURE_CREATED_TABLE_TYPE = "microsoft.operationalinsights/workspaces/tables"
+# Rule D (aif68 2026-11-25, approved 2026-11-25): Microsoft Defender for Storage malware scanning creates an Event Grid
+# system topic on the scanned storage account, and its StorageAntimalwareSubscription, after the receipt that deployed
+# the account, and leaves both untagged. Only this topic (source a storage account, topicType the storage type when
+# present) and only that subscription name, and only through the source account's own verified receipt.
+DEFENDER_SYSTEM_TOPIC_TYPE = "microsoft.eventgrid/systemtopics"
+DEFENDER_SUBSCRIPTION_TYPE = "microsoft.eventgrid/systemtopics/eventsubscriptions"
+DEFENDER_SUBSCRIPTION_NAME = "storageantimalwaresubscription"
+DEFENDER_SOURCE_TYPE = "microsoft.storage/storageaccounts"
+DEFENDER_TOPIC_TYPE = "microsoft.storage.storageaccounts"
+# Defender for Storage also adds its own StorageDataScanner resource access rule to the account it scans (aif68: the
+# only difference from the account's receipt body). Rule D accepts the receipt hash for the current body without
+# exactly those rules; any other drift still blocks, and the account's own receipt check is unchanged.
+DEFENDER_DATA_SCANNER = "/providers/microsoft.security/datascanners/storagedatascanner"
 
 
-def existing_receipt_owner(locks, known, resource_id, resources, cache):
-    """verified_receipt_owner for an untagged existing resource of the Execute ownership walk. A Log Analytics table
-    without evidence of its own is owned through its parent workspace's verified receipt (Rule T)."""
+def _without_ownership_tags(body):
+    return isinstance(body, dict) and not any(TAG_KEYS[field] in (body.get("tags") or {}) for field in TAG_KEYS)
+
+
+def defender_scanned_account(key, resources, bodies):
+    """The storage account whose verified receipt owns an untagged Defender for Storage system topic or its
+    StorageAntimalwareSubscription (Rule D), else None. Read only from the walk's own current bodies."""
+    kind = resource_type_from_id(key)
+    if kind == DEFENDER_SUBSCRIPTION_TYPE:
+        topic, name = key.rsplit("/eventsubscriptions/", 1)
+        subscription = (bodies or {}).get(key)
+        properties = subscription.get("properties") if isinstance(subscription, dict) else None
+        if (name != DEFENDER_SUBSCRIPTION_NAME or not _without_ownership_tags(subscription)
+                or not isinstance(properties, dict)
+                or ("topic" in properties and str(properties["topic"]).lower() != topic)):
+            return None
+    elif kind == DEFENDER_SYSTEM_TOPIC_TYPE:
+        topic = key
+    else:
+        return None
+    body = (bodies or {}).get(topic)
+    properties = body.get("properties") if isinstance(body, dict) else None
+    if topic not in resources or not _without_ownership_tags(body) or not isinstance(properties, dict):
+        return None
+    source = properties.get("source")
+    if not (isinstance(source, str) and NESTED_ID.fullmatch(source)
+            and resource_type_from_id(source) == DEFENDER_SOURCE_TYPE):
+        return None
+    if "topicType" in properties and str(properties["topicType"]).lower() != DEFENDER_TOPIC_TYPE:
+        return None
+    return source.lower()
+
+
+def defender_unscanned_digest(account, resources, bodies):
+    """The Rule D source account's current body hash without Defender's own StorageDataScanner resource access rules
+    (the key is dropped when none remain), or None when the body is not the walk's current instance or has none."""
+    body = (bodies or {}).get(account)
+    if not (isinstance(body, dict) and resource_digest(body, DEFENDER_SOURCE_TYPE) == resources[account]["body_hash"]):
+        return None
+    properties = body.get("properties") if isinstance(body.get("properties"), dict) else {}
+    acls = properties.get("networkAcls") if isinstance(properties.get("networkAcls"), dict) else {}
+    rules = acls.get("resourceAccessRules")
+    scanner = "/subscriptions/" + account.split("/")[2] + DEFENDER_DATA_SCANNER
+    if not isinstance(rules, list):
+        return None
+    kept = [rule for rule in rules if not (isinstance(rule, dict) and str(rule.get("resourceId", "")).lower() == scanner)]
+    if len(kept) == len(rules):
+        return None
+    unscanned = copy.deepcopy(body)
+    if kept:
+        unscanned["properties"]["networkAcls"]["resourceAccessRules"] = kept
+    else:
+        del unscanned["properties"]["networkAcls"]["resourceAccessRules"]
+    return resource_digest(unscanned, DEFENDER_SOURCE_TYPE)
+
+
+def defender_source_owner(locks, evidence, account, resources, bodies, cache):
+    """verified_receipt_owner for a Rule D source account: its current body hash, else that hash without Defender's
+    own StorageDataScanner resource access rules."""
+    try:
+        return verified_receipt_owner(locks, evidence, account, resources[account]["body_hash"], cache)
+    except Blocked as error:
+        unscanned = defender_unscanned_digest(account, resources, bodies)
+        if error.code != "child-instance-ownership-unverified" or unscanned is None:
+            raise
+        return verified_receipt_owner(locks, evidence, account, unscanned, cache)
+
+
+def existing_receipt_owner(locks, known, resource_id, resources, cache, bodies=None):
+    """verified_receipt_owner for an untagged existing resource of the Execute ownership walk. Without evidence of its
+    own, a Log Analytics table is owned through its parent workspace's verified receipt (Rule T), and a Defender for
+    Storage system topic or its StorageAntimalwareSubscription through its source storage account's (Rule D)."""
     key = resource_id.lower()
     evidence = known.get(key, {})
-    if not evidence and NESTED_ID.fullmatch(key) and resource_type_from_id(key) == AZURE_CREATED_TABLE_TYPE:
-        workspace = key.rsplit("/tables/", 1)[0]
-        require(workspace in resources and known.get(workspace), "child-ownership-evidence-required")
-        return verified_receipt_owner(locks, known[workspace], workspace, resources[workspace]["body_hash"], cache)
+    parent = None
+    if not evidence and NESTED_ID.fullmatch(key):
+        if resource_type_from_id(key) == AZURE_CREATED_TABLE_TYPE:
+            parent = key.rsplit("/tables/", 1)[0]
+        elif resource_type_from_id(key) in (DEFENDER_SYSTEM_TOPIC_TYPE, DEFENDER_SUBSCRIPTION_TYPE):
+            parent = defender_scanned_account(key, resources, bodies)
+            require(parent is not None and parent in resources and known.get(parent), "child-ownership-evidence-required")
+            return defender_source_owner(locks, known[parent], parent, resources, bodies, cache)
+    if parent is not None:
+        require(parent in resources and known.get(parent), "child-ownership-evidence-required")
+        return verified_receipt_owner(locks, known[parent], parent, resources[parent]["body_hash"], cache)
     return verified_receipt_owner(locks, evidence, key, resources[key]["body_hash"], cache)
 
 
@@ -7324,7 +7413,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                         previous_owners[key] = bootstrap_owners[key]["owner"]
                     else:
                         previous_owners[key] = existing_receipt_owner(locks, document["deployment"].get("known_ownership", {}), key,
-                                                                      closure["resources"], previous_receipts)
+                                                                      closure["resources"], previous_receipts,
+                                                                      bodies=current_bodies)
                 require(all(previous_owners[key].get(field) == document["target"][field]
                             for field in ("factory_id", "scaleset_id")), "existing-resource-owner-mismatch")
                 require(key not in modified_ids or not previous_owners[key].get("project_id")
