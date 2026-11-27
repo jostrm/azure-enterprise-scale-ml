@@ -7621,13 +7621,24 @@ def protected_worker_envelope(document, locks):
     return raw
 
 
-def github_envelope_chunks(document, locks):
-    """The protected worker envelope as GitHub environment secrets: compressed, base64, at most 16 secrets of 32,000
-    characters (the consumer's scoped workflow reads 16)."""
+def protected_envelope_chunks(document, locks):
+    """The protected worker envelope compressed, base64, in at most 16 chunks of 32,000 characters (the consumer's
+    scoped GitHub workflow and ADO pipeline read 16). A GitHub environment secret holds 48 KB, and Linux caps one
+    environment string at 128 KiB (MAX_ARG_STRLEN): aif-173 run 2552 (2026-11-27) sent an 824 KB project envelope
+    as one ADO secret variable and the agent could not start git ("Argument list too long")."""
     envelope = base64.b64encode(zlib.compress(protected_worker_envelope(document, locks))).decode("ascii")
     chunks = [envelope[index:index + 32000] for index in range(0, len(envelope), 32000)]
-    require(len(chunks) <= 16, "github-protected-manifest-too-large")
+    require(len(chunks) <= 16, "protected-manifest-too-large")
     return chunks
+
+
+def ado_envelope_variables(document, locks):
+    """The queue-time variables of the scoped ADO worker run: the chunk count, then one secret per chunk."""
+    chunks = protected_envelope_chunks(document, locks)
+    variables = {"AIFACTORY_ENVELOPE_CHUNKS": {"isSecret": False, "value": str(len(chunks))}}
+    variables.update({"AIFACTORY_ENVELOPE_%d" % index: {"isSecret": True, "value": chunk}
+                      for index, chunk in enumerate(chunks)})
+    return variables
 
 
 def failed_worker_diagnostic(locks, document):
@@ -7680,7 +7691,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     require(any(row.get("path") == "azure-enterprise-scale-ml" and row.get("mode") == "160000"
                 and row.get("sha") == document["source"]["commit"] for row in tree.get("tree", [])),
             "consumer-version-source-mismatch")
-    chunks = github_envelope_chunks(document, locks)
+    chunks = protected_envelope_chunks(document, locks)
     secret = "AIF_LIFECYCLE_" + document["run_id"].replace("-", "").upper()
     tag = "aifactory-runs/" + document["run_id"]
     locks.assert_held()
@@ -7789,8 +7800,7 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
                    "vmImage": route["runner"].get("image", ""),
                    "agentPool": route["runner"].get("pool", ""),
                    "agentName": route["runner"].get("agent_name", "")}.items() if value != ""},
-               "variables": {"AIFACTORY_ENVELOPE_JSON": {
-                   "isSecret": True, "value": protected_worker_envelope(document, locks).decode("utf-8")}}}
+               "variables": ado_envelope_variables(document, locks)}
     locks.assert_held()
     cloud.assert_no_active_runs(locks.enrollment)
     locks.authorize(document)

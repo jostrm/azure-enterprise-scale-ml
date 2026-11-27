@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from .test_factory_lifecycle import manifest, enrollment, ROOT
+from .test_factory_lifecycle import manifest, enrollment, ROOT, ado_worker_input
 from . import test_single_writer_coordination as native
 
 sys.path.insert(0, str(ROOT / "bootstrap" / "lib"))
@@ -612,7 +612,8 @@ def test_actual_native_ado_scoped_dispatch_and_poll_use_seeded_token(capsys):
     assert receipt["remote_terminal"] and receipt["worker_receipt"]["status"] == "succeeded"
     payload = next(body for method, _, body in calls if method == "POST")
     assert payload["resources"]["repositories"]["self"]["version"] == document["route"]["commit"]
-    assert payload["variables"]["AIFACTORY_ENVELOPE_JSON"]["isSecret"] is True
+    assert payload["variables"]["AIFACTORY_ENVELOPE_0"]["isSecret"] is True
+    assert json.loads(ado_worker_input(payload["variables"], "factory-lifecycle-ado.yml"))["manifest"] == document
     cloud.token.assert_not_called()
     assert all(call.args[0][:2] == ["git", "show"] for call in cloud.command.call_args_list)
     assert "seeded-dispatch-token" not in json.dumps(saved)

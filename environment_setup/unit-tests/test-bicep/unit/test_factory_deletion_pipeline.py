@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from .test_factory_lifecycle import fl, GROUP, COMMON, OWNER, RESOURCE, ROOT, manifest, seal, workspace, no_real_services
+from .test_factory_lifecycle import ado_worker_input
 from .test_selective_project_deletion import prepared, PROJECT, SUBNET, SHARED_SUBNET, VNET, tagged
 
 
@@ -662,7 +663,7 @@ def test_existing_provider_dispatch_carries_boolean_flags_and_requires_completio
         elif "/build/definitions?" in url:
             result = {"value": [{"id": 7, "repository": {"name": "consumer"}, "process": {"yamlFilename": fl.SCOPED_ADO}}]}
         elif method == "POST":
-            envelopes.append(json.loads(data["variables"]["AIFACTORY_ENVELOPE_JSON"]["value"]))
+            envelopes.append(json.loads(ado_worker_input(data["variables"])))
             result = {"id": 43}
         else:
             result = {"id": 43, "pipeline": {"id": 7}, "state": "completed",

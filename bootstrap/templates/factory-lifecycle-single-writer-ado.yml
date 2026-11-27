@@ -68,8 +68,20 @@ jobs:
           keepAzSessionActive: true
           inlineScript: |
             python3 - <<'PY'
-            import os, subprocess, sys
-            raw = os.environ.pop("AIFACTORY_ENVELOPE_JSON").encode("utf-8")
+            import base64, os, subprocess, sys, zlib
+            count = int(os.environ.pop("ENVELOPE_CHUNKS"))
+            if not 1 <= count <= 16:
+                raise SystemExit("Invalid protected envelope size")
+            # Linux caps one environment string at 128 KiB, so the envelope arrives compressed in secret chunks.
+            # Azure DevOps leaves the macro of a chunk it was not sent as literal text.
+            chunks = [os.environ.pop(f"AIFACTORY_ENVELOPE_{i}", "") for i in range(16)]
+            chunks = ["" if chunk == "$(AIFACTORY_ENVELOPE_%d)" % i else chunk for i, chunk in enumerate(chunks)]
+            if not all(chunks[:count]) or any(chunks[count:]):
+                raise SystemExit("Protected envelope is incomplete")
+            decoder = zlib.decompressobj()
+            raw = decoder.decompress(base64.b64decode("".join(chunks[:count]), validate=True), 8 * 1024 * 1024 + 1)
+            if len(raw) > 8 * 1024 * 1024 or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+                raise SystemExit("Invalid or oversized protected envelope")
             result = subprocess.run([
                 sys.executable, "-B", "azure-enterprise-scale-ml/bootstrap/lib/factory_lifecycle.py",
                 "worker", "--source-root", "azure-enterprise-scale-ml",
@@ -80,7 +92,23 @@ jobs:
             PY
         env:
           AIFACTORY_STATE_TOKEN: $(System.AccessToken)
-          AIFACTORY_ENVELOPE_JSON: $(AIFACTORY_ENVELOPE_JSON)
+          ENVELOPE_CHUNKS: $(AIFACTORY_ENVELOPE_CHUNKS)
+          AIFACTORY_ENVELOPE_0: $(AIFACTORY_ENVELOPE_0)
+          AIFACTORY_ENVELOPE_1: $(AIFACTORY_ENVELOPE_1)
+          AIFACTORY_ENVELOPE_2: $(AIFACTORY_ENVELOPE_2)
+          AIFACTORY_ENVELOPE_3: $(AIFACTORY_ENVELOPE_3)
+          AIFACTORY_ENVELOPE_4: $(AIFACTORY_ENVELOPE_4)
+          AIFACTORY_ENVELOPE_5: $(AIFACTORY_ENVELOPE_5)
+          AIFACTORY_ENVELOPE_6: $(AIFACTORY_ENVELOPE_6)
+          AIFACTORY_ENVELOPE_7: $(AIFACTORY_ENVELOPE_7)
+          AIFACTORY_ENVELOPE_8: $(AIFACTORY_ENVELOPE_8)
+          AIFACTORY_ENVELOPE_9: $(AIFACTORY_ENVELOPE_9)
+          AIFACTORY_ENVELOPE_10: $(AIFACTORY_ENVELOPE_10)
+          AIFACTORY_ENVELOPE_11: $(AIFACTORY_ENVELOPE_11)
+          AIFACTORY_ENVELOPE_12: $(AIFACTORY_ENVELOPE_12)
+          AIFACTORY_ENVELOPE_13: $(AIFACTORY_ENVELOPE_13)
+          AIFACTORY_ENVELOPE_14: $(AIFACTORY_ENVELOPE_14)
+          AIFACTORY_ENVELOPE_15: $(AIFACTORY_ENVELOPE_15)
           EXPECTED_RUN: ${{ parameters.runId }}
           EXPECTED_HASH: ${{ parameters.manifestHash }}
           AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'

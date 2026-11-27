@@ -16,7 +16,7 @@ import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 from urllib.request import HTTPSHandler, build_opener
 from urllib.response import addinfourl
@@ -1740,6 +1740,63 @@ def test_scoped_templates_guard_commits_and_use_protected_input():
         compile(script.split("\n", 1)[1].rsplit("\nPY", 1)[0], "protected-worker-transport", "exec")
 
 
+def ado_worker_input(variables, template="factory-lifecycle-single-writer-ado.yml"):
+    """Run the ADO worker step's inline transport as the agent does: a macro of a queued variable expands, an
+    undefined one stays literal text. Returns the bytes the transport pipes to the worker."""
+    def steps(node):
+        if isinstance(node, dict):
+            if "factory_lifecycle.py" in str(node.get("inputs", {}).get("inlineScript", "")):
+                yield node
+            for value in node.values():
+                yield from steps(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from steps(value)
+
+    step = next(steps(yaml.safe_load((ROOT / "bootstrap/templates" / template).read_text())))
+    env = {}
+    for key, value in step["env"].items():
+        value = str(value)
+        name = value[2:-1] if value.startswith("$(") and value.endswith(")") else None
+        env[key] = variables[name]["value"] if name in variables else value
+    script = step["inputs"]["inlineScript"].split("\n", 1)[1].rsplit("\nPY", 1)[0]
+    captured = {}
+
+    def run(args, input, shell):
+        captured["input"] = input
+        return SimpleNamespace(returncode=0)
+
+    with patch.dict(os.environ, env), patch("subprocess.run", run):
+        try:
+            exec(compile(script, "protected-worker-transport", "exec"), {"__name__": "__main__"})
+        except SystemExit as stop:
+            if stop.code != 0:
+                raise
+    return captured["input"]
+
+
+@pytest.mark.parametrize("template", ["factory-lifecycle-ado.yml", "factory-lifecycle-single-writer-ado.yml"])
+def test_ado_worker_envelope_fits_the_linux_per_variable_limit(template):
+    # aif-173 run 2552 (2026-11-27): project001's 824 KB envelope went to the worker as one secret variable. Linux caps
+    # one environment string at 128 KiB (MAX_ARG_STRLEN), so the agent could not start git ("Argument list too long")
+    # and the worker failed before checkout. The envelope now travels compressed in chunks, as on GitHub.
+    document = {"run_id": "run", "blob": os.urandom(300 * 1024).hex()}
+    locks = SimpleNamespace(held={"run_id": "run"})
+    variables = fl.ado_envelope_variables(document, locks)
+    assert len(variables) > 3 and "AIFACTORY_ENVELOPE_JSON" not in variables
+    assert all(len(name) + len(row["value"]) < 64 * 1024 for name, row in variables.items())
+    assert all(row["isSecret"] is True for name, row in variables.items() if name != "AIFACTORY_ENVELOPE_CHUNKS")
+    assert ado_worker_input(variables, template) == fl.protected_worker_envelope(document, locks)
+
+
+def test_ado_worker_transport_refuses_an_incomplete_envelope():
+    document = {"run_id": "run", "blob": os.urandom(100 * 1024).hex()}
+    variables = fl.ado_envelope_variables(document, SimpleNamespace(held={"run_id": "run"}))
+    variables.pop("AIFACTORY_ENVELOPE_1")
+    with pytest.raises(SystemExit, match="incomplete"):
+        ado_worker_input(variables)
+
+
 def successful_worker_receipt(document):
     return {"schema": 1, "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
             "source_commit": document["source"]["commit"], "target": document["target"], "status": "succeeded",
@@ -1872,7 +1929,8 @@ def test_new_ado_scoped_template_uses_namespaced_connection_exact_commit_and_wor
     assert payload["resources"]["repositories"]["self"]["version"] == document["route"]["commit"]
     assert payload["templateParameters"]["serviceConnection"] == document["route"]["auth_namespace"]
     assert payload["templateParameters"]["vmImage"] == "ubuntu-latest"
-    assert payload["variables"]["AIFACTORY_ENVELOPE_JSON"]["isSecret"]
+    assert payload["variables"]["AIFACTORY_ENVELOPE_0"]["isSecret"]
+    assert json.loads(ado_worker_input(payload["variables"], "factory-lifecycle-ado.yml"))["manifest"] == document
     assert receipt["worker_receipt"]["status"] == "succeeded"
 
 

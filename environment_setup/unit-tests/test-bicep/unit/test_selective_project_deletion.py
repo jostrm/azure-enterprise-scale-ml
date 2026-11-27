@@ -610,7 +610,7 @@ def test_a_factory_sized_project_deletion_fits_the_protected_worker_and_github_d
     assert len(cloud.bodies) > 1700
     # pink catalog_runtime refuses a frozen manifest above 8 MiB - 4096 (protected-worker capacity)
     assert len(fl.canonical(document)) <= fl.MAX_DOCUMENT - 4096
-    assert len(fl.github_envelope_chunks(document, types.SimpleNamespace(held={"run_id": document["run_id"]}))) <= 16
+    assert len(fl.protected_envelope_chunks(document, types.SimpleNamespace(held={"run_id": document["run_id"]}))) <= 16
     frozen = set(document["deletion"]["bodies"])
     assert {key for key in cloud.bodies if fl.arm_scope(key) == GROUP.lower()} <= frozen
     assert {GROUP.lower(), OTHER_GROUP.lower(), COMMON.lower(), SUBNET.lower(), VNET.lower()} <= frozen

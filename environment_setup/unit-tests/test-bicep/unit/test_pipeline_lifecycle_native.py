@@ -22,6 +22,7 @@ from .test_selective_project_deletion import prepared, SUBNET, SHARED_SUBNET
 from .test_selective_project_deletion import ProjectCloud, tagged
 from .test_factory_deletion_pipeline import factory_prepared
 from .test_pipeline_lifecycle import Store, resolved
+from .test_factory_lifecycle import ado_worker_input
 
 
 @pytest.fixture(autouse=True)
@@ -705,8 +706,8 @@ def test_native_prepare_execute_persist_reconcile_matrix_without_factory_api(wor
             body = {"value": [{"id": 8, "repository": {"name": "repo"},
                                 "process": {"yamlFilename": fl.SCOPED_ADO}, "queueStatus": "enabled"}]}
         elif method == "POST" and path.startswith("/pipelines/8/runs?"):
-            assert data["variables"]["AIFACTORY_ENVELOPE_JSON"]["isSecret"] is True
-            body = {"id": run_worker(json.loads(data["variables"]["AIFACTORY_ENVELOPE_JSON"]["value"]))}
+            assert data["variables"]["AIFACTORY_ENVELOPE_0"]["isSecret"] is True
+            body = {"id": run_worker(json.loads(ado_worker_input(data["variables"])))}
         elif method == "GET" and (path.startswith("/pipelines/8/runs/") or path.startswith("/build/builds/")):
             body = run_status(int(path.split("?", 1)[0].rsplit("/", 1)[1]))
         else:
