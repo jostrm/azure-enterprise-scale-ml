@@ -1126,8 +1126,10 @@ def native_closure(cloud, scopes, resource_versions=None):
     bodies = {key: copy.deepcopy(body) for key, body in cloud.bodies.items() if fl.arm_scope(key) in selected}
     groups = {key: {"body_hash": fl.resource_digest(body), "etag": body.get("etag")}
               for key, body in bodies.items() if fl.RG_ID.fullmatch(key)}
+    # As collect_resource_closure: a resource is fingerprinted as its own kind, which a listed body may not name.
     closure = {"providers": {}, "collections": {}, "groups": groups,
-               "resources": {key: {"body_hash": fl.resource_digest(body), "etag": fl.resource_etag(body, {}),
+               "resources": {key: {"body_hash": fl.resource_digest(body, fl.resource_type_from_id(key)),
+                                   "etag": fl.resource_etag(body, {}, fl.resource_type_from_id(key)),
                                    "api_version": "2024-05-01"} for key, body in bodies.items() if key not in groups}}
     for identifier, row in closure["resources"].items():
         row["type"] = fl.resource_type_from_id(identifier)
@@ -1357,6 +1359,30 @@ def observation_case(monkeypatch, disposition="owned"):
     document["deployment"]["changes"] = fl.evaluate_what_if(
         cloud, document, {"id": "factory", "scope": "subscription"}, payload)
     return document, cloud, before, after
+
+
+def test_foundry_inventory_accepts_listed_log_analytics_tables_without_a_type(monkeypatch):
+    # aif-174 run 2560 (2026-11-27): the common group's 700 Log Analytics tables come from their workspace's list,
+    # whose rows carry no "type". The closure fingerprints them as tables (schema and state are volatile), and the
+    # Foundry inventory and phase observations rehashed them as untyped bodies: native-foundry-inventory-body-mismatch
+    # before any write. The same tables must also pass each phase's observation.
+    document, cloud, before, after = observation_case(monkeypatch)
+    table = (fl.arm_scope(RESOURCE.lower()) + "/providers/microsoft.operationalinsights/workspaces/la-cmn"
+             "/tables/appevents")
+    cloud.bodies[table] = {"id": table, "name": "AppEvents",
+                           "properties": {"retentionInDays": 30, "plan": "Analytics", "provisioningState": "Succeeded",
+                                          "schema": {"name": "AppEvents", "columns": [{"name": "TimeGenerated"}]}}}
+    fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    seal(document)
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    initial = fl.foundry_inventory_observations(document, closure, bodies)
+    assert initial[table]["body_hash"] == fl.resource_digest(cloud.bodies[table], closure["resources"][table]["type"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": initial}
+    cloud.bodies[table]["properties"]["schema"]["columns"].append({"name": "Platform-added"})
+    fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    assert len(cloud.executed) == 3
+    assert all(table in phase["resources"] for phase in receipt["foundry_phase_observations"])
 
 
 def test_real_multiphase_what_if_accepts_only_reviewed_owned_postphase_observations(monkeypatch):

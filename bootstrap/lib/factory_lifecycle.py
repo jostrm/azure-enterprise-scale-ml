@@ -549,6 +549,13 @@ def resource_digest(body, kind=None):
     return digest(fingerprint_body(body, kind))
 
 
+def observed_digest(identifier, body):
+    """An observed body's fingerprint as collect_resource_closure records it: a resource as the kind its id names,
+    which the body itself may not (aif-174 run 2560, 2026-11-27: a Log Analytics table's list row and its own read
+    carry no "type", so an untyped rehash kept the volatile schema of all 700 tables and every check failed)."""
+    return resource_digest(body, None if RG_ID.fullmatch(identifier) else resource_type_from_id(identifier))
+
+
 def newest_schema_api_version(available):
     """The newest stable api-version a provider schema lists for a type, else its newest preview; None for neither."""
     stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
@@ -5993,7 +6000,7 @@ def verify_foundry_observation_context(cloud, document, receipt, observations):
     for identifier, proof in observations.items():
         status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
         require(status == 200 and str(body.get("id", "")).lower() == identifier
-                and resource_digest(body) == proof["body_hash"], "native-foundry-phase-instance-changed")
+                and observed_digest(identifier, body) == proof["body_hash"], "native-foundry-phase-instance-changed")
 
 
 def verify_foundry_observation_history(document, receipt):
@@ -6067,7 +6074,8 @@ def foundry_inventory_observations(document, closure, bodies=None):
     if bodies is not None:
         require(set(bodies) == set(observed)
                 and all(str(bodies[key].get("id", "")).lower() == key
-                        and resource_digest(bodies[key]) == row["body_hash"] for key, row in observed.items()),
+                        and observed_digest(key, bodies[key]) == row["body_hash"]
+                        for key, row in observed.items()),
                 "native-foundry-inventory-body-mismatch")
     return observed
 
@@ -6108,7 +6116,7 @@ def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
     expected = {**unchanged, **initial, **readiness, **previous}
     observed = {}
     for identifier in sorted(identifiers):
-        current_hash = resource_digest(bodies[identifier])
+        current_hash = observed_digest(identifier, bodies[identifier])
         # Cumulative preview membership never permits rebasing a resource this phase did not write.
         require(identifier in written or current_hash == expected.get(identifier, {}).get("body_hash"),
                 "native-foundry-phase-instance-changed")
@@ -6473,7 +6481,7 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
                    else combined_plan_payload(cloud, document, source_root, phase["step_ids"]))
         for identifier, proof in observations.items():
             status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
-            require(status == 200 and resource_digest(body) == proof["body_hash"],
+            require(status == 200 and observed_digest(identifier, body) == proof["body_hash"],
                     "native-foundry-phase-instance-changed")
         source_changes = {}
         what_if = {"unchanged_resources": observations, "source_changes": source_changes, "phase_receipt": receipt}
@@ -7230,7 +7238,7 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     for key in protected:
         require(all(resources[key].get(field) == proof["resources"][key].get(field)
                     for field in ("type", "api_version", "body_hash", "etag"))
-                and (bodies is None or resource_digest(bodies[key]) == resources[key]["body_hash"]),
+                and (bodies is None or observed_digest(key, bodies[key]) == resources[key]["body_hash"]),
                 "bootstrap-preserved-resource-changed-during-deployment")
     return preserved
 
