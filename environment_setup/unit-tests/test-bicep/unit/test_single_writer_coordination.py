@@ -125,8 +125,14 @@ class Provider:
         if "/refs" in parsed.path:
             return 200, {}, {"value": [{"name": ps.STATE_REF, "objectId": self.head}] if self.head else []}
         if "/items" in parsed.path:
-            assert query["versionDescriptor.version"] == [self.head]
-            return 200, {}, {"content": ps.canonical(self.state()).decode()}
+            # Blob metadata only: Azure DevOps cuts inline content at 5 MiB with 206 (aif-172 run 2545).
+            assert query["versionDescriptor.version"] == [self.head] and "includeContent" not in query
+            return 200, {}, {"objectId": ps.git_blob_id(ps.canonical(self.state())), "gitObjectType": "blob",
+                             "commitId": self.head}
+        if "/blobs/" in parsed.path:
+            assert query["$format"] == ["octetStream"]
+            assert parsed.path.endswith("/blobs/" + ps.git_blob_id(ps.canonical(self.state())))
+            return 200, {}, self.state()
         if "/pushes" in parsed.path:
             if self.contender:
                 callback, self.contender = self.contender, None

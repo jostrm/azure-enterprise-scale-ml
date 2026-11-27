@@ -8,6 +8,7 @@ exclusion and is not a replacement for exclusive shared-hub governance.
 
 import base64
 import copy
+import hashlib
 import json
 import re
 from urllib.parse import quote, unquote, urlsplit
@@ -54,6 +55,10 @@ def ado_job_name(row):
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+
+def git_blob_id(raw):
+    return hashlib.sha1(b"blob %d\0" % len(raw) + raw).hexdigest()
 
 
 def coordinates(repository):
@@ -140,10 +145,21 @@ class ProviderState:
             except (ValueError, KeyError, TypeError):
                 raise self.error("single-writer-state-encoding-invalid") from None
         else:
-            _, _, item = self.request("GET", "/items?path=/state.json&includeContent=true"
+            # Azure DevOps stops inline item content at 5 MiB and answers 206 Partial Content (aif-172 run 2545,
+            # 2026-11-27: an 8.6 MB state.json after project001 Prepare). Name the blob, then read it raw.
+            _, _, item = self.request("GET", "/items?path=/state.json"
                                      "&versionDescriptor.versionType=commit&versionDescriptor.version=" + head)
-            self.require(isinstance(item.get("content"), str), "single-writer-state-content-required")
-            raw = item["content"].encode("utf-8")
+            blob = item.get("objectId") if isinstance(item, dict) else None
+            self.require(isinstance(item, dict) and item.get("gitObjectType") == "blob" and item.get("commitId") == head
+                         and isinstance(blob, str) and re.fullmatch(r"[a-f0-9]{40}", blob),
+                         "single-writer-state-tree-invalid")
+            _, _, stored = self.request("GET", "/blobs/" + blob + "?%24format=octetStream")
+            # Hard gate, essential: the provider transports parse the octet stream as JSON without the duplicate-key
+            # hook below, so the git object id is the only proof that the parsed state is byte for byte the stored
+            # blob (no duplicate key, nothing cut short). The product writes canonical(value), so the round trip
+            # is exact.
+            raw = canonical(stored) if isinstance(stored, dict) else b""
+            self.require(git_blob_id(raw) == blob, "single-writer-state-json-invalid")
         self.require(len(raw) <= MAX_BYTES, "single-writer-state-too-large")
         try:
             def unique(pairs):

@@ -188,7 +188,11 @@ def test_export_uses_authenticated_private_provider_gets_only(tmp_path, monkeypa
             elif "/refs?" in url:
                 value = {"value": [{"name": provider_repository_state.STATE_REF, "objectId": "a" * 40}]}
             elif "/items?" in url:
-                value = {"content": json.dumps(state)}
+                assert "includeContent" not in url  # ADO cuts inline content at 5 MiB (aif-172 run 2545)
+                value = {"objectId": provider_repository_state.git_blob_id(provider_repository_state.canonical(state)),
+                         "gitObjectType": "blob", "commitId": "a" * 40}
+            elif "/blobs/" in url:
+                value = state
             else:
                 value = {"project": {"visibility": "private"}, "remoteUrl": binding["repository"]}
             return 200, {}, value
@@ -198,7 +202,7 @@ def test_export_uses_authenticated_private_provider_gets_only(tmp_path, monkeypa
     result = dispatch.export_configuration(tmp_path, "request.json", canonical, binding, PARENT,
                                            "next/azurefactory", reader=reader)
     assert result["configuration_revision"] == dispatch.digest(current)
-    assert sum("/git/blobs/" in url or "/items?" in url for url in calls) == 1
+    assert sum("/blobs/" in url for url in calls) == 1
     assert len(calls) >= 4
     frozen = dispatch.ProviderStateSnapshot("a" * 40, state)
     with pytest.raises(dispatch.DispatchError, match="read-only"):

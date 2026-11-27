@@ -821,7 +821,7 @@ class Cloud:
         self.tokens[key] = cached
         return cached["token"]
 
-    def http(self, method, url, audience, data=None, headers=None, tenant=None, allowed=(200,)):
+    def http(self, method, url, audience, data=None, headers=None, tenant=None, allowed=(200,), limit=MAX_BYTES):
         require(method in ("GET", "HEAD", "PUT", "POST"), "delete-or-replacement-forbidden")
         require(not self.read_only or method in ("GET", "HEAD"), "plan-mutation-forbidden")
         require(audience != ARM + "/" or method in ("GET", "HEAD") or self.serialized_provisioning,
@@ -849,11 +849,11 @@ class Cloud:
         with response:
             status = response.status if hasattr(response, "status") else response.code
             incoming = {key.lower(): value for key, value in response.headers.items()}
-            raw = response.read(MAX_BYTES + 1)
+            raw = response.read(limit + 1)
         require(status in allowed, f"remote-request-failed-{status}")
-        require(len(raw) <= MAX_BYTES, "remote-response-too-large")
+        require(len(raw) <= limit, "remote-response-too-large")
         if raw and raw.lstrip().startswith((b"{", b"[")):
-            value = parse_json(raw)
+            value = parse_json(raw, limit)
         else:
             value = raw
         return status, incoming, value
@@ -932,7 +932,7 @@ class Cloud:
         if kind == "gha":
             return self.gh(method, endpoint, body, allowed, limit=STATE_RESPONSE_MAX)
         return self.http(method, endpoint, ADO_AUDIENCE, data=body,
-                         tenant=self.request_config["ado_tenant_id"], allowed=allowed)
+                         tenant=self.request_config["ado_tenant_id"], allowed=allowed, limit=STATE_RESPONSE_MAX)
 
 
 def _absent(response):

@@ -651,7 +651,11 @@ def test_provider_receipt_reader_has_no_azure_or_write_capability(provider):
             elif "/refs?" in url:
                 value = {"value": [{"name": provider_repository_state.STATE_REF, "objectId": "e" * 40}]}
             elif "/items?" in url:
-                value = {"content": json.dumps(state)}
+                assert "includeContent" not in url  # ADO cuts inline content at 5 MiB (aif-172 run 2545)
+                value = {"objectId": provider_repository_state.git_blob_id(provider_repository_state.canonical(state)),
+                         "gitObjectType": "blob", "commitId": "e" * 40}
+            elif "/blobs/" in url:
+                value = state
             else:
                 value = {"project": {"visibility": "private"}, "remoteUrl": expected["repository"]}
             return 200, {}, value

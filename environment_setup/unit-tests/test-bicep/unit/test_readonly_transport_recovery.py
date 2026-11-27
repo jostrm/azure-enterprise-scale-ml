@@ -3,6 +3,7 @@
 import base64
 import copy
 import errno
+import hashlib
 import importlib.util
 import io
 import json
@@ -342,7 +343,7 @@ class Snapshots:
         self.route = {"kind": kind, "repository": (
             "https://github.com/org/repo" if kind == "gha" else "https://dev.azure.com/org/project/_git/repo")}
         self.head, self.advances, self.corrupt = 1, advances, corrupt
-        self.calls, self.private_reads = [], 0
+        self.calls, self.private_reads, self.blobs = [], 0, {}
         self.cloud = SimpleNamespace(state_request=self.request)
         self.store = ps.ProviderState(self.cloud, self.route, fl.Blocked)
 
@@ -350,10 +351,49 @@ class Snapshots:
         return self.store.empty() | {"active": {"run_id": "run-" + str(revision)},
                                      "records": {"worker": {"revision": revision}}}
 
+    def stored(self, revision):
+        value = self.value(revision)
+        if self.corrupt == "state":
+            value["repository"] = "foreign"
+        raw = ps.canonical(value)
+        if self.corrupt == "json":
+            raw = b"{"
+        elif self.corrupt == "duplicate":
+            raw = raw[:-1] + b',"schema":1}'
+        elif self.corrupt == "oversize":
+            raw = b" " * (ps.MAX_BYTES + 1)
+        elif self.corrupt == "large":
+            value["records"]["closure"] = {"bytes": "x" * (9 * 1024 * 1024)}
+            raw = ps.canonical(value)
+        return raw
+
     def request(self, kind, method, endpoint, body, allowed):
         self.calls.append((method, endpoint, copy.deepcopy(body)))
         assert method == "GET", "Snapshot reads must never write"
         suffix = endpoint.removeprefix(self.store.base)
+        if kind == "ado" and suffix.startswith("/items?"):
+            # Azure DevOps: item metadata names the blob; inline content stops at 5 MiB with 206 Partial Content
+            # (aif-172 run 2545, 2026-11-27), which the provider transport rejects.
+            query = parse_qs(urlsplit(endpoint).query)
+            raw = self.stored(int(query["versionDescriptor.version"][0], 16))
+            if query.get("includeContent") == ["true"]:
+                if len(raw) > 5 * 1024 * 1024:
+                    raise fl.Blocked("pipeline-provider-request-failed-206")
+                return 200, {}, {"content": raw.decode()}
+            blob = hashlib.sha1(b"blob %d\0" % len(raw) + raw).hexdigest()
+            self.blobs[blob] = raw
+            return 200, {}, {"objectId": blob, "gitObjectType": "tree" if self.corrupt == "tree" else "blob",
+                             "commitId": query["versionDescriptor.version"][0], "path": "/state.json"}
+        if kind == "ado" and suffix.startswith("/blobs/"):
+            assert parse_qs(urlsplit(endpoint).query)["$format"] == ["octetStream"]
+            raw = self.blobs[urlsplit(suffix).path.removeprefix("/blobs/")]
+            if self.advances:
+                self.head += 1
+                self.advances -= 1
+            try:
+                return 200, {}, json.loads(raw)  # the provider transports parse the octet stream as JSON
+            except ValueError:
+                raise fl.Blocked("pipeline-provider-response-invalid") from None
         if suffix in ("", "?api-version=7.1"):
             self.private_reads += 1
             if kind == "gha":
@@ -374,28 +414,12 @@ class Snapshots:
         if suffix.startswith("/git/trees/"):
             return 200, {}, {"truncated": self.corrupt == "tree",
                              "tree": [{"path": "state.json", "type": "blob", "sha": suffix.rsplit("/", 1)[1]}]}
-        if suffix.startswith("/git/blobs/") or suffix.startswith("/items?"):
-            revision = int(suffix.rsplit("/", 1)[1], 16) if kind == "gha" else int(
-                parse_qs(urlsplit(endpoint).query)["versionDescriptor.version"][0], 16)
-            value = self.value(revision)
-            if self.corrupt == "state":
-                value["repository"] = "foreign"
-            raw = ps.canonical(value)
-            if self.corrupt == "json":
-                raw = b"{"
-            elif self.corrupt == "duplicate":
-                raw = raw[:-1] + b',"schema":1}'
-            elif self.corrupt == "oversize":
-                raw = b" " * (ps.MAX_BYTES + 1)
-            elif self.corrupt == "large":
-                value["records"]["closure"] = {"bytes": "x" * (9 * 1024 * 1024)}
-                raw = ps.canonical(value)
+        if suffix.startswith("/git/blobs/"):
+            raw = self.stored(int(suffix.rsplit("/", 1)[1], 16))
             if self.advances:
                 self.head += 1
                 self.advances -= 1
-            if kind == "gha":
-                return 200, {}, {"encoding": "base64", "content": base64.b64encode(raw).decode()}
-            return 200, {}, {"content": raw.decode()}
+            return 200, {}, {"encoding": "base64", "content": base64.b64encode(raw).decode()}
         raise AssertionError(endpoint)
 
 
@@ -428,6 +452,9 @@ def test_provider_snapshot_continual_ref_advance_blocks_after_bounded_attempts(k
     ("oversize", "single-writer-state-too-large"),
 ])
 def test_invalid_provider_snapshot_never_retries_even_when_ref_advances(kind, corrupt, code):
+    if kind == "ado" and corrupt in ("json", "oversize"):
+        # The ADO raw blob is parsed by the provider transport, which rejects a non-JSON body itself.
+        code = "pipeline-provider-response-invalid"
     fake = Snapshots(kind, advances=10, corrupt=corrupt)
     with pytest.raises(fl.Blocked, match="^" + code + "$"):
         fake.store.read()
@@ -498,6 +525,46 @@ def test_provider_state_above_the_old_8_mib_limit_is_read(kind):
     fake = Snapshots(kind, corrupt="large")
     head, value = fake.store.read()
     assert len(value["records"]["closure"]["bytes"]) == 9 * 1024 * 1024
+
+
+def test_ado_state_above_the_5_mib_inline_content_cap_is_read_from_the_raw_blob():
+    # aif-172 run 2545 (2026-11-27): project001 Prepare wrote an 8.6 MB state.json; the items API returned its
+    # content cut at 5,242,880 bytes with 206 Partial Content and the read-back failed after a successful write.
+    fake = Snapshots("ado", corrupt="large")
+    head, value = fake.store.read()
+    assert head == f"{1:040x}" and len(value["records"]["closure"]["bytes"]) == 9 * 1024 * 1024
+    assert not any("includeContent" in endpoint for _, endpoint, _ in fake.calls)
+    assert any("/blobs/" in endpoint for _, endpoint, _ in fake.calls)
+
+
+def test_ado_state_blob_must_be_a_blob_of_the_read_commit():
+    fake = Snapshots("ado", advances=10, corrupt="tree")
+    with pytest.raises(fl.Blocked, match="^single-writer-state-tree-invalid$"):
+        fake.store.read()
+    assert fake.private_reads == 1
+
+
+def test_ado_state_blob_above_the_state_limit_is_refused(monkeypatch):
+    fake = Snapshots("ado")
+    monkeypatch.setattr(ps, "MAX_BYTES", 64)
+    with pytest.raises(fl.Blocked, match="^single-writer-state-too-large$"):
+        fake.store.read()
+
+
+def test_enrollment_ado_state_read_uses_the_state_response_cap():
+    # The enrollment transport capped every response at 8 MiB; state.json is 8.6 MB after project001 Prepare.
+    fe = load("factory_enrollment")
+    state = {"schema": 1, "records": {"closure": "x" * (9 * 1024 * 1024)}}
+    body = json.dumps(state).encode()
+
+    class Response(io.BytesIO):
+        status, headers = 200, {}
+
+    cloud = fe.Cloud({"coordination_mode": "single-writer", "ado_tenant_id": "t"},
+                     opener=SimpleNamespace(open=lambda request, timeout: Response(body)))
+    cloud.token = lambda audience, tenant=None: "token"
+    url = "https://dev.azure.com/org/project/_apis/git/repositories/repo/blobs/" + "a" * 40 + "?%24format=octetStream"
+    assert cloud.state_request("ado", "GET", url, None, (200,))[2] == state
 
 
 def test_state_transport_caps_fit_the_base64_of_the_largest_state():
