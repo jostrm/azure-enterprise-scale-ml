@@ -24,6 +24,11 @@ ALIASES = {
     "projectServicePrincipleAppID_SeedingKeyvaultName": "project_service_principal_AppID_seeding_kv_name",
     "projectServicePrincipleSecret_SeedingKeyvaultName": "project_service_principal_Secret_seeding_kv_name",
 }
+# Bring-your-own common subnet names apply only with BYO_subnets=true, as in the GitHub workflows; a managed network
+# passes them empty so the templates use common_subnet_name. aif-178 run 2588 (2026-11-28): project001 passed
+# variables.json's BYO default snet-dev-esml-cmn-001 for the common ACR endpoint that COMMON had created in the
+# managed snet-esml-cmn-001, and ARM refused CannotChangeSubnetOnExistingPrivateEndpoint.
+BYO_SUBNET_PARAMETERS = ("subnetCommon", "subnetCommonScoring", "subnetCommonPowerbiGw")
 
 
 def expand(value, variables, stack=()):
@@ -113,6 +118,7 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
         if variables.get(env + "_" + name):
             aliases[parameter] = env + "_" + name
     normalize = lambda name: re.sub(r"[^a-z0-9]", "", name.lower().removeprefix("admin_"))
+    byo = str(variables.get("BYO_subnets", "false")).lower() == "true"
     result, deferred = {}, []
     for name, raw in schema.items():
         spec = definition(raw, definitions)
@@ -122,6 +128,8 @@ def parameters(template, variables, target, *, project=None, prepared_at=None):
             value = variables.get(name, spec.get("defaultValue", {}))
         elif name in required:
             value = required[name]
+        elif name in BYO_SUBNET_PARAMETERS and not byo:
+            value = ""
         elif aliases.get(name, name) in variables:
             value = variables[aliases.get(name, name)]
         elif kind.startswith("secure") and (reference := from_secret_id(name, variables, target["environment"])):

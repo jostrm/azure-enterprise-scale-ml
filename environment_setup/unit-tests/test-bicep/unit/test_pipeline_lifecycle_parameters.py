@@ -74,3 +74,33 @@ def test_every_admin_password_template_parameter_is_secure():
             before = text[:match.start()].rstrip().splitlines()[-3:]
             found.append((path.name, any(line.strip().startswith("@secure()") for line in before)))
     assert found and all(secure for _, secure in found), found
+
+
+BYO_SUBNET_SCHEMA = {"subnetCommon": {"type": "string", "defaultValue": ""},
+                     "subnetCommonScoring": {"type": "string", "defaultValue": ""},
+                     "subnetCommonPowerbiGw": {"type": "string", "defaultValue": ""},
+                     "common_subnet_name": {"type": "string"}}
+BYO_SUBNET_VARIABLES = {"subnetCommon": "snet-dev-esml-cmn-001",
+                        "subnetCommonScoring": "snet-<network_env>esml-cmn-001-scoring",
+                        "subnetCommonPowerbiGw": "snet-esml-cmn-pbi-001", "common_subnet_name": "snet-esml-cmn-001"}
+
+
+@pytest.mark.parametrize("flag", [None, "false", False])
+def test_managed_network_plans_ignore_the_byo_subnet_names(flag):
+    # aif-178 run 2588 (2026-11-28): COMMON put the ACR private endpoint in its managed subnet snet-esml-cmn-001,
+    # then project001 passed variables.json's BYO default subnetCommon=snet-dev-esml-cmn-001 and ARM refused
+    # CannotChangeSubnetOnExistingPrivateEndpoint. As in the GitHub workflows, the BYO names apply only with
+    # BYO_subnets=true; otherwise the templates fall back to common_subnet_name.
+    from pipeline_lifecycle_parameters import parameters
+    variables = dict(BYO_SUBNET_VARIABLES, **({} if flag is None else {"BYO_subnets": flag}))
+    result = parameters({"parameters": BYO_SUBNET_SCHEMA}, variables, target(), project="001")
+    assert (result["subnetCommon"], result["subnetCommonScoring"], result["subnetCommonPowerbiGw"]) == ("", "", "")
+    assert result["common_subnet_name"] == "snet-esml-cmn-001"
+
+
+def test_byo_network_plans_keep_the_byo_subnet_names():
+    from pipeline_lifecycle_parameters import parameters
+    variables = dict(BYO_SUBNET_VARIABLES, BYO_subnets="true")
+    result = parameters({"parameters": BYO_SUBNET_SCHEMA}, variables, target(), project="001")
+    assert result["subnetCommon"] == "snet-dev-esml-cmn-001"
+    assert result["subnetCommonPowerbiGw"] == "snet-esml-cmn-pbi-001"
