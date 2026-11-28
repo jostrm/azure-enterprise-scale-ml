@@ -1331,8 +1331,9 @@ class ActualWhatIfCloud(FoundryCloud):
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         if method == "POST" and "/whatIf?" in url:
             selected = data["step_ids"]
-            identifiers = [identifier for ids, values in self.expanded.items() if set(ids) <= set(selected)
-                           for identifier in values]
+            # ARM lists a resource once however many of the selected steps declare it.
+            identifiers = list(dict.fromkeys(identifier for ids, values in self.expanded.items()
+                                             if set(ids) <= set(selected) for identifier in values))
             changes = []
             for identifier in identifiers:
                 before, after = self.bodies.get(identifier), self.planned[identifier]
@@ -1426,6 +1427,57 @@ def test_foundry_phase_reads_listed_tables_from_their_workspace_list(monkeypatch
     fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
     assert len(cloud.executed) == 3 and lists
     assert all(table in phase["resources"] for phase in receipt["foundry_phase_observations"])
+
+
+def what_if_representation(monkeypatch):
+    """ARM what-if answers in its own resource representation: before and after carry apiVersion and leave out
+    etag and systemData, so neither ever fingerprints like the same resource's GET body."""
+    served = ActualWhatIfCloud.request
+
+    def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
+        status, answer_headers, body = served(self, method, url, audience, data, headers, allowed)
+        if method == "POST" and "/whatIf?" in url:
+            for change in body["properties"]["changes"]:
+                for side in ("before", "after"):
+                    if isinstance(change.get(side), dict):
+                        change[side] = {**{key: value for key, value in change[side].items()
+                                           if key not in ("etag", "systemData")}, "apiVersion": "2024-06-01"}
+        return status, answer_headers, body
+
+    monkeypatch.setattr(ActualWhatIfCloud, "request", request)
+
+
+def test_foundry_phases_compare_what_if_rows_with_what_if_rows(monkeypatch):
+    # aif-176 run 2574 (2026-11-28): Prepare froze phase 1's rows from ARM's what-if, whose before body is not a GET
+    # body. The worker compared each declared row's what-if before hash with its GET observation, so the 14 private
+    # DNS zones and links, the registry, its endpoint and the project group project001 redeploys unchanged or
+    # modified all looked changed (native-foundry-initial-instance-changed) though COMMON's own receipt proved the
+    # same GET hashes. Re-running each reviewed preview proves the what-if side; observations prove the GET side.
+    what_if_representation(monkeypatch)
+    document, cloud, before, after = observation_case(monkeypatch)
+    zone = fl.arm_scope(RESOURCE.lower()) + "/providers/microsoft.network/privatednszones/privatelink.redis.azure.net"
+    cloud.bodies[zone] = {"id": zone, "type": "Microsoft.Network/privateDnsZones", "location": "global",
+                          "etag": "fd9e7417-84f5-4959-8a43-7555c4339037", "properties": {"provisioningState": "Succeeded"}}
+    cloud.planned[zone] = copy.deepcopy(cloud.bodies[zone])
+    phases = document["deployment"]["foundry_lifecycle"]["phases"]
+    cloud.expanded[tuple(phases[0]["step_ids"])].append(zone)
+    # A resource several phases declare (in project001 the project group) is a row of each phase's own preview.
+    cloud.expanded.setdefault(tuple(phases[1]["step_ids"]), []).extend([zone, RESOURCE.lower()])
+    document["deployment"]["changes"] = fl.evaluate_what_if(
+        cloud, document, {"id": "factory", "scope": "subscription"}, fl.combined_plan_payload(cloud, document, ROOT))
+    fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    seal(document)
+    rows = {row["resource_id"]: row for row in document["deployment"]["foundry_lifecycle"]["phases"][0]["changes"]}
+    assert rows[zone]["change_type"] == "NoChange" and rows[RESOURCE.lower()]["change_type"] == "Modify"
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": fl.foundry_inventory_observations(
+                   document, closure, bodies)}
+    assert receipt["foundry_initial_observations"][zone]["body_hash"] != rows[zone]["before_hash"]
+    fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    assert len(cloud.executed) == 3
+    assert cloud.bodies[RESOURCE.lower()] == after
+    fl.verify_foundry_phase_receipts(document, receipt)
 
 
 def test_real_multiphase_what_if_accepts_only_reviewed_owned_postphase_observations(monkeypatch):

@@ -6024,9 +6024,10 @@ def verify_foundry_observation_history(document, receipt):
     previous, preceding = receipt.get("foundry_initial_observations"), {}
     verify_foundry_observation_rows(document, previous)
     before = {row["resource_id"]: row for row in phases[0]["changes"]}
+    # An observation is a GET body and a reviewed row's before hash ARM's what-if representation of it (apiVersion,
+    # no etag), so the two never compare (aif-176 run 2574, 2026-11-28: 17 declared rows of project001's first phase).
+    # Re-running each reviewed preview before any write proves the what-if side; observations prove the GET side.
     require(all((key not in before or before[key]["change_type"] != "Create")
-                and (key not in before or before[key].get("before_hash") is None
-                     or value["body_hash"] == before[key]["before_hash"])
                 and (key not in initial or value["body_hash"] == initial[key]["body_hash"])
                 for key, value in previous.items()), "native-foundry-initial-instance-changed")
     for index, record in enumerate(retained):
@@ -6150,18 +6151,19 @@ def verify_foundry_phase_changes(current, expected, preceding, observations=None
     for identifier, row in observed.items():
         before = preceding.get(identifier)
         target = wanted[identifier]
+        # A what-if row fingerprints ARM's what-if representation (apiVersion, no etag), an observation a GET body, so
+        # the two never compare (aif-176 run 2574, 2026-11-28). An observed resource's what-if row is held to the
+        # reviewed rows; observe_foundry_phase holds its GET body to the observations.
+        known = identifier in observations
         if before is None:
             require(row == target, "foundry-phase-what-if-changed")
-        elif row["change_type"] == "NoChange" and identifier in observations:
-            observed_hash = observations[identifier]["body_hash"]
-            require(target.get("after_hash") == before.get("after_hash")
-                    and row.get("before_hash") in (None, observed_hash)
-                    and row.get("after_hash") in (None, observed_hash), "foundry-phase-what-if-changed")
+        elif row["change_type"] == "NoChange" and known:
+            require(target.get("after_hash") == before.get("after_hash"), "foundry-phase-what-if-changed")
         else:
             require(row["change_type"] in ("Modify", "NoChange")
                     and (row["change_type"] != "Modify" or target["change_type"] != "NoChange")
-                    and hash_value(observations.get(identifier, {}).get("body_hash", before.get("after_hash")))
-                    and row.get("before_hash") == observations.get(identifier, {}).get("body_hash", before["after_hash"])
+                    and hash_value(observations[identifier]["body_hash"] if known else before.get("after_hash"))
+                    and (known or row.get("before_hash") == before["after_hash"])
                     and row.get("after_hash") == target.get("after_hash"),
                     "foundry-phase-what-if-changed")
     required = {identifier for identifier, row in wanted.items()
