@@ -1429,6 +1429,80 @@ def test_foundry_phase_reads_listed_tables_from_their_workspace_list(monkeypatch
     assert all(table in phase["resources"] for phase in receipt["foundry_phase_observations"])
 
 
+def appearing_table_case(monkeypatch):
+    """observation_case with one listed workspace table; returns a switch that lets Azure create AzureDiagnostics
+    and the table body that changes AACAudit as the workspace's list and its GET then answer."""
+    document, cloud, before, after = observation_case(monkeypatch)
+    workspace = fl.arm_scope(RESOURCE.lower()) + "/providers/microsoft.operationalinsights/workspaces/la-cmn"
+    table = {"id": workspace + "/tables/AACAudit", "name": "AACAudit",
+             "properties": {"retentionInDays": 30, "plan": "Analytics", "provisioningState": "Succeeded",
+                            "schema": {"name": "AACAudit", "columns": [{"name": "TimeGenerated"}]}}}
+    created = {"id": workspace + "/tables/AzureDiagnostics", "name": "AzureDiagnostics",
+               "properties": {"retentionInDays": 30, "plan": "Analytics", "provisioningState": "Succeeded",
+                              "schema": {"name": "AzureDiagnostics", "columns": [{"name": "identity_claim_oid_g"}]}}}
+    cloud.bodies[workspace] = {"id": workspace, "name": "la-cmn", "type": "Microsoft.OperationalInsights/workspaces",
+                               "location": "swedencentral", "properties": {"retentionInDays": 30}}
+    cloud.bodies[table["id"].lower()] = table
+    state = {"created": False}
+
+    def collection(path, api_version, extension=False):
+        assert path.lower() == workspace + "/tables"
+        return [copy.deepcopy(table)] + ([copy.deepcopy(created)] if state["created"] else []), None
+
+    def create():
+        state["created"] = True
+        cloud.bodies[created["id"].lower()] = copy.deepcopy(created)
+
+    cloud.collection = collection
+    fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    seal(document)
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": fl.foundry_inventory_observations(
+                   document, closure, bodies)}
+    return document, cloud, receipt, created["id"].lower(), create, table
+
+
+def test_foundry_phases_accept_a_table_azure_creates_mid_run(monkeypatch):
+    # aif-177 run 2581 (2026-11-28): Key Vault audit logs reached the common workspace while project001's worker ran,
+    # so Log Analytics created AzureDiagnostics after the initial observations. 957 of 958 observed resources were
+    # unchanged, yet the live inventory check before the first phase's write refused the new table
+    # (native-foundry-phase-instance-changed). Rule T (approved 2026-11-24): Azure creates workspace tables, so a
+    # new table of an observed workspace is accepted and observed from then on; every observed body still counts.
+    document, cloud, receipt, created, create, _ = appearing_table_case(monkeypatch)
+    create()
+    fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    assert len(cloud.executed) == 3
+    assert created not in receipt["foundry_initial_observations"]
+    assert all(created in phase["resources"] for phase in receipt["foundry_phase_observations"])
+    fl.verify_foundry_observation_history(document, receipt)
+    last = receipt["foundry_phase_observations"][-1]
+    fl.verify_foundry_live_inventory(cloud, Mock(spec=["assert_held"]), document, last["resources"],
+                                     closure_hash=last["closure_hash"])
+
+
+def test_foundry_final_inventory_accepts_a_table_azure_creates_after_the_last_phase(monkeypatch):
+    document, cloud, receipt, created, create, _ = appearing_table_case(monkeypatch)
+    fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    last = receipt["foundry_phase_observations"][-1]
+    assert created not in last["resources"]
+    create()
+    fl.verify_foundry_live_inventory(cloud, Mock(spec=["assert_held"]), document, last["resources"],
+                                     closure_hash=last["closure_hash"])
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    assert fl.foundry_observations_match(fl.foundry_inventory_observations(document, closure, bodies), last["resources"])
+    assert fl.foundry_closure_hash(closure) == last["closure_hash"]
+
+
+def test_foundry_phases_still_refuse_a_changed_table(monkeypatch):
+    document, cloud, receipt, created, create, table = appearing_table_case(monkeypatch)
+    create()
+    table["properties"]["retentionInDays"] = 90
+    with pytest.raises(fl.Blocked, match="native-foundry-phase-instance-changed"):
+        fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    assert not cloud.executed
+
+
 def what_if_representation(monkeypatch):
     """ARM what-if answers in its own resource representation: before and after carry apiVersion and leave out
     etag and systemData, so neither ever fingerprints like the same resource's GET body."""

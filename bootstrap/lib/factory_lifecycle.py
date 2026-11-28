@@ -6035,7 +6035,8 @@ def verify_foundry_observation_history(document, receipt):
         readiness = foundry_readiness_observations(document, receipt) if index else {}
         required = {row["resource_id"] for row in phase["changes"]} | set(previous) | set(readiness)
         require(record.get("id") == phase["id"] and isinstance(record.get("resources"), dict)
-                and set(record["resources"]) == required and hash_value(record.get("closure_hash"))
+                and set(record["resources"]) == required | azure_created_tables(record["resources"], required)
+                and hash_value(record.get("closure_hash"))
                 and isinstance(record.get("executed_changes"), list),
                 "native-foundry-phase-observations-incomplete")
         verify_foundry_observation_rows(document, record["resources"])
@@ -6092,6 +6093,38 @@ def foundry_inventory_observations(document, closure, bodies=None):
                 "native-foundry-inventory-body-mismatch")
     return observed
 
+# Rule T in the Foundry observations (aif-177 run 2581, 2026-11-28): Key Vault audit logs reached the common workspace
+# while project001's worker ran, and Log Analytics created AzureDiagnostics after the initial observations. Azure
+# creates a workspace's tables, so a new table of an observed workspace is accepted and observed from then on. A
+# recorded resource still has to be there with its recorded body, and a closure hash leaves the tables out (each
+# table's body is compared through the observations).
+WORKSPACE_TABLE_PATH = re.compile(r".+/providers/microsoft\.operationalinsights/workspaces/[^/]+/tables(?:/.*)?")
+
+
+def azure_created_tables(current, recorded):
+    """The keys of current that recorded lacks and that are Log Analytics tables of a workspace recorded observes."""
+    return {key for key in set(current) - set(recorded)
+            if resource_type_from_id(key) == AZURE_CREATED_TABLE_TYPE and key.rsplit("/tables/", 1)[0] in recorded}
+
+
+def foundry_observations_match(current, recorded):
+    """current holds every recorded observation unchanged and nothing else but tables Azure created (Rule T)."""
+    return (set(recorded) <= set(current)
+            and set(current) - set(recorded) == azure_created_tables(current, recorded)
+            and all(current[key]["body_hash"] == row["body_hash"] for key, row in recorded.items()))
+
+
+def foundry_closure_hash(closure):
+    """digest(closure) without the Log Analytics tables (Rule T): their rows, references and lists."""
+    return digest({**closure,
+                   "resources": {key: row for key, row in closure["resources"].items()
+                                 if resource_type_from_id(key) != AZURE_CREATED_TABLE_TYPE},
+                   "references": {key: row for key, row in closure.get("references", {}).items()
+                                  if not WORKSPACE_TABLE_PATH.fullmatch(key)},
+                   "collections": {key: row for key, row in closure["collections"].items()
+                                   if not WORKSPACE_TABLE_PATH.fullmatch(key)}})
+
+
 def verify_foundry_live_inventory(cloud, locks, document, observations, *, closure_hash=None):
     locks.assert_held()
     scopes = []
@@ -6106,9 +6139,8 @@ def verify_foundry_live_inventory(cloud, locks, document, observations, *, closu
     closure, bodies = collect_resource_closure(cloud, scopes,
                                                bootstrap_resource_versions(document))
     current = foundry_inventory_observations(document, closure, bodies)
-    require(set(current) == set(observations)
-            and all(current[key]["body_hash"] == row["body_hash"] for key, row in observations.items())
-            and (closure_hash is None or digest(closure) == closure_hash),
+    require(foundry_observations_match(current, observations)
+            and (closure_hash is None or foundry_closure_hash(closure) == closure_hash),
             "native-foundry-phase-instance-changed")
     if set(closure["groups"]) == {scope.lower() for scope in document["locks"]["scopes"]}:
         verify_bootstrap_final_closure(document, closure, bodies)
@@ -6120,7 +6152,8 @@ def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
     closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
                                                bootstrap_resource_versions(document))
     snapshot = foundry_inventory_observations(document, closure, bodies)
-    require(identifiers == set(snapshot), "native-foundry-phase-observation-incomplete")
+    created = azure_created_tables(snapshot, identifiers)
+    require(identifiers | created == set(snapshot), "native-foundry-phase-observation-incomplete")
     verify_bootstrap_final_closure(document, closure, bodies)
     written = {row["resource_id"] for row in execution if row["change_type"] in ("Create", "Modify")}
     initial = document["deployment"].get("bootstrap_foundation", {}).get("resources", {})
@@ -6128,10 +6161,11 @@ def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
                  for row in execution if row["change_type"] == "NoChange"}
     expected = {**unchanged, **initial, **readiness, **previous}
     observed = {}
-    for identifier in sorted(identifiers):
+    for identifier in sorted(identifiers | created):
         current_hash = observed_digest(identifier, bodies[identifier])
         # Cumulative preview membership never permits rebasing a resource this phase did not write.
-        require(identifier in written or current_hash == expected.get(identifier, {}).get("body_hash"),
+        require(identifier in written or identifier in created
+                or current_hash == expected.get(identifier, {}).get("body_hash"),
                 "native-foundry-phase-instance-changed")
         require(identifier not in readiness or current_hash == readiness[identifier]["body_hash"],
                 "native-foundry-readiness-instance-changed")
@@ -6140,7 +6174,7 @@ def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
             "api_version": RG_API if identifier in closure["groups"] else closure["resources"][identifier]["api_version"],
         }
     return {"id": phase["id"], "resources": observed, "executed_changes": copy.deepcopy(execution),
-            "closure_hash": digest(closure)}
+            "closure_hash": foundry_closure_hash(closure)}
 
 
 def verify_foundry_phase_changes(current, expected, preceding, observations=None):
@@ -6609,8 +6643,8 @@ def verify_foundry_receipt(document, receipt):
     closure = receipt.get("foundry_final_closure")
     observed = foundry_inventory_observations(document, closure)
     last = receipt["foundry_phase_observations"][-1]
-    require(digest(closure) == last["closure_hash"] == receipt.get("inventory_closure_hash")
-            and observed == last["resources"], "native-foundry-final-instance-evidence-changed")
+    require(foundry_closure_hash(closure) == last["closure_hash"] and digest(closure) == receipt.get("inventory_closure_hash")
+            and foundry_observations_match(observed, last["resources"]), "native-foundry-final-instance-evidence-changed")
     verify_bootstrap_final_closure(document, closure)
     foundation = document["deployment"].get("bootstrap_foundation", {})
     preserved = {key for key, row in foundation.get("resources", {}).items() if row.get("disposition") == "preserve"}
@@ -7505,8 +7539,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         verify_bootstrap_final_closure(document, closure, bodies)
         if "foundry_lifecycle" in document["deployment"]:
             last = receipt["foundry_phase_observations"][-1]
-            require(foundry_inventory_observations(document, closure, bodies) == last["resources"]
-                    and digest(closure) == last["closure_hash"], "native-foundry-final-instance-changed")
+            require(foundry_observations_match(foundry_inventory_observations(document, closure, bodies), last["resources"])
+                    and foundry_closure_hash(closure) == last["closure_hash"], "native-foundry-final-instance-changed")
             receipt["foundry_final_closure"] = copy.deepcopy(closure)
             account_id = document["deployment"]["foundry_lifecycle"]["account_resource_id"]
             require(str(bodies.get(account_id, {}).get("identity", {}).get("principalId", "")).lower()
