@@ -1865,6 +1865,13 @@ class ClosureReads:
             self.pool.shutdown(wait=True, cancel_futures=True)
 
 
+# AI Search's ARM type is Microsoft.Search/searchServices (az provider show -n Microsoft.Search lists searchServices):
+# aif-181 run 2607 (2026-11-28) stopped after all ten project001 deployments because the walk refused it. The older
+# spelling "services" stays accepted so closures recorded with it still compare.
+SEARCH_SERVICE_TYPES = frozenset({"microsoft.search/searchservices", "microsoft.search/services"})
+SEARCH_LINK_TYPES = frozenset(kind + "/sharedprivatelinkresources" for kind in SEARCH_SERVICE_TYPES)
+
+
 def collect_resource_closure(cloud, scopes, resource_versions=None):
     """Complete registered child-resource closure, including scoped extensions.
 
@@ -2015,7 +2022,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
         """The walk's child-inventory steps for one resource, planned lazily in serial order."""
         namespace, relative = kind.split("/", 1)
         key = resource_id.lower()
-        if kind == "microsoft.search/services":
+        if kind in SEARCH_SERVICE_TYPES:
             # This documented ARM child must be inventoried even when omitted
             # from provider discovery; a failed list never means an empty list.
             yield "collection", resource_id + "/sharedPrivateLinkResources", "2025-05-01", None, None
@@ -2024,7 +2031,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             if not child.startswith(relative + "/") or "/" in tail:
                 continue
             full_type = namespace + "/" + child
-            if full_type == "microsoft.search/services/sharedprivatelinkresources":
+            if full_type in SEARCH_LINK_TYPES:
                 continue
             if full_type in inline:
                 yield "inline", key + "/" + tail, None, None, None
@@ -2082,7 +2089,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             if kind in LISTED_ONLY_CHILDREN:
                 return
             reader.prefetch(resource_read(resource_id, versions[resource_id.lower()]))
-            if kind not in terminal_extensions and kind != "microsoft.search/searchservices":
+            if kind not in terminal_extensions:
                 read_children_ahead(resource_id, kind)
                 read_extensions_ahead(resource_id)
 
@@ -2109,7 +2116,7 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             # aif-135: ACR registries/privateEndpointConnectionProxies answers 404 at every api-version.
             # Documented pinned children (Search sharedPrivateLinkResources) stay strict: a failed list there
             # never means an empty list.
-            pinned = collection_resource_type(path) == "microsoft.search/services/sharedprivatelinkresources"
+            pinned = collection_resource_type(path) in SEARCH_LINK_TYPES
             try:
                 api, (rows, unsupported) = served(
                     lambda value: reader.get(collection_read(path, value, extension)), api, kind)
@@ -2260,9 +2267,6 @@ def _collect_resource_closure(reader, scopes, resource_versions):
             enqueue(reference)
         if kind in terminal_extensions:
             continue
-        if kind == "microsoft.search/searchservices":
-            # Search's ARM resource type is services, never searchServices.
-            raise Blocked("invalid-search-service-arm-resource-type")
         for step, path, value, single, child_kind in child_steps(resource_id, kind):
             read_children_ahead(resource_id, kind)
             if step == "inline":
@@ -3438,8 +3442,7 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
     # Only independently proven entries in the immutable manifest are eligible.
     # Leave private endpoint connections to the reviewed RG cascade: deleting
     # them individually changes embedded parent bodies before the next guard.
-    links = [item for item in resources if resource_type_from_id(item["id"]) ==
-             "microsoft.search/services/sharedprivatelinkresources"]
+    links = [item for item in resources if resource_type_from_id(item["id"]) in SEARCH_LINK_TYPES]
     for item in deletion_order(links):
         locks.authorize(document)
         locks.assert_held()

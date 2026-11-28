@@ -370,3 +370,20 @@ def test_a_dangling_reference_to_an_inline_child_of_a_deleted_parent_is_recorded
     closure, _ = collect(cloud)
     assert gone.lower() not in closure["resources"]
     assert closure["inline"][(gone + "/accessPolicies/policy-0").lower()] == {"parent_id": gone.lower()}
+
+
+def test_a_real_search_service_is_walked_with_its_shared_private_links(monkeypatch):
+    # aif-181 run 2607 (2026-11-28): Azure names AI Search Microsoft.Search/searchServices (az provider show lists
+    # searchServices, never services). The closure stopped with invalid-search-service-arm-resource-type after all
+    # ten project001 deployments had succeeded.
+    monkeypatch.setitem(SCHEMAS, "microsoft.search", {
+        "services": "2025-05-01", "searchServices": "2025-05-01", "searchServices/sharedPrivateLinkResources": "2025-05-01"})
+    cloud = InventoryCloud(groups=1, sets=1)
+    search = cloud.groups[0] + "/providers/Microsoft.Search/searchServices/search-real"
+    link = search + "/sharedPrivateLinkResources/link-0"
+    cloud.add(search)
+    cloud.add(link)
+    closure, bodies = collect(cloud)
+    assert search.lower() in closure["resources"] and link.lower() in closure["resources"]
+    assert closure["resources"][search.lower()]["type"] == "microsoft.search/searchservices"
+    assert (search + "/sharedPrivateLinkResources").lower() in {key.lower() for key in closure["collections"]}
