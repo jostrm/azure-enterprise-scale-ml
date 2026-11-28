@@ -4394,6 +4394,17 @@ def read_ignored_instances(cloud, versions):
     return bodies, served
 
 
+def read_observed_bodies(cloud, observations):
+    """{resource id: current body, or None when absent or renamed} for {resource id: {"api_version": ...}}.
+
+    Observations key a resource by its lowercase id, and ARM finds a Log Analytics table by its exact name only
+    (aif-175 run 2567, 2026-11-28: GET .../tables/aacaudit answered 404 while AACAudit existed, so 699 of 700 tables
+    looked deleted). Listed-only children are read from one list of their parent, as the inventory closure reads them.
+    """
+    bodies, _ = read_ignored_instances(cloud, {key: [row["api_version"]] for key, row in observations.items()})
+    return bodies
+
+
 def freeze_ignored_instances(cloud, document, raw_changes, proven):
     """Prepare: an exact-instance proof for each what-if Ignore row inside the plan's own step resource groups.
 
@@ -5997,10 +6008,11 @@ def verify_foundry_observation_context(cloud, document, receipt, observations):
             and (retained[-1]["resources"] if retained else receipt.get("foundry_initial_observations")) == observations,
             "native-foundry-phase-observation-context-required")
     verify_foundry_observation_history(document, receipt)
+    bodies = read_observed_bodies(cloud, observations)
     for identifier, proof in observations.items():
-        status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
-        require(status == 200 and str(body.get("id", "")).lower() == identifier
-                and observed_digest(identifier, body) == proof["body_hash"], "native-foundry-phase-instance-changed")
+        body = bodies[identifier]
+        require(body is not None and observed_digest(identifier, body) == proof["body_hash"],
+                "native-foundry-phase-instance-changed")
 
 
 def verify_foundry_observation_history(document, receipt):
@@ -6479,9 +6491,9 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         phase_steps = [step for step in document["deployment"]["steps"] if step["id"] in phase["step_ids"]]
         payload = (None if per_step_transport(document)
                    else combined_plan_payload(cloud, document, source_root, phase["step_ids"]))
+        bodies = read_observed_bodies(cloud, observations)
         for identifier, proof in observations.items():
-            status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
-            require(status == 200 and observed_digest(identifier, body) == proof["body_hash"],
+            require(bodies[identifier] is not None and observed_digest(identifier, bodies[identifier]) == proof["body_hash"],
                     "native-foundry-phase-instance-changed")
         source_changes = {}
         what_if = {"unchanged_resources": observations, "source_changes": source_changes, "phase_receipt": receipt}

@@ -955,6 +955,12 @@ BICEP_GUID_NAMESPACE = uuid.UUID("11fb06fb-712d-4ddd-98c7-e71bbd588830")
 class FoundryCloud(PlanCloud):
     arm = fl.Cloud.arm
 
+    def collection(self, path, api_version, extension=False):
+        """A parent's list as ARM returns it: every child body directly below the path."""
+        prefix = path.lower() + "/"
+        return [copy.deepcopy(body) for key, body in self.bodies.items()
+                if key.startswith(prefix) and "/" not in key[len(prefix):]], None
+
     def __init__(self, document, templates, failure=None):
         super().__init__(document, templates)
         self.failure = failure
@@ -1382,6 +1388,43 @@ def test_foundry_inventory_accepts_listed_log_analytics_tables_without_a_type(mo
     cloud.bodies[table]["properties"]["schema"]["columns"].append({"name": "Platform-added"})
     fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
     assert len(cloud.executed) == 3
+    assert all(table in phase["resources"] for phase in receipt["foundry_phase_observations"])
+
+
+def test_foundry_phase_reads_listed_tables_from_their_workspace_list(monkeypatch):
+    # aif-175 run 2567 (2026-11-28): observations key a resource by its lowercase id, and ARM finds a Log Analytics
+    # table by its exact name only (GET .../tables/aacaudit answers 404 ResourceNotFound, AACAudit exists). The phase
+    # re-read sent one GET per lowercase id, so 699 of the common group's 700 tables looked deleted:
+    # native-foundry-phase-instance-changed before any write. A listed table is read from its workspace's list.
+    document, cloud, before, after = observation_case(monkeypatch)
+    workspace = fl.arm_scope(RESOURCE.lower()) + "/providers/microsoft.operationalinsights/workspaces/la-cmn"
+    table = workspace + "/tables/aacaudit"
+    cloud.bodies[table] = {"id": workspace + "/tables/AACAudit", "name": "AACAudit",
+                           "properties": {"retentionInDays": 30, "plan": "Analytics", "provisioningState": "Succeeded",
+                                          "schema": {"name": "AACAudit", "columns": [{"name": "TimeGenerated"}]}}}
+    served, lists = cloud.request, []
+
+    def case_sensitive(method, url, audience, data=None, headers=None, allowed=(200,)):
+        path = unquote(urlsplit(url).path)
+        if method == "GET" and path.lower() == table and path != cloud.bodies[table]["id"]:
+            return 404, {}, {"error": {"code": "ResourceNotFound",
+                                       "message": "The specified table: 'aacaudit' does not exist."}}
+        return served(method, url, audience, data, headers, allowed)
+
+    def collection(path, api_version, extension=False):
+        assert path.lower() == workspace + "/tables"
+        lists.append(api_version)
+        return [copy.deepcopy(cloud.bodies[table])], None
+
+    cloud.request, cloud.collection = case_sensitive, collection
+    fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    seal(document)
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": fl.foundry_inventory_observations(
+                   document, closure, bodies)}
+    fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
+    assert len(cloud.executed) == 3 and lists
     assert all(table in phase["resources"] for phase in receipt["foundry_phase_observations"])
 
 
