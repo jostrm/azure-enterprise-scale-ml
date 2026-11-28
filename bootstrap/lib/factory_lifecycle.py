@@ -7836,7 +7836,11 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
     content = item.get("content", "")
     expected = cloud.command(["git", "show", document["source"]["commit"] + ":" + scoped_template(document)],
                              cwd=str(source_root))
-    require(content.strip() == expected and SCOPED_CONTRACT in content, "scoped-ado-template-mismatch")
+    # Line endings are not content: aif-180 run 2599 (2026-11-28) refused a consumer copy committed with CRLF, the
+    # template's own line endings, because git show (text mode) answers LF.
+    content = content.replace("\r\n", "\n").strip()
+    require(content == expected.replace("\r\n", "\n").strip() and SCOPED_CONTRACT in content,
+            "scoped-ado-template-mismatch")
     _, headers, definitions = cloud.request("GET", api + "/build/definitions?includeAllProperties=true&%24top=1000&api-version=7.1",
                                             audience)
     require(not any(key.lower() == "x-ms-continuationtoken" and value for key, value in headers.items())

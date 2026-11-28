@@ -1934,8 +1934,11 @@ def test_new_ado_scoped_template_uses_namespaced_connection_exact_commit_and_wor
     assert receipt["worker_receipt"]["status"] == "succeeded"
 
 
+@pytest.mark.parametrize("consumer_newline", ["\n", "\r\n"])
 @pytest.mark.parametrize("template_name", ["factory-lifecycle-ado.yml"])
-def test_ado_scoped_self_hosted_dispatch_omits_empty_template_parameters(template_name):
+def test_ado_scoped_self_hosted_dispatch_omits_empty_template_parameters(template_name, consumer_newline):
+    # aif-180 run 2599 (2026-11-28): the consumer's copy was committed with CRLF, the template's own line endings, and
+    # git show answers LF; line endings are not template content, so either copy is the trusted template.
     # ADO answers 400 "The 'vmImage' parameter is not a valid String." for "" (aif-163 run 2493);
     # omitted parameters take the template's '' default instead.
     document, _ = scoped_manifest()
@@ -1961,7 +1964,7 @@ def test_ado_scoped_self_hosted_dispatch_omits_empty_template_parameters(templat
                                  "authorization": {"scheme": "WorkloadIdentityFederation", "parameters": {"tenantid": TENANT}},
                                  "data": {"subscriptionId": SUB}}]}
         elif "/items?" in url:
-            result = {"content": template}
+            result = {"content": template.replace("\n", consumer_newline) + consumer_newline}
         elif "/build/definitions?" in url:
             result = {"value": [{"id": 7, "repository": {"name": "consumer"}, "process": {"yamlFilename": fl.SCOPED_ADO}}]}
         elif method == "POST":
