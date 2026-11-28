@@ -118,6 +118,11 @@ $account = [string]$contract.storageAccount
 if ([string]::IsNullOrWhiteSpace($account)) {
     $candidates = @(Invoke-AzJson @('storage', 'account', 'list', '--subscription', $subscription, '--resource-group', $storageRg) |
         Where-Object { $_.isHnsEnabled -eq $true })
+    # Several lakes in one common RG: take the one the Bicep derived from commonLakeNamePrefixMax8chars.
+    $expected = [string](Get-IdentityProperty $contract @('expectedStorageAccount'))
+    if ($candidates.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($expected)) {
+        $candidates = @($candidates | Where-Object { $_.name -eq $expected })
+    }
     if ($candidates.Count -ne 1) {
         throw "Expected exactly one HNS-enabled common lake in '$storageRg'; found $($candidates.Count). Set datalakeName_param to the exact existing lake account."
     }

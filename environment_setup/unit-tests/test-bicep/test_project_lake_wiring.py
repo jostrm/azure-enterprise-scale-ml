@@ -342,6 +342,23 @@ def test_missing_or_ambiguous_lake_never_guesses_name(run_caller, accounts):
     assert not acl
 
 
+def test_ambiguous_lakes_resolve_to_the_lake_the_bicep_configured(run_caller):
+    accounts = [{"name": "otherlake", "isHnsEnabled": True}, {"name": "configuredlake", "isHnsEnabled": True}]
+    result, calls, acl = run_caller(contract() | {"expectedStorageAccount": "configuredlake"}, accounts=accounts)
+    assert result.returncode == 0, result.stderr
+    show = next(call for call in calls if call[:3] == ["storage", "account", "show"])
+    assert show[show.index("--name") + 1] == "configuredlake"
+    assert acl[0]["storageAccount"] == "configuredlake"
+
+
+def test_ambiguous_lakes_without_the_configured_lake_still_fail_closed(run_caller):
+    accounts = [{"name": "lakeone", "isHnsEnabled": True}, {"name": "laketwo", "isHnsEnabled": True}]
+    result, _, acl = run_caller(contract() | {"expectedStorageAccount": "missinglake"}, accounts=accounts)
+    assert result.returncode != 0
+    assert "Set datalakeName_param" in result.stderr
+    assert not acl
+
+
 def test_cli_and_acl_failures_are_not_swallowed(run_caller):
     result, _, acl = run_caller(az_exit=7)
     assert result.returncode != 0 and not acl
@@ -397,7 +414,8 @@ def test_bicep_emits_resolved_identities_without_data_plane_deployment_script():
     source = RBAC.read_text(encoding="utf-8")
     output = source.split("output projectLakeAccess object = {", 1)[1].split("\n}", 1)[0]
     for field in ("projectManagedIdentityObjectId: var_miPrj_PrincipalId",
-                  "storageAccount: datalakeName_param", "storageResourceGroup: commonResourceGroup",
+                  "storageAccount: datalakeName_param", "expectedStorageAccount: datalakeName",
+                  "storageResourceGroup: commonResourceGroup",
                   "projectResourceGroup: targetResourceGroup",
                   "readOnlyObjectIds:", "groupObjectIds:", "userObjectIds:"):
         assert field in output

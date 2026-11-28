@@ -445,6 +445,7 @@ output projectLakeAccess object = {
   storageResourceGroup: commonResourceGroup
   projectResourceGroup: targetResourceGroup
   storageAccount: datalakeName_param
+  expectedStorageAccount: datalakeName
   fileSystem: lakeContainerName
   project: 'project${projectNumber}'
   environment: env
