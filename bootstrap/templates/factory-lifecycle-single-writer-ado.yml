@@ -30,6 +30,8 @@ parameters:
 # ADO rejects a template expression in a root-level pool, so the conditional pool lives in the job.
 jobs:
   - job: ScopedLifecycleWorker
+    # A project deployment runs longer than ADO's 60-minute default (aif-179 run 2595); Execute waits 360 minutes.
+    timeoutInMinutes: 300
     pool:
       ${{ if eq(parameters.runnerKind, 'hosted') }}:
         vmImage: ${{ parameters.vmImage }}

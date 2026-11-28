@@ -197,3 +197,16 @@ def test_repository_ci_timeouts_doubled():
     assert re.findall(r"timeout_minutes: (\d+)", tests) == ["60", "100", "60", "60"]
     ado = (ROOT / "environment_setup/unit-tests/test-bicep/azure-pipelines.yml").read_text(encoding="utf-8")
     assert re.findall(r"jobTimeoutMinutes: (\d+)", ado) == ["60", "100", "60", "60"]
+
+
+@pytest.mark.parametrize("name, values", [
+    # aif-179 runs 2594/2595 (2026-11-28): project001's worker deployed for 60 minutes and Azure DevOps cancelled
+    # both the worker and the Execute job that waits for it at the default job limit. GitHub jobs get 360 minutes.
+    # Execute outlasts the worker it waits for, so a worker timeout still reaches Finalize as a terminal outcome.
+    ("pipelines-only-ado.yml", [1440, 1380, 360, 360]),
+    ("factory-lifecycle-ado.yml", [300]),
+    ("factory-lifecycle-single-writer-ado.yml", [300]),
+])
+def test_pipelines_only_ado_jobs_outlast_a_long_project_deployment(name, values):
+    text = (ROOT / "bootstrap/templates" / name).read_text(encoding="utf-8")
+    assert [int(value) for value in re.findall(r"^\s*timeoutInMinutes:\s*(\d+)", text, re.M)] == values

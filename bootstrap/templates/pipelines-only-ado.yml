@@ -168,6 +168,8 @@ stages:
     jobs:
       - deployment: ExecuteReviewedOperation
         environment: esaf-pipelines-execute
+        # Waits for the scoped worker (300 min); without a limit ADO stops a job at 60 minutes (aif-179 run 2594).
+        timeoutInMinutes: 360
         strategy:
           runOnce:
             deploy:
